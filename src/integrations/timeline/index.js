@@ -43,6 +43,7 @@ function runTimelineCommand(binPath, args, extraEnv = {}, options = {}) {
         ...extraEnv,
       },
       shell: false,
+      windowsHide: true,
     });
 
     let stdout = "";

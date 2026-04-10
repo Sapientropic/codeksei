@@ -49,6 +49,7 @@ class CodexRpcClient {
           env: { ...this.env },
           stdio: ["pipe", "pipe", "pipe"],
           shell: false,
+          windowsHide: true,
         });
         break;
       } catch (error) {
