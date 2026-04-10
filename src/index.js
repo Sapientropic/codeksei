@@ -199,7 +199,7 @@ async function main() {
         console.log(topicHelp);
         return;
       }
-      runReviewCommand(config, "weekly");
+      await runReviewCommand(config, "weekly");
       return;
     }
     if (command === "review" && subcommand === "nightly") {
@@ -207,7 +207,7 @@ async function main() {
         console.log(topicHelp);
         return;
       }
-      runReviewCommand(config, "nightly");
+      await runReviewCommand(config, "nightly");
       return;
     }
     if (command === "review" && subcommand === "monthly") {
@@ -215,7 +215,7 @@ async function main() {
         console.log(topicHelp);
         return;
       }
-      runReviewCommand(config, "monthly");
+      await runReviewCommand(config, "monthly");
       return;
     }
   }

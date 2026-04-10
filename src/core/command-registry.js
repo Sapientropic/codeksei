@@ -530,13 +530,14 @@ function buildTopicUsage(topic) {
       ].join("\n");
     case "review":
       return [
-        "npm run review:nightly -- [--date YYYY-MM-DD]",
-        "npm run review:weekly -- [--week YYYY-Www] [--date YYYY-MM-DD]",
-        "npm run review:monthly -- [--month YYYY-MM] [--date YYYY-MM-DD]",
+        "npm run review:nightly -- [--date YYYY-MM-DD] [--deterministic] [--model <id>]",
+        "npm run review:weekly -- [--week YYYY-Www] [--date YYYY-MM-DD] [--deterministic] [--model <id>]",
+        "npm run review:monthly -- [--month YYYY-MM] [--date YYYY-MM-DD] [--deterministic] [--model <id>]",
         "",
         "补充：",
-        "  复盘基于当前 diary 真相源生成，服务 Cyberboss 自己的生活助理复盘，不复用学习项目模板",
+        "  默认走 hybrid：脚本保骨架，Codex 负责结构化语义提炼；失败时自动回退 deterministic",
         "  nightly 负责睡前收口；周/月复盘在有 nightly 时会优先吸收它",
+        "  传 --deterministic 可强制只走脚本；传 --model <id> 可覆盖语义提炼使用的模型",
         "  周复盘默认按周一到周日；月复盘默认按自然月",
       ].join("\n");
     default:

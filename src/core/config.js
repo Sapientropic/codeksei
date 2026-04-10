@@ -49,6 +49,9 @@ function readConfig() {
       || path.resolve(workspaceRoot, ".codex", "durable-note-schema.json"),
     reviewSchemaConfigFile: readTextEnv("CYBERBOSS_REVIEW_SCHEMA_CONFIG")
       || path.resolve(workspaceRoot, ".codex", "review-schema.json"),
+    reviewSemanticMode: readTextEnv("CYBERBOSS_REVIEW_SEMANTIC_MODE") || "hybrid",
+    reviewSemanticModel: readTextEnv("CYBERBOSS_REVIEW_SEMANTIC_MODEL"),
+    reviewSemanticTimeoutMs: readIntEnv("CYBERBOSS_REVIEW_SEMANTIC_TIMEOUT_MS") || 120000,
     sharedBridgeHeartbeatFile: path.join(stateDir, "logs", "shared-wechat-heartbeat.json"),
     sharedWatchdogStateFile: path.join(stateDir, "logs", "shared-watchdog-state.json"),
     startWithCheckin: (mode === "start" && hasArgFlag(argv, "--checkin")) || readBoolEnv("CYBERBOSS_ENABLE_CHECKIN"),
@@ -70,6 +73,11 @@ function readTextEnv(name) {
 function readBoolEnv(name) {
   const value = readTextEnv(name).toLowerCase();
   return value === "1" || value === "true" || value === "yes" || value === "on";
+}
+
+function readIntEnv(name) {
+  const value = Number.parseInt(readTextEnv(name), 10);
+  return Number.isFinite(value) ? value : 0;
 }
 
 function hasArgFlag(argv, flag) {

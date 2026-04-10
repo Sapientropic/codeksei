@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { maybeGenerateSemanticReview } = require("./review-semantic");
 
 const REVIEW_MARKER_PREFIX = "cyberboss-review";
 
@@ -82,27 +83,40 @@ function resolveReviewProfile(config = {}, kind, options = {}) {
   };
 }
 
-function buildReview(config = {}, kind, options = {}) {
+async function buildReview(config = {}, kind, options = {}) {
   const profile = resolveReviewProfile(config, kind);
   const window = resolveReviewWindow(profile.kind, options);
   const diaryEntries = collectDiaryEntries(config.diaryDir, window.startDate, window.endDate);
   const nightlyEntries = profile.kind === "nightly"
     ? []
     : collectNightlyEntries(config, window);
-  const draft = buildReviewDraft(profile, window, diaryEntries, nightlyEntries);
+  const deterministicDraft = buildReviewDraft(profile, window, diaryEntries, nightlyEntries);
+  // Review v2 keeps routing, windowing, and managed-block writes deterministic.
+  // The semantic pass may upgrade the human-facing bullets, but it must never
+  // become a hard dependency for file generation.
+  const semantic = await maybeGenerateSemanticReview(config, {
+    profile,
+    window,
+    diaryEntries,
+    nightlyEntries,
+    deterministicDraft,
+    options,
+  });
+  const draft = mergeReviewDraft(profile.kind, deterministicDraft, semantic.data);
   const notePath = normalizeDisplayPath(path.join(profile.folderPath, `${draft.periodLabel}.md`));
   return {
     profile,
     window,
     diaryEntries,
     nightlyEntries,
+    semantic,
     draft,
     notePath,
   };
 }
 
-function writeReview(config = {}, kind, options = {}) {
-  const review = buildReview(config, kind, options);
+async function writeReview(config = {}, kind, options = {}) {
+  const review = await buildReview(config, kind, options);
   fs.mkdirSync(path.dirname(review.notePath), { recursive: true });
   const now = new Date();
   const current = fs.existsSync(review.notePath)
@@ -119,6 +133,8 @@ function writeReview(config = {}, kind, options = {}) {
     periodLabel: review.draft.periodLabel,
     diaryCount: review.diaryEntries.length,
     nightlyCount: review.nightlyEntries.length,
+    semanticUsed: !!review.semantic?.used,
+    semanticReason: review.semantic?.reason || "",
   };
 }
 
@@ -241,12 +257,20 @@ function buildNightlyDraft(profile, window, diaryEntries) {
     ...selectSignalFromSupplements(entry ? entry.supplement : []),
     ...carryForward,
   ]).slice(0, 6);
+  const windowFacts = [
+    `日期：${window.startDate}`,
+    `覆盖日记：${diaryEntries.length} 天`,
+    `Todo 完成 / 未完成：${doneTodos} / ${openTodos}`,
+    `时间线事实条数：${timelineCount}`,
+    `补充记录条数：${supplementCount}`,
+  ];
 
   return {
     periodLabel: window.label,
     periodTitle: `${window.label} ${profile.titleSuffix}`,
     sourceDiaryDays: diaryEntries.length,
     sourceNightlyDays: 0,
+    windowFacts,
     insights: {
       progress,
       friction,
@@ -256,13 +280,7 @@ function buildNightlyDraft(profile, window, diaryEntries) {
       signals,
     },
     content: {
-      window: renderBulletList([
-        `日期：${window.startDate}`,
-        `覆盖日记：${diaryEntries.length} 天`,
-        `Todo 完成 / 未完成：${doneTodos} / ${openTodos}`,
-        `时间线事实条数：${timelineCount}`,
-        `补充记录条数：${supplementCount}`,
-      ], "今天还没有可用的日记事实。"),
+      window: renderBulletList(windowFacts, "今天还没有可用的日记事实。"),
       progress: renderBulletList(progress, "今天还没有收出可用的推进摘要。"),
       friction: renderBulletList(friction, "今天还没有明显的摩擦摘要。"),
       "open-loops": renderBulletList(openLoops, "今晚没有明显还开着的线头。"),
@@ -315,12 +333,21 @@ function buildPeriodicReviewDraft(profile, window, diaryEntries, nightlyEntries 
   const supplements = diaryEntries
     .flatMap((entry) => selectPeriodicSupplementGroups(entry, nightlyByDate.get(entry.date)))
     .slice(-8);
+  const windowFacts = [
+    `时间范围：${window.startDate} ~ ${window.endDate}`,
+    `覆盖日记：${diaryEntries.length} 天`,
+    `夜间收口：${nightlyEntries.length} 天`,
+    `Todo 完成 / 未完成：${totalDoneTodos} / ${totalOpenTodos}`,
+    `时间线事实条数：${totalTimelineFacts}`,
+    `周期末尾仍开着的线头：${openLoops.length}`,
+  ];
 
   return {
     periodLabel: window.label,
     periodTitle: `${window.label} ${profile.titleSuffix}`,
     sourceDiaryDays: diaryEntries.length,
     sourceNightlyDays: nightlyEntries.length,
+    windowFacts,
     insights: {
       progress,
       friction,
@@ -330,14 +357,7 @@ function buildPeriodicReviewDraft(profile, window, diaryEntries, nightlyEntries 
       supplements,
     },
     content: {
-      window: renderBulletList([
-        `时间范围：${window.startDate} ~ ${window.endDate}`,
-        `覆盖日记：${diaryEntries.length} 天`,
-        `夜间收口：${nightlyEntries.length} 天`,
-        `Todo 完成 / 未完成：${totalDoneTodos} / ${totalOpenTodos}`,
-        `时间线事实条数：${totalTimelineFacts}`,
-        `周期末尾仍开着的线头：${openLoops.length}`,
-      ], "这一段时间还没有可用日记事实。"),
+      window: renderBulletList(windowFacts, "这一段时间还没有可用日记事实。"),
       progress: renderBulletList(progress, "这段时间还没有收出可用的推进摘要。"),
       friction: renderBulletList(friction, "这段时间还没有明显的摩擦摘要。"),
       "open-loops": renderBulletList(openLoops, "这一周期末尾没有明显还开着的线头。"),
@@ -346,6 +366,47 @@ function buildPeriodicReviewDraft(profile, window, diaryEntries, nightlyEntries 
       supplements: renderSupplementGroups(supplements, "这段时间没有值得回看的补充记录。"),
     },
   };
+}
+
+function mergeReviewDraft(kind, deterministicDraft, semanticData) {
+  if (!semanticData || typeof semanticData !== "object") {
+    return deterministicDraft;
+  }
+
+  const mergedInsights = {
+    ...deterministicDraft.insights,
+  };
+  for (const [key, value] of Object.entries(semanticData)) {
+    if (Array.isArray(value) && value.length) {
+      mergedInsights[key] = value;
+    }
+  }
+
+  const mergedDraft = {
+    ...deterministicDraft,
+    insights: mergedInsights,
+    content: {
+      ...deterministicDraft.content,
+    },
+  };
+
+  if (kind === "nightly") {
+    mergedDraft.content.progress = renderBulletList(mergedInsights.progress, "今天还没有收出可用的推进摘要。");
+    mergedDraft.content.friction = renderBulletList(mergedInsights.friction, "今天还没有明显的摩擦摘要。");
+    mergedDraft.content["open-loops"] = renderBulletList(mergedInsights.openLoops, "今晚没有明显还开着的线头。");
+    mergedDraft.content["carry-forward"] = renderBulletList(mergedInsights.carryForward, "明天先从最小动作重新接上。");
+    mergedDraft.content.closeout = renderBulletList(mergedInsights.closeout, "今天的睡前收口还没有写出来。");
+    mergedDraft.content.signals = renderBulletList(mergedInsights.signals, "今天还没有稳定到值得带走的信号。");
+    return mergedDraft;
+  }
+
+  mergedDraft.content.progress = renderBulletList(mergedInsights.progress, "这段时间还没有收出可用的推进摘要。");
+  mergedDraft.content.friction = renderBulletList(mergedInsights.friction, "这段时间还没有明显的摩擦摘要。");
+  mergedDraft.content["open-loops"] = renderBulletList(mergedInsights.openLoops, "这一周期末尾没有明显还开着的线头。");
+  mergedDraft.content["carry-forward"] = renderBulletList(mergedInsights.carryForward, "下一次先从最小动作重新接上。");
+  mergedDraft.content["daily-summaries"] = renderDatedGroups(mergedInsights.dailySummaries, "这段时间没有可引用的每日总结。");
+  mergedDraft.content.supplements = renderSupplementGroups(mergedInsights.supplements, "这段时间没有值得回看的补充记录。");
+  return mergedDraft;
 }
 
 function collectDiaryEntries(diaryDir, startDate, endDate) {

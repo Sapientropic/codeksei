@@ -84,19 +84,20 @@ function setupReviewFixture() {
       workspaceRoot,
       diaryDir,
       reviewSchemaConfigFile: path.join(codexDir, "review-schema.json"),
+      reviewSemanticMode: "deterministic",
     },
   };
 }
 
-test("review:nightly builds a nightly closeout note from diary truth source", () => {
+test("review:nightly builds a nightly closeout note from diary truth source", async () => {
   const fixture = setupReviewFixture();
-  const preview = buildReview(fixture.config, "nightly", { date: "2026-04-10" });
+  const preview = await buildReview(fixture.config, "nightly", { date: "2026-04-10" });
 
   assert.equal(preview.draft.periodLabel, "2026-04-10");
   assert.match(preview.notePath, /Nightly\/2026-04-10\.md$/u);
   assert.match(preview.draft.insights.closeout.join("\n"), /Apple Watch 提醒实验/u);
 
-  const result = writeReview(fixture.config, "nightly", { date: "2026-04-10" });
+  const result = await writeReview(fixture.config, "nightly", { date: "2026-04-10" });
   assert.equal(result.changed, true);
   const content = fs.readFileSync(preview.notePath, "utf8");
   assert.match(content, /# 2026-04-10 睡前收口/u);
@@ -104,10 +105,10 @@ test("review:nightly builds a nightly closeout note from diary truth source", ()
   assert.match(content, /## 值得带走的信号/u);
 });
 
-test("review:weekly builds a weekly review note from diary truth source", () => {
+test("review:weekly builds a weekly review note from diary truth source", async () => {
   const fixture = setupReviewFixture();
-  writeReview(fixture.config, "nightly", { date: "2026-04-10" });
-  const preview = buildReview(fixture.config, "weekly", { week: "2026-W15" });
+  await writeReview(fixture.config, "nightly", { date: "2026-04-10" });
+  const preview = await buildReview(fixture.config, "weekly", { week: "2026-W15" });
 
   assert.equal(preview.draft.periodLabel, "2026-W15");
   assert.equal(preview.draft.sourceNightlyDays, 1);
@@ -115,7 +116,7 @@ test("review:weekly builds a weekly review note from diary truth source", () => 
   assert.match(preview.draft.insights.progress.join("\n"), /Apple Watch 提醒实验/u);
   assert.match(preview.draft.insights.friction.join("\n"), /偏重/u);
 
-  const result = writeReview(fixture.config, "weekly", { week: "2026-W15" });
+  const result = await writeReview(fixture.config, "weekly", { week: "2026-W15" });
   assert.equal(result.changed, true);
   const content = fs.readFileSync(preview.notePath, "utf8");
   assert.match(content, /# 2026-W15 周复盘/u);
@@ -125,10 +126,10 @@ test("review:weekly builds a weekly review note from diary truth source", () => 
   assert.match(content, /cyberboss-review:daily-summaries:start/u);
 });
 
-test("review:monthly rewrites managed blocks idempotently", () => {
+test("review:monthly rewrites managed blocks idempotently", async () => {
   const fixture = setupReviewFixture();
-  const first = writeReview(fixture.config, "monthly", { month: "2026-04" });
-  const second = writeReview(fixture.config, "monthly", { month: "2026-04" });
+  const first = await writeReview(fixture.config, "monthly", { month: "2026-04" });
+  const second = await writeReview(fixture.config, "monthly", { month: "2026-04" });
 
   assert.equal(first.changed, true);
   assert.equal(second.changed, false);
@@ -137,4 +138,57 @@ test("review:monthly rewrites managed blocks idempotently", () => {
   const content = fs.readFileSync(notePath, "utf8");
   assert.match(content, /# 2026-04 月复盘/u);
   assert.match(content, /明天验证一条 Apple Watch 提醒链路/u);
+});
+
+test("review hybrid v2 lets semantic pass replace noisy deterministic lines", async () => {
+  const fixture = setupReviewFixture();
+  fixture.config.reviewSemanticMode = "hybrid";
+  fixture.config.reviewSemanticGenerator = async ({ profile }) => {
+    if (profile.kind === "weekly") {
+      return {
+        progress: [
+          "Apple Watch 提醒实验先完成最小验证，不把设备折腾当成主线。",
+          "Cyberboss 共享桥接与 timeline 命令链路继续收口。",
+        ],
+        friction: [
+          "注册营养师模板对低能量 C 档仍偏重，启动成本偏高。",
+        ],
+        open_loops: [
+          "先把注册营养师 C 档压轻，再继续推进。",
+        ],
+        carry_forward: [
+          "下次先从压轻 C 档最低完成标准开始。",
+        ],
+        daily_summaries: [
+          {
+            date: "2026-04-10",
+            lines: [
+              "Apple Watch 提醒实验完成最小验证。",
+              "注册营养师日卡真正启动，但确认 C 档还需要压轻。",
+            ],
+          },
+        ],
+        supplement_groups: [
+          {
+            date: "2026-04-10",
+            title: "本周值得带走的模式",
+            body_lines: [
+              "忙起来容易和饥饿信号断开，不适合只靠自发想起吃饭。",
+            ],
+          },
+        ],
+      };
+    }
+    return null;
+  };
+
+  const review = await buildReview(fixture.config, "weekly", { week: "2026-W15" });
+  assert.equal(review.semantic.used, true);
+  assert.equal(review.semantic.source, "injected");
+  assert.deepEqual(review.draft.insights.progress, [
+    "Apple Watch 提醒实验先完成最小验证，不把设备折腾当成主线。",
+    "Cyberboss 共享桥接与 timeline 命令链路继续收口。",
+  ]);
+  assert.doesNotMatch(review.draft.content.progress, /00:21 本来想刷牙/u);
+  assert.match(review.draft.content.supplements, /本周值得带走的模式/u);
 });

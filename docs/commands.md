@@ -65,9 +65,9 @@
 - `npm run note:auto -- --project <slug> --kind <kind> --text "..."`
 - `npm run note:maybe -- [--project <slug> | --scope <name>] [--kind <kind>]`
 - `npm run note:sync -- --project <slug> --section <标题> --text "..."` 或 `--path <path>`
-- `npm run review:nightly -- [--date YYYY-MM-DD]`
-- `npm run review:weekly -- [--week YYYY-Www] [--date YYYY-MM-DD]`
-- `npm run review:monthly -- [--month YYYY-MM] [--date YYYY-MM-DD]`
+- `npm run review:nightly -- [--date YYYY-MM-DD] [--deterministic] [--model <id>]`
+- `npm run review:weekly -- [--week YYYY-Www] [--date YYYY-MM-DD] [--deterministic] [--model <id>]`
+- `npm run review:monthly -- [--month YYYY-MM] [--date YYYY-MM-DD] [--deterministic] [--model <id>]`
 
 ## 规划中的终端子命令
 
@@ -168,7 +168,10 @@
 
 说明：
 - 复盘来源是当前 workspace 的日记真相源，不是 timeline 派生页，也不是学习项目模板
+- 默认走 `hybrid review v2`：脚本负责窗口、文件、幂等 block 和 fallback，Codex 只负责结构化语义提炼
+- 语义提炼失败、超时或请求审批时，会自动回退到 deterministic 提取
 - `nightly` 负责睡前收口，给后面的周/月复盘先压一层低摩擦原料
+- 传 `--deterministic` 可强制只走脚本；传 `--model <id>` 可覆盖 review semantic pass 用的模型
 - 周复盘默认按周一到周日；月复盘默认按自然月
 - 生成的 note 会保留固定骨架，并用受控 block 更新“推进 / 摩擦 / 线头 / 每天收口摘录”等生成区
 - 当同一时间窗口里已经有 nightly note 时，周/月复盘会优先吸收 nightly 的“睡前收口摘录 / 值得带走的信号”
