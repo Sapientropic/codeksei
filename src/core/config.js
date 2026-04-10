@@ -5,6 +5,7 @@ function readConfig() {
   const argv = process.argv.slice(2);
   const mode = argv[0] || "";
   const stateDir = process.env.CYBERBOSS_STATE_DIR || path.join(os.homedir(), ".cyberboss");
+  const workspaceRoot = readTextEnv("CYBERBOSS_WORKSPACE_ROOT") || process.cwd();
 
   return {
     mode,
@@ -12,7 +13,7 @@ function readConfig() {
     stateDir,
     cyberbossHome: readTextEnv("CYBERBOSS_HOME") || path.resolve(__dirname, "..", ".."),
     workspaceId: readTextEnv("CYBERBOSS_WORKSPACE_ID") || "default",
-    workspaceRoot: readTextEnv("CYBERBOSS_WORKSPACE_ROOT") || process.cwd(),
+    workspaceRoot,
     diaryDir: readTextEnv("CYBERBOSS_DIARY_DIR") || path.join(stateDir, "diary"),
     timelineStateDir: readTextEnv("CYBERBOSS_TIMELINE_STATE_DIR") || stateDir,
     userName: readTextEnv("CYBERBOSS_USER_NAME") || "用户",
@@ -42,6 +43,8 @@ function readConfig() {
     sessionsFile: path.join(stateDir, "sessions.json"),
     workspaceBootstrapConfigFile: readTextEnv("CYBERBOSS_WORKSPACE_BOOTSTRAP_CONFIG")
       || path.join(stateDir, "workspace-bootstrap.json"),
+    projectRadarConfigFile: readTextEnv("CYBERBOSS_PROJECT_RADAR_CONFIG")
+      || path.resolve(workspaceRoot, ".codex", "code-projects.json"),
     sharedBridgeHeartbeatFile: path.join(stateDir, "logs", "shared-wechat-heartbeat.json"),
     sharedWatchdogStateFile: path.join(stateDir, "logs", "shared-watchdog-state.json"),
     startWithCheckin: (mode === "start" && hasArgFlag(argv, "--checkin")) || readBoolEnv("CYBERBOSS_ENABLE_CHECKIN"),

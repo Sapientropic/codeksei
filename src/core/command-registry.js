@@ -146,6 +146,20 @@ const COMMAND_GROUPS = [
     ],
   },
   {
+    id: "projects",
+    label: "代码项目",
+    actions: [
+      {
+        action: "project.radar",
+        summary: "读取已跟踪代码项目的稳定入口与轻量 git 近况",
+        terminal: ["project radar"],
+        terminalGroup: "project",
+        weixin: [],
+        status: "active",
+      },
+    ],
+  },
+  {
     id: "capabilities",
     label: "能力集成",
     actions: [
@@ -434,6 +448,14 @@ function buildTopicUsage(topic) {
         "  timeline 查分类先用 npm run timeline:categories；改已有日程前先用 npm run timeline:read -- --date YYYY-MM-DD",
         "  timeline 截图稳定入口是 npm run timeline:screenshot -- --send，它会把任务交给当前微信桥执行",
       ].join("\n");
+    case "project":
+      return [
+        "npm run project:radar -- [--list] [--project <slug>] [--json] [--commits 5] [--changes 20]",
+        "",
+        "补充：",
+        "  默认从当前 workspace 的 .codex/code-projects.json 读取已跟踪代码项目",
+        "  先用 --list 看 slug；讨论具体项目时再用 --project <slug> --json",
+      ].join("\n");
     default:
       return "npm run <script>";
   }
@@ -479,6 +501,8 @@ function toNpmRunExample(commandText) {
       return "npm run timeline:dev";
     case "timeline screenshot":
       return "npm run timeline:screenshot -- --send";
+    case "project radar":
+      return "npm run project:radar -- --project <slug> --json";
     default:
       return normalized;
   }

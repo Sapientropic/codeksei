@@ -147,6 +147,7 @@ CYBERBOSS_WEIXIN_PROTOCOL_CLIENT_VERSION=2.1.1
 CYBERBOSS_DIARY_DIR=/绝对路径/你的 vault/日记
 CYBERBOSS_TIMELINE_STATE_DIR=/绝对路径/你的 vault/.codex/timeline
 CYBERBOSS_WORKSPACE_BOOTSTRAP_CONFIG=/绝对路径/你的 workspace-bootstrap.json
+CYBERBOSS_PROJECT_RADAR_CONFIG=/绝对路径/你的 workspace/.codex/code-projects.json
 ```
 
 `CYBERBOSS_ALLOWED_USER_IDS` 支持逗号分隔多个 user id。
@@ -160,7 +161,7 @@ CYBERBOSS_WORKSPACE_BOOTSTRAP_CONFIG=/绝对路径/你的 workspace-bootstrap.js
 
 如果你要跑共享线程，建议也在第一次启动前就把 `CYBERBOSS_WORKSPACE_ROOT` 配好。这样 `shared:open` 会优先接到你当前项目对应的那条线程，而不是回退到别的历史绑定。
 
-如果你在 `v2` 适配器下需要走特定路由网关，可以额外设置 `CYBERBOSS_WEIXIN_ROUTE_TAG`。`CYBERBOSS_WORKSPACE_BOOTSTRAP_CONFIG` 默认会落到 `${HOME}/.cyberboss/workspace-bootstrap.json`，用来声明“某个 workspace 开新线程时先读哪些稳定入口文件”，这样就不用再把某个 vault 的文件结构写死进仓库源码。
+如果你在 `v2` 适配器下需要走特定路由网关，可以额外设置 `CYBERBOSS_WEIXIN_ROUTE_TAG`。`CYBERBOSS_WORKSPACE_BOOTSTRAP_CONFIG` 默认会落到 `${HOME}/.cyberboss/workspace-bootstrap.json`，用来声明“某个 workspace 开新线程时先读哪些稳定入口文件”，这样就不用再把某个 vault 的文件结构写死进仓库源码。`CYBERBOSS_PROJECT_RADAR_CONFIG` 默认会指向 `${CYBERBOSS_WORKSPACE_ROOT}/.codex/code-projects.json`，用于声明“这个 workspace 里有哪些代码项目值得做轻量 git radar”。
 
 ### 用户自己会用到的终端命令
 
@@ -336,6 +337,10 @@ ${HOME}/.cyberboss
   写本地日记
 - `npm run diary:write -- --date 2026-04-06 --title "4.6" --text "内容"`
   写指定日期日记
+- `npm run project:radar -- --list`
+  列出当前 workspace 已跟踪的代码项目 slug
+- `npm run project:radar -- --project cyberboss --json`
+  读取某个已跟踪代码项目的稳定入口与轻量 git 近况
 - `npm run timeline:write -- --date YYYY-MM-DD --stdin`
   增量写入时间轴
 - `npm run timeline:build`
@@ -359,6 +364,7 @@ ${HOME}/.cyberboss
 - 参数不清楚时先看 `--help`
 - 第一次执行失败时，先反馈报错，不要立刻读源码
 - 如果只是发文件或截图回微信，优先用现成命令，不要去找内部 `channelAdapter.sendFile(...)`
+- 讨论已跟踪代码项目时，优先用 `project:radar` 取回 repo 根目录、workspace note、稳定索引入口和 git 近况；git 只当最近动作信号，不当长期真相
 
 ## 文档入口
 

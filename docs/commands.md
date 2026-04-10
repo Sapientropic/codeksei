@@ -39,6 +39,7 @@
 
 - `model.inspect`
 - `model.select`
+- `project.radar`
 - `channel.send_file`
 - `timeline.write`
 - `reminder.create`
@@ -59,6 +60,8 @@
 - `npm run background:uninstall`
 - `npm run doctor`
 - `npm run help`
+- `npm run project:radar -- --list`
+- `npm run project:radar -- --project <slug> --json`
 
 ## 规划中的终端子命令
 
@@ -111,6 +114,16 @@
 - `timeline:screenshot -- --send` 会把截图任务发给当前微信桥执行，并自动把结果回传给当前微信用户。
 
 当前文档里列出的 `reminder / diary / system / timeline` 都已可直接使用。
+
+### project
+
+- `npm run project:radar -- --list`
+- `npm run project:radar -- --project <slug> --json`
+
+说明：
+- 默认从当前 workspace 的 `.codex/code-projects.json` 读取已跟踪代码项目
+- 输出会包含 workspace note、repo 里的稳定入口、当前 branch、working tree 摘要和最近 commits
+- 这里的 git 信息只应视为“最近在做什么”的弱信号，不应该直接替代项目页、README 或索引报告
 
 ## 当前已接入的微信命令
 

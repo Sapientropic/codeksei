@@ -1451,6 +1451,7 @@ function isShellWrapper(command, flag) {
 function isBuiltInScriptName(scriptName) {
   return scriptName === "reminder:write"
     || scriptName === "diary:write"
+    || scriptName === "project:radar"
     || scriptName.startsWith("timeline:");
 }
 
@@ -1474,6 +1475,9 @@ function matchesBuiltInCliCommand(tokens) {
       || action === "read"
       || action === "categories"
       || action === "proposals";
+  }
+  if (topic === "project") {
+    return action === "radar";
   }
   return (topic === "reminder" && action === "write")
     || (topic === "diary" && action === "write")
