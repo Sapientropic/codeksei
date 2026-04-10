@@ -142,6 +142,11 @@ CYBERBOSS_WORKSPACE_ROOT=/绝对路径/你的项目目录
 CYBERBOSS_ACCOUNT_ID=
 CYBERBOSS_CODEX_ENDPOINT=ws://127.0.0.1:8765
 CYBERBOSS_WEIXIN_ADAPTER=v2
+CYBERBOSS_WEIXIN_ROUTE_TAG=
+CYBERBOSS_WEIXIN_PROTOCOL_CLIENT_VERSION=2.1.1
+CYBERBOSS_DIARY_DIR=/绝对路径/你的 vault/日记
+CYBERBOSS_TIMELINE_STATE_DIR=/绝对路径/你的 vault/.codex/timeline
+CYBERBOSS_WORKSPACE_BOOTSTRAP_CONFIG=/绝对路径/你的 workspace-bootstrap.json
 ```
 
 `CYBERBOSS_ALLOWED_USER_IDS` 支持逗号分隔多个 user id。
@@ -154,6 +159,8 @@ CYBERBOSS_WEIXIN_ADAPTER=v2
 另外，如果你想要更强的“push 感”，建议一开始先不要主动大改 instructions 模板。先让 agent 在真实交流里自己更新行为，再回头只修明显不对的部分。
 
 如果你要跑共享线程，建议也在第一次启动前就把 `CYBERBOSS_WORKSPACE_ROOT` 配好。这样 `shared:open` 会优先接到你当前项目对应的那条线程，而不是回退到别的历史绑定。
+
+如果你在 `v2` 适配器下需要走特定路由网关，可以额外设置 `CYBERBOSS_WEIXIN_ROUTE_TAG`。`CYBERBOSS_WORKSPACE_BOOTSTRAP_CONFIG` 默认会落到 `${HOME}/.cyberboss/workspace-bootstrap.json`，用来声明“某个 workspace 开新线程时先读哪些稳定入口文件”，这样就不用再把某个 vault 的文件结构写死进仓库源码。
 
 ### 用户自己会用到的终端命令
 
@@ -189,11 +196,11 @@ CYBERBOSS_WEIXIN_ADAPTER=v2
 - `/status`
   查看当前绑定项目、线程、模型和上下文状态
 - `/new`
-  切到新线程草稿
+  切到新线程草稿；下一条普通消息会先按当前 workspace 重建上下文入口
 - `/reread`
-  让当前线程重新读取最新 instructions，适合刚改完人格模板或操作模板后使用
+  让当前线程重新读取最新 instructions 和当前 workspace 的稳定入口，适合刚改完人格模板、操作模板或 workspace 入口文档后使用
 - `/switch <threadId>`
-  切换到指定线程
+  切换到指定线程；如果这条 thread 已知属于别的 workspace，会一起跟随过去。下一条普通消息会按当前 workspace 检查是否需要补读稳定入口
 - `/stop`
   停止当前线程里的运行
 - `/yes`
@@ -288,6 +295,8 @@ ${HOME}/.cyberboss
   微信长轮询同步缓冲
 - `weixin-instructions.md`
   首次运行自动生成的本地 instructions
+- `workspace-bootstrap.json`
+  可选的 workspace continuity 配置；默认用于声明开新线程时应优先读取的稳定入口文件
 - `reminder-queue.json`
   reminder 队列
 - `system-message-queue.json`
@@ -300,6 +309,13 @@ ${HOME}/.cyberboss
   timeline 数据、site、shots
 - `logs/`
   共享 bridge、shared app-server 日志，以及 watchdog/heartbeat 状态
+
+如果你配置了下面两个环境变量：
+
+- `CYBERBOSS_DIARY_DIR`
+- `CYBERBOSS_TIMELINE_STATE_DIR`
+
+那么真正的日记 Markdown 和 timeline runtime 数据会改写到你指定的位置；`~/.cyberboss` 仍只保留账号、session、queue、log 等运行态文件。
 
 这个目录只是本地状态目录，不是线程工作目录；微信线程和终端线程仍然应该开在你的项目目录里。
 

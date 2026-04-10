@@ -43,8 +43,10 @@ class CyberbossApp {
       sessionStore: this.runtimeAdapter.getSessionStore(),
     });
     this.pendingRuntimeEventWatchdogs = new Map();
+    this.pendingWorkspaceBootstrapByThreadId = new Map();
     this.runtimeEventChain = Promise.resolve();
     this.runtimeAdapter.onEvent((event) => {
+      this.confirmPendingWorkspaceBootstrap(event);
       this.clearRuntimeEventWatchdog(event?.payload?.threadId);
       this.threadStateStore.applyRuntimeEvent(event);
       this.runtimeEventChain = this.runtimeEventChain
@@ -363,6 +365,13 @@ class CyberbossApp {
         contextToken: prepared.contextToken,
         provider: prepared.provider,
       });
+      if (turn.workspaceBootstrapPending) {
+        this.queuePendingWorkspaceBootstrap({
+          bindingKey,
+          workspaceRoot,
+          threadId: turn.threadId,
+        });
+      }
       this.scheduleRuntimeEventWatchdog({
         bindingKey,
         workspaceRoot,
@@ -460,6 +469,43 @@ class CyberbossApp {
     clearTimeout(watchdog.noticeTimer);
     clearTimeout(watchdog.failureTimer);
     this.pendingRuntimeEventWatchdogs.delete(normalizedThreadId);
+  }
+
+  queuePendingWorkspaceBootstrap({ bindingKey, workspaceRoot, threadId }) {
+    const normalizedBindingKey = normalizeText(bindingKey);
+    const normalizedWorkspaceRoot = normalizeText(workspaceRoot);
+    const normalizedThreadId = normalizeText(threadId);
+    if (!normalizedBindingKey || !normalizedWorkspaceRoot || !normalizedThreadId) {
+      return;
+    }
+    this.pendingWorkspaceBootstrapByThreadId.set(normalizedThreadId, {
+      bindingKey: normalizedBindingKey,
+      workspaceRoot: normalizedWorkspaceRoot,
+    });
+  }
+
+  confirmPendingWorkspaceBootstrap(event) {
+    if (!event || event.type === "runtime.usage.updated") {
+      return;
+    }
+    const threadId = normalizeText(event?.payload?.threadId);
+    if (!threadId) {
+      return;
+    }
+    const pending = this.pendingWorkspaceBootstrapByThreadId.get(threadId);
+    if (!pending?.bindingKey || !pending?.workspaceRoot) {
+      return;
+    }
+    // Do not mark workspace bootstrap as done when sendUserMessage merely
+    // returns. In shared mode the runtime can still stall before emitting the
+    // first real thread event, and prematurely persisting success would skip the
+    // next retry's continuity bootstrap.
+    this.runtimeAdapter.getSessionStore().rememberWorkspaceBootstrapForThread(
+      pending.bindingKey,
+      pending.workspaceRoot,
+      threadId
+    );
+    this.pendingWorkspaceBootstrapByThreadId.delete(threadId);
   }
 
   async prepareIncomingMessageForRuntime(normalized, workspaceRoot) {
@@ -708,7 +754,7 @@ class CyberbossApp {
     this.runtimeAdapter.getSessionStore().setActiveWorkspaceRoot(bindingKey, canonicalWorkspaceRoot);
     await this.channelAdapter.sendText({
       userId: normalized.senderId,
-      text: `已绑定项目。\n\nworkspace: ${canonicalWorkspaceRoot}`,
+      text: `已绑定项目。\n\nworkspace: ${canonicalWorkspaceRoot}\n下一条普通消息会按当前 workspace 检查是否需要补读稳定入口。`,
       contextToken: normalized.contextToken,
     });
   }
@@ -763,7 +809,7 @@ class CyberbossApp {
     this.runtimeAdapter.getSessionStore().clearThreadIdForWorkspace(bindingKey, workspaceRoot);
     await this.channelAdapter.sendText({
       userId: normalized.senderId,
-      text: `已切到新线程草稿。\n\nworkspace: ${workspaceRoot}`,
+      text: `已切到新线程草稿。\n\nworkspace: ${workspaceRoot}\n下一条普通消息会先按当前 workspace 重建上下文入口。`,
       contextToken: normalized.contextToken,
     });
   }
@@ -799,6 +845,7 @@ class CyberbossApp {
         threadId,
       });
       await this.runtimeAdapter.refreshThreadInstructions({
+        bindingKey,
         threadId,
         workspaceRoot,
         model: sessionStore.getCodexParamsForWorkspace(bindingKey, workspaceRoot).model,
@@ -829,12 +876,21 @@ class CyberbossApp {
       accountId: normalized.accountId,
       senderId: normalized.senderId,
     });
-    const workspaceRoot = this.resolveWorkspaceRoot(bindingKey);
+    const sessionStore = this.runtimeAdapter.getSessionStore();
+    const currentWorkspaceRoot = this.resolveWorkspaceRoot(bindingKey);
+    // A thread carries its own workspace continuity contract. If we switch back
+    // to a known old thread but keep today's active workspace, the next message
+    // would inject the wrong workspace bootstrap and silently redirect context.
+    const knownTarget = sessionStore.findBindingForThreadId(targetThreadId);
+    const workspaceRoot = knownTarget?.workspaceRoot || currentWorkspaceRoot;
     await this.runtimeAdapter.resumeThread({ threadId: targetThreadId });
-    this.runtimeAdapter.getSessionStore().setThreadIdForWorkspace(bindingKey, workspaceRoot, targetThreadId);
+    sessionStore.setThreadIdForWorkspace(bindingKey, workspaceRoot, targetThreadId);
+    const switchedWorkspaceNotice = workspaceRoot !== currentWorkspaceRoot
+      ? "\n已跟随这条 thread 的已知 workspace。"
+      : "";
     await this.channelAdapter.sendText({
       userId: normalized.senderId,
-      text: `已切换线程。\n\nworkspace: ${workspaceRoot}\nthread: ${targetThreadId}`,
+      text: `已切换线程。\n\nworkspace: ${workspaceRoot}\nthread: ${targetThreadId}${switchedWorkspaceNotice}\n下一条普通消息会按当前 workspace 检查是否需要补读稳定入口。`,
       contextToken: normalized.contextToken,
     });
   }

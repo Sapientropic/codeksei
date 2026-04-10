@@ -20,8 +20,10 @@ async function runDiaryWriteCommand(config) {
   });
 
   fs.mkdirSync(config.diaryDir, { recursive: true });
-  const prefix = fs.existsSync(filePath) && fs.statSync(filePath).size > 0 ? "\n\n" : "";
-  fs.appendFileSync(filePath, `${prefix}${entry}`, "utf8");
+  ensureDiaryFile(filePath, now);
+  const current = fs.readFileSync(filePath, "utf8");
+  const next = insertDiaryEntry(current, entry, dateString);
+  fs.writeFileSync(filePath, next, "utf8");
   console.log(`diary written: ${filePath}`);
 }
 
@@ -88,8 +90,103 @@ function readStdin() {
 }
 
 function buildDiaryEntry({ timeString, title, body }) {
-  const heading = title ? `## ${timeString} ${title.trim()}` : `## ${timeString}`;
+  const heading = title ? `### ${timeString} ${title.trim()}` : `### ${timeString}`;
   return `${heading}\n\n${body}`;
+}
+
+function ensureDiaryFile(filePath, now) {
+  if (fs.existsSync(filePath) && fs.statSync(filePath).size > 0) {
+    return;
+  }
+  const createdAt = formatDateTime(now);
+  const updated = formatDate(now);
+  fs.writeFileSync(filePath, buildDiaryFileSkeleton({ createdAt, updated }), "utf8");
+}
+
+function buildDiaryFileSkeleton({ createdAt, updated }) {
+  return [
+    "---",
+    `created: ${createdAt}`,
+    `updated: ${updated}`,
+    "---",
+    "## Todo",
+    "- [ ] ",
+    "",
+    "## 时间线事实",
+    "- ",
+    "",
+    "## 今日碎片",
+    "- ",
+    "",
+    "## 补充记录",
+    "",
+    "## 总结",
+    "",
+  ].join("\n");
+}
+
+function insertDiaryEntry(content, entry, updatedDate) {
+  const normalizedContent = normalizeFileEnding(content);
+  const withUpdatedFrontmatter = updateFrontmatterValue(normalizedContent, "updated", updatedDate);
+  const insertionPoint = findInsertionPoint(withUpdatedFrontmatter);
+  const before = withUpdatedFrontmatter.slice(0, insertionPoint).replace(/\s*$/u, "");
+  const after = withUpdatedFrontmatter.slice(insertionPoint).replace(/^\s*/u, "");
+  const parts = [before, entry];
+  if (after) {
+    parts.push(after);
+  }
+  return `${parts.filter(Boolean).join("\n\n").trimEnd()}\n`;
+}
+
+function findInsertionPoint(content) {
+  const supplementSection = locateSectionStart(content, "补充记录");
+  if (supplementSection >= 0) {
+    const nextHeading = locateNextLevelTwoHeading(content, supplementSection + 1);
+    return nextHeading >= 0 ? nextHeading : content.length;
+  }
+  const summarySection = locateSectionStart(content, "总结");
+  if (summarySection >= 0) {
+    return summarySection;
+  }
+  return content.length;
+}
+
+function locateSectionStart(content, headingText) {
+  const pattern = new RegExp(`^##\\s+${escapeRegExp(headingText)}\\s*$`, "m");
+  const match = pattern.exec(content);
+  return match ? match.index : -1;
+}
+
+function locateNextLevelTwoHeading(content, fromIndex) {
+  const pattern = /^##\s+/gm;
+  pattern.lastIndex = fromIndex;
+  const match = pattern.exec(content);
+  return match ? match.index : -1;
+}
+
+function updateFrontmatterValue(content, key, value) {
+  if (!content.startsWith("---\n")) {
+    return content;
+  }
+  const frontmatterEnd = content.indexOf("\n---\n", 4);
+  if (frontmatterEnd < 0) {
+    return content;
+  }
+  const frontmatter = content.slice(4, frontmatterEnd);
+  const body = content.slice(frontmatterEnd + 5);
+  const keyPattern = new RegExp(`^${escapeRegExp(key)}:\\s*.*$`, "m");
+  const nextFrontmatter = keyPattern.test(frontmatter)
+    ? frontmatter.replace(keyPattern, `${key}: ${value}`)
+    : `${frontmatter}\n${key}: ${value}`;
+  return `---\n${nextFrontmatter}\n---\n${body.replace(/^\n*/u, "")}`;
+}
+
+function normalizeFileEnding(content) {
+  return String(content || "").replace(/\r\n/g, "\n");
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function normalizeBody(value) {
@@ -114,4 +211,22 @@ function formatTime(date) {
   }).format(date);
 }
 
-module.exports = { runDiaryWriteCommand };
+function formatDateTime(date) {
+  const formatter = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return formatter.format(date).replace(" ", "T");
+}
+
+module.exports = {
+  buildDiaryEntry,
+  buildDiaryFileSkeleton,
+  insertDiaryEntry,
+  runDiaryWriteCommand,
+};

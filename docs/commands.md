@@ -130,6 +130,9 @@
 说明：
 
 - `/status` 合并了原先 `where` 和 `usage` 的职责
+- `/new` 后的下一条普通消息会先按当前 workspace 重建上下文入口
+- `/reread` 会让当前线程重读最新 instructions 和当前 workspace 的稳定入口
+- `/switch <threadId>` 如果命中这条 thread 已知的旧 workspace，会一起切回去；下一条普通消息会按当前 workspace 检查是否需要补读稳定入口
 - `/help` 保留
-- `/reread` 先不做，自然语言触发即可
+- `/reread` 保留为显式重读入口；如果只是轻微提醒模型“重新读一下”，自然语言也可以
 - 文件发送能力仍保留，但不再暴露成微信命令

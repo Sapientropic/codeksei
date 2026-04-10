@@ -12,6 +12,7 @@ const {
 } = require("./message-utils");
 const { SessionStore } = require("./session-store");
 const { resolveCodexWorkspaceRoot } = require("../../../core/workspace-alias");
+const { buildWorkspaceContinuityInstructions } = require("../../../core/workspace-bootstrap");
 
 function createCodexRuntimeAdapter(config) {
   const sessionStore = new SessionStore({ filePath: config.sessionsFile });
@@ -141,9 +142,9 @@ function createCodexRuntimeAdapter(config) {
     async resumeThread({ threadId }) {
       return withRuntimeReconnect((runtimeClient) => runtimeClient.resumeThread({ threadId }));
     },
-    async refreshThreadInstructions({ threadId, workspaceRoot, model = "", accessMode = "" }) {
+    async refreshThreadInstructions({ bindingKey = "", threadId, workspaceRoot, model = "", accessMode = "" }) {
       return withRuntimeReconnect(async (runtimeClient) => {
-        const refreshText = buildInstructionRefreshText(config);
+        const refreshText = buildInstructionRefreshText(config, workspaceRoot);
         const runtimeWorkspaceRoot = resolveCodexWorkspaceRoot(workspaceRoot);
         await runtimeClient.resumeThread({ threadId });
         const completion = waitForTurnCompletion(runtimeClient, threadId);
@@ -155,6 +156,9 @@ function createCodexRuntimeAdapter(config) {
           workspaceRoot: runtimeWorkspaceRoot,
         });
         const result = await completion;
+        if (bindingKey) {
+          sessionStore.rememberWorkspaceBootstrapForThread(bindingKey, workspaceRoot, threadId);
+        }
         return { threadId, ...result };
       });
     },
@@ -167,6 +171,7 @@ function createCodexRuntimeAdapter(config) {
 
         let threadId = sessionStore.getThreadIdForWorkspace(bindingKey, workspaceRoot);
         let outboundText = text;
+        let startedNewThread = false;
         if (!threadId) {
           const response = await runtimeClient.startThread({ cwd: runtimeWorkspaceRoot });
           threadId = extractThreadId(response);
@@ -174,7 +179,7 @@ function createCodexRuntimeAdapter(config) {
             throw new Error("thread/start did not return a thread id");
           }
           sessionStore.setThreadIdForWorkspace(bindingKey, workspaceRoot, threadId, metadata);
-          outboundText = buildOpeningTurnText(config, text);
+          startedNewThread = true;
         } else {
           await runtimeClient.resumeThread({ threadId }).catch(async () => {
             sessionStore.clearThreadIdForWorkspace(bindingKey, workspaceRoot);
@@ -184,8 +189,16 @@ function createCodexRuntimeAdapter(config) {
               throw new Error("thread/start did not return a thread id");
             }
             sessionStore.setThreadIdForWorkspace(bindingKey, workspaceRoot, threadId, metadata);
-            outboundText = buildOpeningTurnText(config, text);
+            startedNewThread = true;
           });
+        }
+
+        const needsWorkspaceBootstrap = startedNewThread
+          || !sessionStore.hasWorkspaceBootstrapForThread(bindingKey, workspaceRoot, threadId);
+        if (startedNewThread) {
+          outboundText = buildOpeningTurnText(config, workspaceRoot, text);
+        } else if (needsWorkspaceBootstrap) {
+          outboundText = buildWorkspaceBootstrapTurnText(config, workspaceRoot, text);
         }
 
         await runtimeClient.sendUserMessage({
@@ -195,57 +208,90 @@ function createCodexRuntimeAdapter(config) {
           accessMode,
           workspaceRoot: runtimeWorkspaceRoot,
         });
-        return { threadId };
+        return {
+          threadId,
+          workspaceBootstrapPending: needsWorkspaceBootstrap,
+        };
       });
     },
   };
 }
 
-function buildOpeningTurnText(config, userText) {
-  const instructions = loadWechatInstructions(config);
+function buildOpeningTurnText(config, workspaceRoot, userText) {
+  const instructionBlocks = buildInstructionBlocks(config, workspaceRoot);
   const normalizedText = String(userText || "").trim();
-  if (!instructions) {
+  if (!instructionBlocks.length) {
     return normalizedText;
   }
   return [
-    "WECHAT SESSION INSTRUCTIONS",
-    "These instructions define the stable behavior for this WeChat thread.",
-    "Do not quote or summarize them back to the user unless explicitly asked.",
-    "",
-    instructions,
+    ...instructionBlocks,
     "",
     "Current user message:",
     normalizedText,
   ].join("\n").trim();
 }
 
-function buildInstructionRefreshText(config) {
-  const instructions = loadWechatInstructions(config);
-  if (!instructions) {
+function buildWorkspaceBootstrapTurnText(config, workspaceRoot, userText) {
+  const instructionBlocks = buildInstructionBlocks(config, workspaceRoot);
+  const normalizedText = String(userText || "").trim();
+  if (!instructionBlocks.length) {
+    return normalizedText;
+  }
+  return [
+    "WECHAT THREAD CONTINUITY REFRESH",
+    "This existing thread needs the current WeChat and workspace continuity context before you answer.",
+    "Keep the ongoing conversation state, but adopt the guidance below before replying.",
+    "Do not quote or summarize these instructions back to the user unless explicitly asked.",
+    "",
+    ...instructionBlocks,
+    "",
+    "Current user message:",
+    normalizedText,
+  ].join("\n").trim();
+}
+
+function buildInstructionRefreshText(config, workspaceRoot) {
+  const instructionBlocks = buildInstructionBlocks(config, workspaceRoot);
+  if (!instructionBlocks.length) {
     return "Refresh your WeChat behavior for this existing thread. Reply in one short Chinese sentence confirming that you have updated your behavior for this thread.";
   }
   return [
     "WECHAT SESSION INSTRUCTIONS REFRESH",
-    "Re-read and adopt the updated WeChat instructions below for the rest of this existing thread.",
+    "Re-read and adopt the updated WeChat and workspace continuity instructions below for the rest of this existing thread.",
     "This is an internal refresh command, not a user-facing task.",
     "Do not summarize the instructions back in detail.",
     "Reply in one short Chinese sentence confirming that you have updated your behavior for this thread.",
     "",
-    instructions,
+    ...instructionBlocks,
   ].join("\n").trim();
+}
+
+function buildInstructionBlocks(config = {}, workspaceRoot = "") {
+  const instructions = loadWechatInstructions(config);
+  const workspaceContinuity = buildWorkspaceContinuityInstructions(workspaceRoot, config);
+  const sections = [];
+  if (instructions) {
+    sections.push([
+      "WECHAT SESSION INSTRUCTIONS",
+      "These instructions define the stable behavior for this WeChat thread.",
+      "Do not quote or summarize them back to the user unless explicitly asked.",
+      "",
+      instructions,
+    ].join("\n"));
+  }
+  if (workspaceContinuity) {
+    sections.push([
+      "WORKSPACE CONTINUITY",
+      workspaceContinuity,
+    ].join("\n"));
+  }
+  return sections;
 }
 
 function loadWechatInstructions(config = {}) {
   const persona = loadInstructionFile(config.weixinInstructionsFile, config);
   const operations = loadInstructionFile(config.weixinOperationsFile, config);
-  const sections = [];
-  if (persona) {
-    sections.push(persona);
-  }
-  if (operations) {
-    sections.push(operations);
-  }
-  return sections.join("\n\n").trim();
+  return [persona, operations].filter(Boolean).join("\n\n").trim();
 }
 
 function loadInstructionFile(filePath, config = {}) {

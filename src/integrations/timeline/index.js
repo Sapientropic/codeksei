@@ -10,7 +10,7 @@ function createTimelineIntegration(config) {
         id: "timeline-for-agent",
         kind: "integration",
         command: `${process.execPath} ${binPath}`,
-        stateDir: config.stateDir,
+        stateDir: config.timelineStateDir,
       };
     },
     async runSubcommand(subcommand, args = []) {
@@ -19,7 +19,7 @@ function createTimelineIntegration(config) {
         throw new Error("timeline 子命令不能为空");
       }
       return runTimelineCommand(binPath, [normalizedSubcommand, ...normalizeArgs(args)], {
-        TIMELINE_FOR_AGENT_STATE_DIR: config.stateDir,
+        TIMELINE_FOR_AGENT_STATE_DIR: config.timelineStateDir,
         TIMELINE_FOR_AGENT_CHROME_PATH: resolveTimelineChromePath(),
       }, {
         subcommand: normalizedSubcommand,

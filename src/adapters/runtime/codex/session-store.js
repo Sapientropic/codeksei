@@ -74,6 +74,7 @@ class SessionStore {
 
   setThreadIdForWorkspace(bindingKey, workspaceRoot, threadId, extra = {}) {
     const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
+    const normalizedThreadId = normalizeValue(threadId);
     if (!normalizedWorkspaceRoot) {
       return this.getBinding(bindingKey);
     }
@@ -81,7 +82,14 @@ class SessionStore {
     const current = this.getBinding(bindingKey) || {};
     const threadIdByWorkspaceRoot = {
       ...getThreadMap(current),
-      [normalizedWorkspaceRoot]: normalizeValue(threadId),
+      [normalizedWorkspaceRoot]: normalizedThreadId,
+    };
+    const workspaceBootstrapThreadIdByWorkspaceRoot = {
+      ...getWorkspaceBootstrapThreadMap(current),
+      [normalizedWorkspaceRoot]:
+        getWorkspaceBootstrapThreadMap(current)[normalizedWorkspaceRoot] === normalizedThreadId
+          ? normalizedThreadId
+          : "",
     };
 
     return this.updateBinding(bindingKey, {
@@ -89,6 +97,7 @@ class SessionStore {
       ...extra,
       activeWorkspaceRoot: normalizedWorkspaceRoot,
       threadIdByWorkspaceRoot,
+      workspaceBootstrapThreadIdByWorkspaceRoot,
     });
   }
 
@@ -133,9 +142,14 @@ class SessionStore {
       ...getThreadMap(current),
       [normalizedWorkspaceRoot]: "",
     };
+    const workspaceBootstrapThreadIdByWorkspaceRoot = {
+      ...getWorkspaceBootstrapThreadMap(current),
+      [normalizedWorkspaceRoot]: "",
+    };
     return this.updateBinding(bindingKey, {
       ...current,
       threadIdByWorkspaceRoot,
+      workspaceBootstrapThreadIdByWorkspaceRoot,
     });
   }
 
@@ -170,6 +184,33 @@ class SessionStore {
       }
     }
     return null;
+  }
+
+  hasWorkspaceBootstrapForThread(bindingKey, workspaceRoot, threadId) {
+    const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
+    const normalizedThreadId = normalizeValue(threadId);
+    if (!normalizedWorkspaceRoot || !normalizedThreadId) {
+      return false;
+    }
+    const current = this.getBinding(bindingKey) || {};
+    return getWorkspaceBootstrapThreadMap(current)[normalizedWorkspaceRoot] === normalizedThreadId;
+  }
+
+  rememberWorkspaceBootstrapForThread(bindingKey, workspaceRoot, threadId) {
+    const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
+    const normalizedThreadId = normalizeValue(threadId);
+    if (!normalizedWorkspaceRoot || !normalizedThreadId) {
+      return this.getBinding(bindingKey);
+    }
+    const current = this.getBinding(bindingKey) || {};
+    const workspaceBootstrapThreadIdByWorkspaceRoot = {
+      ...getWorkspaceBootstrapThreadMap(current),
+      [normalizedWorkspaceRoot]: normalizedThreadId,
+    };
+    return this.updateBinding(bindingKey, {
+      ...current,
+      workspaceBootstrapThreadIdByWorkspaceRoot,
+    });
   }
 
   getApprovalCommandAllowlistForWorkspace(workspaceRoot) {
@@ -309,6 +350,13 @@ function getThreadMap(binding) {
 function getCodexParamsMap(binding) {
   return binding?.codexParamsByWorkspaceRoot && typeof binding.codexParamsByWorkspaceRoot === "object"
     ? binding.codexParamsByWorkspaceRoot
+    : {};
+}
+
+function getWorkspaceBootstrapThreadMap(binding) {
+  return binding?.workspaceBootstrapThreadIdByWorkspaceRoot
+    && typeof binding.workspaceBootstrapThreadIdByWorkspaceRoot === "object"
+    ? binding.workspaceBootstrapThreadIdByWorkspaceRoot
     : {};
 }
 
