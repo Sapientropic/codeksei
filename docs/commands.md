@@ -65,6 +65,8 @@
 - `npm run note:auto -- --project <slug> --kind <kind> --text "..."`
 - `npm run note:maybe -- [--project <slug> | --scope <name>] [--kind <kind>]`
 - `npm run note:sync -- --project <slug> --section <标题> --text "..."` 或 `--path <path>`
+- `npm run review:weekly -- [--week YYYY-Www] [--date YYYY-MM-DD]`
+- `npm run review:monthly -- [--month YYYY-MM] [--date YYYY-MM-DD]`
 
 ## 规划中的终端子命令
 
@@ -153,6 +155,18 @@
 - 默认 `style=bullet`，适合“最近动作 / durable 结论 / 下一步”
 - 传 `--slot <id>` 时，会在该 section 里维护一个受控块，适合“当前状态”这类需要覆盖旧值的摘要
 - `--project <slug>` 适合代码项目 note；`--path` 适合 life-assistant note 或其他 workspace note
+
+### review
+
+- `npm run review:weekly`
+- `npm run review:weekly -- --week 2026-W15`
+- `npm run review:monthly`
+- `npm run review:monthly -- --month 2026-04`
+
+说明：
+- 复盘来源是当前 workspace 的日记真相源，不是 timeline 派生页，也不是学习项目模板
+- 周复盘默认按周一到周日；月复盘默认按自然月
+- 生成的 note 会保留固定骨架，并用受控 block 更新“推进 / 摩擦 / 线头 / 每天收口摘录”等生成区
 
 ## 当前已接入的微信命令
 

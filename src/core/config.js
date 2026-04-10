@@ -47,6 +47,8 @@ function readConfig() {
       || path.resolve(workspaceRoot, ".codex", "code-projects.json"),
     durableNoteSchemaConfigFile: readTextEnv("CYBERBOSS_DURABLE_NOTE_SCHEMA_CONFIG")
       || path.resolve(workspaceRoot, ".codex", "durable-note-schema.json"),
+    reviewSchemaConfigFile: readTextEnv("CYBERBOSS_REVIEW_SCHEMA_CONFIG")
+      || path.resolve(workspaceRoot, ".codex", "review-schema.json"),
     sharedBridgeHeartbeatFile: path.join(stateDir, "logs", "shared-wechat-heartbeat.json"),
     sharedWatchdogStateFile: path.join(stateDir, "logs", "shared-watchdog-state.json"),
     startWithCheckin: (mode === "start" && hasArgFlag(argv, "--checkin")) || readBoolEnv("CYBERBOSS_ENABLE_CHECKIN"),

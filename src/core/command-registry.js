@@ -181,6 +181,22 @@ const COMMAND_GROUPS = [
         weixin: [],
         status: "active",
       },
+      {
+        action: "review.weekly",
+        summary: "从日记真相源生成一份周复盘",
+        terminal: ["review weekly"],
+        terminalGroup: "review",
+        weixin: [],
+        status: "active",
+      },
+      {
+        action: "review.monthly",
+        summary: "从日记真相源生成一份月复盘",
+        terminal: ["review monthly"],
+        terminalGroup: "review",
+        weixin: [],
+        status: "active",
+      },
     ],
   },
   {
@@ -504,6 +520,15 @@ function buildTopicUsage(topic) {
         "  默认写成 bullet；需要维护一个稳定状态块时传 --slot",
         "  note:sync 保留给自定义 section 或一次性低层回写",
       ].join("\n");
+    case "review":
+      return [
+        "npm run review:weekly -- [--week YYYY-Www] [--date YYYY-MM-DD]",
+        "npm run review:monthly -- [--month YYYY-MM] [--date YYYY-MM-DD]",
+        "",
+        "补充：",
+        "  复盘基于当前 diary 真相源生成，服务 Cyberboss 自己的生活助理复盘，不复用学习项目模板",
+        "  周复盘默认按周一到周日；月复盘默认按自然月",
+      ].join("\n");
     default:
       return "npm run <script>";
   }
@@ -559,6 +584,10 @@ function toNpmRunExample(commandText) {
       return "npm run note:auto -- --project <slug> --kind recent --text \"...\"";
     case "note maybe":
       return "npm run note:maybe -- --scope assistant --kind preference";
+    case "review weekly":
+      return "npm run review:weekly";
+    case "review monthly":
+      return "npm run review:monthly";
     default:
       return normalized;
   }

@@ -13,6 +13,7 @@ const { runChannelSendFileCommand } = require("./app/channel-send-file-cli");
 const { runNoteAutoCommand, runNoteMaybeCommand } = require("./app/note-auto-cli");
 const { runNoteSyncCommand } = require("./app/note-sync-cli");
 const { runProjectRadarCommand } = require("./app/project-radar-cli");
+const { runReviewCommand } = require("./app/review-cli");
 const { runTimelineEventCommand } = require("./app/timeline-event-cli");
 const { runTimelineScreenshotCommand } = require("./app/timeline-screenshot-cli");
 const { runSystemCheckinPoller } = require("./app/system-checkin-poller");
@@ -191,6 +192,22 @@ async function main() {
         return;
       }
       await runProjectRadarCommand(config);
+      return;
+    }
+    if (command === "review" && subcommand === "weekly") {
+      if (wantsSubcommandHelp) {
+        console.log(topicHelp);
+        return;
+      }
+      runReviewCommand(config, "weekly");
+      return;
+    }
+    if (command === "review" && subcommand === "monthly") {
+      if (wantsSubcommandHelp) {
+        console.log(topicHelp);
+        return;
+      }
+      runReviewCommand(config, "monthly");
       return;
     }
   }
