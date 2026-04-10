@@ -148,6 +148,7 @@ CYBERBOSS_DIARY_DIR=/绝对路径/你的 vault/日记
 CYBERBOSS_TIMELINE_STATE_DIR=/绝对路径/你的 vault/.codex/timeline
 CYBERBOSS_WORKSPACE_BOOTSTRAP_CONFIG=/绝对路径/你的 workspace-bootstrap.json
 CYBERBOSS_PROJECT_RADAR_CONFIG=/绝对路径/你的 workspace/.codex/code-projects.json
+CYBERBOSS_SHARED_USE_BUNDLED_CODEX_BINARY=1
 ```
 
 `CYBERBOSS_ALLOWED_USER_IDS` 支持逗号分隔多个 user id。
@@ -162,6 +163,13 @@ CYBERBOSS_PROJECT_RADAR_CONFIG=/绝对路径/你的 workspace/.codex/code-projec
 如果你要跑共享线程，建议也在第一次启动前就把 `CYBERBOSS_WORKSPACE_ROOT` 配好。这样 `shared:open` 会优先接到你当前项目对应的那条线程，而不是回退到别的历史绑定。
 
 如果你在 `v2` 适配器下需要走特定路由网关，可以额外设置 `CYBERBOSS_WEIXIN_ROUTE_TAG`。`CYBERBOSS_WORKSPACE_BOOTSTRAP_CONFIG` 默认会落到 `${HOME}/.cyberboss/workspace-bootstrap.json`，用来声明“某个 workspace 开新线程时先读哪些稳定入口文件”，这样就不用再把某个 vault 的文件结构写死进仓库源码。`CYBERBOSS_PROJECT_RADAR_CONFIG` 默认会指向 `${CYBERBOSS_WORKSPACE_ROOT}/.codex/code-projects.json`，用于声明“这个 workspace 里有哪些代码项目值得做轻量 git radar”。
+
+`CYBERBOSS_SHARED_USE_BUNDLED_CODEX_BINARY` 只影响共享 `app-server` 在 Windows 下如何启动：
+
+- `1`：优先直连 packaged `codex.exe`
+- `0`：保留 `codex`/`codex.cmd` 启动链路
+
+如果你发现 Windows 上“微信侧同一个 session 里一调用工具就闪 PowerShell/命令窗”，可以先把它设成 `0` 做最小回退验证。
 
 ### 用户自己会用到的终端命令
 

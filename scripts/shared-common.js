@@ -32,6 +32,10 @@ const BRIDGE_HEARTBEAT_MAX_AGE_MS = Number.parseInt(
   String(process.env.CYBERBOSS_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS || ""),
   10
 ) || DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS;
+const SHARED_USE_BUNDLED_CODEX_BINARY = readBoolEnv(
+  "CYBERBOSS_SHARED_USE_BUNDLED_CODEX_BINARY",
+  true
+);
 
 function loadSharedEnv() {
   const defaultStateDir = path.join(os.homedir(), ".cyberboss");
@@ -48,6 +52,20 @@ function loadSharedEnv() {
     dotenv.config({ path: envPath });
     return;
   }
+}
+
+function readBoolEnv(name, defaultValue = false) {
+  const raw = String(process.env[name] || "").trim().toLowerCase();
+  if (!raw) {
+    return defaultValue;
+  }
+  if (["1", "true", "yes", "on"].includes(raw)) {
+    return true;
+  }
+  if (["0", "false", "no", "off"].includes(raw)) {
+    return false;
+  }
+  return defaultValue;
 }
 
 function ensureLogDir() {
@@ -510,11 +528,14 @@ async function ensureSharedAppServer() {
   }
 
   const command = process.env.CYBERBOSS_CODEX_COMMAND || "codex";
-  // The npm-installed codex.cmd shim eventually re-spawns the native binary
-  // with inherited stdio, which causes Windows to pop a visible console even
-  // when the parent task runs hidden. Launch the packaged codex.exe directly
-  // for shared background app-server runs so the process stays headless.
-  const detachedCommand = resolveBundledCodexBinary(command) || command;
+  // Some Windows setups behave better when the shared app-server is launched
+  // through the npm codex.cmd shim, because later shell_command children can
+  // inherit that console environment instead of spawning a fresh visible one.
+  // Keep the direct codex.exe path as an opt-in/opt-out switch so we can A/B
+  // detached startup behavior without rewriting the shared lifecycle.
+  const detachedCommand = SHARED_USE_BUNDLED_CODEX_BINARY
+    ? (resolveBundledCodexBinary(command) || command)
+    : command;
   const pid = spawnDetachedCommand(detachedCommand, ["app-server", "--listen", listenUrl], {
     logFile: appServerLogFile,
     env,
