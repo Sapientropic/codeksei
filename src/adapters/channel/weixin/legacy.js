@@ -13,6 +13,7 @@ const SEND_MESSAGE_CHUNK_INTERVAL_MS = 350;
 const WEIXIN_SEND_CHUNK_LIMIT = 80;
 const MAX_WEIXIN_CHUNK = 3800;
 const WEIXIN_MAX_DELIVERY_MESSAGES = 10;
+const SEND_RETRY_DELAYS_MS = [900, 1800];
 
 function createLegacyWeixinChannelAdapter(config) {
   let selectedAccount = null;
@@ -147,7 +148,7 @@ function createLegacyWeixinChannelAdapter(config) {
         );
       for (let index = 0; index < sendChunks.length; index += 1) {
         const compactChunk = compactPlainTextForWeixin(sendChunks[index]) || "已完成。";
-        await sendMessage({
+        await sendTextChunkWithRetry(() => sendMessage({
           baseUrl: account.baseUrl,
           token: account.token,
           body: {
@@ -166,7 +167,7 @@ function createLegacyWeixinChannelAdapter(config) {
               context_token: resolvedToken,
             },
           },
-        });
+        }));
         if (index < sendChunks.length - 1) {
           await sleep(SEND_MESSAGE_CHUNK_INTERVAL_MS);
         }
@@ -398,6 +399,33 @@ function collectStreamingBoundaries(text) {
   }
 
   return Array.from(boundaries).sort((left, right) => left - right);
+}
+
+async function sendTextChunkWithRetry(send) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= SEND_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      return await send();
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableSendError(error) || attempt >= SEND_RETRY_DELAYS_MS.length) {
+        throw error;
+      }
+      await sleep(SEND_RETRY_DELAYS_MS[attempt]);
+    }
+  }
+  throw lastError || new Error("sendText chunk failed");
+}
+
+function isRetryableSendError(error) {
+  const message = String(error?.message || error || "");
+  return message.includes("ret=-2")
+    || message.includes("AbortError")
+    || message.includes("aborted")
+    || message.includes("fetch failed")
+    || message.includes("ECONNRESET")
+    || message.includes("ETIMEDOUT")
+    || /http 5\d\d/.test(message);
 }
 
 function trimOuterBlankLines(text) {

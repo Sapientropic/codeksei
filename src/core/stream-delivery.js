@@ -253,13 +253,13 @@ class StreamDelivery {
       return;
     }
 
-    state.sentText = safeText;
     state.sendChain = state.sendChain.then(async () => {
       await this.channelAdapter.sendText({
         userId: state.replyTarget.userId,
         text: delta,
         contextToken: state.replyTarget.contextToken,
       });
+      state.sentText = safeText;
     }).catch((error) => {
       console.error(`[cyberboss] failed to deliver reply thread=${state.threadId}: ${error.message}`);
     });
