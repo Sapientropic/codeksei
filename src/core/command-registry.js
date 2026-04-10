@@ -182,6 +182,14 @@ const COMMAND_GROUPS = [
         status: "active",
       },
       {
+        action: "review.nightly",
+        summary: "从日记真相源生成一份睡前收口",
+        terminal: ["review nightly"],
+        terminalGroup: "review",
+        weixin: [],
+        status: "active",
+      },
+      {
         action: "review.weekly",
         summary: "从日记真相源生成一份周复盘",
         terminal: ["review weekly"],
@@ -522,11 +530,13 @@ function buildTopicUsage(topic) {
       ].join("\n");
     case "review":
       return [
+        "npm run review:nightly -- [--date YYYY-MM-DD]",
         "npm run review:weekly -- [--week YYYY-Www] [--date YYYY-MM-DD]",
         "npm run review:monthly -- [--month YYYY-MM] [--date YYYY-MM-DD]",
         "",
         "补充：",
         "  复盘基于当前 diary 真相源生成，服务 Cyberboss 自己的生活助理复盘，不复用学习项目模板",
+        "  nightly 负责睡前收口；周/月复盘在有 nightly 时会优先吸收它",
         "  周复盘默认按周一到周日；月复盘默认按自然月",
       ].join("\n");
     default:
@@ -586,6 +596,8 @@ function toNpmRunExample(commandText) {
       return "npm run note:maybe -- --scope assistant --kind preference";
     case "review weekly":
       return "npm run review:weekly";
+    case "review nightly":
+      return "npm run review:nightly";
     case "review monthly":
       return "npm run review:monthly";
     default:

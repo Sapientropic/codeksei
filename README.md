@@ -166,7 +166,7 @@ CYBERBOSS_SHARED_DISABLE_SHELL_SNAPSHOT=0
 
 如果你要跑共享线程，建议也在第一次启动前就把 `CYBERBOSS_WORKSPACE_ROOT` 配好。这样 `shared:open` 会优先接到你当前项目对应的那条线程，而不是回退到别的历史绑定。
 
-如果你在 `v2` 适配器下需要走特定路由网关，可以额外设置 `CYBERBOSS_WEIXIN_ROUTE_TAG`。`CYBERBOSS_WORKSPACE_BOOTSTRAP_CONFIG` 默认会落到 `${HOME}/.cyberboss/workspace-bootstrap.json`，用来声明“某个 workspace 开新线程时先读哪些稳定入口文件”，这样就不用再把某个 vault 的文件结构写死进仓库源码。`CYBERBOSS_PROJECT_RADAR_CONFIG` 默认会指向 `${CYBERBOSS_WORKSPACE_ROOT}/.codex/code-projects.json`，用于声明“这个 workspace 里有哪些代码项目值得做轻量 git radar”。`CYBERBOSS_DURABLE_NOTE_SCHEMA_CONFIG` 默认会指向 `${CYBERBOSS_WORKSPACE_ROOT}/.codex/durable-note-schema.json`，用于声明“不同 durable note family 的固定章节骨架和自动路由规则”。`CYBERBOSS_REVIEW_SCHEMA_CONFIG` 默认会指向 `${CYBERBOSS_WORKSPACE_ROOT}/.codex/review-schema.json`，用于声明“周复盘 / 月复盘应该写到哪里，以及使用哪套生活助理复盘模型”。 
+如果你在 `v2` 适配器下需要走特定路由网关，可以额外设置 `CYBERBOSS_WEIXIN_ROUTE_TAG`。`CYBERBOSS_WORKSPACE_BOOTSTRAP_CONFIG` 默认会落到 `${HOME}/.cyberboss/workspace-bootstrap.json`，用来声明“某个 workspace 开新线程时先读哪些稳定入口文件”，这样就不用再把某个 vault 的文件结构写死进仓库源码。`CYBERBOSS_PROJECT_RADAR_CONFIG` 默认会指向 `${CYBERBOSS_WORKSPACE_ROOT}/.codex/code-projects.json`，用于声明“这个 workspace 里有哪些代码项目值得做轻量 git radar”。`CYBERBOSS_DURABLE_NOTE_SCHEMA_CONFIG` 默认会指向 `${CYBERBOSS_WORKSPACE_ROOT}/.codex/durable-note-schema.json`，用于声明“不同 durable note family 的固定章节骨架和自动路由规则”。`CYBERBOSS_REVIEW_SCHEMA_CONFIG` 默认会指向 `${CYBERBOSS_WORKSPACE_ROOT}/.codex/review-schema.json`，用于声明“睡前收口 / 周复盘 / 月复盘应该写到哪里，以及使用哪套生活助理复盘模型”。 
 
 `CYBERBOSS_SHARED_USE_BUNDLED_CODEX_BINARY` 只影响共享 `app-server` 在 Windows 下如何启动：
 

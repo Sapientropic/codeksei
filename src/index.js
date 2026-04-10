@@ -202,6 +202,14 @@ async function main() {
       runReviewCommand(config, "weekly");
       return;
     }
+    if (command === "review" && subcommand === "nightly") {
+      if (wantsSubcommandHelp) {
+        console.log(topicHelp);
+        return;
+      }
+      runReviewCommand(config, "nightly");
+      return;
+    }
     if (command === "review" && subcommand === "monthly") {
       if (wantsSubcommandHelp) {
         console.log(topicHelp);

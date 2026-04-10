@@ -63,11 +63,26 @@ function parseReviewArgs(args, kind) {
   if (kind === "monthly" && options.week) {
     throw new Error("review:monthly 不支持 --week");
   }
+  if (kind === "nightly" && (options.week || options.month)) {
+    throw new Error("review:nightly 只支持 --date");
+  }
 
   return options;
 }
 
 function printReviewHelp(kind) {
+  const nightly = [
+    "用法: npm run review:nightly -- [--date YYYY-MM-DD] [--stdout]",
+    "",
+    "说明：",
+    "  从当前 diary 真相源生成一份 Cyberboss 睡前收口。",
+    "  默认按 Asia/Shanghai 的当前日期推断今天，并给周/月复盘提供更轻的日级原料。",
+    "",
+    "示例：",
+    "  npm run review:nightly",
+    "  npm run review:nightly -- --date 2026-04-10",
+  ].join("\n");
+
   const weekly = [
     "用法: npm run review:weekly -- [--week YYYY-Www] [--date YYYY-MM-DD] [--stdout]",
     "",
@@ -94,6 +109,10 @@ function printReviewHelp(kind) {
     "  npm run review:monthly -- --date 2026-04-11",
   ].join("\n");
 
+  if (kind === "nightly") {
+    console.log(nightly);
+    return;
+  }
   console.log(kind === "weekly" ? weekly : monthly);
 }
 

@@ -3,6 +3,30 @@ const path = require("path");
 
 const REVIEW_MARKER_PREFIX = "cyberboss-review";
 
+const DEFAULT_REVIEW_MODELS = {
+  nightly: {
+    cadenceLabel: "夜",
+    titleSuffix: "睡前收口",
+    carryLabel: "明天第一步",
+    intro: "这是一份 Cyberboss 睡前收口，不是学习项目模板。它只收今天真实推进了什么、现在还挂着什么、明天从哪里更容易接上，好把周/月复盘的原料先压成一层低摩擦摘要。",
+    tags: ["cyberboss", "life-assistant", "review", "nightly"],
+  },
+  weekly: {
+    cadenceLabel: "周",
+    titleSuffix: "周复盘",
+    carryLabel: "下周第一步",
+    intro: "这是一份 Cyberboss 生活助理周复盘，不是学习项目模板。它只关心这周真实推进了什么、摩擦在哪里、线头还挂着什么，以及下周如何更容易重新接上。",
+    tags: ["cyberboss", "life-assistant", "review", "weekly"],
+  },
+  monthly: {
+    cadenceLabel: "月",
+    titleSuffix: "月复盘",
+    carryLabel: "下月第一步",
+    intro: "这是一份 Cyberboss 生活助理月复盘，不是学习项目模板。它优先收口这个月真实推进的线、反复出现的摩擦、仍未解决的线头，以及下个月应该从哪里接上。",
+    tags: ["cyberboss", "life-assistant", "review", "monthly"],
+  },
+};
+
 function loadReviewSchemaConfig(config = {}) {
   const filePath = normalizeText(config.reviewSchemaConfigFile);
   if (!filePath) {
@@ -20,8 +44,10 @@ function loadReviewSchemaConfig(config = {}) {
   }
 }
 
-function resolveReviewProfile(config = {}, kind) {
+function resolveReviewProfile(config = {}, kind, options = {}) {
   const normalizedKind = normalizeReviewKind(kind);
+  const defaults = DEFAULT_REVIEW_MODELS[normalizedKind];
+  const required = options.required !== false;
   const workspaceRoot = normalizeDisplayPath(path.resolve(String(config.workspaceRoot || process.cwd())));
   const schemaConfig = loadReviewSchemaConfig(config);
   const workspaceProfile = selectWorkspaceProfile(schemaConfig.workspaces, workspaceRoot);
@@ -29,6 +55,10 @@ function resolveReviewProfile(config = {}, kind) {
     ? workspaceProfile.reviews
     : {};
   const rawProfile = reviews[normalizedKind];
+
+  if ((!rawProfile || typeof rawProfile !== "object") && !required) {
+    return null;
+  }
   if (!rawProfile || typeof rawProfile !== "object") {
     throw new Error(`当前 workspace 没有 ${normalizedKind} review 配置: ${workspaceRoot}`);
   }
@@ -37,14 +67,18 @@ function resolveReviewProfile(config = {}, kind) {
   if (!folder) {
     throw new Error(`${normalizedKind} review 缺少 folder 配置`);
   }
+
+  const carryLabel = normalizeText(rawProfile.carryLabel) || defaults.carryLabel;
   return {
     kind: normalizedKind,
     workspaceRoot,
     folderPath: resolveWorkspacePath(workspaceRoot, folder),
-    intro: normalizeText(rawProfile.intro),
-    cadenceLabel: normalizeText(rawProfile.cadenceLabel) || (normalizedKind === "weekly" ? "周" : "月"),
-    titleSuffix: normalizeText(rawProfile.titleSuffix) || (normalizedKind === "weekly" ? "周复盘" : "月复盘"),
-    carryLabel: normalizeText(rawProfile.carryLabel) || (normalizedKind === "weekly" ? "下周第一步" : "下月第一步"),
+    intro: normalizeText(rawProfile.intro) || defaults.intro,
+    cadenceLabel: normalizeText(rawProfile.cadenceLabel) || defaults.cadenceLabel,
+    titleSuffix: normalizeText(rawProfile.titleSuffix) || defaults.titleSuffix,
+    carryLabel,
+    tags: normalizeTags(rawProfile.tags, defaults.tags),
+    sections: buildReviewSections(normalizedKind, carryLabel),
   };
 }
 
@@ -52,12 +86,16 @@ function buildReview(config = {}, kind, options = {}) {
   const profile = resolveReviewProfile(config, kind);
   const window = resolveReviewWindow(profile.kind, options);
   const diaryEntries = collectDiaryEntries(config.diaryDir, window.startDate, window.endDate);
-  const draft = buildReviewDraft(profile, window, diaryEntries);
+  const nightlyEntries = profile.kind === "nightly"
+    ? []
+    : collectNightlyEntries(config, window);
+  const draft = buildReviewDraft(profile, window, diaryEntries, nightlyEntries);
   const notePath = normalizeDisplayPath(path.join(profile.folderPath, `${draft.periodLabel}.md`));
   return {
     profile,
     window,
     diaryEntries,
+    nightlyEntries,
     draft,
     notePath,
   };
@@ -80,16 +118,14 @@ function writeReview(config = {}, kind, options = {}) {
     filePath: review.notePath,
     periodLabel: review.draft.periodLabel,
     diaryCount: review.diaryEntries.length,
+    nightlyCount: review.nightlyEntries.length,
   };
 }
 
 function buildReviewFileSkeleton(review, now = new Date()) {
   const createdAt = formatDateTime(now);
   const updated = formatDate(now);
-  const tags = review.profile.kind === "weekly"
-    ? ["cyberboss", "life-assistant", "review", "weekly"]
-    : ["cyberboss", "life-assistant", "review", "monthly"];
-  return [
+  const frontmatter = [
     "---",
     `created: ${createdAt}`,
     `updated: ${updated}`,
@@ -98,40 +134,35 @@ function buildReviewFileSkeleton(review, now = new Date()) {
     `period_label: ${review.draft.periodLabel}`,
     `period_start: ${review.window.startDate}`,
     `period_end: ${review.window.endDate}`,
-    `source_diary_days: ${review.diaryEntries.length}`,
+    `source_diary_days: ${review.draft.sourceDiaryDays}`,
+  ];
+
+  if (review.profile.kind !== "nightly") {
+    frontmatter.push(`source_nightly_days: ${review.draft.sourceNightlyDays}`);
+  }
+
+  frontmatter.push(
     "status: working",
     "tags:",
-    ...tags.map((tag) => `  - ${tag}`),
+    ...review.profile.tags.map((tag) => `  - ${tag}`),
     "---",
     `# ${review.draft.periodTitle}`,
     "",
-    `> ${review.profile.intro || "这是一份 Cyberboss 生活助理复盘，不是学习项目模板。它只关心这段时间真实推进了什么、摩擦在哪里、线头还挂着什么，以及下一次怎么更容易重新接上。"} `,
-    "",
-    "## 本周期窗口",
-    buildManagedBlock("window", ""),
-    "",
-    "## 这段时间最真实的推进",
-    buildManagedBlock("progress", ""),
-    "",
-    "## 消耗与摩擦",
-    buildManagedBlock("friction", ""),
-    "",
-    "## 还开着的线头",
-    buildManagedBlock("open-loops", ""),
-    "",
-    `## ${review.profile.carryLabel}`,
-    buildManagedBlock("carry-forward", ""),
-    "",
-    "## 每天收口摘录",
-    buildManagedBlock("daily-summaries", ""),
-    "",
-    "## 值得回看的补充记录",
-    buildManagedBlock("supplements", ""),
-    "",
-    "## Agent 判断",
-    "- ",
-    "",
-  ].join("\n");
+    `> ${review.profile.intro} `,
+    ""
+  );
+
+  for (const section of review.profile.sections) {
+    frontmatter.push(section.heading);
+    if (section.slot) {
+      frontmatter.push(buildManagedBlock(section.slot, ""));
+    } else {
+      frontmatter.push(section.staticBody || "");
+    }
+    frontmatter.push("");
+  }
+
+  return frontmatter.join("\n");
 }
 
 function syncReviewContent(content, review, now = new Date()) {
@@ -141,63 +172,133 @@ function syncReviewContent(content, review, now = new Date()) {
   next = updateFrontmatterValue(next, "period_start", review.window.startDate);
   next = updateFrontmatterValue(next, "period_end", review.window.endDate);
   next = updateFrontmatterValue(next, "source_diary_days", String(review.diaryEntries.length));
+  if (review.profile.kind !== "nightly") {
+    next = updateFrontmatterValue(next, "source_nightly_days", String(review.nightlyEntries.length));
+  }
 
   next = replaceHeading(next, 1, review.draft.periodTitle);
-  next = upsertManagedBlock(next, "window", renderBulletList(review.draft.windowFacts, "这一段时间还没有可用日记事实。"));
-  next = upsertManagedBlock(next, "progress", renderBulletList(review.draft.progress, "这段时间还没有收出可用的推进摘要。"));
-  next = upsertManagedBlock(next, "friction", renderBulletList(review.draft.friction, "这段时间还没有明显的摩擦摘要。"));
-  next = upsertManagedBlock(next, "open-loops", renderBulletList(review.draft.openLoops, "这一周期末尾没有明显还开着的线头。"));
-  next = upsertManagedBlock(next, "carry-forward", renderBulletList(review.draft.carryForward, "下一次先从最小动作重新接上。"));
-  next = upsertManagedBlock(next, "daily-summaries", renderDatedGroups(review.draft.dailySummaries, "这段时间没有可引用的每日总结。"));
-  next = upsertManagedBlock(next, "supplements", renderSupplementGroups(review.draft.supplements, "这段时间没有值得回看的补充记录。"));
+  for (const [slot, body] of Object.entries(review.draft.content)) {
+    next = upsertManagedBlock(next, slot, body);
+  }
   return ensureTrailingNewline(next);
 }
 
 function ensureReviewSections(content, review) {
   let next = content;
-  const requiredHeadings = [
-    "## 本周期窗口",
-    "## 这段时间最真实的推进",
-    "## 消耗与摩擦",
-    "## 还开着的线头",
-    `## ${review.profile.carryLabel}`,
-    "## 每天收口摘录",
-    "## 值得回看的补充记录",
-    "## Agent 判断",
-  ];
-  for (const heading of requiredHeadings) {
-    if (new RegExp(`^${escapeRegExp(heading)}\\s*$`, "m").test(next)) {
+  for (const section of review.profile.sections) {
+    const headingPattern = new RegExp(`^${escapeRegExp(section.heading)}\\s*$`, "m");
+    const hasHeading = headingPattern.test(next);
+    const hasBlock = !section.slot || hasManagedBlock(next, section.slot);
+    if (hasHeading && hasBlock) {
       continue;
     }
-    next = `${next.replace(/\s*$/u, "")}\n\n${heading}\n`;
+
+    const sectionBody = section.slot
+      ? buildManagedBlock(section.slot, "")
+      : (section.staticBody || "");
+
+    if (!hasHeading) {
+      next = `${next.replace(/\s*$/u, "")}\n\n${section.heading}\n${sectionBody}\n`;
+      continue;
+    }
+
+    if (section.slot && !hasBlock) {
+      next = next.replace(
+        headingPattern,
+        `${section.heading}\n${buildManagedBlock(section.slot, "")}`
+      );
+    }
   }
   return next;
 }
 
-function buildReviewDraft(profile, window, diaryEntries) {
+function buildReviewDraft(profile, window, diaryEntries, nightlyEntries = []) {
+  if (profile.kind === "nightly") {
+    return buildNightlyDraft(profile, window, diaryEntries);
+  }
+  return buildPeriodicReviewDraft(profile, window, diaryEntries, nightlyEntries);
+}
+
+function buildNightlyDraft(profile, window, diaryEntries) {
+  const entry = diaryEntries[0] || null;
+  const openTodos = entry ? entry.todo.open.length : 0;
+  const doneTodos = entry ? entry.todo.done.length : 0;
+  const timelineCount = entry ? entry.timeline.length : 0;
+  const supplementCount = entry ? entry.supplement.length : 0;
+
+  const progress = dedupeStatements(selectProgressFromDiary(entry)).slice(0, 6);
+  const friction = dedupeStatements(selectFrictionFromDiary(entry)).slice(0, 6);
+  const openLoops = dedupeStatements(entry ? entry.todo.open : []).slice(0, 8);
+  const carryForward = dedupeStatements([
+    ...(entry ? entry.summary.filter(looksLikeCarryForward) : []),
+    ...openLoops,
+  ]).slice(0, 5);
+  const closeout = dedupeStatements(
+    entry && entry.summary.length ? entry.summary : progress
+  ).slice(0, 6);
+  const signals = dedupeStatements([
+    ...(entry ? entry.fragment : []),
+    ...selectSignalFromSupplements(entry ? entry.supplement : []),
+    ...carryForward,
+  ]).slice(0, 6);
+
+  return {
+    periodLabel: window.label,
+    periodTitle: `${window.label} ${profile.titleSuffix}`,
+    sourceDiaryDays: diaryEntries.length,
+    sourceNightlyDays: 0,
+    insights: {
+      progress,
+      friction,
+      openLoops,
+      carryForward,
+      closeout,
+      signals,
+    },
+    content: {
+      window: renderBulletList([
+        `日期：${window.startDate}`,
+        `覆盖日记：${diaryEntries.length} 天`,
+        `Todo 完成 / 未完成：${doneTodos} / ${openTodos}`,
+        `时间线事实条数：${timelineCount}`,
+        `补充记录条数：${supplementCount}`,
+      ], "今天还没有可用的日记事实。"),
+      progress: renderBulletList(progress, "今天还没有收出可用的推进摘要。"),
+      friction: renderBulletList(friction, "今天还没有明显的摩擦摘要。"),
+      "open-loops": renderBulletList(openLoops, "今晚没有明显还开着的线头。"),
+      "carry-forward": renderBulletList(carryForward, "明天先从最小动作重新接上。"),
+      closeout: renderBulletList(closeout, "今天的睡前收口还没有写出来。"),
+      signals: renderBulletList(signals, "今天还没有稳定到值得带走的信号。"),
+    },
+  };
+}
+
+function buildPeriodicReviewDraft(profile, window, diaryEntries, nightlyEntries = []) {
   const latestEntry = diaryEntries[diaryEntries.length - 1] || null;
+  const nightlyByDate = new Map(
+    nightlyEntries.map((entry) => [entry.date, entry])
+  );
   const totalOpenTodos = diaryEntries.reduce((sum, entry) => sum + entry.todo.open.length, 0);
   const totalDoneTodos = diaryEntries.reduce((sum, entry) => sum + entry.todo.done.length, 0);
   const totalTimelineFacts = diaryEntries.reduce((sum, entry) => sum + entry.timeline.length, 0);
 
-  const progressFromSummary = diaryEntries.flatMap((entry) =>
-    entry.summary.filter((line) => !looksLikeCarryForward(line) && !hasFrictionSignal(line))
-  );
   const progress = dedupeStatements(
-    progressFromSummary.length
-      ? progressFromSummary
-      : diaryEntries.flatMap((entry) => entry.timeline)
+    diaryEntries.flatMap((entry) => selectPeriodicProgress(entry, nightlyByDate.get(entry.date)))
   ).slice(0, 8);
 
-  const friction = dedupeStatements([
-    ...diaryEntries.flatMap((entry) => entry.fragment.filter(hasFrictionSignal)),
-    ...diaryEntries.flatMap((entry) => selectFrictionFromSupplements(entry.supplement)),
-    ...diaryEntries.flatMap((entry) => entry.summary.filter((line) => hasFrictionSignal(line))),
-  ]).slice(0, 8);
+  const friction = dedupeStatements(
+    diaryEntries.flatMap((entry) => selectPeriodicFriction(entry, nightlyByDate.get(entry.date)))
+  ).slice(0, 8);
 
-  const openLoops = dedupeStatements(latestEntry ? latestEntry.todo.open : []).slice(0, 8);
+  const latestNightly = latestEntry ? nightlyByDate.get(latestEntry.date) || null : null;
+  const openLoops = dedupeStatements(
+    latestNightly?.openLoops?.length
+      ? latestNightly.openLoops
+      : (latestEntry ? latestEntry.todo.open : [])
+  ).slice(0, 8);
 
   const carryForward = dedupeStatements([
+    ...(latestNightly?.carryForward || []),
     ...(latestEntry ? latestEntry.summary.filter(looksLikeCarryForward) : []),
     ...openLoops,
   ]).slice(0, 5);
@@ -205,35 +306,45 @@ function buildReviewDraft(profile, window, diaryEntries) {
   const dailySummaries = diaryEntries
     .map((entry) => ({
       date: entry.date,
-      lines: dedupeStatements(entry.summary).slice(0, 6),
+      lines: dedupeStatements(
+        selectPeriodicCloseout(entry, nightlyByDate.get(entry.date))
+      ).slice(0, 6),
     }))
     .filter((entry) => entry.lines.length);
 
   const supplements = diaryEntries
-    .flatMap((entry) => entry.supplement.map((item) => ({
-      date: entry.date,
-      title: item.title,
-      body: toCompactSentence(item.body),
-    })))
-    .filter((item) => item.body)
+    .flatMap((entry) => selectPeriodicSupplementGroups(entry, nightlyByDate.get(entry.date)))
     .slice(-8);
 
   return {
     periodLabel: window.label,
     periodTitle: `${window.label} ${profile.titleSuffix}`,
-    windowFacts: [
-      `时间范围：${window.startDate} ~ ${window.endDate}`,
-      `覆盖日记：${diaryEntries.length} 天`,
-      `Todo 完成 / 未完成：${totalDoneTodos} / ${totalOpenTodos}`,
-      `时间线事实条数：${totalTimelineFacts}`,
-      `周期末尾仍开着的线头：${openLoops.length}`,
-    ],
-    progress,
-    friction,
-    openLoops,
-    carryForward,
-    dailySummaries,
-    supplements,
+    sourceDiaryDays: diaryEntries.length,
+    sourceNightlyDays: nightlyEntries.length,
+    insights: {
+      progress,
+      friction,
+      openLoops,
+      carryForward,
+      dailySummaries,
+      supplements,
+    },
+    content: {
+      window: renderBulletList([
+        `时间范围：${window.startDate} ~ ${window.endDate}`,
+        `覆盖日记：${diaryEntries.length} 天`,
+        `夜间收口：${nightlyEntries.length} 天`,
+        `Todo 完成 / 未完成：${totalDoneTodos} / ${totalOpenTodos}`,
+        `时间线事实条数：${totalTimelineFacts}`,
+        `周期末尾仍开着的线头：${openLoops.length}`,
+      ], "这一段时间还没有可用日记事实。"),
+      progress: renderBulletList(progress, "这段时间还没有收出可用的推进摘要。"),
+      friction: renderBulletList(friction, "这段时间还没有明显的摩擦摘要。"),
+      "open-loops": renderBulletList(openLoops, "这一周期末尾没有明显还开着的线头。"),
+      "carry-forward": renderBulletList(carryForward, "下一次先从最小动作重新接上。"),
+      "daily-summaries": renderDatedGroups(dailySummaries, "这段时间没有可引用的每日总结。"),
+      supplements: renderSupplementGroups(supplements, "这段时间没有值得回看的补充记录。"),
+    },
   };
 }
 
@@ -251,6 +362,20 @@ function collectDiaryEntries(diaryDir, startDate, endDate) {
     .filter(Boolean);
 }
 
+function collectNightlyEntries(config, window) {
+  const nightlyProfile = resolveReviewProfile(config, "nightly", { required: false });
+  if (!nightlyProfile || !fs.existsSync(nightlyProfile.folderPath)) {
+    return [];
+  }
+  return fs.readdirSync(nightlyProfile.folderPath)
+    .filter((name) => /^\d{4}-\d{2}-\d{2}\.md$/u.test(name))
+    .map((name) => name.replace(/\.md$/u, ""))
+    .filter((date) => date >= window.startDate && date <= window.endDate)
+    .sort()
+    .map((date) => parseNightlyReviewFile(path.join(nightlyProfile.folderPath, `${date}.md`), date))
+    .filter(Boolean);
+}
+
 function parseDiaryFile(filePath, date) {
   const content = normalizeLineEnding(fs.readFileSync(filePath, "utf8"));
   return {
@@ -261,6 +386,20 @@ function parseDiaryFile(filePath, date) {
     fragment: parseBulletSection(readSectionBody(content, "今日碎片")),
     supplement: parseSupplementSection(readSectionBody(content, "补充记录")),
     summary: parseSummarySection(readSectionBody(content, "总结")),
+  };
+}
+
+function parseNightlyReviewFile(filePath, date) {
+  const content = normalizeLineEnding(fs.readFileSync(filePath, "utf8"));
+  return {
+    date,
+    filePath: normalizeDisplayPath(filePath),
+    progress: parseManagedBulletList(content, "progress"),
+    friction: parseManagedBulletList(content, "friction"),
+    openLoops: parseManagedBulletList(content, "open-loops"),
+    carryForward: parseManagedBulletList(content, "carry-forward"),
+    closeout: parseManagedBulletList(content, "closeout"),
+    signals: parseManagedBulletList(content, "signals"),
   };
 }
 
@@ -341,6 +480,68 @@ function parseSupplementSection(body) {
     .filter((item) => item.title || item.body);
 }
 
+function selectProgressFromDiary(entry) {
+  if (!entry) {
+    return [];
+  }
+  const progressFromSummary = entry.summary.filter(
+    (line) => !looksLikeCarryForward(line) && !hasFrictionSignal(line)
+  );
+  return progressFromSummary.length ? progressFromSummary : entry.timeline;
+}
+
+function selectFrictionFromDiary(entry) {
+  if (!entry) {
+    return [];
+  }
+  return [
+    ...entry.fragment.filter(hasFrictionSignal),
+    ...selectFrictionFromSupplements(entry.supplement),
+    ...entry.summary.filter((line) => hasFrictionSignal(line)),
+  ];
+}
+
+function selectPeriodicProgress(entry, nightlyEntry) {
+  if (nightlyEntry?.progress?.length) {
+    return nightlyEntry.progress;
+  }
+  return selectProgressFromDiary(entry);
+}
+
+function selectPeriodicFriction(entry, nightlyEntry) {
+  if (nightlyEntry?.friction?.length) {
+    return nightlyEntry.friction;
+  }
+  return selectFrictionFromDiary(entry);
+}
+
+function selectPeriodicCloseout(entry, nightlyEntry) {
+  if (nightlyEntry?.closeout?.length) {
+    return nightlyEntry.closeout;
+  }
+  if (entry?.summary?.length) {
+    return entry.summary;
+  }
+  return selectProgressFromDiary(entry);
+}
+
+function selectPeriodicSupplementGroups(entry, nightlyEntry) {
+  if (nightlyEntry?.signals?.length) {
+    return [{
+      date: entry.date,
+      title: "夜间收口提炼",
+      body: nightlyEntry.signals.map((line) => `- ${normalizeLineItem(line)}`).join("\n"),
+    }];
+  }
+  return entry.supplement
+    .map((item) => ({
+      date: entry.date,
+      title: item.title,
+      body: toCompactSentence(item.body),
+    }))
+    .filter((item) => item.body);
+}
+
 function selectFrictionFromSupplements(items) {
   return (Array.isArray(items) ? items : [])
     .map((item) => {
@@ -353,6 +554,18 @@ function selectFrictionFromSupplements(items) {
         return `${item.title}：${body}`;
       }
       return item.title || body;
+    })
+    .filter(Boolean);
+}
+
+function selectSignalFromSupplements(items) {
+  return (Array.isArray(items) ? items : [])
+    .map((item) => {
+      const title = normalizeLineItem(item.title);
+      if (title) {
+        return title;
+      }
+      return truncateSentence(toCompactSentence(item.body), 140);
     })
     .filter(Boolean);
 }
@@ -415,6 +628,37 @@ function buildManagedBlock(slot, body) {
   ].join("\n");
 }
 
+function hasManagedBlock(content, slot) {
+  const markerStart = `<!-- ${REVIEW_MARKER_PREFIX}:${slot}:start -->`;
+  const markerEnd = `<!-- ${REVIEW_MARKER_PREFIX}:${slot}:end -->`;
+  return content.includes(markerStart) && content.includes(markerEnd);
+}
+
+function readManagedBlock(content, slot) {
+  const markerStart = `<!-- ${REVIEW_MARKER_PREFIX}:${slot}:start -->`;
+  const markerEnd = `<!-- ${REVIEW_MARKER_PREFIX}:${slot}:end -->`;
+  const pattern = new RegExp(
+    `${escapeRegExp(markerStart)}\\n?([\\s\\S]*?)\\n?${escapeRegExp(markerEnd)}`,
+    "u"
+  );
+  const match = pattern.exec(content);
+  return match?.[1] || "";
+}
+
+function parseManagedBulletList(content, slot) {
+  return splitLines(readManagedBlock(content, slot))
+    .map((line) => {
+      if (/^###\s+/u.test(line)) {
+        return "";
+      }
+      if (/^-\s+/u.test(line)) {
+        return normalizeLineItem(line.replace(/^-\s+/u, ""));
+      }
+      return normalizeLineItem(line);
+    })
+    .filter((line) => line && !isGeneratedFallbackLine(line));
+}
+
 function replaceHeading(content, level, title) {
   const pattern = new RegExp(`^${"#".repeat(level)}\\s+.*$`, "m");
   if (!pattern.test(content)) {
@@ -442,10 +686,25 @@ function updateFrontmatterValue(content, key, value) {
 
 function resolveReviewWindow(kind, options = {}) {
   const normalizedKind = normalizeReviewKind(kind);
+  if (normalizedKind === "nightly") {
+    return resolveNightlyWindow(options);
+  }
   if (normalizedKind === "weekly") {
     return resolveWeeklyWindow(options);
   }
   return resolveMonthlyWindow(options);
+}
+
+function resolveNightlyWindow(options = {}) {
+  const baseDate = normalizeText(options.date)
+    ? parseDateString(normalizeText(options.date))
+    : getCurrentUtcDateInShanghai();
+  const label = formatUtcDate(baseDate);
+  return {
+    label,
+    startDate: label,
+    endDate: label,
+  };
 }
 
 function resolveWeeklyWindow(options = {}) {
@@ -505,12 +764,44 @@ function resolveMonthlyWindow(options = {}) {
   };
 }
 
+function buildReviewSections(kind, carryLabel) {
+  if (kind === "nightly") {
+    return [
+      { heading: "## 今晚窗口", slot: "window" },
+      { heading: "## 今天最真实的推进", slot: "progress" },
+      { heading: "## 今天的消耗与摩擦", slot: "friction" },
+      { heading: "## 今晚还开着的线头", slot: "open-loops" },
+      { heading: `## ${carryLabel}`, slot: "carry-forward" },
+      { heading: "## 睡前收口摘录", slot: "closeout" },
+      { heading: "## 值得带走的信号", slot: "signals" },
+      { heading: "## Agent 判断", staticBody: "- " },
+    ];
+  }
+  return [
+    { heading: "## 本周期窗口", slot: "window" },
+    { heading: "## 这段时间最真实的推进", slot: "progress" },
+    { heading: "## 消耗与摩擦", slot: "friction" },
+    { heading: "## 还开着的线头", slot: "open-loops" },
+    { heading: `## ${carryLabel}`, slot: "carry-forward" },
+    { heading: "## 每天收口摘录", slot: "daily-summaries" },
+    { heading: "## 值得回看的补充记录", slot: "supplements" },
+    { heading: "## Agent 判断", staticBody: "- " },
+  ];
+}
+
 function normalizeReviewKind(value) {
   const normalized = normalizeText(value).toLowerCase();
-  if (normalized === "weekly" || normalized === "monthly") {
+  if (normalized === "nightly" || normalized === "weekly" || normalized === "monthly") {
     return normalized;
   }
   throw new Error(`不支持的 review kind: ${value}`);
+}
+
+function normalizeTags(value, fallback) {
+  const tags = Array.isArray(value) ? value : fallback;
+  return tags
+    .map((tag) => normalizeText(tag))
+    .filter(Boolean);
 }
 
 function hasFrictionSignal(value) {
@@ -538,6 +829,14 @@ function isReviewLeadIn(value) {
     || /^[^：:]{1,20}[：:]$/u.test(normalized);
 }
 
+function isGeneratedFallbackLine(value) {
+  const normalized = normalizeText(value);
+  if (!normalized) {
+    return true;
+  }
+  return /还没有可用|还没有明显|没有明显还开着|没有明显的摩擦|下一次先从最小动作|明天先从最小动作|没有可引用的每日总结|没有值得回看的补充记录|睡前收口还没有写出来|还没有稳定到值得带走的信号/u.test(normalized);
+}
+
 function dedupeStatements(items) {
   const seen = new Set();
   const result = [];
@@ -561,6 +860,14 @@ function splitLines(body) {
     .split("\n")
     .map((line) => String(line || "").trim())
     .filter(Boolean);
+}
+
+function truncateSentence(value, maxLength) {
+  const normalized = normalizeText(value);
+  if (!normalized || normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, Math.max(0, maxLength - 1)).replace(/[，。；,;:\s]+$/u, "")}…`;
 }
 
 function toCompactSentence(value) {

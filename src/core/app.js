@@ -1567,6 +1567,7 @@ function isBuiltInScriptName(scriptName) {
     || scriptName === "note:maybe"
     || scriptName === "note:sync"
     || scriptName === "project:radar"
+    || scriptName === "review:nightly"
     || scriptName === "review:weekly"
     || scriptName === "review:monthly"
     || scriptName.startsWith("timeline:");
