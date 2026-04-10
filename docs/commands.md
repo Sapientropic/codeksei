@@ -62,6 +62,9 @@
 - `npm run help`
 - `npm run project:radar -- --list`
 - `npm run project:radar -- --project <slug> --json`
+- `npm run note:auto -- --project <slug> --kind <kind> --text "..."`
+- `npm run note:maybe -- [--project <slug> | --scope <name>] [--kind <kind>]`
+- `npm run note:sync -- --project <slug> --section <标题> --text "..."` 或 `--path <path>`
 
 ## 规划中的终端子命令
 
@@ -131,6 +134,25 @@
 - 默认从当前 workspace 的 `.codex/code-projects.json` 读取已跟踪代码项目
 - 输出会包含 workspace note、repo 里的稳定入口、当前 branch、working tree 摘要和最近 commits
 - 这里的 git 信息只应视为“最近在做什么”的弱信号，不应该直接替代项目页、README 或索引报告
+
+### note
+
+- `npm run note:auto -- --project cyberboss --kind recent --text "补了 durable note schema 和 note:auto / note:maybe"`
+- `npm run note:auto -- --scope assistant --kind preference --text "默认先接住，再定向，再推进，不做催债式主动提醒"`
+- `npm run note:auto -- --scope inspiration --kind idea --text "做一个更像 transition scaffolding 的主动 check-in"`
+- `npm run note:maybe -- --project cyberboss`
+- `npm run note:maybe -- --scope assistant --kind preference`
+- `npm run note:sync -- --project cyberboss --section "最近动作" --text "把 prompt 收口成更温柔的 chief-of-staff 风格"`
+- `npm run note:sync -- --project cyberboss --section "当前状态" --slot current-status --style paragraph --text "shared bridge 正常，默认主 workspace 是 Website"`
+- `npm run note:sync -- --path "项目/Cyberboss 生活助理/README.md" --section "当前定位" --text "默认先接住，再定向，再推进"`
+
+说明：
+- `note:auto` 会按 workspace 的 durable note schema 自动决定 file / section / style / slot，默认应该优先用它
+- `note:maybe` 只看路由，不落盘；适合先判断当前摘要应该进哪个 durable sink
+- 这是轻量 durable note 回写入口，不是强制日志系统
+- 默认 `style=bullet`，适合“最近动作 / durable 结论 / 下一步”
+- 传 `--slot <id>` 时，会在该 section 里维护一个受控块，适合“当前状态”这类需要覆盖旧值的摘要
+- `--project <slug>` 适合代码项目 note；`--path` 适合 life-assistant note 或其他 workspace note
 
 ## 当前已接入的微信命令
 

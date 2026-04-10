@@ -157,6 +157,30 @@ const COMMAND_GROUPS = [
         weixin: [],
         status: "active",
       },
+      {
+        action: "note.sync",
+        summary: "把轻量 durable 摘要同步到指定 note 的指定 section",
+        terminal: ["note sync"],
+        terminalGroup: "note",
+        weixin: [],
+        status: "active",
+      },
+      {
+        action: "note.auto",
+        summary: "按 workspace durable note schema 自动选择 note 与 section 并落盘",
+        terminal: ["note auto"],
+        terminalGroup: "note",
+        weixin: [],
+        status: "active",
+      },
+      {
+        action: "note.maybe",
+        summary: "预览 durable note 路由，不实际写入",
+        terminal: ["note maybe"],
+        terminalGroup: "note",
+        weixin: [],
+        status: "active",
+      },
     ],
   },
   {
@@ -468,6 +492,18 @@ function buildTopicUsage(topic) {
         "  默认从当前 workspace 的 .codex/code-projects.json 读取已跟踪代码项目",
         "  先用 --list 看 slug；讨论具体项目时再用 --project <slug> --json",
       ].join("\n");
+    case "note":
+      return [
+        "npm run note:auto -- (--project <slug> | --scope <name>) --kind <kind> [--text \"内容\" | --stdin]",
+        "npm run note:maybe -- [--project <slug> | --scope <name>] [--kind <kind>] [--json]",
+        "npm run note:sync -- (--project <slug> | --path <path>) --section <标题> [--text \"内容\" | --stdin] [--style bullet|paragraph] [--slot <id>] [--max-items N]",
+        "",
+        "补充：",
+        "  默认先用 note:auto，让 schema 决定 file / section / style / slot",
+        "  note:maybe 只看路由，适合先确认 scope 或 kind 会落到哪里",
+        "  默认写成 bullet；需要维护一个稳定状态块时传 --slot",
+        "  note:sync 保留给自定义 section 或一次性低层回写",
+      ].join("\n");
     default:
       return "npm run <script>";
   }
@@ -517,6 +553,12 @@ function toNpmRunExample(commandText) {
       return "npm run timeline:screenshot -- --send";
     case "project radar":
       return "npm run project:radar -- --project <slug> --json";
+    case "note sync":
+      return "npm run note:sync -- --project <slug> --section <标题> --text \"...\"";
+    case "note auto":
+      return "npm run note:auto -- --project <slug> --kind recent --text \"...\"";
+    case "note maybe":
+      return "npm run note:maybe -- --scope assistant --kind preference";
     default:
       return normalized;
   }

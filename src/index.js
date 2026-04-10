@@ -10,6 +10,8 @@ const { createTimelineIntegration } = require("./integrations/timeline");
 const { runDiaryWriteCommand } = require("./app/diary-write-cli");
 const { runReminderWriteCommand } = require("./app/reminder-write-cli");
 const { runChannelSendFileCommand } = require("./app/channel-send-file-cli");
+const { runNoteAutoCommand, runNoteMaybeCommand } = require("./app/note-auto-cli");
+const { runNoteSyncCommand } = require("./app/note-sync-cli");
 const { runProjectRadarCommand } = require("./app/project-radar-cli");
 const { runTimelineEventCommand } = require("./app/timeline-event-cli");
 const { runTimelineScreenshotCommand } = require("./app/timeline-screenshot-cli");
@@ -157,6 +159,30 @@ async function main() {
     }
     if (command === "channel" && subcommand === "send-file") {
       await runChannelSendFileCommand(getApp());
+      return;
+    }
+    if (command === "note" && subcommand === "sync") {
+      if (wantsSubcommandHelp) {
+        console.log(topicHelp);
+        return;
+      }
+      await runNoteSyncCommand(config);
+      return;
+    }
+    if (command === "note" && subcommand === "auto") {
+      if (wantsSubcommandHelp) {
+        console.log(topicHelp);
+        return;
+      }
+      await runNoteAutoCommand(config);
+      return;
+    }
+    if (command === "note" && subcommand === "maybe") {
+      if (wantsSubcommandHelp) {
+        console.log(topicHelp);
+        return;
+      }
+      runNoteMaybeCommand(config);
       return;
     }
     if (command === "project" && subcommand === "radar") {
