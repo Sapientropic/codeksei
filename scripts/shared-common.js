@@ -36,6 +36,14 @@ const SHARED_USE_BUNDLED_CODEX_BINARY = readBoolEnv(
   "CYBERBOSS_SHARED_USE_BUNDLED_CODEX_BINARY",
   true
 );
+const SHARED_DISABLE_PLUGINS = readBoolEnv(
+  "CYBERBOSS_SHARED_DISABLE_PLUGINS",
+  false
+);
+const SHARED_DISABLE_SHELL_SNAPSHOT = readBoolEnv(
+  "CYBERBOSS_SHARED_DISABLE_SHELL_SNAPSHOT",
+  false
+);
 
 function loadSharedEnv() {
   const defaultStateDir = path.join(os.homedir(), ".cyberboss");
@@ -536,7 +544,22 @@ async function ensureSharedAppServer() {
   const detachedCommand = SHARED_USE_BUNDLED_CODEX_BINARY
     ? (resolveBundledCodexBinary(command) || command)
     : command;
-  const pid = spawnDetachedCommand(detachedCommand, ["app-server", "--listen", listenUrl], {
+  const appServerArgs = ["app-server", "--listen", listenUrl];
+  // The shared WeChat bridge does not rely on Desktop-only curated plugins, so
+  // allow callers to disable plugin loading for this detached runtime. That
+  // avoids noisy startup sync/cache warnings without changing the user's global
+  // Codex Desktop plugin setup.
+  if (SHARED_DISABLE_PLUGINS) {
+    appServerArgs.push("--disable", "plugins");
+  }
+  // PowerShell shell snapshots are not supported upstream today. Disabling the
+  // feature for the shared runtime only suppresses the startup warning; normal
+  // shell command execution still works.
+  if (SHARED_DISABLE_SHELL_SNAPSHOT) {
+    appServerArgs.push("--disable", "shell_snapshot");
+  }
+
+  const pid = spawnDetachedCommand(detachedCommand, appServerArgs, {
     logFile: appServerLogFile,
     env,
   });

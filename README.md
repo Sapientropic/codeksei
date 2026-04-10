@@ -149,6 +149,8 @@ CYBERBOSS_TIMELINE_STATE_DIR=/绝对路径/你的 vault/.codex/timeline
 CYBERBOSS_WORKSPACE_BOOTSTRAP_CONFIG=/绝对路径/你的 workspace-bootstrap.json
 CYBERBOSS_PROJECT_RADAR_CONFIG=/绝对路径/你的 workspace/.codex/code-projects.json
 CYBERBOSS_SHARED_USE_BUNDLED_CODEX_BINARY=1
+CYBERBOSS_SHARED_DISABLE_PLUGINS=0
+CYBERBOSS_SHARED_DISABLE_SHELL_SNAPSHOT=0
 ```
 
 `CYBERBOSS_ALLOWED_USER_IDS` 支持逗号分隔多个 user id。
@@ -170,6 +172,13 @@ CYBERBOSS_SHARED_USE_BUNDLED_CODEX_BINARY=1
 - `0`：保留 `codex`/`codex.cmd` 启动链路
 
 如果你发现 Windows 上“微信侧同一个 session 里一调用工具就闪 PowerShell/命令窗”，可以先把它设成 `0` 做最小回退验证。
+
+`CYBERBOSS_SHARED_DISABLE_PLUGINS` 和 `CYBERBOSS_SHARED_DISABLE_SHELL_SNAPSHOT` 只影响共享 `app-server` 这一条 detached runtime：
+
+- `CYBERBOSS_SHARED_DISABLE_PLUGINS=1`
+  适合 WeChat life-assistant 场景。共享线程通常不需要 Desktop 那套 curated plugins；关掉后可以避开远程 plugin sync / plugin cache / manifest 相关启动告警。
+- `CYBERBOSS_SHARED_DISABLE_SHELL_SNAPSHOT=1`
+  适合 Windows + PowerShell 场景。当前上游还不支持 PowerShell shell snapshot；关掉后可以消掉这条启动期 warning，而不影响正常 shell 工具执行。
 
 ### 用户自己会用到的终端命令
 
