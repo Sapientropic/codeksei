@@ -148,26 +148,13 @@ function createLegacyWeixinChannelAdapter(config) {
         );
       for (let index = 0; index < sendChunks.length; index += 1) {
         const compactChunk = compactPlainTextForWeixin(sendChunks[index]) || "已完成。";
-        await sendTextChunkWithRetry(() => sendMessage({
+        await sendLegacyTextChunk({
           baseUrl: account.baseUrl,
           token: account.token,
-          body: {
-            msg: {
-              client_id: crypto.randomUUID(),
-              from_user_id: "",
-              to_user_id: userId,
-              message_type: 2,
-              message_state: 2,
-              item_list: [
-                {
-                  type: 1,
-                  text_item: { text: compactChunk },
-                },
-              ],
-              context_token: resolvedToken,
-            },
-          },
-        }));
+          toUserId: userId,
+          text: compactChunk,
+          contextToken: resolvedToken,
+        });
         if (index < sendChunks.length - 1) {
           await sleep(SEND_MESSAGE_CHUNK_INTERVAL_MS);
         }
@@ -417,6 +404,38 @@ async function sendTextChunkWithRetry(send) {
   throw lastError || new Error("sendText chunk failed");
 }
 
+function sendLegacyTextChunk({
+  sendMessageImpl = sendMessage,
+  baseUrl,
+  token,
+  toUserId,
+  text,
+  contextToken,
+  clientId = "",
+}) {
+  const stableClientId = String(clientId || "").trim() || crypto.randomUUID();
+  return sendTextChunkWithRetry(() => sendMessageImpl({
+    baseUrl,
+    token,
+    body: {
+      msg: {
+        client_id: stableClientId,
+        from_user_id: "",
+        to_user_id: toUserId,
+        message_type: 2,
+        message_state: 2,
+        item_list: [
+          {
+            type: 1,
+            text_item: { text: String(text || "") },
+          },
+        ],
+        context_token: contextToken,
+      },
+    },
+  }));
+}
+
 function isRetryableSendError(error) {
   const message = String(error?.message || error || "");
   return message.includes("ret=-2")
@@ -438,4 +457,7 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-module.exports = { createLegacyWeixinChannelAdapter };
+module.exports = {
+  createLegacyWeixinChannelAdapter,
+  sendLegacyTextChunk,
+};

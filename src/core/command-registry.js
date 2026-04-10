@@ -186,6 +186,14 @@ const COMMAND_GROUPS = [
         status: "active",
       },
       {
+        action: "timeline.event",
+        summary: "按单个时间块写入时间轴，不必手写 JSON",
+        terminal: ["timeline event"],
+        terminalGroup: "timeline",
+        weixin: [],
+        status: "active",
+      },
+      {
         action: "timeline.write",
         summary: "将当前上下文写入时间轴",
         terminal: ["timeline write"],
@@ -423,12 +431,15 @@ function buildTopicUsage(topic) {
         "",
         "参数：",
         "  --text \"内容\"",
-        "  --title \"标题\"        只影响条目标题，不决定落到哪一天",
+        "  --section todo|timeline|fragment|supplement|summary",
+        "  --state open|done     只和 --section todo 一起用",
+        "  --title \"标题\"        默认主要给 supplement 用；其他 section 会和正文合成单行内容",
         "  --date YYYY-MM-DD     决定写入哪个日记文件",
         "  --time HH:mm          可选，覆盖条目时间",
         "",
         "示例：",
-        "  npm run diary:write -- --date 2026-04-06 --title \"4.6\" --text \"内容\"",
+        "  npm run diary:write -- --section todo --state open --text \"把药单发给 Alex\"",
+        "  npm run diary:write -- --section timeline --text \"17:30-17:58 把药单发出去了\"",
       ].join("\n");
     case "channel":
       return [
@@ -442,9 +453,10 @@ function buildTopicUsage(topic) {
       return "npm run system:send -- <args> / npm run system:checkin";
     case "timeline":
       return [
-        "npm run timeline:write -- <args> / npm run timeline:read -- <args> / npm run timeline:categories / npm run timeline:proposals -- <args> / npm run timeline:build / npm run timeline:serve / npm run timeline:dev / npm run timeline:screenshot -- --send",
+        "npm run timeline:event -- <args> / npm run timeline:write -- <args> / npm run timeline:read -- <args> / npm run timeline:categories / npm run timeline:proposals -- <args> / npm run timeline:build / npm run timeline:serve / npm run timeline:dev / npm run timeline:screenshot -- --send",
         "",
         "补充：",
+        "  单条事件优先用 npm run timeline:event -- --date YYYY-MM-DD --start HH:mm --end HH:mm --title \"...\" ...，避免手写 JSON",
         "  timeline 查分类先用 npm run timeline:categories；改已有日程前先用 npm run timeline:read -- --date YYYY-MM-DD",
         "  timeline 截图稳定入口是 npm run timeline:screenshot -- --send，它会把任务交给当前微信桥执行",
       ].join("\n");
@@ -487,6 +499,8 @@ function toNpmRunExample(commandText) {
       return "npm run system:checkin";
     case "timeline write":
       return "npm run timeline:write -- <args>";
+    case "timeline event":
+      return "npm run timeline:event -- <args>";
     case "timeline read":
       return "npm run timeline:read -- <args>";
     case "timeline categories":

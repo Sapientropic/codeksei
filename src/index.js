@@ -11,6 +11,7 @@ const { runDiaryWriteCommand } = require("./app/diary-write-cli");
 const { runReminderWriteCommand } = require("./app/reminder-write-cli");
 const { runChannelSendFileCommand } = require("./app/channel-send-file-cli");
 const { runProjectRadarCommand } = require("./app/project-radar-cli");
+const { runTimelineEventCommand } = require("./app/timeline-event-cli");
 const { runTimelineScreenshotCommand } = require("./app/timeline-screenshot-cli");
 const { runSystemCheckinPoller } = require("./app/system-checkin-poller");
 const { runSystemSendCommand } = require("./app/system-send-cli");
@@ -172,6 +173,10 @@ async function main() {
     const timelineIntegration = createTimelineIntegration(config);
     if (!subcommand || subcommand === "help") {
       console.log(buildTerminalTopicHelp("timeline"));
+      return;
+    }
+    if (subcommand === "event") {
+      await runTimelineEventCommand(timelineIntegration, argv.slice(2));
       return;
     }
     if (subcommand === "screenshot") {

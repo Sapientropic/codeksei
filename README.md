@@ -350,16 +350,20 @@ ${HOME}/.cyberboss
   给未来的自己留 reminder
 - `npm run reminder:write -- --at "2026-04-07 21:30" --text "提醒内容"`
   写明确时间点 reminder
-- `npm run diary:write -- --title 标题 --text "内容"`
-  写本地日记
-- `npm run diary:write -- --date 2026-04-06 --title "4.6" --text "内容"`
-  写指定日期日记
+- `npm run diary:write -- --section todo --state open --text "内容"`
+  写当天仍在跟进的活 Todo
+- `npm run diary:write -- --section timeline --text "17:30-17:58 把药单发出去了"`
+  把切换点或硬事实写回日记的时间线事实
+- `npm run diary:write -- --date 2026-04-06 --section supplement --title "4.6" --text "内容"`
+  写指定日期的补充记录；`supplement` 仍兼容原来的默认行为
 - `npm run project:radar -- --list`
   列出当前 workspace 已跟踪的代码项目 slug
 - `npm run project:radar -- --project cyberboss --json`
   读取某个已跟踪代码项目的稳定入口与轻量 git 近况
+- `npm run timeline:event -- --date YYYY-MM-DD --start HH:mm --end HH:mm --title "标题" --subcategory <id>`
+  追加单条时间轴事件，不必手写 JSON
 - `npm run timeline:write -- --date YYYY-MM-DD --stdin`
-  增量写入时间轴
+  批量 / 原始 JSON 写入时间轴
 - `npm run timeline:build`
   构建时间轴静态页面
 - `npm run timeline:serve`
@@ -367,7 +371,7 @@ ${HOME}/.cyberboss
 - `npm run timeline:dev`
   启动时间轴热更新开发服务
 - `npm --prefix "$CYBERBOSS_HOME" run timeline:screenshot -- --send`
-  稳定截图入口，会把截图任务交给当前微信桥执行
+  稳定截图入口，会把截图任务交给当前微信桥异步执行；`queued` 不等于已经发到微信
 - `npm run channel:send-file -- --path /绝对路径`
   把本地已有文件直接发回当前微信聊天
 - `npm run system:send -- --text "系统消息"`

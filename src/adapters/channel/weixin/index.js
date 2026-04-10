@@ -91,7 +91,7 @@ function createWeixinChannelAdapter(config) {
     return sendChunks.reduce((promise, chunk, index) => promise
       .then(() => {
         const compactChunk = compactPlainTextForWeixin(chunk) || "已完成。";
-        return sendTextChunkWithRetry(() => sendTextV2({
+        return sendV2TextChunk({
           baseUrl: account.baseUrl,
           token: account.token,
           routeTag: account.routeTag,
@@ -99,8 +99,7 @@ function createWeixinChannelAdapter(config) {
           toUserId: userId,
           text: compactChunk,
           contextToken: resolvedToken,
-          clientId: `cb-${crypto.randomUUID()}`,
-        }));
+        });
       })
       .then(() => {
         if (index < sendChunks.length - 1) {
@@ -227,6 +226,12 @@ function createWeixinChannelAdapter(config) {
       if (!resolvedToken) {
         throw new Error(`缺少 context_token，无法发送文件给用户 ${userId}`);
       }
+      // Text polling/sending lives on the v2 stack, but attachments intentionally
+      // stay on the legacy media API. The original repo never moved sendFile onto
+      // v2, and live timeline screenshot failures ("getUploadUrl returned no
+      // upload_param") only appeared after we forced media onto the v2 headers.
+      // Keep this split explicit so future "cleanup" work does not silently route
+      // screenshots/files back onto the broken stack.
       return sendWeixinMediaFile({
         filePath,
         to: userId,
@@ -234,7 +239,7 @@ function createWeixinChannelAdapter(config) {
         baseUrl: account.baseUrl,
         token: account.token,
         cdnBaseUrl: config.weixinCdnBaseUrl,
-        apiVariant: "v2",
+        apiVariant: "legacy",
         routeTag: account.routeTag,
         clientVersion: config.weixinProtocolClientVersion,
       });
@@ -445,6 +450,30 @@ async function sendTextChunkWithRetry(send) {
   throw lastError || new Error("sendText chunk failed");
 }
 
+function sendV2TextChunk({
+  sendTextImpl = sendTextV2,
+  baseUrl,
+  token,
+  routeTag = "",
+  clientVersion = "",
+  toUserId,
+  text,
+  contextToken,
+  clientId = "",
+}) {
+  const stableClientId = String(clientId || "").trim() || `cb-${crypto.randomUUID()}`;
+  return sendTextChunkWithRetry(() => sendTextImpl({
+    baseUrl,
+    token,
+    routeTag,
+    clientVersion,
+    toUserId,
+    text,
+    contextToken,
+    clientId: stableClientId,
+  }));
+}
+
 function isRetryableSendError(error) {
   const message = String(error?.message || error || "");
   return message.includes("ret=-2")
@@ -466,4 +495,7 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-module.exports = { createWeixinChannelAdapter };
+module.exports = {
+  createWeixinChannelAdapter,
+  sendV2TextChunk,
+};

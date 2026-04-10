@@ -71,6 +71,59 @@ test("finalizeAbandonedTurn flushes partial text and ignores late terminal event
   assert.equal(sent.length, 1);
 });
 
+test("weixin replies wait until turn completion before sending", async () => {
+  const sent = [];
+  const delivery = new StreamDelivery({
+    channelAdapter: {
+      async sendText(payload) {
+        sent.push(payload);
+      },
+    },
+    sessionStore: {
+      findBindingForThreadId() {
+        return { bindingKey: "binding-1" };
+      },
+    },
+  });
+
+  delivery.queueReplyTargetForThread("thread-buffered", {
+    userId: "user-buffered",
+    contextToken: "ctx-buffered",
+    provider: "weixin",
+  });
+
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.started",
+    payload: {
+      threadId: "thread-buffered",
+      turnId: "turn-buffered",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-buffered",
+      turnId: "turn-buffered",
+      itemId: "item-1",
+      text: "这条回复要等整轮完成后再发。",
+    },
+  });
+
+  assert.equal(sent.length, 0);
+
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.completed",
+    payload: {
+      threadId: "thread-buffered",
+      turnId: "turn-buffered",
+    },
+  });
+
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].text, "这条回复要等整轮完成后再发。");
+  assert.equal(sent[0].preserveBlock, true);
+});
+
 test("persistent send failure abandons the run and reports delivery degradation", async () => {
   const failures = [];
   const delivery = new StreamDelivery({
@@ -112,6 +165,16 @@ test("persistent send failure abandons the run and reports delivery degradation"
     },
   });
 
+  assert.equal(failures.length, 0);
+
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.completed",
+    payload: {
+      threadId: "thread-2",
+      turnId: "turn-2",
+    },
+  });
+
   assert.equal(failures.length, 1);
   assert.equal(failures[0].threadId, "thread-2");
   assert.match(String(failures[0].error?.message || ""), /ret=-2/);
@@ -135,4 +198,166 @@ test("persistent send failure abandons the run and reports delivery degradation"
   });
 
   assert.equal(failures.length, 1);
+});
+
+test("watchdog does not resurrect an already-disposed exact turn", async () => {
+  const sent = [];
+  const delivery = new StreamDelivery({
+    channelAdapter: {
+      async sendText(payload) {
+        sent.push(payload.text);
+      },
+    },
+    sessionStore: {
+      findBindingForThreadId() {
+        return { bindingKey: "binding-1" };
+      },
+    },
+  });
+
+  await delivery.finalizeAbandonedTurn({
+    threadId: "thread-gone",
+    turnId: "turn-gone",
+    trailingText: "这段 watchdog 尾巴不该被单独补发。",
+  });
+
+  assert.deepEqual(sent, []);
+});
+
+test("settled weixin delivery suppresses the same text twice on one thread", async () => {
+  const sent = [];
+  const delivery = new StreamDelivery({
+    channelAdapter: {
+      async sendText(payload) {
+        sent.push(payload.text);
+      },
+    },
+    sessionStore: {
+      findBindingForThreadId() {
+        return { bindingKey: "binding-dup" };
+      },
+    },
+  });
+
+  delivery.setReplyTarget("binding-dup", {
+    userId: "user-dup",
+    contextToken: "ctx-dup",
+    provider: "weixin",
+  });
+
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.started",
+    payload: {
+      threadId: "thread-dup",
+      turnId: "turn-1",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-dup",
+      turnId: "turn-1",
+      itemId: "item-1",
+      text: "同一条完整回复不该马上连发两遍。",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.completed",
+    payload: {
+      threadId: "thread-dup",
+      turnId: "turn-1",
+    },
+  });
+
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.started",
+    payload: {
+      threadId: "thread-dup",
+      turnId: "turn-2",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-dup",
+      turnId: "turn-2",
+      itemId: "item-1",
+      text: "同一条完整回复不该马上连发两遍。",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.completed",
+    payload: {
+      threadId: "thread-dup",
+      turnId: "turn-2",
+    },
+  });
+
+  assert.deepEqual(sent, ["同一条完整回复不该马上连发两遍。"]);
+});
+
+test("weixin settled delivery collapses consecutive duplicate completed items within one turn", async () => {
+  const sent = [];
+  const delivery = new StreamDelivery({
+    channelAdapter: {
+      async sendText(payload) {
+        sent.push(payload.text);
+      },
+    },
+    sessionStore: {
+      findBindingForThreadId() {
+        return { bindingKey: "binding-collapse" };
+      },
+    },
+  });
+
+  delivery.queueReplyTargetForThread("thread-collapse", {
+    userId: "user-collapse",
+    contextToken: "ctx-collapse",
+    provider: "weixin",
+  });
+
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.started",
+    payload: {
+      threadId: "thread-collapse",
+      turnId: "turn-collapse",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-collapse",
+      turnId: "turn-collapse",
+      itemId: "item-1",
+      text: "这是同一段完整回复。",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-collapse",
+      turnId: "turn-collapse",
+      itemId: "item-2",
+      text: "这是同一段完整回复。",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-collapse",
+      turnId: "turn-collapse",
+      itemId: "item-3",
+      text: "这是后续新增的一段。",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.completed",
+    payload: {
+      threadId: "thread-collapse",
+      turnId: "turn-collapse",
+    },
+  });
+
+  assert.deepEqual(sent, ["这是同一段完整回复。\n\n这是后续新增的一段。"]);
 });

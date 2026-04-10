@@ -139,6 +139,8 @@ async function sendWeixinMediaFile({
   apiVariant = "legacy",
   routeTag = "",
   clientVersion = "",
+  mediaApiOverride = null,
+  mediaApiFallbackOverride = null,
 }) {
   if (!contextToken) {
     throw new Error("sendWeixinMediaFile requires contextToken");
@@ -146,36 +148,62 @@ async function sendWeixinMediaFile({
 
   const mime = getMimeFromFilename(filePath);
   const uploadOpts = { baseUrl, token, routeTag, clientVersion };
-  const { getUploadUrlImpl, sendMessageImpl } = resolveWeixinMediaApi(apiVariant);
+  const primaryMediaApi = mediaApiOverride || resolveWeixinMediaApi(apiVariant);
+  const fallbackMediaApi = mediaApiFallbackOverride
+    || (mediaApiOverride ? null : resolveFallbackWeixinMediaApi(apiVariant));
+  const { getUploadUrlImpl, sendMessageImpl } = primaryMediaApi;
 
   if (mime.startsWith("image/")) {
-    const uploaded = await uploadMediaToWeixin({
-      filePath,
-      toUserId: to,
-      opts: uploadOpts,
-      cdnBaseUrl,
-      mediaType: WEIXIN_MEDIA_TYPE.IMAGE,
-      getUploadUrlImpl,
-    });
-    await sendMediaItem({
-      to,
-      contextToken,
-      baseUrl,
-      token,
-      routeTag,
-      clientVersion,
-      sendMessageImpl,
-      item: {
-        type: 2,
-        image_item: {
-          media: buildMediaRef(uploaded),
-          aeskey: uploaded.aeskey,
-          mid_size: uploaded.fileSizeCiphertext,
-          hd_size: uploaded.fileSizeCiphertext,
+    try {
+      const uploaded = await uploadMediaToWeixin({
+        filePath,
+        toUserId: to,
+        opts: uploadOpts,
+        cdnBaseUrl,
+        mediaType: WEIXIN_MEDIA_TYPE.IMAGE,
+        getUploadUrlImpl,
+      });
+      await sendMediaItem({
+        to,
+        contextToken,
+        baseUrl,
+        token,
+        routeTag,
+        clientVersion,
+        sendMessageImpl,
+        item: {
+          type: 2,
+          image_item: {
+            media: buildMediaRef(uploaded),
+            aeskey: uploaded.aeskey,
+            mid_size: uploaded.fileSizeCiphertext,
+            hd_size: uploaded.fileSizeCiphertext,
+          },
         },
-      },
-    });
-    return { kind: "image", fileName: path.basename(filePath) };
+      });
+      return { kind: "image", fileName: path.basename(filePath) };
+    } catch (error) {
+      if (!isMissingUploadParamError(error)) {
+        throw error;
+      }
+      // Some WeChat routed sessions refuse image upload params but still accept
+      // generic file uploads. Falling back keeps screenshot delivery alive
+      // instead of failing the whole "send back the screenshot" flow.
+      return sendFileFallback({
+        filePath,
+        to,
+        contextToken,
+        baseUrl,
+        token,
+        routeTag,
+        clientVersion,
+        uploadOpts,
+        cdnBaseUrl,
+        primaryMediaApi,
+        fallbackMediaApi,
+        fallbackFrom: "image",
+      });
+    }
   }
 
   if (mime.startsWith("video/")) {
@@ -206,32 +234,98 @@ async function sendWeixinMediaFile({
     return { kind: "video", fileName: path.basename(filePath) };
   }
 
-  const uploaded = await uploadMediaToWeixin({
+  return sendFileFallback({
     filePath,
-    toUserId: to,
-    opts: uploadOpts,
-    cdnBaseUrl,
-    mediaType: WEIXIN_MEDIA_TYPE.FILE,
-    getUploadUrlImpl,
-  });
-  await sendMediaItem({
     to,
     contextToken,
     baseUrl,
     token,
     routeTag,
     clientVersion,
-    sendMessageImpl,
-    item: {
-      type: 4,
-      file_item: {
-        media: buildMediaRef(uploaded),
-        file_name: path.basename(filePath),
-        len: String(uploaded.fileSize),
-      },
-    },
+    uploadOpts,
+    cdnBaseUrl,
+    primaryMediaApi,
+    fallbackMediaApi,
+    fallbackFrom: "",
   });
-  return { kind: "file", fileName: path.basename(filePath) };
+}
+
+function isMissingUploadParamError(error) {
+  return String(error?.message || error || "").includes("getUploadUrl returned no upload_param");
+}
+
+function resolveFallbackWeixinMediaApi(apiVariant) {
+  const normalized = String(apiVariant || "").trim().toLowerCase();
+  return normalized === "legacy" ? null : resolveWeixinMediaApi("legacy");
+}
+
+async function sendFileFallback({
+  filePath,
+  to,
+  contextToken,
+  baseUrl,
+  token,
+  routeTag,
+  clientVersion,
+  uploadOpts,
+  cdnBaseUrl,
+  primaryMediaApi,
+  fallbackMediaApi = null,
+  fallbackFrom = "",
+}) {
+  const strategies = [
+    { label: "primary", api: primaryMediaApi },
+    { label: "fallback", api: fallbackMediaApi },
+  ].filter((entry) => entry.api);
+
+  let lastError = null;
+  for (let index = 0; index < strategies.length; index += 1) {
+    const { label, api } = strategies[index];
+    try {
+      const uploaded = await uploadMediaToWeixin({
+        filePath,
+        toUserId: to,
+        opts: uploadOpts,
+        cdnBaseUrl,
+        mediaType: WEIXIN_MEDIA_TYPE.FILE,
+        getUploadUrlImpl: api.getUploadUrlImpl,
+      });
+      await sendMediaItem({
+        to,
+        contextToken,
+        baseUrl,
+        token,
+        routeTag,
+        clientVersion,
+        sendMessageImpl: api.sendMessageImpl,
+        item: {
+          type: 4,
+          file_item: {
+            media: buildMediaRef(uploaded),
+            file_name: path.basename(filePath),
+            len: String(uploaded.fileSize),
+          },
+        },
+      });
+      return {
+        kind: "file",
+        fileName: path.basename(filePath),
+        fallbackFrom: fallbackFrom || undefined,
+        uploadStrategy: label,
+      };
+    } catch (error) {
+      lastError = error;
+      if (!isMissingUploadParamError(error) || index >= strategies.length - 1) {
+        throw error;
+      }
+      console.warn(
+        `[cyberboss] weixin media upload fallback `
+        + `file=${path.basename(filePath)} reason=${String(error.message || error)}`
+      );
+    }
+  }
+
+  throw lastError || new Error("weixin media upload failed");
 }
 
 module.exports = { sendWeixinMediaFile };

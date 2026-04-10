@@ -37,7 +37,7 @@ async function runTimelineScreenshotCommand(config, args = process.argv.slice(4)
   });
 
   console.log(`timeline screenshot queued: ${queued.id}`);
-  console.log(`user: ${queued.senderId}`);
+  console.log("delivery_status: pending_bridge_send");
 }
 
 function parseTimelineScreenshotArgs(args) {
@@ -95,7 +95,8 @@ function printTimelineScreenshotHelp() {
 用法: npm run timeline:screenshot -- --send [--user <wechatUserId>] [--output /绝对路径] [其他 timeline screenshot 参数]
 
 说明:
-  这条命令只负责把截图任务排进本地队列，真正截图由正在运行的微信 bridge 执行。
+  这条命令只负责把截图任务排进本地队列，真正截图和发送由正在运行的微信 bridge 异步执行。
+  queued 不等于“已经发到微信”；只有 bridge 真正送达后，用户那边才会看到图片或文件。
 
 示例:
   npm run timeline:screenshot -- --send --selector timeline

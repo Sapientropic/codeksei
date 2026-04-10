@@ -1,7 +1,7 @@
-const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { redactSensitiveText } = require("./redact");
+const { getStableWechatUin } = require("./protocol");
 
 function readChannelVersion() {
   try {
@@ -26,17 +26,12 @@ function ensureTrailingSlash(url) {
   return url.endsWith("/") ? url : `${url}/`;
 }
 
-function randomWechatUin() {
-  const uint32 = crypto.randomBytes(4).readUInt32BE(0);
-  return Buffer.from(String(uint32), "utf8").toString("base64");
-}
-
 function buildHeaders(opts) {
   const headers = {
     "Content-Type": "application/json",
     AuthorizationType: "ilink_bot_token",
     "Content-Length": String(Buffer.byteLength(opts.body, "utf8")),
-    "X-WECHAT-UIN": randomWechatUin(),
+    "X-WECHAT-UIN": getStableWechatUin(),
   };
   if (opts.token && String(opts.token).trim()) {
     headers.Authorization = `Bearer ${String(opts.token).trim()}`;

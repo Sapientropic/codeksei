@@ -83,11 +83,14 @@
 
 ### diary
 
-- `npm run diary:write -- --title 标题 --text "内容"`
-- `npm run diary:write -- --date 2026-04-06 --title "4.6" --text "内容"`
+- `npm run diary:write -- --section todo --state open --text "内容"`
+- `npm run diary:write -- --section timeline --text "17:30-17:58 把药单发出去了"`
+- `npm run diary:write -- --date 2026-04-06 --section supplement --title "4.6" --text "内容"`
 
 说明：
-- `--title` 只影响条目标题
+- `--section` 决定写到 `Todo / 时间线事实 / 今日碎片 / 补充记录 / 总结` 里的哪一层
+- `--state` 只和 `--section todo` 一起用，支持 `open | done`
+- `--title` 默认主要给 `supplement` 用；其他 section 会和 `--text` 合成单行内容
 - `--date` 才决定写入哪个日记文件
 - `--time` 可选，用来覆盖条目时间
 
@@ -104,6 +107,7 @@
 
 ### timeline
 
+- `npm run timeline:event -- --date YYYY-MM-DD --start HH:mm --end HH:mm --title "标题" --subcategory <id>`
 - `npm run timeline:write -- --date YYYY-MM-DD --stdin`
 - `npm run timeline:build`
 - `npm run timeline:serve`
@@ -111,7 +115,10 @@
 - `npm run timeline:screenshot -- --send`
 
 说明：
+- 单条事件优先用 `timeline:event`，它会在 bridge 里帮你组装 `timeline write --json ...`，避免 agent 自己拼 raw JSON。
+- `timeline:write` 保留给批量写入、替换或你已经有完整 JSON payload 的情况。
 - `timeline:screenshot -- --send` 会把截图任务发给当前微信桥执行，并自动把结果回传给当前微信用户。
+- 这条命令本身只表示“已入队”；不要把 `queued` 误解成“图片已经发到微信”。
 
 当前文档里列出的 `reminder / diary / system / timeline` 都已可直接使用。
 

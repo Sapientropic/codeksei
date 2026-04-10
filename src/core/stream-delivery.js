@@ -1,4 +1,7 @@
+const crypto = require("crypto");
 const { sanitizeProtocolLeakText } = require("../adapters/runtime/codex/protocol-leak-monitor");
+
+const RECENT_WEIXIN_DELIVERY_TTL_MS = 30_000;
 
 class StreamDelivery {
   constructor({ channelAdapter, sessionStore, onDeliveryFailure = null }) {
@@ -9,6 +12,7 @@ class StreamDelivery {
     this.pendingReplyTargetsByThreadId = new Map();
     this.stateByRunKey = new Map();
     this.ignoredRunKeys = new Set();
+    this.recentSettledWeixinDeliveries = new Map();
   }
 
   setReplyTarget(bindingKey, target) {
@@ -132,6 +136,12 @@ class StreamDelivery {
 
     const state = this.findRunState(normalizedThreadId, normalizedTurnId);
     if (!state) {
+      // If this exact turn is already gone, do not resurrect a new pending run
+      // just to send the watchdog suffix again. That creates duplicate "tail"
+      // messages after delivery failure or other local terminal states.
+      if (normalizedTurnId) {
+        return;
+      }
       if (normalizedTrailingText) {
         await this.finishTurn({
           threadId: normalizedThreadId,
@@ -293,8 +303,17 @@ class StreamDelivery {
     if (!state.replyTarget) {
       return;
     }
+    // WeChat transport is much more sensitive to repeated partial sends than
+    // desktop chat. Prefer settled whole-turn delivery here so ambiguous send
+    // failures do not surface as duplicate or truncated fragments.
+    if (!force && prefersSettledDelivery(state)) {
+      return;
+    }
 
-    const plainText = markdownToPlainText(buildReplyText(state, { completedOnly: !force }));
+    const plainText = markdownToPlainText(buildReplyText(state, {
+      completedOnly: !force,
+      collapseConsecutiveDuplicateParts: prefersSettledDelivery(state),
+    }));
     const sanitized = sanitizeReplyText(state.replyTarget, plainText);
     if (sanitized.suppress) {
       state.sentText = sanitized.text;
@@ -321,13 +340,29 @@ class StreamDelivery {
       return;
     }
 
+    const deliveryDedupKey = buildSettledWeixinDeliveryKey(state, safeText);
+    if (deliveryDedupKey && this.wasRecentlyDelivered(deliveryDedupKey)) {
+      state.sentText = safeText;
+      console.warn(`[cyberboss] suppress duplicate weixin delivery thread=${state.threadId}`);
+      return;
+    }
+
     state.sendChain = state.sendChain.then(async () => {
+      const settledWechatDelivery = prefersSettledDelivery(state);
       await this.channelAdapter.sendText({
         userId: state.replyTarget.userId,
         text: delta,
         contextToken: state.replyTarget.contextToken,
+        preserveBlock: settledWechatDelivery,
       });
       state.sentText = safeText;
+      if (deliveryDedupKey) {
+        this.rememberRecentDelivery(deliveryDedupKey);
+        console.log(
+          `[cyberboss] delivered weixin reply `
+          + `thread=${state.threadId} chars=${safeText.length} hash=${hashReplyText(safeText)}`
+        );
+      }
     }).catch((error) => {
       console.error(`[cyberboss] failed to deliver reply thread=${state.threadId}: ${error.message}`);
       this.handleDeliveryFailure(state, error);
@@ -366,6 +401,26 @@ class StreamDelivery {
     }
     this.stateByRunKey.delete(normalizedRunKey);
   }
+
+  wasRecentlyDelivered(key) {
+    this.pruneRecentDeliveries();
+    const deliveredAt = this.recentSettledWeixinDeliveries.get(key);
+    return Number.isFinite(deliveredAt) && (Date.now() - deliveredAt) <= RECENT_WEIXIN_DELIVERY_TTL_MS;
+  }
+
+  rememberRecentDelivery(key) {
+    this.pruneRecentDeliveries();
+    this.recentSettledWeixinDeliveries.set(key, Date.now());
+  }
+
+  pruneRecentDeliveries() {
+    const now = Date.now();
+    for (const [key, deliveredAt] of this.recentSettledWeixinDeliveries.entries()) {
+      if (!Number.isFinite(deliveredAt) || (now - deliveredAt) > RECENT_WEIXIN_DELIVERY_TTL_MS) {
+        this.recentSettledWeixinDeliveries.delete(key);
+      }
+    }
+  }
 }
 
 function buildRunKey(threadId, turnId = "") {
@@ -376,7 +431,7 @@ function buildRunKey(threadId, turnId = "") {
     : `${normalizedThreadId}:pending`;
 }
 
-function buildReplyText(state, { completedOnly }) {
+function buildReplyText(state, { completedOnly, collapseConsecutiveDuplicateParts = false }) {
   const parts = [];
   for (const itemId of state.itemOrder) {
     const item = state.items.get(itemId);
@@ -389,6 +444,9 @@ function buildReplyText(state, { completedOnly }) {
       : (item.completed ? item.completedText : item.currentText);
     const normalized = trimOuterBlankLines(sourceText);
     if (normalized) {
+      if (collapseConsecutiveDuplicateParts && parts[parts.length - 1] === normalized) {
+        continue;
+      }
       parts.push(normalized);
     }
   }
@@ -446,6 +504,31 @@ function appendStreamingText(current, next) {
   }
 
   return `${base}${incoming}`;
+}
+
+function prefersSettledDelivery(state) {
+  return normalizeText(state?.replyTarget?.provider) === "weixin";
+}
+
+function buildSettledWeixinDeliveryKey(state, safeText) {
+  if (!prefersSettledDelivery(state)) {
+    return "";
+  }
+  const threadId = normalizeText(state?.threadId);
+  const userId = normalizeText(state?.replyTarget?.userId);
+  const contextToken = normalizeText(state?.replyTarget?.contextToken);
+  const text = normalizeLineEndings(safeText).trim();
+  if (!threadId || !userId || !contextToken || !text) {
+    return "";
+  }
+  // Keep the scope narrow: only suppress the same settled payload on the same
+  // WeChat thread shortly after a successful send, which is where we see
+  // accidental duplicate terminal deliveries.
+  return `${threadId}|${userId}|${contextToken}|${text}`;
+}
+
+function hashReplyText(text) {
+  return crypto.createHash("sha1").update(String(text || ""), "utf8").digest("hex").slice(0, 12);
 }
 
 function mergeCompletedItemText(current, completed) {
