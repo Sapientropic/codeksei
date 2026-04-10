@@ -1,52 +1,37 @@
-const { spawn } = require("child_process");
 const {
-  rootDir,
   listenUrl,
-  bridgePidFile,
-  writePidFile,
-  removePidFileIfMatches,
-  ensureSharedAppServer,
-  ensureBridgeNotRunning,
+  ensureManagedAppServer,
+  ensureManagedBridge,
+  ensureManagedSupervisor,
 } = require("./shared-common");
 
+function parseIntervalMinutes() {
+  for (const rawArg of process.argv.slice(2)) {
+    if (!rawArg.startsWith("--interval-minutes=")) {
+      continue;
+    }
+    const value = Number.parseInt(rawArg.slice("--interval-minutes=".length), 10);
+    if (Number.isInteger(value) && value >= 1) {
+      return value;
+    }
+  }
+  const value = Number.parseInt(
+    String(process.env.CYBERBOSS_SHARED_WATCHDOG_INTERVAL_MINUTES || "5"),
+    10
+  );
+  return Number.isInteger(value) && value >= 1 ? value : 5;
+}
+
 async function main() {
-  const appServer = await ensureSharedAppServer();
+  const appServer = await ensureManagedAppServer({ restartUnhealthy: true });
   const appServerPidLabel = appServer.pid ? ` pid=${appServer.pid}` : "";
   console.log(`shared app-server ${appServer.status}${appServerPidLabel} listen=${listenUrl}`);
 
-  const existingBridgePid = ensureBridgeNotRunning();
-  if (existingBridgePid) {
-    console.log(`shared cyberboss already running pid=${existingBridgePid}`);
-    return;
-  }
+  const bridge = await ensureManagedBridge({ restartUnhealthy: true });
+  console.log(`shared cyberboss ${bridge.status} pid=${bridge.pid}`);
 
-  const child = spawn(process.execPath, ["./bin/cyberboss.js", "start", "--checkin"], {
-    cwd: rootDir,
-    env: {
-      ...process.env,
-      CYBERBOSS_CODEX_ENDPOINT: listenUrl,
-    },
-    stdio: "inherit",
-  });
-
-  writePidFile(bridgePidFile, child.pid);
-  const cleanup = () => removePidFileIfMatches(bridgePidFile, child.pid);
-  process.on("exit", cleanup);
-  process.on("SIGINT", () => {
-    child.kill("SIGINT");
-  });
-  process.on("SIGTERM", () => {
-    child.kill("SIGTERM");
-  });
-
-  child.on("exit", (code, signal) => {
-    cleanup();
-    if (signal) {
-      process.kill(process.pid, signal);
-      return;
-    }
-    process.exit(code ?? 0);
-  });
+  const supervisor = await ensureManagedSupervisor({ intervalMinutes: parseIntervalMinutes() });
+  console.log(`shared supervisor ${supervisor.status} pid=${supervisor.pid}`);
 }
 
 main().catch((error) => {

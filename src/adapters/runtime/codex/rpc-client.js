@@ -27,6 +27,9 @@ class CodexRpcClient {
   }
 
   async connect() {
+    if (this.isConnected()) {
+      return;
+    }
     if (this.mode === "websocket") {
       await this.connectWebSocket();
       return;
@@ -83,11 +86,33 @@ class CodexRpcClient {
   }
 
   async connectWebSocket() {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      return;
+    }
+    if (this.socket) {
+      try {
+        this.socket.terminate();
+      } catch {
+        // best effort
+      }
+      this.socket = null;
+    }
     await new Promise((resolve, reject) => {
+      let settled = false;
       const socket = new WebSocket(this.endpoint);
       this.socket = socket;
-      socket.on("open", () => resolve());
-      socket.on("error", (error) => reject(error));
+      socket.on("open", () => {
+        settled = true;
+        resolve();
+      });
+      socket.on("error", (error) => {
+        if (!settled) {
+          this.socket = null;
+          reject(error);
+          return;
+        }
+        this.handleTransportClosed("Codex websocket errored");
+      });
       socket.on("message", (chunk) => {
         const message = typeof chunk === "string" ? chunk : chunk.toString("utf8");
         if (message.trim()) {
@@ -95,9 +120,21 @@ class CodexRpcClient {
         }
       });
       socket.on("close", () => {
-        this.isReady = false;
+        if (!settled) {
+          this.socket = null;
+          reject(new Error("Codex websocket closed before connection completed"));
+          return;
+        }
+        this.handleTransportClosed("Codex websocket closed");
       });
     });
+  }
+
+  isConnected() {
+    if (this.mode === "websocket") {
+      return Boolean(this.socket && this.socket.readyState === WebSocket.OPEN);
+    }
+    return Boolean(this.child && this.child.stdin && this.child.stdin.writable);
   }
 
   onMessage(listener) {
@@ -183,6 +220,7 @@ class CodexRpcClient {
   }
 
   async close() {
+    this.rejectPending(new Error("Codex RPC client closed"));
     if (this.socket) {
       try {
         this.socket.close();
@@ -235,6 +273,20 @@ class CodexRpcClient {
       throw new Error("Codex process stdin is not writable");
     }
     this.child.stdin.write(`${payload}\n`);
+  }
+
+  handleTransportClosed(message) {
+    this.socket = null;
+    this.child = null;
+    this.isReady = false;
+    this.rejectPending(new Error(message));
+  }
+
+  rejectPending(error) {
+    for (const { reject } of this.pending.values()) {
+      reject(error);
+    }
+    this.pending.clear();
   }
 
   handleIncoming(rawMessage) {

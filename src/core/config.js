@@ -10,6 +10,7 @@ function readConfig() {
     mode,
     argv,
     stateDir,
+    cyberbossHome: readTextEnv("CYBERBOSS_HOME") || path.resolve(__dirname, "..", ".."),
     workspaceId: readTextEnv("CYBERBOSS_WORKSPACE_ID") || "default",
     workspaceRoot: readTextEnv("CYBERBOSS_WORKSPACE_ROOT") || process.cwd(),
     userName: readTextEnv("CYBERBOSS_USER_NAME") || "用户",
@@ -24,6 +25,7 @@ function readConfig() {
     weixinAdapterVariant: readTextEnv("CYBERBOSS_WEIXIN_ADAPTER") || "v2",
     weixinQrBotType: readTextEnv("CYBERBOSS_WEIXIN_QR_BOT_TYPE") || "3",
     accountsDir: path.join(stateDir, "accounts"),
+    logDir: path.join(stateDir, "logs"),
     reminderQueueFile: path.join(stateDir, "reminder-queue.json"),
     systemMessageQueueFile: path.join(stateDir, "system-message-queue.json"),
     timelineScreenshotQueueFile: path.join(stateDir, "timeline-screenshot-queue.json"),
@@ -33,7 +35,10 @@ function readConfig() {
     syncBufferDir: path.join(stateDir, "sync-buffers"),
     codexEndpoint: readTextEnv("CYBERBOSS_CODEX_ENDPOINT"),
     codexCommand: readTextEnv("CYBERBOSS_CODEX_COMMAND"),
+    codexAccessMode: readTextEnv("CYBERBOSS_CODEX_ACCESS_MODE"),
     sessionsFile: path.join(stateDir, "sessions.json"),
+    sharedBridgeHeartbeatFile: path.join(stateDir, "logs", "shared-wechat-heartbeat.json"),
+    sharedWatchdogStateFile: path.join(stateDir, "logs", "shared-watchdog-state.json"),
     startWithCheckin: (mode === "start" && hasArgFlag(argv, "--checkin")) || readBoolEnv("CYBERBOSS_ENABLE_CHECKIN"),
   };
 }

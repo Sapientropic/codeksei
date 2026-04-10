@@ -14,6 +14,7 @@ const { ThreadStateStore } = require("./thread-state-store");
 const { SystemMessageQueueStore } = require("./system-message-queue-store");
 const { SystemMessageDispatcher } = require("./system-message-dispatcher");
 const { TimelineScreenshotQueueStore } = require("./timeline-screenshot-queue-store");
+const { writeSharedBridgeHeartbeat } = require("./shared-bridge-heartbeat");
 const { ReminderQueueStore } = require("../adapters/channel/weixin/reminder-queue-store");
 const { runSystemCheckinPoller } = require("../app/system-checkin-poller");
 
@@ -74,9 +75,30 @@ class CyberbossApp {
     this.channelAdapter.printAccounts();
   }
 
+  updateBridgeHeartbeat(patch) {
+    const filePath = normalizeText(this.config.sharedBridgeHeartbeatFile);
+    if (!filePath) {
+      return;
+    }
+    try {
+      writeSharedBridgeHeartbeat(filePath, patch);
+    } catch (error) {
+      console.error(`[cyberboss] bridge heartbeat write failed: ${formatErrorMessage(error)}`);
+    }
+  }
+
   async start() {
     const account = this.channelAdapter.resolveAccount();
     this.activeAccountId = account.accountId;
+    this.updateBridgeHeartbeat({
+      pid: process.pid,
+      status: "starting",
+      accountId: account.accountId,
+      workspaceRoot: this.config.workspaceRoot,
+      startedAt: new Date().toISOString(),
+      consecutiveFailures: 0,
+      lastError: "",
+    });
     this.systemMessageDispatcher = new SystemMessageDispatcher({
       queueStore: this.systemMessageQueue,
       config: this.config,
@@ -86,6 +108,15 @@ class CyberbossApp {
     const knownContextTokens = Object.keys(this.channelAdapter.getKnownContextTokens()).length;
     const syncBuffer = this.channelAdapter.loadSyncBuffer();
     await this.restoreBoundThreadSubscriptions();
+    this.updateBridgeHeartbeat({
+      pid: process.pid,
+      status: "running",
+      accountId: account.accountId,
+      workspaceRoot: this.config.workspaceRoot,
+      codexEndpoint: runtimeState.endpoint,
+      consecutiveFailures: 0,
+      lastError: "",
+    });
 
     console.log("[cyberboss] bootstrap ok");
     console.log(`[cyberboss] channel=${this.channelAdapter.describe().id}`);
@@ -114,6 +145,14 @@ class CyberbossApp {
       let consecutiveFailures = 0;
       while (!shutdown.stopped) {
         try {
+          this.updateBridgeHeartbeat({
+            pid: process.pid,
+            status: "running",
+            accountId: account.accountId,
+            workspaceRoot: this.config.workspaceRoot,
+            codexEndpoint: runtimeState.endpoint,
+            lastPollStartedAt: new Date().toISOString(),
+          });
           await this.flushDueReminders(account);
           await this.flushPendingSystemMessages();
           await this.flushPendingTimelineScreenshots(account);
@@ -123,6 +162,16 @@ class CyberbossApp {
           });
           assertWeixinUpdateResponse(response);
           consecutiveFailures = 0;
+          this.updateBridgeHeartbeat({
+            pid: process.pid,
+            status: "running",
+            accountId: account.accountId,
+            workspaceRoot: this.config.workspaceRoot,
+            codexEndpoint: runtimeState.endpoint,
+            lastPollSucceededAt: new Date().toISOString(),
+            consecutiveFailures: 0,
+            lastError: "",
+          });
           const messages = Array.isArray(response?.msgs) ? response.msgs : [];
           for (const message of messages) {
             if (shutdown.stopped) {
@@ -143,12 +192,28 @@ class CyberbossApp {
           }
 
           consecutiveFailures += 1;
-          console.error(`[cyberboss] poll failed: ${formatErrorMessage(error)}`);
+          const errorMessage = formatErrorMessage(error);
+          this.updateBridgeHeartbeat({
+            pid: process.pid,
+            status: "degraded",
+            accountId: account.accountId,
+            workspaceRoot: this.config.workspaceRoot,
+            codexEndpoint: runtimeState.endpoint,
+            lastPollFailedAt: new Date().toISOString(),
+            consecutiveFailures,
+            lastError: errorMessage,
+          });
+          console.error(`[cyberboss] poll failed: ${errorMessage}`);
           await sleep(consecutiveFailures >= MAX_CONSECUTIVE_FAILURES ? BACKOFF_DELAY_MS : RETRY_DELAY_MS);
         }
       }
     } finally {
       shutdown.dispose();
+      this.updateBridgeHeartbeat({
+        pid: process.pid,
+        status: "stopped",
+        stoppedAt: new Date().toISOString(),
+      });
       await this.runtimeAdapter.close();
     }
   }
@@ -280,15 +345,16 @@ class CyberbossApp {
       contextToken: normalized.contextToken,
     }).catch(() => {});
 
-    try {
-      const turn = await this.runtimeAdapter.sendTextTurn({
-        bindingKey,
-        workspaceRoot,
-        text: prepared.text,
-        model: this.runtimeAdapter.getSessionStore().getCodexParamsForWorkspace(bindingKey, workspaceRoot).model,
-        metadata: {
-          workspaceId: prepared.workspaceId,
-          accountId: prepared.accountId,
+      try {
+        const turn = await this.runtimeAdapter.sendTextTurn({
+          bindingKey,
+          workspaceRoot,
+          text: prepared.text,
+          model: this.runtimeAdapter.getSessionStore().getCodexParamsForWorkspace(bindingKey, workspaceRoot).model,
+          accessMode: this.config.codexAccessMode,
+          metadata: {
+            workspaceId: prepared.workspaceId,
+            accountId: prepared.accountId,
           senderId: prepared.senderId,
         },
       });
@@ -599,11 +665,11 @@ class CyberbossApp {
   }
 
   async handleBindCommand(normalized, command) {
-    const workspaceRoot = normalizeWorkspacePath(command.args);
+    const workspaceRoot = resolveBindWorkspaceRoot(command.args, this.config.workspaceRoot);
     if (!workspaceRoot) {
       await this.channelAdapter.sendText({
         userId: normalized.senderId,
-        text: "用法：/bind /绝对路径",
+        text: "用法：/bind [绝对路径]",
         contextToken: normalized.contextToken,
       });
       return;
@@ -628,15 +694,21 @@ class CyberbossApp {
       return;
     }
 
+    // Bind the canonical real path so junction aliases do not fork thread/model
+    // state across multiple workspace keys on Windows.
+    const canonicalWorkspaceRoot = normalizeWorkspacePath(
+      await fs.promises.realpath(workspaceRoot).catch(() => workspaceRoot)
+    ) || workspaceRoot;
+
     const bindingKey = this.runtimeAdapter.getSessionStore().buildBindingKey({
       workspaceId: normalized.workspaceId,
       accountId: normalized.accountId,
       senderId: normalized.senderId,
     });
-    this.runtimeAdapter.getSessionStore().setActiveWorkspaceRoot(bindingKey, workspaceRoot);
+    this.runtimeAdapter.getSessionStore().setActiveWorkspaceRoot(bindingKey, canonicalWorkspaceRoot);
     await this.channelAdapter.sendText({
       userId: normalized.senderId,
-      text: `已绑定项目。\n\nworkspace: ${workspaceRoot}`,
+      text: `已绑定项目。\n\nworkspace: ${canonicalWorkspaceRoot}`,
       contextToken: normalized.contextToken,
     });
   }
@@ -730,6 +802,7 @@ class CyberbossApp {
         threadId,
         workspaceRoot,
         model: sessionStore.getCodexParamsForWorkspace(bindingKey, workspaceRoot).model,
+        accessMode: this.config.codexAccessMode,
       });
     } catch (error) {
       await this.channelAdapter.sendText({
@@ -1177,7 +1250,14 @@ function normalizeWorkspacePath(value) {
 
   const fromFileUri = extractPathFromFileUri(normalized);
   const rawPath = fromFileUri || normalized;
-  const withForwardSlashes = rawPath.replace(/\\/g, "/").replace(WINDOWS_UNC_PREFIX_RE, "");
+  // WeChat + Chinese IME can turn Windows paths into mixed-width punctuation.
+  // Normalize them here so `/bind E:\foo`, `/bind E：＼foo`, and file URIs
+  // all converge before we decide whether the path is absolute.
+  const canonicalWindowsPath = rawPath
+    .replace(/[：﹕]/g, ":")
+    .replace(/[＼]/g, "\\")
+    .replace(/[／]/g, "/");
+  const withForwardSlashes = canonicalWindowsPath.replace(/\\/g, "/").replace(WINDOWS_UNC_PREFIX_RE, "");
   const normalizedDrivePrefix = /^\/[A-Za-z]:\//.test(withForwardSlashes)
     ? withForwardSlashes.slice(1)
     : withForwardSlashes;
@@ -1200,6 +1280,24 @@ function isAbsoluteWorkspacePath(value) {
     return true;
   }
   return path.posix.isAbsolute(normalized);
+}
+
+function resolveBindWorkspaceRoot(value, defaultWorkspaceRoot) {
+  const normalizedArg = normalizeCommandArgument(value);
+  if (!normalizedArg || isDefaultWorkspaceAlias(normalizedArg)) {
+    return normalizeWorkspacePath(defaultWorkspaceRoot);
+  }
+  return normalizeWorkspacePath(value);
+}
+
+function isDefaultWorkspaceAlias(value) {
+  const normalized = normalizeCommandArgument(value);
+  return normalized === "."
+    || normalized === "here"
+    || normalized === "default"
+    || normalized === "当前项目"
+    || normalized === "本项目"
+    || normalized === "这里";
 }
 
 function extractPathFromFileUri(value) {

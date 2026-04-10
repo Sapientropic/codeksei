@@ -1,6 +1,8 @@
 const { spawn } = require("child_process");
+const { resolveCodexWorkspaceRoot } = require("../src/core/workspace-alias");
 const {
   listenUrl,
+  buildSpawnInvocation,
   ensureSharedAppServer,
   resolveBoundThread,
 } = require("./shared-common");
@@ -9,17 +11,23 @@ async function main() {
   const workspaceRoot = process.env.CYBERBOSS_WORKSPACE_ROOT || process.cwd();
   await ensureSharedAppServer();
   const { threadId, workspaceRoot: resolvedWorkspaceRoot } = resolveBoundThread(workspaceRoot);
-  const child = spawn(process.env.CYBERBOSS_CODEX_COMMAND || "codex", [
+  // Keep the session bound to the canonical workspace root, but launch the
+  // local Codex client from the ASCII alias so desktop attach does not
+  // reintroduce the non-ASCII workspace header bug on Windows.
+  const runtimeWorkspaceRoot = resolveCodexWorkspaceRoot(resolvedWorkspaceRoot);
+  const spawnSpec = buildSpawnInvocation(process.env.CYBERBOSS_CODEX_COMMAND || "codex", [
     "resume",
     threadId,
     "--remote",
     listenUrl,
     "-C",
-    resolvedWorkspaceRoot,
+    runtimeWorkspaceRoot,
     ...process.argv.slice(2),
-  ], {
+  ]);
+  const child = spawn(spawnSpec.command, spawnSpec.args, {
     stdio: "inherit",
-    shell: process.platform === "win32",
+    shell: false,
+    windowsHide: true,
   });
 
   child.on("exit", (code, signal) => {

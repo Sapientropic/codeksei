@@ -1,21 +1,43 @@
 const http = require("http");
+const { readSharedBridgeHeartbeat, classifySharedBridgeHeartbeat } = require("../src/core/shared-bridge-heartbeat");
 const {
   listenUrl,
   appServerPidFile,
   bridgePidFile,
+  supervisorPidFile,
+  bridgeHeartbeatFile,
+  watchdogStateFile,
   readPidFile,
   isPidAlive,
+  resolveReadyAppServerPid,
+  readJsonFile,
+  BRIDGE_HEARTBEAT_MAX_AGE_MS,
 } = require("./shared-common");
 
 async function main() {
+  const ready = await checkReadyz();
+  const readyAppServerPid = ready ? await resolveReadyAppServerPid() : 0;
+  const bridgePid = readPidFile(bridgePidFile);
+  const bridgeAlive = bridgePid ? isPidAlive(bridgePid) : false;
+  const bridgeHeartbeat = readSharedBridgeHeartbeat(bridgeHeartbeatFile);
+  const bridgeHeartbeatState = classifySharedBridgeHeartbeat(bridgeHeartbeat, {
+    expectedPid: bridgeAlive ? bridgePid : 0,
+    maxAgeMs: BRIDGE_HEARTBEAT_MAX_AGE_MS,
+  });
+  const watchdogState = readJsonFile(watchdogStateFile) || {};
   console.log(`listen=${listenUrl}`);
-  printPidState("shared_app_server_pid", appServerPidFile);
+  printPidState("shared_supervisor_pid", supervisorPidFile);
+  printPidState("shared_app_server_pid", appServerPidFile, readyAppServerPid);
   printPidState("shared_cyberboss_pid", bridgePidFile);
-  console.log(`readyz=${await checkReadyz() ? "ok" : "down"}`);
+  console.log(`shared_bridge_heartbeat=${bridgeHeartbeatState.status}`);
+  console.log(`shared_bridge_heartbeat_at=${bridgeHeartbeatState.updatedAt || "missing"}`);
+  console.log(`shared_watchdog_last_run=${normalizeText(watchdogState.lastRunAt) || "missing"}`);
+  console.log(`shared_watchdog_last_result=${normalizeText(watchdogState.result) || "missing"}`);
+  console.log(`readyz=${ready ? "ok" : "down"}`);
 }
 
-function printPidState(label, filePath) {
-  const pid = readPidFile(filePath);
+function printPidState(label, filePath, fallbackPid = 0) {
+  const pid = readPidFile(filePath) || fallbackPid;
   if (!pid) {
     console.log(`${label}=missing`);
     return;
@@ -47,6 +69,10 @@ function checkReadyz() {
       resolve(false);
     });
   });
+}
+
+function normalizeText(value) {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 main().catch((error) => {

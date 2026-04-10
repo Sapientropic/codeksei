@@ -162,11 +162,17 @@ CYBERBOSS_WEIXIN_ADAPTER=v2
 - `npm run accounts`
   查看本地已保存的账号
 - `npm run shared:start`
-  默认启动方式。跨平台启动共享 `codex app-server` 和共享微信桥接；Windows / macOS / Linux 都优先用这个入口
+  默认启动方式。跨平台修复/拉起后台共享 `codex app-server` 和共享微信桥接；Windows / macOS / Linux 都优先用这个入口
 - `npm run shared:open`
   默认接管方式。跨平台接入当前微信绑定的那条共享线程
 - `npm run shared:status`
-  跨平台查看共享 `app-server`、共享桥接和 `readyz` 状态
+  跨平台查看共享 `app-server`、共享桥接、heartbeat 和 `readyz` 状态
+- `npm run shared:watchdog`
+  主动跑一轮后台巡检；会在需要时自恢复，并在恢复/失败后给当前绑定微信发可见通知
+- `npm run background:install`
+  Windows 安装“登录即拉起 + 解锁/唤醒即时 poke + 常驻 supervisor 巡检”的后台任务
+- `npm run background:uninstall`
+  Windows 卸载后台计划任务
 - `npm run doctor`
   查看当前配置、channel/runtime 边界和线程状态
 - `npm run help`
@@ -213,13 +219,13 @@ CYBERBOSS_WEIXIN_ADAPTER=v2
 
 如果你想把微信里当前绑定的同一条 Codex 线程同步到本机终端继续看、继续接管，稳定流程是：
 
-第一个终端：
+先启动后台共享链路：
 
 ```bash
 npm run shared:start
 ```
 
-保持这个终端不要退出。第二个终端：
+如果你想在本机终端继续接管同一条线程，再开一个终端：
 
 ```bash
 npm run shared:open
@@ -235,8 +241,33 @@ npm run shared:open
 - 不要单独执行 `node ./bin/cyberboss.js start --checkin`，除非已经明确设置 `CYBERBOSS_CODEX_ENDPOINT=ws://127.0.0.1:8765`
 - 不要让微信桥接走 `spawn` 私有 runtime；微信和终端必须连接同一个共享 `codex app-server`
 - 不要同时保留多套 `cyberboss` 进程
-- 不要把 `npm run shared:start` 放到后台跑；它就是共享桥接主进程
+- `npm run shared:start` 现在会把共享 bridge 和 app-server 交给后台进程；命令返回后，不需要保留启动它的那个终端窗口
 - Windows 用户不要再使用 `.sh` 入口；共享启动和接管请统一使用 `npm run shared:start` / `npm run shared:open`
+
+### Windows 后台常驻
+
+如果你想让共享链路随登录自动拉起，并且在解锁/睡眠恢复后尽快自愈：
+
+```powershell
+npm run background:install
+```
+
+这会安装 3 条 Windows 事件任务：
+
+- `Cyberboss Shared Start`
+  用户登录时打一枪 bootstrap：修复/拉起共享 bridge，并确保隐藏的常驻 supervisor 已运行。
+- `Cyberboss Shared Unlock`
+  用户解锁桌面时再打一枪 bootstrap；如果锁屏期间链路掉了，不用等 supervisor 下一轮。
+- `Cyberboss Shared Resume`
+  系统从睡眠恢复时根据 `Microsoft-Windows-Power-Troubleshooter / EventID 1` 触发一次 bootstrap。
+
+常态下不会再有“每 5 分钟计划任务新拉 watchdog 脚本”的动静。后台健康检查仍由 supervisor 在进程内按 5 分钟间隔睡眠巡检。
+
+卸载：
+
+```powershell
+npm run background:uninstall
+```
 
 <a id="data-dir"></a>
 ## 本地数据放在哪里
@@ -268,7 +299,7 @@ ${HOME}/.cyberboss
 - `timeline/`
   timeline 数据、site、shots
 - `logs/`
-  共享 bridge 和 shared app-server 日志
+  共享 bridge、shared app-server 日志，以及 watchdog/heartbeat 状态
 
 这个目录只是本地状态目录，不是线程工作目录；微信线程和终端线程仍然应该开在你的项目目录里。
 

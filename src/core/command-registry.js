@@ -180,6 +180,30 @@ const COMMAND_GROUPS = [
         status: "active",
       },
       {
+        action: "timeline.read",
+        summary: "读取某一天的时间轴草稿或已发布内容",
+        terminal: ["timeline read"],
+        terminalGroup: "timeline",
+        weixin: [],
+        status: "active",
+      },
+      {
+        action: "timeline.categories",
+        summary: "查看可用分类、子类和 event node",
+        terminal: ["timeline categories"],
+        terminalGroup: "timeline",
+        weixin: [],
+        status: "active",
+      },
+      {
+        action: "timeline.proposals",
+        summary: "根据自然语言生成候选时间轴事件",
+        terminal: ["timeline proposals"],
+        terminalGroup: "timeline",
+        weixin: [],
+        status: "active",
+      },
+      {
         action: "timeline.build",
         summary: "构建时间轴静态页面",
         terminal: ["timeline build"],
@@ -250,8 +274,11 @@ function buildTerminalHelpText() {
     "用法: npm run <script>",
     "",
     "当前终端命令：",
-    "  npm run shared:start   默认启动共享 app-server 与共享微信桥接",
-    "  npm run shared:open    默认接入当前微信绑定的共享线程",
+    "  npm run shared:start      默认修复/拉起后台共享 app-server 与共享微信桥接",
+    "  npm run shared:open       默认接入当前微信绑定的共享线程",
+    "  npm run shared:watchdog   主动巡检并自恢复共享链路",
+    "  npm run background:install    Windows 安装开机自启和周期巡检",
+    "  npm run background:uninstall  Windows 卸载开机自启和周期巡检",
   ];
 
   for (const group of COMMAND_GROUPS) {
@@ -401,9 +428,10 @@ function buildTopicUsage(topic) {
       return "npm run system:send -- <args> / npm run system:checkin";
     case "timeline":
       return [
-        "npm run timeline:write -- <args> / npm run timeline:build / npm run timeline:serve / npm run timeline:dev / npm run timeline:screenshot -- --send",
+        "npm run timeline:write -- <args> / npm run timeline:read -- <args> / npm run timeline:categories / npm run timeline:proposals -- <args> / npm run timeline:build / npm run timeline:serve / npm run timeline:dev / npm run timeline:screenshot -- --send",
         "",
         "补充：",
+        "  timeline 查分类先用 npm run timeline:categories；改已有日程前先用 npm run timeline:read -- --date YYYY-MM-DD",
         "  timeline 截图稳定入口是 npm run timeline:screenshot -- --send，它会把任务交给当前微信桥执行",
       ].join("\n");
     default:
@@ -437,6 +465,12 @@ function toNpmRunExample(commandText) {
       return "npm run system:checkin";
     case "timeline write":
       return "npm run timeline:write -- <args>";
+    case "timeline read":
+      return "npm run timeline:read -- <args>";
+    case "timeline categories":
+      return "npm run timeline:categories";
+    case "timeline proposals":
+      return "npm run timeline:proposals -- <args>";
     case "timeline build":
       return "npm run timeline:build";
     case "timeline serve":

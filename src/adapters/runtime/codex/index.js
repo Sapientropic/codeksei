@@ -11,6 +11,7 @@ const {
   isAssistantItemCompleted,
 } = require("./message-utils");
 const { SessionStore } = require("./session-store");
+const { resolveCodexWorkspaceRoot } = require("../../../core/workspace-alias");
 
 function createCodexRuntimeAdapter(config) {
   const sessionStore = new SessionStore({ filePath: config.sessionsFile });
@@ -27,6 +28,58 @@ function createCodexRuntimeAdapter(config) {
       });
     }
     return client;
+  }
+
+  function isReconnectableRuntimeError(error) {
+    const message = error instanceof Error ? error.message : String(error || "");
+    return message.includes("Codex websocket is not connected")
+      || message.includes("Codex websocket closed")
+      || message.includes("Codex websocket errored")
+      || message.includes("Codex process stdin is not writable")
+      || message.includes("Codex RPC client closed");
+  }
+
+  async function refreshReadyState(runtimeClient) {
+    const modelResponse = await runtimeClient.listModels().catch(() => null);
+    const models = Array.isArray(modelResponse?.result?.data)
+      ? modelResponse.result.data
+      : [];
+    if (models.length) {
+      sessionStore.setAvailableModelCatalog(models);
+    }
+    readyState = {
+      endpoint: config.codexEndpoint || "(spawn)",
+      models,
+    };
+    return readyState;
+  }
+
+  async function ensureInitialized({ forceReconnect = false } = {}) {
+    const runtimeClient = ensureClient();
+    if (forceReconnect) {
+      readyState = null;
+      await runtimeClient.close();
+    }
+    if (readyState && runtimeClient.isConnected()) {
+      return readyState;
+    }
+    await runtimeClient.connect();
+    await runtimeClient.initialize();
+    return refreshReadyState(runtimeClient);
+  }
+
+  async function withRuntimeReconnect(action) {
+    const runtimeClient = ensureClient();
+    try {
+      await ensureInitialized();
+      return await action(runtimeClient);
+    } catch (error) {
+      if (!isReconnectableRuntimeError(error)) {
+        throw error;
+      }
+      await ensureInitialized({ forceReconnect: true });
+      return action(runtimeClient);
+    }
   }
 
   return {
@@ -57,24 +110,7 @@ function createCodexRuntimeAdapter(config) {
       return sessionStore;
     },
     async initialize() {
-      if (readyState) {
-        return readyState;
-      }
-      const runtimeClient = ensureClient();
-      await runtimeClient.connect();
-      await runtimeClient.initialize();
-      const modelResponse = await runtimeClient.listModels().catch(() => null);
-      const models = Array.isArray(modelResponse?.result?.data)
-        ? modelResponse.result.data
-        : [];
-      if (models.length) {
-        sessionStore.setAvailableModelCatalog(models);
-      }
-      readyState = {
-        endpoint: config.codexEndpoint || "(spawn)",
-        models,
-      };
-      return readyState;
+      return ensureInitialized();
     },
     async close() {
       if (client) {
@@ -84,78 +120,83 @@ function createCodexRuntimeAdapter(config) {
       client = null;
     },
     async respondApproval({ requestId, decision }) {
-      const runtimeClient = ensureClient();
-      await this.initialize();
-      const normalizedDecision = decision === "accept" ? "accept" : "decline";
-      if (requestId == null || String(requestId).trim() === "") {
-        throw new Error("approval response requires a requestId");
-      }
-      await runtimeClient.sendResponse(requestId, { decision: normalizedDecision });
-      return {
-        requestId,
-        decision: normalizedDecision,
-      };
+      return withRuntimeReconnect(async (runtimeClient) => {
+        const normalizedDecision = decision === "accept" ? "accept" : "decline";
+        if (requestId == null || String(requestId).trim() === "") {
+          throw new Error("approval response requires a requestId");
+        }
+        await runtimeClient.sendResponse(requestId, { decision: normalizedDecision });
+        return {
+          requestId,
+          decision: normalizedDecision,
+        };
+      });
     },
     async cancelTurn({ threadId, turnId }) {
-      const runtimeClient = ensureClient();
-      await this.initialize();
-      await runtimeClient.cancelTurn({ threadId, turnId });
-      return { threadId, turnId };
+      return withRuntimeReconnect(async (runtimeClient) => {
+        await runtimeClient.cancelTurn({ threadId, turnId });
+        return { threadId, turnId };
+      });
     },
     async resumeThread({ threadId }) {
-      const runtimeClient = ensureClient();
-      await this.initialize();
-      return runtimeClient.resumeThread({ threadId });
+      return withRuntimeReconnect((runtimeClient) => runtimeClient.resumeThread({ threadId }));
     },
-    async refreshThreadInstructions({ threadId, workspaceRoot, model = "" }) {
-      const runtimeClient = ensureClient();
-      await this.initialize();
-      const refreshText = buildInstructionRefreshText(config);
-      await runtimeClient.resumeThread({ threadId });
-      const completion = waitForTurnCompletion(runtimeClient, threadId);
-      await runtimeClient.sendUserMessage({
-        threadId,
-        text: refreshText,
-        model,
-        workspaceRoot,
+    async refreshThreadInstructions({ threadId, workspaceRoot, model = "", accessMode = "" }) {
+      return withRuntimeReconnect(async (runtimeClient) => {
+        const refreshText = buildInstructionRefreshText(config);
+        const runtimeWorkspaceRoot = resolveCodexWorkspaceRoot(workspaceRoot);
+        await runtimeClient.resumeThread({ threadId });
+        const completion = waitForTurnCompletion(runtimeClient, threadId);
+        await runtimeClient.sendUserMessage({
+          threadId,
+          text: refreshText,
+          model,
+          accessMode,
+          workspaceRoot: runtimeWorkspaceRoot,
+        });
+        const result = await completion;
+        return { threadId, ...result };
       });
-      const result = await completion;
-      return { threadId, ...result };
     },
-    async sendTextTurn({ bindingKey, workspaceRoot, text, metadata = {}, model = "" }) {
-      const runtimeClient = ensureClient();
-      await this.initialize();
+    async sendTextTurn({ bindingKey, workspaceRoot, text, metadata = {}, model = "", accessMode = "" }) {
+      return withRuntimeReconnect(async (runtimeClient) => {
+        // Codex websocket metadata currently breaks on non-ASCII workspace keys.
+        // Keep session truth keyed by the canonical workspace root, but route the
+        // actual runtime cwd through the existing machine-level ASCII alias map.
+        const runtimeWorkspaceRoot = resolveCodexWorkspaceRoot(workspaceRoot);
 
-      let threadId = sessionStore.getThreadIdForWorkspace(bindingKey, workspaceRoot);
-      let outboundText = text;
-      if (!threadId) {
-        const response = await runtimeClient.startThread({ cwd: workspaceRoot });
-        threadId = extractThreadId(response);
+        let threadId = sessionStore.getThreadIdForWorkspace(bindingKey, workspaceRoot);
+        let outboundText = text;
         if (!threadId) {
-          throw new Error("thread/start did not return a thread id");
-        }
-        sessionStore.setThreadIdForWorkspace(bindingKey, workspaceRoot, threadId, metadata);
-        outboundText = buildOpeningTurnText(config, text);
-      } else {
-        await runtimeClient.resumeThread({ threadId }).catch(async () => {
-          sessionStore.clearThreadIdForWorkspace(bindingKey, workspaceRoot);
-          const recreated = await runtimeClient.startThread({ cwd: workspaceRoot });
-          threadId = extractThreadId(recreated);
+          const response = await runtimeClient.startThread({ cwd: runtimeWorkspaceRoot });
+          threadId = extractThreadId(response);
           if (!threadId) {
             throw new Error("thread/start did not return a thread id");
           }
           sessionStore.setThreadIdForWorkspace(bindingKey, workspaceRoot, threadId, metadata);
           outboundText = buildOpeningTurnText(config, text);
-        });
-      }
+        } else {
+          await runtimeClient.resumeThread({ threadId }).catch(async () => {
+            sessionStore.clearThreadIdForWorkspace(bindingKey, workspaceRoot);
+            const recreated = await runtimeClient.startThread({ cwd: runtimeWorkspaceRoot });
+            threadId = extractThreadId(recreated);
+            if (!threadId) {
+              throw new Error("thread/start did not return a thread id");
+            }
+            sessionStore.setThreadIdForWorkspace(bindingKey, workspaceRoot, threadId, metadata);
+            outboundText = buildOpeningTurnText(config, text);
+          });
+        }
 
-      await runtimeClient.sendUserMessage({
-        threadId,
-        text: outboundText,
-        model,
-        workspaceRoot,
+        await runtimeClient.sendUserMessage({
+          threadId,
+          text: outboundText,
+          model,
+          accessMode,
+          workspaceRoot: runtimeWorkspaceRoot,
+        });
+        return { threadId };
       });
-      return { threadId };
     },
   };
 }

@@ -54,6 +54,9 @@
 - `npm run shared:start`
 - `npm run shared:open`
 - `npm run shared:status`
+- `npm run shared:watchdog`
+- `npm run background:install`
+- `npm run background:uninstall`
 - `npm run doctor`
 - `npm run help`
 
@@ -93,6 +96,8 @@
 说明：
 - `checkin` 更推荐跟随共享模式一起开：`npm run shared:start`
 - `system:checkin` 仅保留为底层轮询入口
+- 后台桥本身的健康巡检请优先用 `npm run shared:watchdog`
+- Windows 默认后台安装会注册 `登录 / 解锁 / 睡眠恢复` 三类 poke task；这些任务只打一枪 `shared:start`，而长期健康检查由常驻 supervisor 在进程内按 5 分钟间隔睡眠巡检
 
 ### timeline
 

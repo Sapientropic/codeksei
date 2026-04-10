@@ -1,8 +1,5 @@
 const path = require("path");
 const { spawn } = require("child_process");
-const os = require("os");
-
-const IS_WINDOWS = os.platform() === "win32";
 
 function createTimelineIntegration(config) {
   const binPath = resolveTimelineBinPath();
@@ -86,34 +83,13 @@ function runTimelineCommand(binPath, args, extraEnv = {}, options = {}) {
 }
 
 function buildTimelineSpawnSpec(binPath, args = []) {
-  if (IS_WINDOWS) {
-    return {
-      command: "cmd.exe",
-      args: ["/d", "/s", "/c", buildWindowsNodeCommand(process.execPath, binPath, args)],
-    };
-  }
-
+  // Windows `cmd.exe /c "<node> <script>"` double-quotes the inner command and
+  // breaks when `process.execPath` contains spaces. Spawn Node directly so the
+  // timeline CLI behaves the same on Windows and Unix.
   return {
     command: process.execPath,
     args: [binPath, ...args],
   };
-}
-
-function buildWindowsNodeCommand(nodePath, binPath, args = []) {
-  const commandParts = [nodePath, binPath, ...args].map(quoteWindowsCmdArg);
-  return commandParts.join(" ");
-}
-
-function quoteWindowsCmdArg(value) {
-  const text = String(value ?? "");
-  if (!text.length) {
-    return "\"\"";
-  }
-  if (!/[\s"]/u.test(text)) {
-    return text;
-  }
-  const escaped = text.replace(/(\\*)"/g, "$1$1\\\"");
-  return `"${escaped.replace(/(\\+)$/g, "$1$1")}"`;
 }
 
 function normalizeArgs(args) {
