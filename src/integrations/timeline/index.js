@@ -18,7 +18,7 @@ function createTimelineIntegration(config) {
       if (!normalizedSubcommand) {
         throw new Error("timeline 子命令不能为空");
       }
-      return runTimelineCommand(binPath, [normalizedSubcommand, ...normalizeArgs(args)], {
+      return runTimelineCommand(binPath, [normalizedSubcommand, ...normalizeTimelineArgs(normalizedSubcommand, args)], {
         TIMELINE_FOR_AGENT_STATE_DIR: config.timelineStateDir,
         TIMELINE_FOR_AGENT_CHROME_PATH: resolveTimelineChromePath(),
       }, {
@@ -99,6 +99,64 @@ function normalizeArgs(args) {
       .map((value) => String(value ?? ""))
       .filter((value) => value.length > 0)
     : [];
+}
+
+function normalizeTimelineArgs(subcommand, args) {
+  const normalizedArgs = normalizeArgs(args).filter((value) => value !== "--");
+  if (!["read", "write"].includes(subcommand)) {
+    return normalizedArgs;
+  }
+
+  const rewritten = [];
+  let hasDateFlag = false;
+
+  for (const token of normalizedArgs) {
+    const trimmed = normalizeText(token);
+    if (!trimmed) {
+      continue;
+    }
+    if (trimmed === "--date") {
+      hasDateFlag = true;
+      rewritten.push(trimmed);
+      continue;
+    }
+    if (trimmed.startsWith("--date=")) {
+      const value = normalizeText(trimmed.slice("--date=".length));
+      if (value) {
+        hasDateFlag = true;
+        rewritten.push("--date", value);
+      }
+      continue;
+    }
+    if (trimmed.startsWith("--mode=")) {
+      const value = normalizeText(trimmed.slice("--mode=".length));
+      if (value) {
+        rewritten.push("--mode", value);
+      }
+      continue;
+    }
+    if (trimmed.startsWith("--json=")) {
+      const value = trimmed.slice("--json=".length);
+      if (value) {
+        rewritten.push("--json", value);
+      }
+      continue;
+    }
+    rewritten.push(trimmed);
+  }
+
+  // When an agent forgets npm's passthrough `--`, npm swallows `--date` and the
+  // script only receives a bare YYYY-MM-DD token. Recover that common intent so
+  // bridge-owned timeline commands fail less often on formatting slips.
+  if (!hasDateFlag && rewritten.length && isIsoDateToken(rewritten[0])) {
+    return ["--date", rewritten[0], ...rewritten.slice(1)];
+  }
+
+  return rewritten;
+}
+
+function isIsoDateToken(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalizeText(value));
 }
 
 function normalizeText(value) {

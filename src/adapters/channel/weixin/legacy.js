@@ -353,7 +353,15 @@ function packChunksForWeixinDelivery(chunks, maxMessages = 10, maxChunkChars = 3
     groupedTail.push(current);
   }
 
-  return preserved.concat(groupedTail.map((item) => compactPlainTextForWeixin(item) || "已完成。")).slice(0, maxMessages);
+  const normalizedGroupedTail = groupedTail.map((item) => compactPlainTextForWeixin(item) || "已完成。");
+  if (preserved.length + normalizedGroupedTail.length <= maxMessages) {
+    return preserved.concat(normalizedGroupedTail);
+  }
+
+  // Never silently drop the tail of a long reply. If grouping by semantic
+  // chunk boundaries still overflows the per-message budget, fall back to hard
+  // UTF-8 splits of the already-joined tail so the full answer is still sent.
+  return preserved.concat(tailHardChunks.slice(0, Math.max(1, maxMessages - preserved.length)));
 }
 
 function collectStreamingBoundaries(text) {

@@ -175,8 +175,9 @@ class StreamDelivery {
 
     const current = state.items.get(itemId);
     if (completed) {
-      current.currentText = text;
-      current.completedText = text;
+      const merged = mergeCompletedItemText(current.currentText, text);
+      current.currentText = merged;
+      current.completedText = merged;
       current.completed = true;
       return;
     }
@@ -353,6 +354,18 @@ function appendStreamingText(current, next) {
   }
 
   return `${base}${incoming}`;
+}
+
+function mergeCompletedItemText(current, completed) {
+  const streamed = String(current || "");
+  const finalized = String(completed || "");
+  if (!finalized) {
+    return streamed;
+  }
+  if (!streamed) {
+    return finalized;
+  }
+  return appendStreamingText(streamed, finalized);
 }
 
 function indentBlock(text) {
