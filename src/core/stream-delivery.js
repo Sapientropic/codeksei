@@ -1,12 +1,14 @@
 const { sanitizeProtocolLeakText } = require("../adapters/runtime/codex/protocol-leak-monitor");
 
 class StreamDelivery {
-  constructor({ channelAdapter, sessionStore }) {
+  constructor({ channelAdapter, sessionStore, onDeliveryFailure = null }) {
     this.channelAdapter = channelAdapter;
     this.sessionStore = sessionStore;
+    this.onDeliveryFailure = typeof onDeliveryFailure === "function" ? onDeliveryFailure : null;
     this.replyTargetByBindingKey = new Map();
     this.pendingReplyTargetsByThreadId = new Map();
     this.stateByRunKey = new Map();
+    this.ignoredRunKeys = new Set();
   }
 
   setReplyTarget(bindingKey, target) {
@@ -38,6 +40,13 @@ class StreamDelivery {
     const threadId = normalizeText(event?.payload?.threadId);
     const turnId = normalizeText(event?.payload?.turnId);
     if (!threadId) {
+      return;
+    }
+    const ignoredRunKey = turnId ? buildRunKey(threadId, turnId) : "";
+    if (ignoredRunKey && this.ignoredRunKeys.has(ignoredRunKey)) {
+      if (event.type === "runtime.turn.completed" || event.type === "runtime.turn.failed") {
+        this.ignoredRunKeys.delete(ignoredRunKey);
+      }
       return;
     }
 
@@ -113,6 +122,38 @@ class StreamDelivery {
     this.disposeRunState(state.runKey);
   }
 
+  async finalizeAbandonedTurn({ threadId, turnId = "", trailingText = "" }) {
+    const normalizedThreadId = normalizeText(threadId);
+    const normalizedTurnId = normalizeText(turnId);
+    const normalizedTrailingText = normalizeLineEndings(trailingText).trim();
+    if (!normalizedThreadId) {
+      return;
+    }
+
+    const state = this.findRunState(normalizedThreadId, normalizedTurnId);
+    if (!state) {
+      if (normalizedTrailingText) {
+        await this.finishTurn({
+          threadId: normalizedThreadId,
+          finalText: normalizedTrailingText,
+        });
+      }
+      return;
+    }
+
+    this.attachReplyTarget(state);
+    if (normalizedTrailingText) {
+      this.upsertItem(state, {
+        itemId: "__watchdog__",
+        text: normalizedTrailingText,
+        completed: true,
+      });
+    }
+    await this.flush(state, { force: true });
+    this.ignoredRunKeys.add(state.runKey);
+    this.disposeRunState(state.runKey);
+  }
+
   ensureRunState(threadId, turnId = "") {
     const runKey = buildRunKey(threadId, turnId);
     const existing = this.stateByRunKey.get(runKey);
@@ -135,6 +176,33 @@ class StreamDelivery {
     this.stateByRunKey.set(runKey, created);
     this.attachReplyTarget(created);
     return created;
+  }
+
+  findRunState(threadId, turnId = "") {
+    const normalizedThreadId = normalizeText(threadId);
+    const normalizedTurnId = normalizeText(turnId);
+    if (!normalizedThreadId) {
+      return null;
+    }
+    if (normalizedTurnId) {
+      const exact = this.stateByRunKey.get(buildRunKey(normalizedThreadId, normalizedTurnId));
+      if (exact) {
+        return exact;
+      }
+    }
+    const pending = this.stateByRunKey.get(buildRunKey(normalizedThreadId, ""));
+    if (pending && (!normalizedTurnId || !pending.turnId || pending.turnId === normalizedTurnId)) {
+      return pending;
+    }
+    for (const candidate of this.stateByRunKey.values()) {
+      if (candidate.threadId !== normalizedThreadId) {
+        continue;
+      }
+      if (!normalizedTurnId || candidate.turnId === normalizedTurnId) {
+        return candidate;
+      }
+    }
+    return null;
   }
 
   attachReplyTarget(state) {
@@ -262,9 +330,33 @@ class StreamDelivery {
       state.sentText = safeText;
     }).catch((error) => {
       console.error(`[cyberboss] failed to deliver reply thread=${state.threadId}: ${error.message}`);
+      this.handleDeliveryFailure(state, error);
     });
 
     await state.sendChain;
+  }
+
+  handleDeliveryFailure(state, error) {
+    if (!state?.runKey) {
+      return;
+    }
+    // Once WeChat delivery has exhausted its retries for this run, continuing
+    // to stream later deltas only creates repeated send failures and fake typing.
+    this.ignoredRunKeys.add(state.runKey);
+    this.disposeRunState(state.runKey);
+    if (!this.onDeliveryFailure) {
+      return;
+    }
+    Promise.resolve(this.onDeliveryFailure({
+      threadId: state.threadId,
+      turnId: state.turnId,
+      bindingKey: state.bindingKey,
+      error,
+      sentText: state.sentText,
+      replyTarget: state.replyTarget ? { ...state.replyTarget } : null,
+    })).catch((callbackError) => {
+      console.error(`[cyberboss] delivery failure callback crashed thread=${state.threadId}: ${callbackError.message}`);
+    });
   }
 
   disposeRunState(runKey) {

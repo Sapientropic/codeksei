@@ -148,12 +148,20 @@ function createCodexRuntimeAdapter(config) {
         const runtimeWorkspaceRoot = resolveCodexWorkspaceRoot(workspaceRoot);
         await runtimeClient.resumeThread({ threadId });
         const completion = waitForTurnCompletion(runtimeClient, threadId);
-        await runtimeClient.sendUserMessage({
+        await sendUserMessageWithWorkspaceDiagnostics({
+          runtimeClient,
+          params: {
+            threadId,
+            text: refreshText,
+            model,
+            accessMode,
+            workspaceRoot: runtimeWorkspaceRoot,
+          },
+          operation: "turn/start(refresh)",
+          bindingKey,
           threadId,
-          text: refreshText,
-          model,
-          accessMode,
-          workspaceRoot: runtimeWorkspaceRoot,
+          workspaceRoot,
+          runtimeWorkspaceRoot,
         });
         const result = await completion;
         if (bindingKey) {
@@ -173,7 +181,13 @@ function createCodexRuntimeAdapter(config) {
         let outboundText = text;
         let startedNewThread = false;
         if (!threadId) {
-          const response = await runtimeClient.startThread({ cwd: runtimeWorkspaceRoot });
+          const response = await startThreadWithWorkspaceDiagnostics({
+            runtimeClient,
+            cwd: runtimeWorkspaceRoot,
+            bindingKey,
+            workspaceRoot,
+            runtimeWorkspaceRoot,
+          });
           threadId = extractThreadId(response);
           if (!threadId) {
             throw new Error("thread/start did not return a thread id");
@@ -183,7 +197,14 @@ function createCodexRuntimeAdapter(config) {
         } else {
           await runtimeClient.resumeThread({ threadId }).catch(async () => {
             sessionStore.clearThreadIdForWorkspace(bindingKey, workspaceRoot);
-            const recreated = await runtimeClient.startThread({ cwd: runtimeWorkspaceRoot });
+            const recreated = await startThreadWithWorkspaceDiagnostics({
+              runtimeClient,
+              cwd: runtimeWorkspaceRoot,
+              bindingKey,
+              workspaceRoot,
+              runtimeWorkspaceRoot,
+              threadId,
+            });
             threadId = extractThreadId(recreated);
             if (!threadId) {
               throw new Error("thread/start did not return a thread id");
@@ -201,12 +222,20 @@ function createCodexRuntimeAdapter(config) {
           outboundText = buildWorkspaceBootstrapTurnText(config, workspaceRoot, text);
         }
 
-        await runtimeClient.sendUserMessage({
+        await sendUserMessageWithWorkspaceDiagnostics({
+          runtimeClient,
+          params: {
+            threadId,
+            text: outboundText,
+            model,
+            accessMode,
+            workspaceRoot: runtimeWorkspaceRoot,
+          },
+          operation: "turn/start",
+          bindingKey,
           threadId,
-          text: outboundText,
-          model,
-          accessMode,
-          workspaceRoot: runtimeWorkspaceRoot,
+          workspaceRoot,
+          runtimeWorkspaceRoot,
         });
         return {
           threadId,
@@ -308,6 +337,103 @@ function loadInstructionFile(filePath, config = {}) {
 }
 
 module.exports = { createCodexRuntimeAdapter };
+
+async function startThreadWithWorkspaceDiagnostics({
+  runtimeClient,
+  cwd,
+  bindingKey = "",
+  workspaceRoot = "",
+  runtimeWorkspaceRoot = "",
+  threadId = "",
+}) {
+  try {
+    return await runtimeClient.startThread({ cwd });
+  } catch (error) {
+    logInvalidWorkspaceError({
+      operation: "thread/start",
+      bindingKey,
+      threadId,
+      workspaceRoot,
+      runtimeWorkspaceRoot,
+      error,
+    });
+    throw error;
+  }
+}
+
+async function sendUserMessageWithWorkspaceDiagnostics({
+  runtimeClient,
+  params,
+  operation,
+  bindingKey = "",
+  threadId = "",
+  workspaceRoot = "",
+  runtimeWorkspaceRoot = "",
+}) {
+  try {
+    return await runtimeClient.sendUserMessage(params);
+  } catch (error) {
+    logInvalidWorkspaceError({
+      operation,
+      bindingKey,
+      threadId: threadId || params?.threadId || "",
+      workspaceRoot,
+      runtimeWorkspaceRoot,
+      error,
+    });
+    throw error;
+  }
+}
+
+function logInvalidWorkspaceError({
+  operation,
+  bindingKey = "",
+  threadId = "",
+  workspaceRoot = "",
+  runtimeWorkspaceRoot = "",
+  error,
+}) {
+  if (!isInvalidWorkspaceError(error)) {
+    return;
+  }
+  console.error(
+    `[cyberboss] codex ${operation} invalid workspace cwd `
+    + `thread=${normalizeLogValue(threadId) || "(new)"} `
+    + `binding=${normalizeLogValue(bindingKey) || "(none)"} `
+    + `workspaceRoot=${normalizeLogValue(workspaceRoot) || "(empty)"} `
+    + `workspaceState=${describeWorkspaceState(workspaceRoot)} `
+    + `runtimeWorkspaceRoot=${normalizeLogValue(runtimeWorkspaceRoot) || "(empty)"} `
+    + `runtimeWorkspaceState=${describeWorkspaceState(runtimeWorkspaceRoot)} `
+    + `error=${formatErrorMessage(error)}`
+  );
+}
+
+function isInvalidWorkspaceError(error) {
+  const message = formatErrorMessage(error).toLowerCase();
+  return message.includes("os error 267")
+    || message.includes("notadirectory")
+    || message.includes("目录名称无效");
+}
+
+function describeWorkspaceState(workspaceRoot) {
+  const normalized = normalizeLogValue(workspaceRoot);
+  if (!normalized) {
+    return "empty";
+  }
+  try {
+    return fs.statSync(normalized).isDirectory() ? "directory" : "not-directory";
+  } catch {
+    return "missing";
+  }
+}
+
+function normalizeLogValue(value) {
+  return typeof value === "string" ? value.trim().replace(/\\/g, "/") : "";
+}
+
+function formatErrorMessage(error) {
+  return error instanceof Error ? error.message : String(error || "unknown error");
+}
 
 function waitForTurnCompletion(client, threadId) {
   return new Promise((resolve, reject) => {

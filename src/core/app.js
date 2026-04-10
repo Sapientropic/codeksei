@@ -26,6 +26,7 @@ const BACKOFF_DELAY_MS = 30_000;
 const MAX_CONSECUTIVE_FAILURES = 3;
 const FIRST_RUNTIME_EVENT_NOTICE_TIMEOUT_MS = 8_000;
 const FIRST_RUNTIME_EVENT_FAILURE_TIMEOUT_MS = 45_000;
+const STREAM_SETTLEMENT_TIMEOUT_MS = 90_000;
 
 class CyberbossApp {
   constructor(config) {
@@ -41,13 +42,16 @@ class CyberbossApp {
     this.streamDelivery = new StreamDelivery({
       channelAdapter: this.channelAdapter,
       sessionStore: this.runtimeAdapter.getSessionStore(),
+      onDeliveryFailure: (payload) => this.handleReplyDeliveryFailure(payload),
     });
     this.pendingRuntimeEventWatchdogs = new Map();
+    this.pendingTurnSettlementWatchdogs = new Map();
     this.pendingWorkspaceBootstrapByThreadId = new Map();
     this.runtimeEventChain = Promise.resolve();
     this.runtimeAdapter.onEvent((event) => {
       this.confirmPendingWorkspaceBootstrap(event);
       this.clearRuntimeEventWatchdog(event?.payload?.threadId);
+      this.refreshTurnSettlementWatchdog(event);
       this.threadStateStore.applyRuntimeEvent(event);
       this.runtimeEventChain = this.runtimeEventChain
         .catch(() => {})
@@ -471,6 +475,73 @@ class CyberbossApp {
     this.pendingRuntimeEventWatchdogs.delete(normalizedThreadId);
   }
 
+  refreshTurnSettlementWatchdog(event) {
+    const threadId = normalizeCommandArgument(event?.payload?.threadId);
+    const turnId = normalizeCommandArgument(event?.payload?.turnId);
+    if (!threadId || !turnId) {
+      return;
+    }
+
+    if (event.type === "runtime.turn.completed" || event.type === "runtime.turn.failed" || event.type === "runtime.approval.requested") {
+      this.clearTurnSettlementWatchdog(threadId, turnId);
+      return;
+    }
+    if (event.type !== "runtime.reply.delta" && event.type !== "runtime.reply.completed") {
+      return;
+    }
+
+    const watchdogKey = buildTurnSettlementWatchdogKey(threadId, turnId);
+    this.clearTurnSettlementWatchdog(threadId, turnId);
+    const timer = setTimeout(async () => {
+      this.pendingTurnSettlementWatchdogs.delete(watchdogKey);
+      const currentThreadState = this.threadStateStore.getThreadState(threadId);
+      if (!currentThreadState || currentThreadState.turnId !== turnId || currentThreadState.status !== "running") {
+        return;
+      }
+
+      const linked = this.runtimeAdapter.getSessionStore().findBindingForThreadId(threadId);
+      const workspaceRoot = normalizeText(linked?.workspaceRoot);
+      // Once a reply has already started streaming, hanging forever is worse
+      // than surfacing a partial answer. We only trip this guard after a long
+      // quiet period to avoid fighting normal long-running tool calls.
+      console.error(
+        `[cyberboss] runtime settlement watchdog expired `
+        + `thread=${threadId} turn=${turnId} workspace=${workspaceRoot || "(unknown)"}`
+      );
+      await this.streamDelivery.finalizeAbandonedTurn({
+        threadId,
+        turnId,
+        trailingText: [
+          "【系统提示】",
+          "这一轮回复已经开始输出，但 Codex runtime 一直没有发回完成或失败事件。",
+          "我先把目前拿到的内容停在这里，避免你继续看到假 typing。",
+          "如果要继续，请直接再发一句“继续刚才那条未完回复”。",
+        ].join("\n"),
+      });
+      this.threadStateStore.markTurnFailed(
+        threadId,
+        turnId,
+        "这轮回复已经开始输出，但 Codex runtime 一直没有发回完成或失败事件。"
+      );
+      this.runtimeAdapter.getSessionStore().clearApprovalPrompt(threadId);
+      await this.stopTypingForThread(threadId);
+    }, STREAM_SETTLEMENT_TIMEOUT_MS);
+    this.pendingTurnSettlementWatchdogs.set(watchdogKey, { timer });
+  }
+
+  clearTurnSettlementWatchdog(threadId, turnId) {
+    const watchdogKey = buildTurnSettlementWatchdogKey(threadId, turnId);
+    if (!watchdogKey) {
+      return;
+    }
+    const watchdog = this.pendingTurnSettlementWatchdogs.get(watchdogKey);
+    if (!watchdog) {
+      return;
+    }
+    clearTimeout(watchdog.timer);
+    this.pendingTurnSettlementWatchdogs.delete(watchdogKey);
+  }
+
   queuePendingWorkspaceBootstrap({ bindingKey, workspaceRoot, threadId }) {
     const normalizedBindingKey = normalizeText(bindingKey);
     const normalizedWorkspaceRoot = normalizeText(workspaceRoot);
@@ -670,6 +741,44 @@ class CyberbossApp {
     return true;
   }
 
+  async handleReplyDeliveryFailure({
+    threadId,
+    turnId = "",
+    error,
+    sentText = "",
+  }) {
+    const normalizedThreadId = normalizeCommandArgument(threadId);
+    const normalizedTurnId = normalizeCommandArgument(turnId);
+    if (!normalizedThreadId) {
+      return;
+    }
+
+    const messageText = error instanceof Error ? error.message : String(error || "unknown error");
+    const deliveryFailureText = isPersistentWeixinSendFailure(error)
+      ? "微信发送层连续失败（sendMessage ret=-2），本地已停止继续投递这轮回复。"
+      : `回复投递失败：${messageText}`;
+    const linked = this.runtimeAdapter.getSessionStore().findBindingForThreadId(normalizedThreadId);
+    const workspaceRoot = normalizeText(linked?.workspaceRoot);
+
+    console.error(
+      `[cyberboss] reply delivery degraded `
+      + `thread=${normalizedThreadId} turn=${normalizedTurnId || "(pending)"} `
+      + `workspace=${workspaceRoot || "(unknown)"} `
+      + `sentChars=${String(sentText || "").length} `
+      + `reason=${messageText}`
+    );
+
+    this.clearRuntimeEventWatchdog(normalizedThreadId);
+    if (normalizedTurnId) {
+      this.clearTurnSettlementWatchdog(normalizedThreadId, normalizedTurnId);
+    }
+    // Delivery failure is a local terminal state even if Codex later finishes
+    // the turn, otherwise the bridge UI keeps showing a ghost "still replying".
+    this.runtimeAdapter.getSessionStore().clearApprovalPrompt(normalizedThreadId);
+    this.threadStateStore.markTurnFailed(normalizedThreadId, normalizedTurnId, deliveryFailureText);
+    await this.stopTypingForThread(normalizedThreadId);
+  }
+
   async dispatchChannelCommand(normalized, command) {
     switch (command.name) {
       case "bind":
@@ -775,6 +884,9 @@ class CyberbossApp {
       `status: ${threadState?.status || "idle"}`,
       `model: ${this.runtimeAdapter.getSessionStore().getCodexParamsForWorkspace(bindingKey, workspaceRoot).model || "(default)"}`,
     ];
+    if (threadState?.lastError) {
+      lines.push(`lastError: ${threadState.lastError}`);
+    }
     if (usage) {
       const usageParts = [];
       if (usage.modelContextWindow > 0 && usage.lastTotalTokens > 0) {
@@ -1651,6 +1763,20 @@ function stringifyRpcId(value) {
 
 function hasRpcId(value) {
   return stringifyRpcId(value) !== "";
+}
+
+function isPersistentWeixinSendFailure(error) {
+  const message = String(error?.message || error || "");
+  return message.includes("sendMessage ret=-2");
+}
+
+function buildTurnSettlementWatchdogKey(threadId, turnId) {
+  const normalizedThreadId = normalizeCommandArgument(threadId);
+  const normalizedTurnId = normalizeCommandArgument(turnId);
+  if (!normalizedThreadId || !normalizedTurnId) {
+    return "";
+  }
+  return `${normalizedThreadId}:${normalizedTurnId}`;
 }
 
 function resolveTimelineScreenshotOutput(args) {

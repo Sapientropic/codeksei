@@ -19,7 +19,13 @@ function resolveCodexWorkspaceRoot(workspaceRoot, options = {}) {
   }
 
   const converted = convertRootedPath(normalized, mapping.fromRoot, mapping.toRoot);
-  return converted || normalized;
+  if (!converted) {
+    return normalized;
+  }
+  // Alias roots are only a compatibility shim for Codex transport quirks. If
+  // the manifest drifts or the junction disappears, prefer the real workspace
+  // root over a synthetic cwd that would otherwise trigger os error 267.
+  return isReadableDirectory(converted) ? converted : normalized;
 }
 
 function resolveAliasMappingForPath(workspaceRoot, options = {}) {
@@ -109,6 +115,18 @@ function isPathWithinRoot(pathValue, rootValue) {
   }
   const nextChar = normalizedPath[normalizedRoot.length];
   return nextChar === "/" || nextChar === "\\";
+}
+
+function isReadableDirectory(pathValue) {
+  const normalized = normalizeWorkspaceRoot(pathValue);
+  if (!normalized) {
+    return false;
+  }
+  try {
+    return fs.statSync(path.resolve(normalized)).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 function normalizeWorkspaceRoot(value) {

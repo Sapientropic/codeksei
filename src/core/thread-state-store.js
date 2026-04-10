@@ -85,6 +85,28 @@ class ThreadStateStore {
     return next;
   }
 
+  markTurnFailed(threadId, turnId, message = "执行失败") {
+    const normalizedThreadId = normalizeText(threadId);
+    const normalizedTurnId = normalizeText(turnId);
+    if (!normalizedThreadId) {
+      return null;
+    }
+    const current = this.stateByThreadId.get(normalizedThreadId) || createEmptyThreadState(normalizedThreadId);
+    if (normalizedTurnId && normalizeText(current.turnId) && normalizeText(current.turnId) !== normalizedTurnId) {
+      return current;
+    }
+    const next = {
+      ...current,
+      status: "failed",
+      turnId: normalizedTurnId || current.turnId,
+      lastError: normalizeText(message) || "执行失败",
+      pendingApproval: null,
+      updatedAt: new Date().toISOString(),
+    };
+    this.stateByThreadId.set(normalizedThreadId, next);
+    return next;
+  }
+
   snapshot() {
     return Array.from(this.stateByThreadId.values()).map((entry) => ({ ...entry }));
   }
@@ -104,6 +126,10 @@ function createEmptyThreadState(threadId) {
     pendingApproval: null,
     updatedAt: new Date().toISOString(),
   };
+}
+
+function normalizeText(value) {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 module.exports = { ThreadStateStore };
