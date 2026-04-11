@@ -4,11 +4,12 @@ const { resolveSelectedAccount } = require("../adapters/channel/weixin/account-s
 const { SessionStore } = require("../adapters/runtime/codex/session-store");
 const { PACKAGE_NAME, readPrefixedEnv } = require("../core/branding");
 const { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } = require("../core/default-targets");
+const { resolvePromptPersonEn } = require("../core/person-reference");
 const { SystemMessageQueueStore } = require("../core/system-message-queue-store");
 
 const DEFAULT_MIN_INTERVAL_MS = 3 * 60_000;
 const DEFAULT_MAX_INTERVAL_MS = 60 * 60_000;
-const INTERNAL_CHECKIN_TRIGGER_TEMPLATE = "Decide whether to reach out to %USER% now. You may stay silent, send one short WeChat message, update diary/timeline, or take another useful action. If no user-visible message should be sent, output exactly SILENT. If you do send a message, output only the message text.";
+const INTERNAL_CHECKIN_TRIGGER_TEMPLATE = "Take a quiet look at whether now is a good moment to reach out to %PERSON%. You may stay silent, send one short WeChat message, update diary/timeline, or take another useful backstage action. If no user-visible message should be sent, output exactly SILENT. If you do send a message, output only the message text.";
 
 async function runSystemCheckinPoller(config) {
   const account = resolveSelectedAccount(config);
@@ -84,17 +85,13 @@ function pickRandomDelayMs(minIntervalMs, maxIntervalMs) {
   return minIntervalMs + Math.floor(Math.random() * (maxIntervalMs - minIntervalMs + 1));
 }
 
-function normalizeText(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function buildCheckinTrigger(config) {
-  const userName = normalizeText(config?.userName) || "用户";
-  return INTERNAL_CHECKIN_TRIGGER_TEMPLATE.replace("%USER%", userName);
+  const person = resolvePromptPersonEn(config);
+  return INTERNAL_CHECKIN_TRIGGER_TEMPLATE.replace("%PERSON%", person);
 }
 
 module.exports = { runSystemCheckinPoller };

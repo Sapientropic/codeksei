@@ -1,3 +1,9 @@
+const {
+  resolveConfiguredPersonName,
+  resolvePromptPersonEn,
+  resolvePromptPersonZh,
+} = require("./person-reference");
+
 function resolveUserPronoun(gender) {
   const normalized = String(gender || "").trim().toLowerCase();
   if (normalized === "male" || normalized === "man" || normalized === "m" || normalized === "男") {
@@ -10,8 +16,10 @@ function resolveUserPronoun(gender) {
 }
 
 function renderInstructionTemplate(template, config = {}) {
-  const userName = String(config?.userName || "").trim() || "用户";
+  const userName = resolveConfiguredPersonName(config);
   const pronoun = resolveUserPronoun(config?.userGender);
+  const personZh = resolvePromptPersonZh(config);
+  const personEn = resolvePromptPersonEn(config);
   const codekseiHome = String(
     config?.codekseiHome
     || config?.cyberbossHome
@@ -21,6 +29,8 @@ function renderInstructionTemplate(template, config = {}) {
   ).trim();
   return String(template || "")
     .replaceAll("{{USER_NAME}}", userName)
+    .replaceAll("{{PERSON_ZH}}", personZh)
+    .replaceAll("{{PERSON_EN}}", personEn)
     .replaceAll("{{CODEKSEI_HOME}}", codekseiHome)
     .replaceAll("{{CYBERBOSS_HOME}}", codekseiHome)
     .replaceAll("她", pronoun);

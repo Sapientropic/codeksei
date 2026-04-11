@@ -1,3 +1,5 @@
+const { resolvePromptPersonEn } = require("./person-reference");
+
 class SystemMessageDispatcher {
   constructor({ queueStore, config, accountId }) {
     this.queueStore = queueStore;
@@ -42,11 +44,11 @@ class SystemMessageDispatcher {
 
 function buildSystemInboundText(text, config = {}) {
   const body = normalizeText(text);
-  const userName = normalizeText(config?.userName) || "用户";
+  const person = resolvePromptPersonEn(config);
   if (!body) {
-    return `System trigger.\nThis message is not visible to ${userName}.`;
+    return `System trigger.\nThis message stays backstage and is not visible to ${person}.`;
   }
-  return `System trigger.\nThis message is not visible to ${userName}.\n${body}`;
+  return `System trigger.\nThis message stays backstage and is not visible to ${person}.\n${body}`;
 }
 
 function normalizeIsoTime(value) {

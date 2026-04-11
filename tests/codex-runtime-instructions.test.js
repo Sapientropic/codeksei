@@ -61,3 +61,19 @@ test("weixin persona template keeps a natural collaboration contract without old
   assert.doesNotMatch(content, /chief of staff|body double/u);
   assert.doesNotMatch(content, /第一物理动作|先接住，再定向，再推进/u);
 });
+
+test("wechat instructions fall back to a warm generic person reference instead of 用户", () => {
+  const personaPath = path.join(__dirname, "..", "templates", "weixin-instructions.md");
+  const operationsPath = path.join(__dirname, "..", "templates", "weixin-operations.md");
+  const content = loadWechatInstructions({
+    codekseiHome: "E:/workspace/codeksei",
+    weixinInstructionsFile: personaPath,
+    weixinOperationsFile: operationsPath,
+  });
+
+  assert.match(content, /你现在是在微信里陪 眼前这个人/u);
+  assert.match(content, /the person you're with/u);
+  assert.match(content, /companion note family/u);
+  assert.doesNotMatch(content, /用户/u);
+  assert.doesNotMatch(content, /life-assistant note family|scope assistant/u);
+});

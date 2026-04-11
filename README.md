@@ -9,24 +9,65 @@
     <a href="https://www.npmjs.com/package/codeksei"><img alt="npm version" src="https://img.shields.io/npm/v/codeksei"></a>
     <a href="https://github.com/Sapientropic/codeksei/blob/main/LICENSE"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/license-AGPL--3.0--only-111111.svg"></a>
   </p>
-  <h3>主动记录日常，照看生活节奏，也陪你把项目慢慢落地</h3>
-  <p><strong>一个本地优先的生活助理与伙伴。</strong></p>
-  <p>它会接住那些最容易被忽略的碎片：微信里的念头、待办、提醒、时间线、复盘线索和零散日常；再把它们慢慢整理成更稳的生活节奏与推进中的项目行动。</p>
+  <h3>会主动分忧、替你守住时间感，也陪你把一天和项目慢慢接回正轨</h3>
+  <p><strong>一个本地优先、会持续在场，也会先替你搭把手的陪伴者助理。</strong></p>
+  <p>很多时候，先断掉的不是事情本身，而是时间感、线头和重新开口的力气。Codeksei 会在该出现时出现，也会把一天里已经发生过的东西慢慢钉成时间线和记忆锚点，让你不用老是从一团雾里重来。</p>
   <p>
-    <a href="#为什么叫-codeksei">名字寓意</a> ·
+    <a href="#day-with-codeksei">一天会怎么相处</a> ·
     <a href="#快速开始">快速开始</a> ·
     <a href="#现在可以做什么">当前能力</a> ·
+    <a href="#why-the-name">名字寓意</a> ·
     <a href="./docs/commands.md">命令</a> ·
     <a href="./docs/architecture.md">架构</a> ·
     <a href="./docs/release.md">发布</a>
   </p>
 </div>
 
-> 这个仓库已经显著偏离上游 `cyberboss` 的原始 README 和使用方式。当前行为请以本仓 `README`、`docs/` 和实际代码实现为准。
-
-| 主入口 | 更像什么 | 当前状态 |
+| 你会在哪里遇见它 | 它会主动分担什么 | 你会慢慢得到什么 |
 | --- | --- | --- |
-| WeChat + `codeksei` | 面向 ADHD 陪伴、照看、主动记录与生活节奏校准的本地生活助理 | `codeksei@0.1.1`，兼容 `cyberboss` / `CYBERBOSS_*` / `~/.cyberboss` |
+| WeChat + `codeksei` | 守住时间感、补记忆锚点、在该出现时主动出现 | 一天不那么容易整块糊掉，项目也更容易重新接上 |
+
+<a id="day-with-codeksei"></a>
+
+## 一天里，你会这样遇见 Codeksei
+
+| 这种时刻很常见 | 你也许会这样说 | 它会先替你做什么 | 你心里会轻一点的地方 |
+| --- | --- | --- | --- |
+| 一天刚开始 | “我现在准备开始了。” / “昨天那条线停在哪来着？” | 把挂着的提醒、最近状态、项目线索和更适合眼前的第一步慢慢接回来 | 不用从空白和慌乱里重新起步 |
+| 白天推进中 | 随手把念头、待办、做完的时间块、突然想到的事丢给它 | 把这些碎片留下来，该落到 diary 的落 diary，该钉进 timeline 的钉进 timeline，该晚点提醒的就先替你记住 | 脑子不用一直替未来的自己硬撑记忆 |
+| 一抬头发现半天已经过去了 | “我刚刚到底干嘛去了？” / “今天怎么又糊了。” | 把已经发生过的时间块、切换点和留下的线索慢慢钉回时间线，让这一天重新有形 | 少一点整块失真，也少一点空白带来的自责 |
+| 你一阵子没来找它的时候 | 你也许什么都没说，或者整条线已经安静了很久 | 它会掂量现在更适合主动问一句、跟进一条线、先补一条记录、留给未来一个提醒，还是先安静不打扰 | 陪伴感不靠你次次手动召唤 |
+| 项目做到一半，刚切回来脑子空了一下 | “继续这条。” / “我现在卡在哪了？” | 它会顺着同一条线程、项目脉络和最近动作，把该从哪重新进去慢慢接回来 | 重新进入不必先把上下文从头扛一遍 |
+| 卡住、切换、躲一下的时候 | “我有点散。” / “我想逃一下。” / “我现在不知道先做哪件。” | 帮你把线缩回眼前，留下一步可做的动作，必要时替你补一个提醒或收一个尾 | 切换成本更低，不容易整条线一起掉下去 |
+| 一天要收口的时候 | 睡前、出门前、做完一段之后，让它陪你收一下 | 把今天真实发生过的东西压成 timeline、review 和明天更容易接上的入口 | 明天回来时，线还在，时间感也还在 |
+
+> `主动分忧` 不只是更勤快地来问。
+>
+> 它会先替你守住时间感、线头和已经发生过的痕迹。该出现时出现，该留痕时留痕，让一天不那么容易整块糊掉。
+
+## 现在可以做什么
+
+- `Timeline`：把已经发生过的时间块、切换点和生活事实钉成时间感与记忆锚点，不让一天只剩模糊印象
+- `Diary`：Todo、碎片、补充记录、总结，以及和 timeline 紧密联动的时间线事实，帮你把零散日常慢慢收成可用痕迹
+- `Check-ins`：随机唤醒与主动分忧。发一句消息只是其中一种；它也会先回看上下文、整理后台、补一条 diary / timeline、留一个提醒，再决定要不要来打扰你
+- `Reminders`：提醒写入与调度，给生活节奏和待办推进一个外部支点
+- `Review`：nightly / weekly / monthly，把日常记录压成更稳定的节奏校准与复盘材料
+- `Project support`：workspace bootstrap、project radar、按 workspace 恢复共享线程。项目切走再回来时，不用先把整条线在脑子里重建一遍
+- `WeChat bridge`：扫码登录、长轮询收发、文件发送、共享线程接管
+- `Codex runtime`：共享 `app-server`、thread/session 绑定、审批流、stop/resume
+- `Durable note`：`note:auto`、`note:maybe`、`note:sync`
+
+## 这些人会喜欢它
+
+- 想有人替自己照看琐碎日常、提醒和未收口事项的人
+- 有 ADHD 或执行功能摩擦，希望得到持续陪伴和轻推的人
+- 希望对方会主动来问、主动跟进，也愿意替你分担一点琐碎的人
+- 一天常常糊成一团，事后很难想起自己到底做了什么的人
+- 项目一被别的事打断，再回来就像整条线一起断掉的人
+- 想把项目推进、日常记录和复盘整理放进同一条工作流的人
+- 想把微信保留成主要交互入口，同时保留本地可控性的人
+
+<a id="why-the-name"></a>
 
 ## 为什么叫 Codeksei
 
@@ -41,31 +82,6 @@
 <div align="center">
   <p><em>线索有人照看，离开之后仍能顺着原来的温度回来。</em></p>
 </div>
-
-## 它会怎么帮你
-
-- 主动记录和整理琐碎日常，减少“回头再记”时已经散掉的东西。
-- 提醒、日记、时间线和复盘会彼此接力，慢慢帮你校准生活节奏。
-- 项目推进、碎片收集和后续整理放在同一条链上，更容易真的落地。
-- 微信和终端共用同一条状态，让这份照看不会因为换入口就断掉。
-
-## 这些人会喜欢它
-
-- 想有人替自己照看琐碎日常、提醒和未收口事项的人
-- 有 ADHD 或执行功能摩擦，希望得到持续陪伴和轻推的人
-- 想把项目推进、日常记录和复盘整理放进同一条工作流的人
-- 想把微信保留成主要交互入口，同时保留本地可控性的人
-
-## 现在可以做什么
-
-- `Diary`：Todo、时间线事实、碎片、补充记录、总结，帮你把零散日常慢慢收成可用痕迹
-- `Reminders`：提醒写入与调度，给生活节奏和待办推进一个外部支点
-- `Review`：nightly / weekly / monthly，把日常记录压成更稳定的节奏校准与复盘材料
-- `Timeline`：单条事件写入、批量写入、分类查询、构建、预览、截图
-- `WeChat bridge`：扫码登录、长轮询收发、文件发送、共享线程接管
-- `Codex runtime`：共享 `app-server`、thread/session 绑定、审批流、stop/resume
-- `Durable note`：`note:auto`、`note:maybe`、`note:sync`
-- `Project support`：workspace bootstrap、project radar、按 workspace 恢复共享线程，帮助项目更容易重新进入推进状态
 
 ## 快速开始
 
@@ -223,26 +239,15 @@ npm run help
 - [docs/architecture.md](./docs/architecture.md)
 - [docs/release.md](./docs/release.md)
 
-## 命名与兼容
+## 如果你是从 cyberboss 过来
 
-品牌上现在统一使用 `Codeksei`，兼容上仍保留旧入口。
+新安装与新文档默认都用 `Codeksei / codeksei / CODEKSEI_*`。
 
-- 主名称：`Codeksei`
-- 主包名：`codeksei`
-- 主 CLI 名：`codeksei`
-- 主环境变量前缀：`CODEKSEI_*`
-- 主状态目录：`~/.codeksei`
+如果你的本地已经在跑旧名字，当前兼容层还在：
 
-为了不打断已有本地使用，当前仍保留兼容层：
-
-- 旧 CLI：`cyberboss`
-- 旧环境变量前缀：`CYBERBOSS_*`
-- 旧状态目录：`~/.cyberboss`
-
-兼容规则：
-
-- 新前缀优先于旧前缀
-- 如果 `~/.codeksei` 不存在但 `~/.cyberboss` 已存在，运行时会优先复用旧状态
+- `cyberboss` CLI 仍可调用
+- `CYBERBOSS_*` 仍会被读取，新前缀优先
+- 如果 `~/.codeksei` 不存在但 `~/.cyberboss` 已存在，运行时会继续复用旧状态
 - Windows 后台任务会安装为 `Codeksei Shared *`，同时清理旧 `Cyberboss Shared *`
 
 ## 本地数据与公开边界
@@ -285,7 +290,7 @@ Codeksei 的时间轴能力建立在 [`timeline-for-agent`](https://github.com/W
 ## Upstream Acknowledgement
 
 感谢原仓 [`WenXiaoWendy/cyberboss`](https://github.com/WenXiaoWendy/cyberboss) 的开源。  
-Codeksei 是在其基础上发展出来的版本，但当前已经进行了大量魔改和结构调整，包括共享桥接生命周期、workspace continuity、review/durable-note/timeline 命令链路、WeChat v2 登录与回复处理等。因此，使用和维护时请以本仓 README、`docs/` 和实际代码实现为准，不再默认沿用原仓说明。
+Codeksei 从那里长出来，也感谢这份开源起点。
 
 ## FAQ
 
@@ -296,8 +301,8 @@ Codeksei 是在其基础上发展出来的版本，但当前已经进行了大�
 
 ### 现在到底该用 `codeksei` 还是 `cyberboss`？
 
-新项目和新文档都应使用 `Codeksei / codeksei / CODEKSEI_*`。  
-旧名字目前仍保留兼容，只是为了不打断已有本地状态和脚本。
+新安装和新文档统一使用 `Codeksei / codeksei / CODEKSEI_*`。
+如果你本地已经在跑 `cyberboss`，沿用当前兼容层即可，不需要为了迁移立刻重装一遍。
 
 ### 共享模式和 `npm run start` 有什么区别？
 

@@ -9,6 +9,10 @@ const { findModelByQuery } = require("../adapters/runtime/codex/model-catalog");
 const { createTimelineIntegration } = require("../integrations/timeline");
 const { buildWeixinHelpText } = require("./command-registry");
 const { resolvePreferredSenderId } = require("./default-targets");
+const {
+  resolveConfiguredPersonName,
+  resolvePromptPersonEn,
+} = require("./person-reference");
 const { StreamDelivery } = require("./stream-delivery");
 const { ThreadStateStore } = require("./thread-state-store");
 const { SystemMessageQueueStore } = require("./system-message-queue-store");
@@ -457,7 +461,7 @@ class CyberbossApp {
           `workspace: ${workspaceRoot}`,
           `thread: ${normalizedThreadId}`,
           "优先检查：共享 app-server 是否正常、当前终端是否接在同一个 thread、runtime 是否真的开始处理这条消息。",
-          "如果你正在帮用户排查，直接按这套顺序做：",
+          "如果你现在是在替这条线排查，直接按这套顺序做：",
           "1. 在项目目录执行 npm run shared:status",
           "2. 如果 bridge 不在，先执行 npm run shared:start",
           "3. 再开一个终端执行 npm run shared:open",
@@ -1707,10 +1711,11 @@ function buildApprovalPromptSignature(approval) {
 
 function buildReminderSystemTrigger(reminder, config = {}) {
   const reminderText = String(reminder?.text || "").trim();
-  const userName = String(config?.userName || "").trim() || "用户";
+  const person = resolvePromptPersonEn(config);
   return [
     "A scheduled reminder is due.",
-    `Send ${userName} one short and natural WeChat message.`,
+    `Decide the most useful next move for ${person} right now.`,
+    "If a message is best, send one short and natural WeChat message.",
     "Do not mention internal triggers.",
     "Do not mechanically repeat the reminder text.",
     `Reminder: ${reminderText}`,
@@ -1721,7 +1726,8 @@ function buildCodexInboundText(normalized, persisted = {}, config = {}) {
   const text = String(normalized?.text || "").trim();
   const saved = Array.isArray(persisted?.saved) ? persisted.saved : [];
   const failed = Array.isArray(persisted?.failed) ? persisted.failed : [];
-  const userName = String(config?.userName || "").trim() || "用户";
+  const configuredName = resolveConfiguredPersonName(config);
+  const person = resolvePromptPersonEn(config);
   const localTime = formatWechatLocalTime(normalized?.receivedAt, config.timezone);
   const lines = [];
   if (localTime) {
@@ -1738,13 +1744,17 @@ function buildCodexInboundText(normalized, persisted = {}, config = {}) {
     if (lines.length) {
       lines.push("");
     }
-    lines.push(`${userName} sent image/file attachments. They were saved under the local data directory:`);
+    if (configuredName) {
+      lines.push(`${configuredName} sent image/file attachments. They were saved under the local data directory:`);
+    } else {
+      lines.push("The person in this thread sent image/file attachments. They were saved under the local data directory:");
+    }
     for (const item of saved) {
       const suffix = item.sourceFileName ? ` (original name: ${item.sourceFileName})` : "";
       lines.push(`- [${item.kind}] ${item.absolutePath}${suffix}`);
     }
-    lines.push(`You must read these files before replying to ${userName}. Do not skip the read step.`);
-    lines.push(`If the required local tool is missing, tell ${userName} exactly what is missing and that you cannot read the file yet. Do not pretend you already read it.`);
+    lines.push(`You must read these files before replying to ${person}. Do not skip the read step.`);
+    lines.push(`If the required local tool is missing, tell ${person} exactly what is missing and that you cannot read the file yet. Do not pretend you already read it.`);
   }
 
   if (failed.length) {

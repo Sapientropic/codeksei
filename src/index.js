@@ -29,6 +29,7 @@ const {
   buildTerminalTopicHelp,
   isPlannedTerminalTopic,
 } = require("./core/command-registry");
+const { resolveConfiguredPersonName } = require("./core/person-reference");
 
 function ensureDefaultStateDirectory() {
   ensureStateDirectory();
@@ -73,7 +74,7 @@ function ensureInstructionsTemplate(config) {
     return;
   }
 
-  const userName = String(config?.userName || "").trim() || "用户";
+  const userName = resolveConfiguredPersonName(config);
   const content = renderInstructionTemplate(template, {
     ...config,
     userName,

@@ -128,9 +128,9 @@ Diary 用来接那些更琐碎、更生活化、也最容易散掉的东西。
 Durable note 负责把值得长期记住的判断、偏好和项目脉络，放到更稳定的位置。
 
 - `npm run note:auto -- --project <slug> --kind recent --text "..."`
-- `npm run note:auto -- --scope assistant --kind preference --text "..."`
+- `npm run note:auto -- --scope companion --kind preference --text "..."`
 - `npm run note:maybe -- --project <slug>`
-- `npm run note:maybe -- --scope assistant --kind preference`
+- `npm run note:maybe -- --scope companion --kind preference`
 - `npm run note:sync -- --project <slug> --section "最近动作" --text "..."`
 - `npm run note:sync -- --path "/absolute/path/to/note.md" --section "当前定位" --text "..."`
 
@@ -139,6 +139,7 @@ Durable note 负责把值得长期记住的判断、偏好和项目脉络，放�
 - 默认优先 `note:auto`
 - 先判断路由时用 `note:maybe`
 - 需要定制 section / slot 时再用 `note:sync`
+- 公开示例默认用 `companion`；旧的 `assistant` scope 仍兼容
 
 这一层让值得长期保留的判断、偏好和项目脉络有稳定落点，也让后续照看更连贯。
 
