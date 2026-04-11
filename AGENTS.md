@@ -18,12 +18,16 @@ Read these in order when you first enter this repo:
 
 1. `AGENTS.md`
    - repo-local routing, public/private boundary, and maintenance rules
-2. `README.md`
+2. `AGENTS.local.md` if present
+   - local operator overlay, local branch/release boundaries, and private workflow inheritance
+3. `README.md`
    - public overview, install path, main commands, naming/compatibility story
-3. `docs/commands.md`
+4. `docs/commands.md`
    - command surface, compatibility details, public-facing usage expectations
-4. `docs/architecture.md`
+5. `docs/architecture.md`
    - module boundaries, shared-mode structure, persistence model
+6. `docs/release.md` if present
+   - maintainer release workflow truth for local integration work
 
 When a task changes compatibility, managed markers, bootstrap behavior, or
 shared-mode lifecycle, also read the relevant source of truth in:
