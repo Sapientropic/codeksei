@@ -88,6 +88,8 @@ npm 侧需要的 GitHub Actions trusted publisher 配置：
 
 补充约束：
 
+- 本地 `main` 只作为维护者收口分支保留，默认不要推远端
+- 对外发布、文档更新、版本推进统一只推 `public`
 - GitHub Release 触发时，workflow 会校验 `package.json` 版本和 tag 去掉前缀 `v` 后一致
 - `workflow_dispatch` 固定只做 dry-run，避免误发
 - 兼容入口 `cyberboss` 不会再单独发布 npm 包

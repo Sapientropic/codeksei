@@ -42,6 +42,9 @@ shared-mode lifecycle, also read the relevant source of truth in:
 - This repository is public. Do not push local-machine cleanup, private vault
   routing, personal absolute paths, or workstation-specific state changes into
   the public repo unless the shipped product behavior genuinely depends on them.
+- Local `main` is a maintainer branch, not a public push target.
+  Push release-ready history to remote `public` only unless the user
+  explicitly asks for a different branch workflow.
 - Public docs and new examples should default to `Codeksei / codeksei /
   CODEKSEI_*`.
 - Legacy `cyberboss / CYBERBOSS_* / ~/.cyberboss` mentions are allowed only for
