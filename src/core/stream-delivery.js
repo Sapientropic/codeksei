@@ -5,6 +5,7 @@ const { normalizeAssistantPhase } = require("../adapters/runtime/codex/message-u
 const RECENT_WEIXIN_DELIVERY_TTL_MS = 30_000;
 const STREAM_PROGRESS_MAX_CHARS = 120;
 const STREAM_PROGRESS_MAX_LINES = 2;
+const STREAM_SNAPSHOT_REPLACEMENT_MIN_CHARS = 40;
 
 class StreamDelivery {
   constructor({
@@ -812,6 +813,11 @@ function appendStreamingText(current, next) {
     return incoming;
   }
 
+  const replacement = chooseStreamingSnapshotReplacement(base, incoming);
+  if (replacement) {
+    return replacement;
+  }
+
   const maxOverlap = Math.min(base.length, incoming.length);
   for (let size = maxOverlap; size > 0; size -= 1) {
     if (base.slice(-size) === incoming.slice(0, size)) {
@@ -911,6 +917,10 @@ function mergeCompletedItemText(current, completed) {
   if (normalizeVisibleStreamingText(streamed) === normalizeVisibleStreamingText(finalized)) {
     return finalized;
   }
+  const finalizedReplacement = chooseCompletedSnapshotReplacement(streamed, finalized);
+  if (finalizedReplacement) {
+    return finalizedReplacement;
+  }
   return appendStreamingText(streamed, finalized);
 }
 
@@ -951,6 +961,68 @@ function buildVisibleItemDedupKey(text) {
 
 function normalizeVisibleStreamingText(text) {
   return buildVisibleItemDedupKey(text).replace(/\s+/gu, " ").trim();
+}
+
+function normalizeStreamingSnapshotSemanticText(text) {
+  return normalizeVisibleStreamingText(text)
+    .replace(/[\p{P}\p{S}]+/gu, "")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
+function chooseStreamingSnapshotReplacement(base, incoming) {
+  const baseVisible = normalizeStreamingSnapshotSemanticText(base);
+  const incomingVisible = normalizeStreamingSnapshotSemanticText(incoming);
+  if (
+    !baseVisible
+    || !incomingVisible
+    || baseVisible.length < STREAM_SNAPSHOT_REPLACEMENT_MIN_CHARS
+    || incomingVisible.length < STREAM_SNAPSHOT_REPLACEMENT_MIN_CHARS
+  ) {
+    return "";
+  }
+
+  // Codex can resend the whole in-flight assistant item after reformatting an
+  // earlier region (for example, once a fenced code block becomes plain text in
+  // a later snapshot). Raw prefix checks then fail even though the newer
+  // snapshot semantically contains the older one. Prefer the newer snapshot so
+  // we do not weld two whole copies of the same answer together.
+  if (incomingVisible.startsWith(baseVisible)) {
+    return incoming;
+  }
+  // Some upstream snapshots briefly regress to a shorter normalized view while
+  // the same item is still being built. Keep the richer text we already have
+  // instead of treating that shorter resend as a new block to append.
+  if (baseVisible.startsWith(incomingVisible)) {
+    return base;
+  }
+  return "";
+}
+
+function chooseCompletedSnapshotReplacement(streamed, finalized) {
+  const streamedVisible = normalizeStreamingSnapshotSemanticText(streamed);
+  const finalizedVisible = normalizeStreamingSnapshotSemanticText(finalized);
+  if (
+    !streamedVisible
+    || !finalizedVisible
+    || streamedVisible.length < STREAM_SNAPSHOT_REPLACEMENT_MIN_CHARS
+    || finalizedVisible.length < STREAM_SNAPSHOT_REPLACEMENT_MIN_CHARS
+  ) {
+    return "";
+  }
+
+  // The completed item is the authoritative final snapshot. If the streamed
+  // buffer already contains the same normalized answer as a prefix/substring,
+  // it usually means earlier delta snapshots were stitched together after a
+  // formatting rewrite. Collapse back to the completed text instead of sending
+  // a duplicated mega-bubble.
+  if (streamedVisible.startsWith(finalizedVisible) || streamedVisible.includes(finalizedVisible)) {
+    return finalized;
+  }
+  if (finalizedVisible.startsWith(streamedVisible)) {
+    return finalized;
+  }
+  return "";
 }
 
 function hasWatchdogTail(state, { completedOnly }) {

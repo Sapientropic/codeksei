@@ -831,6 +831,146 @@ test("weixin stream delivery does not duplicate a final block when delta and com
   );
 });
 
+test("weixin stream delivery treats reformatted final snapshots as replacements instead of concatenating them", async () => {
+  const sent = [];
+  const delivery = new StreamDelivery({
+    weixinReplyMode: "stream",
+    channelAdapter: {
+      async sendText(payload) {
+        sent.push(payload);
+      },
+    },
+    sessionStore: {
+      findBindingForThreadId() {
+        return { bindingKey: "binding-stream-final-snapshot-rewrite" };
+      },
+    },
+  });
+
+  delivery.queueReplyTargetForThread("thread-stream-final-snapshot-rewrite", {
+    userId: "user-stream-final-snapshot-rewrite",
+    contextToken: "ctx-stream-final-snapshot-rewrite",
+    provider: "weixin",
+  });
+
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.started",
+    payload: {
+      threadId: "thread-stream-final-snapshot-rewrite",
+      turnId: "turn-stream-final-snapshot-rewrite",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-stream-final-snapshot-rewrite",
+      turnId: "turn-stream-final-snapshot-rewrite",
+      itemId: "item-commentary",
+      text: "我先去点晚饭。",
+      phase: "commentary",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.delta",
+    payload: {
+      threadId: "thread-stream-final-snapshot-rewrite",
+      turnId: "turn-stream-final-snapshot-rewrite",
+      itemId: "item-final",
+      text: [
+        "时间线我已经补上了：",
+        "",
+        "- 18:59-19:14 那段已经进了今天日记",
+        "- 也派生了一条 timeline event",
+        "",
+        "你先去点晚饭。",
+        "",
+        "另一个碎片我刚写的时候命令又报了同一个错：",
+        "",
+        "```text",
+        "[codeksei] --state 只支持和 --section todo 一起使用",
+        "```",
+      ].join("\n"),
+      phase: "final",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.delta",
+    payload: {
+      threadId: "thread-stream-final-snapshot-rewrite",
+      turnId: "turn-stream-final-snapshot-rewrite",
+      itemId: "item-final",
+      text: [
+        "时间线我已经补上了：",
+        "- 18:59-19:14 那段已经进了今天日记",
+        "- 也派生了一条 timeline event",
+        "你先去点晚饭。",
+        "另一个碎片我刚写的时候命令又报了同一个错：",
+        "text:",
+        "[codeksei] --state 只支持和 --section todo 一起使用",
+        "我先停住了，没继续硬写。",
+      ].join("\n"),
+      phase: "final",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-stream-final-snapshot-rewrite",
+      turnId: "turn-stream-final-snapshot-rewrite",
+      itemId: "item-final",
+      text: [
+        "时间线我已经补上了：",
+        "",
+        "- `18:59-19:14` 那段已经进了今天日记",
+        "- 也派生了一条 `timeline event`",
+        "",
+        "你先去点晚饭。",
+        "",
+        "另一个碎片，我刚写的时候命令又报了同一个错：",
+        "",
+        "```text",
+        "[codeksei] --state 只支持和 --section todo 一起使用",
+        "```",
+        "",
+        "我先停住了，没继续硬写。",
+      ].join("\n"),
+      phase: "final",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.completed",
+    payload: {
+      threadId: "thread-stream-final-snapshot-rewrite",
+      turnId: "turn-stream-final-snapshot-rewrite",
+    },
+  });
+
+  assert.deepEqual(
+    sent.map((payload) => ({ text: payload.text, preserveBlock: payload.preserveBlock })),
+    [
+      { text: "我先去点晚饭。", preserveBlock: false },
+      {
+        text: [
+          "时间线我已经补上了：",
+          "",
+          "- 18:59-19:14 那段已经进了今天日记",
+          "- 也派生了一条 timeline event",
+          "",
+          "你先去点晚饭。",
+          "",
+          "另一个碎片，我刚写的时候命令又报了同一个错：",
+          "",
+          "text:",
+          "[codeksei] --state 只支持和 --section todo 一起使用",
+          "",
+          "我先停住了，没继续硬写。",
+        ].join("\n"),
+        preserveBlock: false,
+      },
+    ]
+  );
+});
+
 test("weixin stream delivery holds a terminal brief block without phase until another item proves it is progress", async () => {
   const sent = [];
   const delivery = new StreamDelivery({
