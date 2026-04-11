@@ -16,11 +16,20 @@ function isAssistantItemCompleted(message) {
 }
 
 function extractAssistantText(params) {
-  const directText = [
-    params?.delta,
+  return extractAssistantDeltaText(params) || extractAssistantSnapshotText(params);
+}
+
+function extractAssistantDeltaText(params) {
+  return typeof params?.delta === "string" && params.delta.length > 0
+    ? normalizeLineEndings(params.delta)
+    : "";
+}
+
+function extractAssistantSnapshotText(params) {
+  const snapshotCandidates = [
     params?.item?.text,
   ];
-  for (const value of directText) {
+  for (const value of snapshotCandidates) {
     if (typeof value === "string" && value.length > 0) {
       return normalizeLineEndings(value);
     }
@@ -38,6 +47,31 @@ function extractAssistantText(params) {
   }
 
   return "";
+}
+
+function extractAssistantDeltaFragment(params) {
+  const deltaText = extractAssistantDeltaText(params);
+  if (deltaText) {
+    return {
+      text: deltaText,
+      fragmentKind: "delta",
+    };
+  }
+  const snapshotText = extractAssistantSnapshotText(params);
+  if (snapshotText) {
+    return {
+      text: snapshotText,
+      fragmentKind: "snapshot",
+    };
+  }
+  return {
+    text: "",
+    fragmentKind: "",
+  };
+}
+
+function extractCompletedAssistantText(params) {
+  return extractAssistantSnapshotText(params);
 }
 
 function extractAssistantPhase(params) {
@@ -130,8 +164,12 @@ function extractRawTextFromContent(content) {
 }
 
 module.exports = {
+  extractAssistantDeltaFragment,
+  extractAssistantDeltaText,
   extractAssistantPhase,
+  extractAssistantSnapshotText,
   extractAssistantText,
+  extractCompletedAssistantText,
   extractFailureText,
   extractThreadId,
   extractThreadIdFromParams,

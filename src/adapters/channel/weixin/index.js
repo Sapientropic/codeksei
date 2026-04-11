@@ -80,15 +80,15 @@ function createWeixinChannelAdapter(config) {
     if (!content.trim()) {
       return Promise.resolve();
     }
-    const sendChunks = preserveBlock
-      ? splitUtf8(compactPlainTextForWeixin(content) || "已完成。", MAX_WEIXIN_CHUNK)
-      : packChunksForWeixinDelivery(
-        chunkReplyTextForWeixin(content, WEIXIN_SEND_CHUNK_LIMIT).length
-          ? chunkReplyTextForWeixin(content, WEIXIN_SEND_CHUNK_LIMIT)
-          : ["已完成。"],
-        WEIXIN_MAX_DELIVERY_MESSAGES,
-        MAX_WEIXIN_CHUNK
-      );
+    const normalizedContent = normalizePlainTextForWeixin(content) || "已完成。";
+    const chunkCandidates = preserveBlock
+      ? chunkReplyText(normalizedContent, MAX_WEIXIN_CHUNK)
+      : chunkReplyTextForWeixin(normalizedContent, WEIXIN_SEND_CHUNK_LIMIT);
+    const sendChunks = packChunksForWeixinDelivery(
+      chunkCandidates.length ? chunkCandidates : [normalizedContent],
+      WEIXIN_MAX_DELIVERY_MESSAGES,
+      MAX_WEIXIN_CHUNK
+    );
     const traceContext = buildWeixinTraceContext(trace, {
       enabled: config.weixinDeliveryTrace,
       origin: "adapter.sendText",
@@ -98,7 +98,7 @@ function createWeixinChannelAdapter(config) {
     });
     return sendChunks.reduce((promise, chunk, index) => promise
       .then(() => {
-        const compactChunk = compactPlainTextForWeixin(chunk) || "已完成。";
+        const compactChunk = normalizePlainTextForWeixin(chunk) || "已完成。";
         const clientId = `cb-${crypto.randomUUID()}`;
         return sendV2TextChunk({
           baseUrl: account.baseUrl,
@@ -281,9 +281,13 @@ function splitUtf8(text, maxRunes) {
   return chunks;
 }
 
-function compactPlainTextForWeixin(text) {
+function normalizePlainTextForWeixin(text) {
   const normalized = String(text || "").replace(/\r\n/g, "\n");
-  return trimOuterBlankLines(normalized.replace(/\n\s*\n+/g, "\n"));
+  return trimOuterBlankLines(normalized.replace(/\n\s*\n(?:\s*\n)+/g, "\n\n"));
+}
+
+function compactPlainTextForLegacySingleLine(text) {
+  return trimOuterBlankLines(normalizePlainTextForWeixin(text).replace(/\n\s*\n+/g, "\n"));
 }
 
 function chunkReplyText(text, limit = 3500) {
@@ -362,62 +366,25 @@ function chunkReplyTextForWeixin(text, limit = 80) {
 
 function packChunksForWeixinDelivery(chunks, maxMessages = 10, maxChunkChars = 3800) {
   const normalizedChunks = Array.isArray(chunks)
-    ? chunks.map((chunk) => compactPlainTextForWeixin(chunk)).filter(Boolean)
+    ? chunks.map((chunk) => normalizePlainTextForWeixin(chunk)).filter(Boolean)
     : [];
   if (!normalizedChunks.length) {
     return normalizedChunks;
   }
-
-  const groupedChunks = groupChunksWithinBudget(normalizedChunks, maxChunkChars);
-  if (groupedChunks.length <= maxMessages) {
-    return groupedChunks;
-  }
-
-  const fullText = compactPlainTextForWeixin(normalizedChunks.join("\n")) || "已完成。";
-  const hardChunks = splitUtf8(fullText, maxChunkChars);
-  if (hardChunks.length <= maxMessages) {
-    return hardChunks;
-  }
-
-  // `maxMessages` is only a spam guard. If the full reply still needs more
-  // chunks at the hard per-message budget, prefer complete delivery over
-  // silently dropping the tail.
-  return hardChunks;
-}
-
-function groupChunksWithinBudget(chunks, maxChunkChars) {
-  const grouped = [];
-  let current = "";
-
-  for (const rawChunk of Array.isArray(chunks) ? chunks : []) {
-    const normalizedChunk = compactPlainTextForWeixin(rawChunk);
-    if (!normalizedChunk) {
+  const packed = [];
+  for (const chunk of normalizedChunks) {
+    if (chunk.length <= maxChunkChars) {
+      packed.push(chunk);
       continue;
     }
-
-    const units = normalizedChunk.length > maxChunkChars
-      ? splitUtf8(normalizedChunk, maxChunkChars)
-      : [normalizedChunk];
-
-    for (const unit of units) {
-      if (!current) {
-        current = unit;
-        continue;
-      }
-      const joined = `${current}\n${unit}`;
-      if (joined.length > maxChunkChars) {
-        grouped.push(current);
-        current = unit;
-        continue;
-      }
-      current = joined;
-    }
+    packed.push(...chunkReplyText(chunk, maxChunkChars));
   }
 
-  if (current) {
-    grouped.push(current);
-  }
-  return grouped;
+  // `maxMessages` stays as an extreme safety budget, but readability wins over
+  // bubble minimization. Preserve semantic chunk boundaries instead of merging
+  // them back together just to hit a smaller message count.
+  void maxMessages;
+  return packed;
 }
 
 function collectStreamingBoundaries(text) {

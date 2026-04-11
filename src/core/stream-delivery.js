@@ -5,7 +5,9 @@ const { normalizeAssistantPhase } = require("../adapters/runtime/codex/message-u
 const RECENT_WEIXIN_DELIVERY_TTL_MS = 30_000;
 const STREAM_PROGRESS_MAX_CHARS = 120;
 const STREAM_PROGRESS_MAX_LINES = 2;
-const STREAM_SNAPSHOT_REPLACEMENT_MIN_CHARS = 40;
+const STREAM_IDLE_FLUSH_MS = 500;
+const STREAM_FORCE_FLUSH_CHARS = 100;
+const STREAM_BOUNDARY_FLUSH_CHARS = 30;
 const WEIXIN_DUPLICATE_BLOCK_MIN_CHARS = 120;
 const WEIXIN_DUPLICATE_BLOCK_MIN_SEGMENTS = 2;
 
@@ -16,12 +18,18 @@ class StreamDelivery {
     weixinReplyMode = "settled",
     deliveryTraceEnabled = false,
     onDeliveryFailure = null,
+    streamIdleFlushMs = STREAM_IDLE_FLUSH_MS,
+    streamForceFlushChars = STREAM_FORCE_FLUSH_CHARS,
+    streamBoundaryFlushChars = STREAM_BOUNDARY_FLUSH_CHARS,
   }) {
     this.channelAdapter = channelAdapter;
     this.sessionStore = sessionStore;
     this.weixinReplyMode = normalizeWeixinReplyMode(weixinReplyMode);
     this.deliveryTraceEnabled = Boolean(deliveryTraceEnabled);
     this.onDeliveryFailure = typeof onDeliveryFailure === "function" ? onDeliveryFailure : null;
+    this.streamIdleFlushMs = numberOrDefault(streamIdleFlushMs, STREAM_IDLE_FLUSH_MS);
+    this.streamForceFlushChars = numberOrDefault(streamForceFlushChars, STREAM_FORCE_FLUSH_CHARS);
+    this.streamBoundaryFlushChars = numberOrDefault(streamBoundaryFlushChars, STREAM_BOUNDARY_FLUSH_CHARS);
     this.replyTargetByBindingKey = new Map();
     this.pendingReplyTargetsByThreadId = new Map();
     this.stateByRunKey = new Map();
@@ -80,11 +88,25 @@ class StreamDelivery {
       case "runtime.reply.delta": {
         const state = this.ensureRunState(threadId, turnId);
         state.abandonedAt = 0;
-        this.upsertItem(state, {
-          itemId: normalizeText(event.payload.itemId) || `item-${state.itemOrder.length + 1}`,
+        const itemId = normalizeText(event.payload.itemId) || `item-${state.itemOrder.length + 1}`;
+        const phase = normalizeAssistantPhase(event.payload.phase);
+        const fragmentKind = normalizeFragmentKind(event.payload.fragmentKind) || "delta";
+        const fragment = this.upsertItem(state, {
+          itemId,
           text: normalizeLineEndings(event.payload.text),
           completed: false,
-          phase: normalizeAssistantPhase(event.payload.phase),
+          phase,
+          fragmentKind,
+        });
+        this.scheduleStreamingFlush(state, {
+          force: false,
+          trigger: {
+            source: event.type,
+            itemId,
+            phase,
+            fragmentKind,
+            fragmentRelation: fragment.relation,
+          },
         });
         return;
       }
@@ -93,18 +115,22 @@ class StreamDelivery {
         state.abandonedAt = 0;
         const itemId = normalizeText(event.payload.itemId) || `item-${state.itemOrder.length + 1}`;
         const phase = normalizeAssistantPhase(event.payload.phase);
-        this.upsertItem(state, {
+        const fragment = this.upsertItem(state, {
           itemId,
           text: normalizeLineEndings(event.payload.text),
           completed: true,
           phase,
+          fragmentKind: "completed_snapshot",
         });
+        this.clearScheduledFlush(state);
         await this.flush(state, {
           force: false,
           trigger: {
             source: event.type,
             itemId,
             phase,
+            fragmentKind: "completed_snapshot",
+            fragmentRelation: fragment.relation,
           },
         });
         return;
@@ -113,6 +139,7 @@ class StreamDelivery {
         const state = this.ensureRunState(threadId, turnId);
         state.turnId = turnId || state.turnId;
         state.abandonedAt = 0;
+        this.clearScheduledFlush(state);
         await this.flush(state, {
           force: true,
           trigger: { source: event.type },
@@ -142,6 +169,8 @@ class StreamDelivery {
         itemId: "final",
         text: normalizedFinalText,
         completed: true,
+        phase: "final",
+        fragmentKind: "completed_snapshot",
       });
     } else {
       const itemId = state.itemOrder[state.itemOrder.length - 1] || "final";
@@ -149,7 +178,8 @@ class StreamDelivery {
       for (const candidateId of state.itemOrder) {
         const item = state.items.get(candidateId);
         if (item) {
-          item.currentText = item.completedText || item.currentText;
+          item.authoritativeText = item.completedText || item.authoritativeText;
+          item.currentText = item.authoritativeText;
           item.completed = true;
         }
       }
@@ -160,6 +190,7 @@ class StreamDelivery {
       trigger: {
         source: "finishTurn",
         itemId: state.itemOrder[state.itemOrder.length - 1] || "final",
+        fragmentKind: "completed_snapshot",
       },
     });
     this.disposeRunState(state.runKey);
@@ -191,11 +222,13 @@ class StreamDelivery {
     }
 
     this.attachReplyTarget(state);
+    this.clearScheduledFlush(state);
     if (normalizedTrailingText) {
       this.upsertItem(state, {
         itemId: "__watchdog__",
         text: normalizedTrailingText,
         completed: true,
+        fragmentKind: "completed_snapshot",
       });
     }
     await this.flush(state, {
@@ -203,10 +236,12 @@ class StreamDelivery {
       trigger: {
         source: "finalizeAbandonedTurn",
         itemId: normalizedTrailingText ? "__watchdog__" : "",
+        fragmentKind: normalizedTrailingText ? "completed_snapshot" : "",
       },
     });
     removeStateItem(state, "__watchdog__");
     state.sentText = buildCurrentSafeReplyText(state, { force: true });
+    state.lastDeliveredVisibleText = state.sentText;
     state.abandonedAt = Date.now();
   }
 
@@ -227,8 +262,10 @@ class StreamDelivery {
       items: new Map(),
       weixinReplyMode: this.weixinReplyMode,
       sentText: "",
+      lastDeliveredVisibleText: "",
       sendChain: Promise.resolve(),
       flushPromise: null,
+      scheduledFlushTimer: null,
       abandonedAt: 0,
     };
     this.stateByRunKey.set(runKey, created);
@@ -286,56 +323,46 @@ class StreamDelivery {
     }
   }
 
-  upsertItem(state, { itemId, text, completed, phase = "" }) {
-    if (!text) {
-      return;
+  upsertItem(state, { itemId, text, completed, phase = "", fragmentKind = "" }) {
+    const normalizedText = normalizeLineEndings(text);
+    if (!normalizedText) {
+      return { relation: "keep", text: "" };
     }
-    if (!state.items.has(itemId)) {
-      state.itemOrder.push(itemId);
-      state.items.set(itemId, {
-        currentText: "",
-        completedText: "",
-        completed: false,
-        phase: "",
-      });
-    }
-
-    const current = state.items.get(itemId);
+    const current = ensureStateItem(state, itemId);
     const normalizedPhase = normalizeAssistantPhase(phase);
+    const normalizedFragmentKind = normalizeFragmentKind(fragmentKind);
     if (normalizedPhase) {
       current.phase = normalizedPhase;
     }
+    current.lastFragmentAt = Date.now();
+    current.lastFragmentKind = normalizedFragmentKind || current.lastFragmentKind;
+    const merge = mergeAuthoritativeItemText(current.authoritativeText, normalizedText, {
+      fragmentKind: completed ? "completed_snapshot" : normalizedFragmentKind,
+      completed,
+    });
+    current.authoritativeText = merge.text;
+    current.currentText = merge.text;
     if (completed) {
-      const merged = mergeCompletedItemText(current.currentText, text);
-      current.currentText = merged;
-      current.completedText = merged;
+      current.completedText = merge.text;
       current.completed = true;
-      return;
     }
-
-    current.currentText = appendStreamingText(current.currentText, text);
+    current.pendingVisibleSuffix = "";
+    return merge;
   }
 
   setItemText(state, itemId, text, completed) {
-    if (!text) {
+    const normalizedText = normalizeLineEndings(text);
+    if (!normalizedText) {
       return;
     }
-    if (!state.items.has(itemId)) {
-      state.itemOrder.push(itemId);
-        state.items.set(itemId, {
-          currentText: "",
-          completedText: "",
-          completed: false,
-          phase: "",
-        });
-    }
-
-    const current = state.items.get(itemId);
-    current.currentText = text;
+    const current = ensureStateItem(state, itemId);
+    current.authoritativeText = normalizedText;
+    current.currentText = normalizedText;
     if (completed) {
-      current.completedText = text;
+      current.completedText = normalizedText;
     }
     current.completed = Boolean(completed);
+    current.pendingVisibleSuffix = "";
   }
 
   async flush(state, { force, trigger = null }) {
@@ -366,14 +393,26 @@ class StreamDelivery {
       return;
     }
 
-    const plainText = markdownToPlainText(buildReplyText(state, {
-      completedOnly: !force,
-      preferLatestMessage: prefersSettledDelivery(state),
-      force,
-    }));
-    const sanitized = sanitizeReplyText(state.replyTarget, plainText);
+    const completedOnly = prefersSettledDelivery(state) ? !force : false;
+    const streamPrepared = prefersStreamingDelivery(state)
+      ? prepareStreamingDelivery(state, {
+        completedOnly,
+        force,
+      })
+      : null;
+    const plainText = streamPrepared
+      ? streamPrepared.safeText
+      : buildReplyText(state, {
+        completedOnly,
+        preferLatestMessage: prefersSettledDelivery(state),
+        force,
+      });
+    const sanitized = streamPrepared
+      ? { suppress: false, text: plainText }
+      : sanitizeReplyText(state.replyTarget, plainText);
     if (sanitized.suppress) {
       state.sentText = sanitized.text;
+      state.lastDeliveredVisibleText = sanitized.text;
       console.log(
         `[codeksei] suppressed system reply `
         + `thread=${state.threadId} turn=${state.turnId || "(pending)"} `
@@ -382,25 +421,52 @@ class StreamDelivery {
       return;
     }
     const safeText = sanitized.text;
-    if (!safeText || safeText === state.sentText) {
+    if (!safeText) {
       return;
     }
-
-    if (state.sentText && !safeText.startsWith(state.sentText)) {
-      console.warn(`[codeksei] skip non-monotonic reply thread=${state.threadId}`);
-      return;
-    }
-
-    const delta = normalizeDeliveryDelta(
-      safeText.slice(state.sentText.length),
+    let deltaResult = streamPrepared
+      ? {
+        delta: streamPrepared.safeText,
+        relation: streamPrepared.relation,
+        deliveredVisibleBefore: state.lastDeliveredVisibleText,
+        deliveredVisibleAfter: streamPrepared.deliveredVisibleAfter,
+      }
+      : computeVisibleDeliveryDelta(state.sentText, safeText);
+    let delta = normalizeDeliveryDelta(
+      deltaResult.delta,
       { streaming: prefersStreamingDelivery(state) }
     );
+    if (
+      !delta
+      && !streamPrepared
+      && Boolean(state.abandonedAt)
+      && force
+      && safeText
+      && safeText !== state.sentText
+    ) {
+      deltaResult = {
+        delta: safeText,
+        relation: deltaResult.relation === "rewrite_without_extension"
+          ? "late_rewrite"
+          : (deltaResult.relation || "late_rewrite"),
+        deliveredVisibleBefore: state.sentText,
+        deliveredVisibleAfter: safeText,
+      };
+      delta = safeText;
+    }
     if (!delta) {
+      if (streamPrepared) {
+        commitPreparedStreamingDelivery(streamPrepared, { delivered: false });
+      }
       return;
     }
 
     if (!delta.trim()) {
       state.sentText = safeText;
+      state.lastDeliveredVisibleText = safeText;
+      if (streamPrepared) {
+        commitPreparedStreamingDelivery(streamPrepared, { delivered: false });
+      }
       return;
     }
 
@@ -418,8 +484,11 @@ class StreamDelivery {
       traceId: this.deliveryTraceEnabled ? crypto.randomUUID().slice(0, 8) : "",
       safeText,
       delta,
+      relation: deltaResult.relation,
+      deliveredVisibleBefore: deltaResult.deliveredVisibleBefore,
+      deliveredVisibleAfter: deltaResult.deliveredVisibleAfter,
     });
-    state.sendChain = state.sendChain.then(async () => {
+      state.sendChain = state.sendChain.then(async () => {
       this.logDeliveryTrace("attempt", tracePayload);
       await this.channelAdapter.sendText({
         userId: state.replyTarget.userId,
@@ -434,7 +503,13 @@ class StreamDelivery {
           }
           : null,
       });
-      state.sentText = safeText;
+      state.sentText = streamPrepared
+        ? (deltaResult.deliveredVisibleAfter || state.lastDeliveredVisibleText || safeText)
+        : safeText;
+      state.lastDeliveredVisibleText = deltaResult.deliveredVisibleAfter || safeText;
+      if (streamPrepared) {
+        commitPreparedStreamingDelivery(streamPrepared, { delivered: true });
+      }
       this.logDeliveryTrace("delivered", tracePayload);
       if (deliveryDedupKey) {
         this.rememberRecentDelivery(deliveryDedupKey);
@@ -445,6 +520,9 @@ class StreamDelivery {
         );
       }
     }).catch((error) => {
+      if (streamPrepared) {
+        commitPreparedStreamingDelivery(streamPrepared, { delivered: false });
+      }
       this.logDeliveryTrace("failed", tracePayload, error);
       console.error(`[codeksei] failed to deliver reply thread=${state.threadId}: ${error.message}`);
       this.handleDeliveryFailure(state, error);
@@ -499,7 +577,58 @@ class StreamDelivery {
     if (!normalizedRunKey) {
       return;
     }
+    const state = this.stateByRunKey.get(normalizedRunKey);
+    if (state) {
+      this.clearScheduledFlush(state);
+    }
     this.stateByRunKey.delete(normalizedRunKey);
+  }
+
+  scheduleStreamingFlush(state, { force = false, trigger = null } = {}) {
+    if (!prefersStreamingDelivery(state)) {
+      return;
+    }
+    const completedOnly = false;
+    const prepared = prepareStreamingDelivery(state, { completedOnly, force });
+    if (!prepared.safeText) {
+      return;
+    }
+    const flushImmediately = force
+      || hasCompletedFlushTrigger(trigger)
+      || prepared.safeText.length >= this.streamForceFlushChars
+      || (
+        prepared.safeText.length >= this.streamBoundaryFlushChars
+        && hasNaturalFlushBoundary(prepared.safeText)
+      );
+    if (flushImmediately) {
+      this.clearScheduledFlush(state);
+      void this.flush(state, { force, trigger });
+      return;
+    }
+    if (state.scheduledFlushTimer) {
+      return;
+    }
+    state.scheduledFlushTimer = setTimeout(() => {
+      state.scheduledFlushTimer = null;
+      void this.flush(state, {
+        force,
+        trigger: {
+          source: "scheduled_stream_flush",
+          itemId: normalizeText(trigger?.itemId),
+          phase: normalizeText(trigger?.phase),
+          fragmentKind: normalizeText(trigger?.fragmentKind),
+          fragmentRelation: normalizeText(trigger?.fragmentRelation),
+        },
+      });
+    }, this.streamIdleFlushMs);
+  }
+
+  clearScheduledFlush(state) {
+    if (!state?.scheduledFlushTimer) {
+      return;
+    }
+    clearTimeout(state.scheduledFlushTimer);
+    state.scheduledFlushTimer = null;
   }
 
   wasRecentlyDelivered(key) {
@@ -538,6 +667,9 @@ class StreamDelivery {
       `sentCharsBefore=${payload.sentCharsBefore}`,
       `safeChars=${payload.safeChars}`,
       `deltaChars=${payload.deltaChars}`,
+      payload.relation ? `relation=${payload.relation}` : "",
+      `visibleBefore=${payload.deliveredVisibleBeforeChars}`,
+      `visibleAfter=${payload.deliveredVisibleAfterChars}`,
       `safeHash=${payload.safeHash}`,
       `deltaHash=${payload.deltaHash}`,
     ].filter(Boolean);
@@ -559,10 +691,13 @@ function buildRunKey(threadId, turnId = "") {
 }
 
 function buildReplyText(state, { completedOnly, preferLatestMessage = false, force = false }) {
+  if (prefersStreamingDelivery(state) && !preferLatestMessage) {
+    return force && hasWatchdogTail(state, { completedOnly })
+      ? buildStreamingWatchdogReplyText(state, { completedOnly })
+      : buildStreamingReplyText(state, { completedOnly });
+  }
+
   if (force && hasWatchdogTail(state, { completedOnly })) {
-    if (prefersStreamingDelivery(state)) {
-      return buildStreamingWatchdogReplyText(state, { completedOnly });
-    }
     return buildSettledReplyText(state, { completedOnly });
   }
 
@@ -570,61 +705,34 @@ function buildReplyText(state, { completedOnly, preferLatestMessage = false, for
     return buildSettledReplyText(state, { completedOnly });
   }
 
-  if (prefersStreamingDelivery(state)) {
-    return buildStreamingReplyText(state, { completedOnly, force });
-  }
-
   return buildAllVisibleReplyText(state, { completedOnly });
 }
 
-function buildStreamingReplyText(state, { completedOnly, force }) {
-  const visibleItems = collectVisibleItems(state, { completedOnly });
+function buildStreamingReplyText(state, { completedOnly }) {
   const parts = [];
   const seenParts = new Set();
-  const lastVisibleReplyIndex = findLastVisibleReplyIndex(visibleItems);
-
-  for (let index = 0; index < visibleItems.length; index += 1) {
-    const item = visibleItems[index];
-    if (!shouldStreamImmediately(item, { isTerminalVisibleItem: index === lastVisibleReplyIndex })) {
+  for (const item of collectVisibleItems(state, { completedOnly })) {
+    if (!shouldStreamImmediately(item)) {
       continue;
     }
     rememberVisiblePart(parts, seenParts, item.text);
-  }
-
-  if (!force) {
-    return parts.join("\n\n");
-  }
-
-  const terminal = findStreamingTerminalReplyText(visibleItems);
-  if (terminal) {
-    // `stream` means "ship completed user-visible blocks early when safe", not
-    // "stitch every unseen progress block onto the terminal answer". If no
-    // user-visible text has actually gone out yet, collapsing to the terminal
-    // block avoids the historical failure mode where several brief progress
-    // items get welded onto the final answer as one duplicated mega-bubble.
-    const terminalWasHeldBack = !shouldStreamImmediately(terminal, {
-      isTerminalVisibleItem: true,
-    });
-    if (!normalizeVisibleStreamingText(state.sentText) && terminalWasHeldBack) {
-      return terminal.text;
-    }
-    rememberVisiblePart(parts, seenParts, terminal.text);
   }
   return parts.join("\n\n");
 }
 
 function buildStreamingWatchdogReplyText(state, { completedOnly }) {
-  const visible = buildStreamingReplyText(state, { completedOnly, force: true });
+  const visible = buildStreamingReplyText(state, { completedOnly });
   const tail = readStateItemText(state, "__watchdog__", { completedOnly });
-  return [visible, tail].filter(Boolean).join("\n\n");
+  const watchdogText = tail ? markdownToPlainText(tail) : "";
+  return [visible, watchdogText].filter(Boolean).join("\n\n");
 }
 
 function buildCurrentSafeReplyText(state, { force = false, completedOnly = false } = {}) {
-  const plainText = markdownToPlainText(buildReplyText(state, {
+  const plainText = buildReplyText(state, {
     completedOnly,
     preferLatestMessage: prefersSettledDelivery(state),
     force,
-  }));
+  });
   return sanitizeReplyText(state.replyTarget, plainText).text;
 }
 
@@ -642,7 +750,7 @@ function buildSettledReplyText(state, { completedOnly }) {
   // commentary or task cards leak as one giant assistant bubble. Keep only the
   // latest safe visible block, then append the watchdog tail.
   const visible = findLatestWatchdogVisibleReplyText(state, { completedOnly });
-  return [visible, tail].filter(Boolean).join("\n\n");
+  return [visible, markdownToPlainText(tail)].filter(Boolean).join("\n\n");
 }
 
 function buildAllVisibleReplyText(
@@ -737,8 +845,8 @@ function readStateItemText(state, itemId, { completedOnly }) {
     return "";
   }
   const sourceText = completedOnly
-    ? (item.completed ? item.completedText : "")
-    : (item.completed ? item.completedText : item.currentText);
+    ? (item.completed ? item.completedText || item.authoritativeText : "")
+    : (item.completedText || item.authoritativeText);
   return trimOuterBlankLines(sourceText);
 }
 
@@ -748,16 +856,23 @@ function collectVisibleItems(state, { completedOnly, skipItemIds = null }) {
     if (skipItemIds?.has(itemId)) {
       continue;
     }
-    const text = readStateItemText(state, itemId, { completedOnly });
-    if (!text) {
+    const sourceText = readStateItemText(state, itemId, { completedOnly });
+    if (!sourceText) {
       continue;
     }
     const item = state.items.get(itemId);
+    const text = markdownToPlainText(sourceText);
+    if (!text) {
+      continue;
+    }
     items.push({
       itemId,
       text,
       completed: Boolean(item?.completed),
       phase: normalizeAssistantPhase(item?.phase),
+      lastDeliveredVisibleText: trimOuterBlankLines(String(item?.lastDeliveredVisibleText || "")),
+      lastFragmentAt: numberOrDefault(item?.lastFragmentAt, 0),
+      lastFragmentKind: normalizeFragmentKind(item?.lastFragmentKind),
     });
   }
   return items;
@@ -799,6 +914,130 @@ function markdownToPlainText(text) {
   return trimOuterBlankLines(result);
 }
 
+function ensureStateItem(state, itemId) {
+  const normalizedItemId = normalizeText(itemId) || `item-${state.itemOrder.length + 1}`;
+  const existing = state.items.get(normalizedItemId);
+  if (existing) {
+    return existing;
+  }
+  const created = {
+    itemId: normalizedItemId,
+    authoritativeText: "",
+    currentText: "",
+    completedText: "",
+    completed: false,
+    phase: "",
+    lastFragmentAt: 0,
+    lastFragmentKind: "",
+    lastDeliveredVisibleText: "",
+    pendingVisibleSuffix: "",
+  };
+  state.items.set(normalizedItemId, created);
+  state.itemOrder.push(normalizedItemId);
+  return created;
+}
+
+function normalizeFragmentKind(value) {
+  const normalized = normalizeText(value).toLowerCase();
+  if (normalized === "delta") {
+    return "delta";
+  }
+  if (normalized === "snapshot") {
+    return "snapshot";
+  }
+  if (normalized === "completed_snapshot") {
+    return "completed_snapshot";
+  }
+  return "";
+}
+
+function mergeAuthoritativeItemText(current, incoming, { fragmentKind = "", completed = false } = {}) {
+  const base = normalizeLineEndings(current);
+  const next = normalizeLineEndings(incoming);
+  const normalizedFragmentKind = normalizeFragmentKind(
+    completed ? "completed_snapshot" : fragmentKind
+  ) || (completed ? "completed_snapshot" : "delta");
+  if (!next) {
+    return { text: base, relation: "keep" };
+  }
+  if (!base) {
+    return {
+      text: next,
+      relation: normalizedFragmentKind === "delta" ? "append" : "replace",
+    };
+  }
+  if (normalizedFragmentKind === "delta") {
+    const appended = appendDeltaFragment(base, next);
+    if (appended === base) {
+      return { text: base, relation: "keep" };
+    }
+    if (appended === next) {
+      return { text: next, relation: "replace" };
+    }
+    return { text: appended, relation: "append" };
+  }
+
+  const baseVisible = normalizeVisibleStreamingText(base);
+  const nextVisible = normalizeVisibleStreamingText(next);
+  const baseSemantic = normalizeStreamingSnapshotSemanticText(base);
+  const nextSemantic = normalizeStreamingSnapshotSemanticText(next);
+  const equivalent = (baseVisible && baseVisible === nextVisible)
+    || (baseSemantic && baseSemantic === nextSemantic);
+  if (equivalent) {
+    if (normalizedFragmentKind === "completed_snapshot") {
+      return { text: next, relation: "replace" };
+    }
+    return next.length >= base.length
+      ? { text: next, relation: "replace" }
+      : { text: base, relation: "keep" };
+  }
+
+  const nextContainsBase = (
+    (baseVisible && nextVisible && (nextVisible.startsWith(baseVisible) || nextVisible.includes(baseVisible)))
+    || (baseSemantic && nextSemantic && (nextSemantic.startsWith(baseSemantic) || nextSemantic.includes(baseSemantic)))
+  );
+  if (nextContainsBase) {
+    return { text: next, relation: "replace" };
+  }
+
+  const baseContainsNext = (
+    (baseVisible && nextVisible && (baseVisible.startsWith(nextVisible) || baseVisible.includes(nextVisible)))
+    || (baseSemantic && nextSemantic && (baseSemantic.startsWith(nextSemantic) || baseSemantic.includes(nextSemantic)))
+  );
+  if (baseContainsNext) {
+    if (normalizedFragmentKind === "completed_snapshot") {
+      return { text: next, relation: "replace" };
+    }
+    return { text: base, relation: "keep" };
+  }
+
+  return { text: next, relation: "rewrite" };
+}
+
+function appendDeltaFragment(current, next) {
+  const base = String(current || "");
+  const incoming = String(next || "");
+  if (!incoming) {
+    return base;
+  }
+  if (!base) {
+    return incoming;
+  }
+  if (base.endsWith(incoming)) {
+    return base;
+  }
+  if (incoming.startsWith(base)) {
+    return incoming;
+  }
+  const maxOverlap = Math.min(base.length, incoming.length);
+  for (let size = maxOverlap; size > 0; size -= 1) {
+    if (base.slice(-size) === incoming.slice(0, size)) {
+      return `${base}${incoming.slice(size)}`;
+    }
+  }
+  return `${base}${incoming}`;
+}
+
 function appendStreamingText(current, next) {
   const base = String(current || "");
   const incoming = String(next || "");
@@ -828,6 +1067,235 @@ function appendStreamingText(current, next) {
   }
 
   return `${base}${incoming}`;
+}
+
+function prepareStreamingDelivery(state, { completedOnly, force }) {
+  const visibleItems = collectVisibleItems(state, { completedOnly });
+  const deliveredItems = [];
+  const deltaParts = [];
+
+  for (const item of visibleItems) {
+    const isWatchdog = item.itemId === "__watchdog__";
+    if (!isWatchdog && !shouldStreamImmediately(item)) {
+      continue;
+    }
+    if (isWatchdog && !force) {
+      continue;
+    }
+
+    const itemState = state.items.get(item.itemId);
+    const deltaResult = computeVisibleDeliveryDelta(item.lastDeliveredVisibleText, item.text);
+    if (itemState) {
+      itemState.pendingVisibleSuffix = deltaResult.delta;
+    }
+    const normalizedDelta = normalizeDeliveryDelta(deltaResult.delta, { streaming: true });
+    if (!normalizedDelta) {
+      continue;
+    }
+    if (deltaParts.length) {
+      deltaParts.push("\n\n");
+    }
+    deltaParts.push(normalizedDelta);
+    deliveredItems.push({
+      itemId: item.itemId,
+      visibleText: item.text,
+      deltaText: normalizedDelta,
+      relation: deltaResult.relation,
+      phase: item.phase,
+      fragmentKind: item.lastFragmentKind,
+    });
+  }
+
+  return {
+    state,
+    safeText: deltaParts.join(""),
+    relation: deliveredItems.length === 1
+      ? deliveredItems[0].relation
+      : (deliveredItems.length > 1 ? "batch" : "keep"),
+    deliveredItems,
+    deliveredVisibleAfter: buildStreamingDeliveredVisibleText(state, {
+      completedOnly,
+      deliveredItems,
+      force,
+    }),
+  };
+}
+
+function buildStreamingDeliveredVisibleText(state, { completedOnly, deliveredItems, force }) {
+  const deliveredById = new Map();
+  for (const item of Array.isArray(deliveredItems) ? deliveredItems : []) {
+    deliveredById.set(item.itemId, item.visibleText);
+  }
+
+  const parts = [];
+  const seenParts = new Set();
+  for (const item of collectVisibleItems(state, { completedOnly })) {
+    if (item.itemId === "__watchdog__" && !force) {
+      continue;
+    }
+    if (item.itemId !== "__watchdog__" && !shouldStreamImmediately(item)) {
+      continue;
+    }
+    const visibleText = trimOuterBlankLines(
+      deliveredById.get(item.itemId) || item.lastDeliveredVisibleText || ""
+    );
+    if (!visibleText) {
+      continue;
+    }
+    rememberVisiblePart(parts, seenParts, visibleText);
+  }
+  return parts.join("\n\n");
+}
+
+function commitPreparedStreamingDelivery(prepared, { delivered }) {
+  if (!prepared?.state || !Array.isArray(prepared.deliveredItems)) {
+    return;
+  }
+  for (const item of prepared.deliveredItems) {
+    const stateItem = prepared.state.items.get(item.itemId);
+    if (!stateItem) {
+      continue;
+    }
+    if (delivered) {
+      stateItem.lastDeliveredVisibleText = item.visibleText;
+      stateItem.pendingVisibleSuffix = "";
+      continue;
+    }
+    stateItem.pendingVisibleSuffix = item.deltaText;
+  }
+}
+
+function computeVisibleDeliveryDelta(previous, next) {
+  const before = trimOuterBlankLines(normalizeLineEndings(previous));
+  const after = trimOuterBlankLines(normalizeLineEndings(next));
+  if (!after) {
+    return {
+      delta: "",
+      relation: "keep",
+      deliveredVisibleBefore: before,
+      deliveredVisibleAfter: before,
+    };
+  }
+  if (!before) {
+    return {
+      delta: after,
+      relation: "initial",
+      deliveredVisibleBefore: "",
+      deliveredVisibleAfter: after,
+    };
+  }
+  if (after === before) {
+    return {
+      delta: "",
+      relation: "keep",
+      deliveredVisibleBefore: before,
+      deliveredVisibleAfter: before,
+    };
+  }
+  if (after.startsWith(before)) {
+    return {
+      delta: after.slice(before.length),
+      relation: "extend",
+      deliveredVisibleBefore: before,
+      deliveredVisibleAfter: after,
+    };
+  }
+
+  const visibleBefore = normalizeVisibleStreamingText(before);
+  const visibleAfter = normalizeVisibleStreamingText(after);
+  if (visibleBefore && visibleBefore === visibleAfter) {
+    return {
+      delta: "",
+      relation: "equivalent",
+      deliveredVisibleBefore: before,
+      deliveredVisibleAfter: before,
+    };
+  }
+  if (visibleBefore && visibleAfter.startsWith(visibleBefore)) {
+    const nextMap = buildComparisonMap(after);
+    const previousMap = buildComparisonMap(before);
+    return {
+      delta: after.slice(comparisonIndexToRawIndex(nextMap, previousMap.comparison.length)),
+      relation: "normalized_extend",
+      deliveredVisibleBefore: before,
+      deliveredVisibleAfter: after,
+    };
+  }
+
+  const semanticBefore = normalizeStreamingSnapshotSemanticText(before);
+  const semanticAfter = normalizeStreamingSnapshotSemanticText(after);
+  if (semanticBefore && semanticBefore === semanticAfter) {
+    return {
+      delta: "",
+      relation: "semantic_equivalent",
+      deliveredVisibleBefore: before,
+      deliveredVisibleAfter: before,
+    };
+  }
+  if (semanticBefore && semanticAfter.startsWith(semanticBefore)) {
+    const nextMap = buildComparisonMap(after, { stripPunctuation: true });
+    const previousMap = buildComparisonMap(before, { stripPunctuation: true });
+    return {
+      delta: after.slice(comparisonIndexToRawIndex(nextMap, previousMap.comparison.length)),
+      relation: "semantic_extend",
+      deliveredVisibleBefore: before,
+      deliveredVisibleAfter: after,
+    };
+  }
+
+  return {
+    delta: "",
+    relation: "rewrite_without_extension",
+    deliveredVisibleBefore: before,
+    deliveredVisibleAfter: before,
+  };
+}
+
+function buildComparisonMap(text, { stripPunctuation = false } = {}) {
+  const raw = normalizeLineEndings(String(text || ""));
+  const rawToComparison = new Array(raw.length + 1);
+  let comparison = "";
+  let lastWasSpace = true;
+  rawToComparison[0] = 0;
+
+  for (let index = 0; index < raw.length; index += 1) {
+    const character = raw[index];
+    if (/\s/u.test(character)) {
+      if (!comparison || lastWasSpace) {
+        rawToComparison[index + 1] = comparison.length;
+        continue;
+      }
+      comparison += " ";
+      lastWasSpace = true;
+      rawToComparison[index + 1] = comparison.length;
+      continue;
+    }
+    if (stripPunctuation && /[\p{P}\p{S}]/u.test(character)) {
+      rawToComparison[index + 1] = comparison.length;
+      continue;
+    }
+    comparison += character;
+    lastWasSpace = false;
+    rawToComparison[index + 1] = comparison.length;
+  }
+
+  while (comparison.endsWith(" ")) {
+    comparison = comparison.slice(0, -1);
+  }
+
+  return { raw, comparison, rawToComparison };
+}
+
+function comparisonIndexToRawIndex(map, comparisonLength) {
+  if (!map || !Array.isArray(map.rawToComparison) || comparisonLength <= 0) {
+    return 0;
+  }
+  for (let index = 0; index < map.rawToComparison.length; index += 1) {
+    if (map.rawToComparison[index] >= comparisonLength) {
+      return index;
+    }
+  }
+  return map.raw.length;
 }
 
 function prefersSettledDelivery(state) {
@@ -873,6 +1341,9 @@ function buildDeliveryTracePayload(state, {
   traceId = "",
   safeText = "",
   delta = "",
+  relation = "",
+  deliveredVisibleBefore = "",
+  deliveredVisibleAfter = "",
 } = {}) {
   return {
     traceId: normalizeText(traceId),
@@ -881,9 +1352,12 @@ function buildDeliveryTracePayload(state, {
     mode: buildDeliveryMode(state),
     force: Boolean(force),
     trigger: formatDeliveryTrigger(trigger),
+    relation: normalizeText(relation),
     sentCharsBefore: String(state?.sentText || "").length,
     safeChars: String(safeText || "").length,
     deltaChars: String(delta || "").length,
+    deliveredVisibleBeforeChars: String(deliveredVisibleBefore || "").length,
+    deliveredVisibleAfterChars: String(deliveredVisibleAfter || "").length,
     safeHash: hashReplyText(safeText),
     deltaHash: hashReplyText(delta),
   };
@@ -897,6 +1371,8 @@ function formatDeliveryTrigger(trigger) {
     normalizeText(trigger.source),
     normalizeText(trigger.itemId),
     normalizeText(trigger.phase),
+    normalizeText(trigger.fragmentKind),
+    normalizeText(trigger.fragmentRelation),
   ].filter(Boolean).join("/");
 }
 
@@ -946,6 +1422,28 @@ function normalizeLineEndings(value) {
   return String(value || "").replace(/\r\n/g, "\n");
 }
 
+function numberOrDefault(value, fallback) {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function hasCompletedFlushTrigger(trigger) {
+  const source = normalizeText(trigger?.source);
+  return source === "runtime.reply.completed"
+    || source === "runtime.turn.completed"
+    || source === "finishTurn"
+    || source === "finalizeAbandonedTurn";
+}
+
+function hasNaturalFlushBoundary(text) {
+  const normalized = trimOuterBlankLines(normalizeLineEndings(text));
+  if (!normalized) {
+    return false;
+  }
+  return /\n\n$/.test(normalized)
+    || /\n$/.test(normalized)
+    || /(?:[。！？!?]|[.!?]["'”’）)\]」』】]?)$/.test(normalized);
+}
+
 function normalizeDeliveryDelta(delta, { streaming = false } = {}) {
   const normalized = String(delta || "");
   if (!streaming) {
@@ -973,57 +1471,14 @@ function normalizeStreamingSnapshotSemanticText(text) {
 }
 
 function chooseStreamingSnapshotReplacement(base, incoming) {
-  const baseVisible = normalizeStreamingSnapshotSemanticText(base);
-  const incomingVisible = normalizeStreamingSnapshotSemanticText(incoming);
-  if (
-    !baseVisible
-    || !incomingVisible
-    || baseVisible.length < STREAM_SNAPSHOT_REPLACEMENT_MIN_CHARS
-    || incomingVisible.length < STREAM_SNAPSHOT_REPLACEMENT_MIN_CHARS
-  ) {
-    return "";
-  }
-
-  // Codex can resend the whole in-flight assistant item after reformatting an
-  // earlier region (for example, once a fenced code block becomes plain text in
-  // a later snapshot). Raw prefix checks then fail even though the newer
-  // snapshot semantically contains the older one. Prefer the newer snapshot so
-  // we do not weld two whole copies of the same answer together.
-  if (incomingVisible.startsWith(baseVisible)) {
-    return incoming;
-  }
-  // Some upstream snapshots briefly regress to a shorter normalized view while
-  // the same item is still being built. Keep the richer text we already have
-  // instead of treating that shorter resend as a new block to append.
-  if (baseVisible.startsWith(incomingVisible)) {
-    return base;
-  }
+  void base;
+  void incoming;
   return "";
 }
 
 function chooseCompletedSnapshotReplacement(streamed, finalized) {
-  const streamedVisible = normalizeStreamingSnapshotSemanticText(streamed);
-  const finalizedVisible = normalizeStreamingSnapshotSemanticText(finalized);
-  if (
-    !streamedVisible
-    || !finalizedVisible
-    || streamedVisible.length < STREAM_SNAPSHOT_REPLACEMENT_MIN_CHARS
-    || finalizedVisible.length < STREAM_SNAPSHOT_REPLACEMENT_MIN_CHARS
-  ) {
-    return "";
-  }
-
-  // The completed item is the authoritative final snapshot. If the streamed
-  // buffer already contains the same normalized answer as a prefix/substring,
-  // it usually means earlier delta snapshots were stitched together after a
-  // formatting rewrite. Collapse back to the completed text instead of sending
-  // a duplicated mega-bubble.
-  if (streamedVisible.startsWith(finalizedVisible) || streamedVisible.includes(finalizedVisible)) {
-    return finalized;
-  }
-  if (finalizedVisible.startsWith(streamedVisible)) {
-    return finalized;
-  }
+  void streamed;
+  void finalized;
   return "";
 }
 
@@ -1117,13 +1572,13 @@ function rememberVisiblePart(parts, seenParts, text) {
   parts.push(text);
 }
 
-function shouldStreamImmediately(item, { isTerminalVisibleItem = false } = {}) {
+function shouldStreamImmediately(item) {
   if (!item?.text || item.itemId === "__watchdog__") {
     return false;
   }
   const phase = normalizeAssistantPhase(item.phase);
   if (phase === "final") {
-    return false;
+    return true;
   }
   if (!isBriefStreamingProgressText(item.text)) {
     return false;
@@ -1131,11 +1586,7 @@ function shouldStreamImmediately(item, { isTerminalVisibleItem = false } = {}) {
   if (phase === "commentary") {
     return true;
   }
-  // When phase is missing, the current terminal short block could still be the
-  // user's final answer. Hold only that trailing block until another visible
-  // item arrives or the turn completes, so we do not leak a short final reply
-  // early just because upstream omitted phase metadata once.
-  return !isTerminalVisibleItem;
+  return true;
 }
 
 function isBriefStreamingProgressText(text) {

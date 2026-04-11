@@ -22,6 +22,35 @@ test("codex runtime delta events keep commentary phase", () => {
       turnId: "turn-1",
       itemId: "item-1",
       text: "我先去看一下。",
+      fragmentKind: "delta",
+      phase: "commentary",
+    },
+  });
+});
+
+test("codex runtime delta events classify snapshot resends separately", () => {
+  const event = mapCodexMessageToRuntimeEvent({
+    method: "item/agentMessage/delta",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-1",
+      itemId: "item-2",
+      item: {
+        id: "item-2",
+        text: "我先看了一圈，先把现状告诉你。",
+      },
+      phase: "commentary",
+    },
+  });
+
+  assert.deepEqual(event, {
+    type: "runtime.reply.delta",
+    payload: {
+      threadId: "thread-1",
+      turnId: "turn-1",
+      itemId: "item-2",
+      text: "我先看了一圈，先把现状告诉你。",
+      fragmentKind: "snapshot",
       phase: "commentary",
     },
   });
