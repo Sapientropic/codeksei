@@ -438,8 +438,11 @@ function sendLegacyTextChunk({
 
 function isRetryableSendError(error) {
   const message = String(error?.message || error || "");
-  return message.includes("ret=-2")
-    || message.includes("AbortError")
+  // Legacy sendmessage shows the same live ambiguity as v2: `ret=-2` can mean
+  // "client saw an error even though WeChat already accepted the message".
+  // Do not auto-retry it, or one failed bridge turn can fan out into duplicate
+  // bubbles on the user side.
+  return message.includes("AbortError")
     || message.includes("aborted")
     || message.includes("fetch failed")
     || message.includes("ECONNRESET")

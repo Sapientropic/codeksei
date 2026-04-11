@@ -476,8 +476,11 @@ function sendV2TextChunk({
 
 function isRetryableSendError(error) {
   const message = String(error?.message || error || "");
-  return message.includes("ret=-2")
-    || message.includes("AbortError")
+  // `ret=-2` is ambiguous in live WeChat delivery: the API can still return it
+  // after the user-facing message has already landed. Retrying that chunk risks
+  // duplicating the same assistant block in chat, which is worse than surfacing
+  // one degraded turn locally and letting the operator re-send intentionally.
+  return message.includes("AbortError")
     || message.includes("aborted")
     || message.includes("fetch failed")
     || message.includes("ECONNRESET")
