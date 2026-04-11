@@ -351,6 +351,7 @@ class StreamDelivery {
   }
 
   async flushNow(state, { force, trigger = null }) {
+    this.attachReplyTarget(state);
     if (!state.replyTarget) {
       return;
     }
@@ -598,7 +599,10 @@ function buildStreamingReplyText(state, { completedOnly, force }) {
     // user-visible text has actually gone out yet, collapsing to the terminal
     // block avoids the historical failure mode where several brief progress
     // items get welded onto the final answer as one duplicated mega-bubble.
-    if (!normalizeVisibleStreamingText(state.sentText)) {
+    const terminalWasHeldBack = !shouldStreamImmediately(terminal, {
+      isTerminalVisibleItem: true,
+    });
+    if (!normalizeVisibleStreamingText(state.sentText) && terminalWasHeldBack) {
       return terminal.text;
     }
     rememberVisiblePart(parts, seenParts, terminal.text);
