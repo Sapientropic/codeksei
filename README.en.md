@@ -1,71 +1,95 @@
 # Codeksei
 
-[![CI](https://github.com/Sapientropic/codeksei/actions/workflows/ci.yml/badge.svg)](https://github.com/Sapientropic/codeksei/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/codeksei)](https://www.npmjs.com/package/codeksei)
-[![License: AGPL-3.0-only](https://img.shields.io/badge/license-AGPL--3.0--only-111111.svg)](https://github.com/Sapientropic/codeksei/blob/main/LICENSE)
-
-[中文 README](./README.md)
-
-> A local-first life-assistant agent bridge that connects WeChat, Codex runtime, timeline, diary, review, durable notes, and workspace continuity into one ongoing personal workflow.
-
-`Codeksei` is not a hosted SaaS, and it is not a stateless personality shell.  
-It is a local operational layer for keeping state, reconnecting context, and moving work forward across WeChat, terminal sessions, and workspace tools.
+<div align="center">
+  <p>
+    <a href="./README.md">中文 README</a>
+  </p>
+  <p>
+    <a href="https://github.com/Sapientropic/codeksei/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sapientropic/codeksei/actions/workflows/ci.yml/badge.svg"></a>
+    <a href="https://www.npmjs.com/package/codeksei"><img alt="npm version" src="https://img.shields.io/npm/v/codeksei"></a>
+    <a href="https://github.com/Sapientropic/codeksei/blob/main/LICENSE"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/license-AGPL--3.0--only-111111.svg"></a>
+  </p>
+  <h3>Capture daily life, steady the rhythm, and keep projects moving with you</h3>
+  <p><strong>A local-first life assistant and companion.</strong></p>
+  <p>It catches the pieces most likely to be missed: WeChat thoughts, reminders, todos, timeline facts, review clues, and scattered daily fragments, then turns them into steadier rhythm and more concrete project follow-through.</p>
+  <p>
+    <a href="#why-the-name">Why the Name</a> ·
+    <a href="#quick-start">Quick Start</a> ·
+    <a href="#what-it-can-do">Capabilities</a> ·
+    <a href="./docs/commands.md">Commands</a> ·
+    <a href="./docs/architecture.md">Architecture</a> ·
+    <a href="./docs/release.md">Release</a>
+  </p>
+</div>
 
 > This repository has diverged substantially from the original `cyberboss` README and usage model. Treat this repository’s `README`, `docs/`, and actual code as the current source of truth.
 
-## At a Glance
+| Main interfaces | What it feels like | Current status |
+| --- | --- | --- |
+| WeChat + `codeksei` | a local life assistant for ADHD-friendly companionship, care, proactive capture, and rhythm calibration | `codeksei@0.1.1`, with compatibility for `cyberboss` / `CYBERBOSS_*` / `~/.cyberboss` |
 
-| Item | What it means |
+## Why the Name
+
+<div align="center">
+  <p><strong>One name, held in two moods.</strong></p>
+</div>
+
+| `Code` | `-ksei` |
 | --- | --- |
-| Positioning | Local-first personal life-assistant bridge |
-| Main interfaces | WeChat + `codeksei` CLI |
-| Core value | Shared thread, shared state, low-friction re-entry |
-| Current package | `codeksei@0.1.1` |
-| Compatibility layer | `cyberboss` / `CYBERBOSS_*` / `~/.cyberboss` |
+| The quiet shorthand of everyday life.<br>Fleeting thoughts, paused threads, and the texture you meant to remember. | Taken from the latter half of `Aleksei`.<br>Here it carries an image of care, help, and companionship. |
 
-## Why It Is More Than a Chat Shell
+<div align="center">
+  <p><em>Your threads are watched over, and returning can still feel warm and continuous.</em></p>
+</div>
 
-- It is designed for continuity, not one-off prompts.
-- WeChat and terminal sessions can attach to the same shared thread.
-- `timeline`, `diary`, `review`, and `note` are built-in workflows, not afterthought scripts.
-- State and tooling stay local, auditable, and modifiable.
+## What It Helps With
+
+- It proactively captures and organizes messy daily fragments before they disappear.
+- Reminders, diary, timeline, and review can work together to help steady life rhythm over time.
+- Project follow-through, fragment capture, and later organization stay on the same chain.
+- WeChat and terminal sessions can share the same state so the care does not break when the surface changes.
 
 ## Who It Fits
 
-- People who want WeChat to be the main interaction surface
-- People who need the agent to remember thread state, unfinished work, and review clues
-- People who prefer local control over hosted products
-- People who benefit from low-friction re-entry, especially when executive function is the bottleneck
+- People who want help looking after messy daily life, reminders, and unfinished loops
+- People with ADHD or executive-function friction who benefit from steady companionship and gentle external support
+- People who want projects, daily capture, and review to live in one workflow
+- People who want WeChat as the main interaction surface while keeping things local and editable
 
-## Current Capabilities
+## What It Can Do
 
-| Area | What it currently does |
-| --- | --- |
-| WeChat bridge | QR login, long polling, file send-back, shared-thread attach |
-| Codex runtime | Shared `app-server`, thread/session binding, approvals, stop/resume |
-| Timeline | Event write, batch write, taxonomy lookup, build, preview, screenshot |
-| Diary | Todo, factual timeline, fragments, supplements, summaries |
-| Review | nightly / weekly / monthly, with hybrid semantic extraction by default |
-| Durable notes | `note:auto`, `note:maybe`, `note:sync` |
-| Workspace continuity | workspace bootstrap, project radar, shared-thread recovery by workspace |
+- `Diary`: todos, factual timeline, fragments, supplements, summaries, and gradual daily capture
+- `Reminders`: reminder write and scheduling support for rhythm and follow-through
+- `Review`: nightly / weekly / monthly review, with hybrid semantic extraction by default
+- `Timeline`: event write, batch write, taxonomy lookup, build, preview, screenshot
+- `WeChat bridge`: QR login, long polling, file send-back, shared-thread attach
+- `Codex runtime`: shared `app-server`, thread/session binding, approvals, stop/resume
+- `Durable notes`: `note:auto`, `note:maybe`, `note:sync`
+- `Project support`: workspace bootstrap, project radar, shared-thread recovery by workspace
 
 ## Quick Start
 
-### 1. Fastest install path
+### 1. Choose your install path
 
-If you just want to install and use it:
-
-```bash
-npm install -g codeksei
-```
-
-If you want source-level customization, debugging, or local script changes:
+If you want the full shared-mode path described in this README, clone the repository and use `npm run ...`:
 
 ```bash
 git clone https://github.com/Sapientropic/codeksei.git
 cd codeksei
 npm install
 ```
+
+If you only want the base CLI first:
+
+```bash
+npm install -g codeksei
+codeksei help
+```
+
+Notes:
+
+- The command examples below assume a repo checkout and `npm run ...`
+- Global install is a good way to try the base CLI; shared-mode scripts are most straightforward from the repository checkout
 
 ### 2. Minimum env setup
 
@@ -74,7 +98,7 @@ Runtime env lookup order:
 1. `.env` in the current project directory
 2. `.env` in the current state directory
 
-Recommended minimum variables:
+Minimum usable variables:
 
 ```dotenv
 CODEKSEI_USER_NAME=YourName
@@ -83,7 +107,8 @@ CODEKSEI_ALLOWED_USER_IDS=bridge_observed_sender_id
 CODEKSEI_WORKSPACE_ROOT=/absolute/path/to/your/workspace
 ```
 
-Useful optional variables:
+<details>
+<summary>Show common optional environment variables</summary>
 
 ```dotenv
 CODEKSEI_ACCOUNT_ID=
@@ -103,6 +128,8 @@ CODEKSEI_SHARED_USE_BUNDLED_CODEX_BINARY=1
 CODEKSEI_SHARED_DISABLE_PLUGINS=0
 CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 ```
+
+</details>
 
 Notes:
 
@@ -125,7 +152,7 @@ npm run login
 
 ### 4. Start shared mode
 
-Shared mode is the default operational path:
+Shared mode is the better day-to-day path when you want WeChat and terminal sessions attached to the same thread:
 
 ```bash
 npm run shared:start
@@ -157,33 +184,36 @@ npm run background:uninstall
 
 ## Common Commands
 
-Most frequently used terminal commands:
+This small set is enough to get started:
 
-- `npm run login`
-- `npm run accounts`
-- `npm run shared:start`
-- `npm run shared:open`
-- `npm run shared:status`
-- `npm run shared:watchdog`
-- `npm run background:install`
-- `npm run background:uninstall`
-- `npm run doctor`
-- `npm run help`
+Terminal:
 
-Common WeChat commands:
+```bash
+npm run login
+npm run accounts
+npm run shared:start
+npm run shared:open
+npm run shared:status
+npm run doctor
+npm run help
+```
 
-- `/bind /absolute/path`
-- `/status`
-- `/new`
-- `/reread`
-- `/switch <threadId>`
-- `/stop`
-- `/yes`
-- `/always`
-- `/no`
-- `/model`
-- `/model <id>`
-- `/help`
+WeChat:
+
+```text
+/bind /absolute/path
+/status
+/new
+/reread
+/switch <threadId>
+/stop
+/yes
+/always
+/no
+/model
+/model <id>
+/help
+```
 
 More detailed references:
 
@@ -193,7 +223,7 @@ More detailed references:
 
 ## Naming and Compatibility
 
-`Codeksei` is now the primary public name.
+`Codeksei` is now the primary public name, while legacy entrypoints remain for compatibility.
 
 - Primary package name: `codeksei`
 - Primary CLI name: `codeksei`
@@ -256,10 +286,10 @@ Codeksei grew from that base, but this version has been substantially reworked. 
 
 ## FAQ
 
-### Why not just `npm install -g codeksei`?
+### Can I install it with `npm install -g codeksei`?
 
-You can. `codeksei@0.1.1` is already on npm.  
-Use npm if you only want to install it; clone the repository when you want customization, debugging, or source-level changes.
+You can.
+Use that path when you want the base CLI quickly; clone the repository when you want the full shared-mode flow from this README, source-level customization, or shared-script debugging.
 
 ### Should I use `codeksei` or `cyberboss`?
 

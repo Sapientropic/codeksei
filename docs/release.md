@@ -1,14 +1,22 @@
 # Release Guide
 
+这页是维护者收口用的。
+
+目标很简单：稳稳发布，不把临时状态、个人配置或仓促判断带进公共版本里。
+
 `Codeksei` 的仓库发布与 npm 发包约定统一收口在这里。README 只保留入口说明，本页只保留维护者真正需要的流程与边界。
 
 ## Canonical Names
+
+对外名字要稳定，对内兼容可以继续保留。
 
 - GitHub 仓库：`https://github.com/Sapientropic/codeksei`
 - npm 包名：`codeksei`
 - 旧仓库 slug `Sapientropic/cyberboss` 只应视为 GitHub redirect，不再作为正式地址继续写回文档、badge、workflow 或包元数据
 
 ## Workflows
+
+发布链路尽量少分叉，这样更不容易在真正发包时出意外。
 
 当前仓库内置三条 GitHub Actions workflow：
 
@@ -44,6 +52,8 @@
 
 ## Trusted Publishing
 
+这里的核心原则是：尽量不依赖长期存在的 publish secret。
+
 当前仓库使用 npm trusted publishing 主链路，不依赖长期存在的 `NPM_TOKEN`。
 
 npm 侧需要的 GitHub Actions trusted publisher 配置：
@@ -65,6 +75,8 @@ npm 侧需要的 GitHub Actions trusted publisher 配置：
 
 ## Release Steps
 
+常规发布时，先确认“真实状态已经收住”，再让 workflow 接手。
+
 常规版本发布流程：
 
 1. 本地确认改动、测试和 packlist 都通过
@@ -83,6 +95,8 @@ npm 侧需要的 GitHub Actions trusted publisher 配置：
 
 ## Hardening
 
+当主链稳定之后，再继续收紧权限边界。
+
 在 trusted publishing 验证稳定后，建议继续把 npm 包设置里的 `Publishing access` 设为：
 
 - `Require two-factor authentication and disallow tokens`
@@ -90,6 +104,8 @@ npm 侧需要的 GitHub Actions trusted publisher 配置：
 这样可以把传统 publish token 彻底降为不可用，只保留 OIDC trusted publishing。
 
 ## Migration Checklist
+
+迁移检查的重点是确认旧仓地址和旧入口不会继续写回新的公共出口。
 
 这轮迁移之后，所有外部入口都应优先引用新 slug：
 

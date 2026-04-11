@@ -1,65 +1,77 @@
 # Codeksei
 
-[![CI](https://github.com/Sapientropic/codeksei/actions/workflows/ci.yml/badge.svg)](https://github.com/Sapientropic/codeksei/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/codeksei)](https://www.npmjs.com/package/codeksei)
-[![License: AGPL-3.0-only](https://img.shields.io/badge/license-AGPL--3.0--only-111111.svg)](https://github.com/Sapientropic/codeksei/blob/main/LICENSE)
-
-[English README](./README.en.md)
-
-> 一个本地优先的生活助理 Agent Bridge，把 WeChat、Codex runtime、timeline、diary、review、durable note 和 workspace continuity 接到同一条可持续运行的个人工作流里。
-
-`Codeksei` 不是云端 SaaS，也不是只靠提示词扮演人格的聊天外壳。  
-它更像一个本地运行的协作底座：让 agent 能持续记住线程、接住上下文、把事情往前推，并在你掉线之后还能低摩擦重新接上。
+<div align="center">
+  <p>
+    <a href="./README.en.md">English README</a>
+  </p>
+  <p>
+    <a href="https://github.com/Sapientropic/codeksei/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sapientropic/codeksei/actions/workflows/ci.yml/badge.svg"></a>
+    <a href="https://www.npmjs.com/package/codeksei"><img alt="npm version" src="https://img.shields.io/npm/v/codeksei"></a>
+    <a href="https://github.com/Sapientropic/codeksei/blob/main/LICENSE"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/license-AGPL--3.0--only-111111.svg"></a>
+  </p>
+  <h3>主动记录日常，照看生活节奏，也陪你把项目慢慢落地</h3>
+  <p><strong>一个本地优先的生活助理与伙伴。</strong></p>
+  <p>它会接住那些最容易被忽略的碎片：微信里的念头、待办、提醒、时间线、复盘线索和零散日常；再把它们慢慢整理成更稳的生活节奏与推进中的项目行动。</p>
+  <p>
+    <a href="#为什么叫-codeksei">名字寓意</a> ·
+    <a href="#快速开始">快速开始</a> ·
+    <a href="#现在可以做什么">当前能力</a> ·
+    <a href="./docs/commands.md">命令</a> ·
+    <a href="./docs/architecture.md">架构</a> ·
+    <a href="./docs/release.md">发布</a>
+  </p>
+</div>
 
 > 这个仓库已经显著偏离上游 `cyberboss` 的原始 README 和使用方式。当前行为请以本仓 `README`、`docs/` 和实际代码实现为准。
 
-## 一眼看懂
+| 主入口 | 更像什么 | 当前状态 |
+| --- | --- | --- |
+| WeChat + `codeksei` | 面向 ADHD 陪伴、照看、主动记录与生活节奏校准的本地生活助理 | `codeksei@0.1.1`，兼容 `cyberboss` / `CYBERBOSS_*` / `~/.cyberboss` |
 
-| 项目 | 说明 |
+## 为什么叫 Codeksei
+
+<div align="center">
+  <p><strong>一个名字，留下两层感觉。</strong></p>
+</div>
+
+| `Code` | `-ksei` |
 | --- | --- |
-| 定位 | 本地优先的个人生活助理桥接层 |
-| 主要入口 | WeChat + `codeksei` CLI |
-| 核心价值 | 同一条线程、同一份状态、低摩擦续接 |
-| 当前发布 | `codeksei@0.1.1` |
-| 兼容层 | `cyberboss` / `CYBERBOSS_*` / `~/.cyberboss` |
+| 散落日常里的隐秘书写。<br>稍纵即逝的念头、半途停下的线索、以及你本来想记住的生活纹理。 | 取自 `Aleksei` 的后半段。<br>在这里，它借来“守护 / 帮助 / 同行”的意象，像一位安静的陪跑者。 |
 
-## 为什么它不是普通聊天壳
+<div align="center">
+  <p><em>线索有人照看，离开之后仍能顺着原来的温度回来。</em></p>
+</div>
 
-- 持续运行，而不是每次对话都从零开始。
-- 微信和终端可以接到同一条共享线程，而不是两个互不相认的入口。
-- `timeline`、`diary`、`review`、`note` 是内建工作流，不是后贴的边缘脚本。
-- 数据与脚本本地可控、可改、可审计，更适合长期陪跑而不是一次性问答。
+## 它会怎么帮你
 
-## 适合谁
+- 主动记录和整理琐碎日常，减少“回头再记”时已经散掉的东西。
+- 提醒、日记、时间线和复盘会彼此接力，慢慢帮你校准生活节奏。
+- 项目推进、碎片收集和后续整理放在同一条链上，更容易真的落地。
+- 微信和终端共用同一条状态，让这份照看不会因为换入口就断掉。
 
-- 希望把微信当成主要交互入口，而不是再开一个单独助手 App 的人
-- 需要 agent 帮自己记住线程状态、时间线、未收口事项和复盘线索的人
-- 更在意本地数据可控、可改、可审计，而不是云端托管的人
-- 有 ADHD 或执行功能摩擦，想把“重新接上”做成默认能力的人
+## 这些人会喜欢它
 
-## 当前能力
+- 想有人替自己照看琐碎日常、提醒和未收口事项的人
+- 有 ADHD 或执行功能摩擦，希望得到持续陪伴和轻推的人
+- 想把项目推进、日常记录和复盘整理放进同一条工作流的人
+- 想把微信保留成主要交互入口，同时保留本地可控性的人
 
-| 模块 | 当前能力 |
-| --- | --- |
-| WeChat bridge | 扫码登录、长轮询收发、文件发送、共享线程接管 |
-| Codex runtime | 共享 `app-server`、thread/session 绑定、审批流、stop/resume |
-| Timeline | 单条事件写入、批量写入、分类查询、构建、预览、截图 |
-| Diary | Todo、时间线事实、碎片、补充记录、总结 |
-| Review | nightly / weekly / monthly，默认 hybrid 语义提炼 |
-| Durable note | `note:auto`、`note:maybe`、`note:sync` |
-| Workspace continuity | workspace bootstrap、project radar、按 workspace 恢复共享线程 |
+## 现在可以做什么
+
+- `Diary`：Todo、时间线事实、碎片、补充记录、总结，帮你把零散日常慢慢收成可用痕迹
+- `Reminders`：提醒写入与调度，给生活节奏和待办推进一个外部支点
+- `Review`：nightly / weekly / monthly，把日常记录压成更稳定的节奏校准与复盘材料
+- `Timeline`：单条事件写入、批量写入、分类查询、构建、预览、截图
+- `WeChat bridge`：扫码登录、长轮询收发、文件发送、共享线程接管
+- `Codex runtime`：共享 `app-server`、thread/session 绑定、审批流、stop/resume
+- `Durable note`：`note:auto`、`note:maybe`、`note:sync`
+- `Project support`：workspace bootstrap、project radar、按 workspace 恢复共享线程，帮助项目更容易重新进入推进状态
 
 ## 快速开始
 
-### 1. 最短安装路径
+### 1. 先选安装方式
 
-如果你只是要安装和使用：
-
-```bash
-npm install -g codeksei
-```
-
-如果你要改源码、调试共享脚本或做本地定制：
+如果你想按本文完整使用共享模式，先 clone 仓库，再跑 `npm run ...`：
 
 ```bash
 git clone https://github.com/Sapientropic/codeksei.git
@@ -67,14 +79,26 @@ cd codeksei
 npm install
 ```
 
-### 2. 最小环境变量
+如果你只是想先拿到基础 CLI：
 
-运行时默认读取：
+```bash
+npm install -g codeksei
+codeksei help
+```
+
+说明：
+
+- 本文后续命令示例默认按仓库工作树写成 `npm run ...`
+- 全局安装更适合先体验基础 CLI；共享模式相关脚本在仓库内运行最直接
+
+### 2. 配置最小环境变量
+
+运行时会依次读取：
 
 1. 当前项目目录下的 `.env`
 2. 当前状态目录下的 `.env`
 
-推荐优先使用新前缀：
+最小可用配置：
 
 ```dotenv
 CODEKSEI_USER_NAME=你的名字
@@ -83,7 +107,8 @@ CODEKSEI_ALLOWED_USER_IDS=桥实际观测到的 sender id
 CODEKSEI_WORKSPACE_ROOT=/绝对路径/你的项目目录
 ```
 
-常用可选项：
+<details>
+<summary>展开常用可选环境变量</summary>
 
 ```dotenv
 CODEKSEI_ACCOUNT_ID=
@@ -104,10 +129,12 @@ CODEKSEI_SHARED_DISABLE_PLUGINS=0
 CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 ```
 
+</details>
+
 说明：
 
 - 旧的 `CYBERBOSS_*` 仍可用，但新项目建议统一切到 `CODEKSEI_*`
-- `CODEKSEI_USER_NAME` 是 agent 聊天时怎么称呼你的人设字段，不参与消息路由
+- `CODEKSEI_USER_NAME` 决定对话里怎么称呼你，不参与消息路由
 - `CODEKSEI_ALLOWED_USER_IDS` 必须填写微信桥实际观测到的 sender id；最简单的做法是先跑 `npm run accounts`
 - 第一次运行任意命令时，会在状态目录生成 `weixin-instructions.md`
 - 如果你在共享模式下使用多 workspace，建议启动前就设置好 `CODEKSEI_WORKSPACE_ROOT`
@@ -123,9 +150,9 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 npm run login
 ```
 
-### 4. 启动共享模式
+### 4. 拉起共享模式
 
-默认推荐共享模式，不再推荐把桥接跑成一次性的私有 runtime：
+共享模式更适合日常使用：微信和终端会接到同一条共享线程。
 
 ```bash
 npm run shared:start
@@ -159,33 +186,36 @@ npm run background:uninstall
 
 ## 常用命令
 
-终端里最常用的是这些：
+先记住这一小组就够用：
 
-- `npm run login`
-- `npm run accounts`
-- `npm run shared:start`
-- `npm run shared:open`
-- `npm run shared:status`
-- `npm run shared:watchdog`
-- `npm run background:install`
-- `npm run background:uninstall`
-- `npm run doctor`
-- `npm run help`
+终端：
 
-微信里最常用的是这些：
+```bash
+npm run login
+npm run accounts
+npm run shared:start
+npm run shared:open
+npm run shared:status
+npm run doctor
+npm run help
+```
 
-- `/bind /绝对路径`
-- `/status`
-- `/new`
-- `/reread`
-- `/switch <threadId>`
-- `/stop`
-- `/yes`
-- `/always`
-- `/no`
-- `/model`
-- `/model <id>`
-- `/help`
+微信：
+
+```text
+/bind /绝对路径
+/status
+/new
+/reread
+/switch <threadId>
+/stop
+/yes
+/always
+/no
+/model
+/model <id>
+/help
+```
 
 更完整的命令与架构说明见：
 
@@ -195,7 +225,7 @@ npm run background:uninstall
 
 ## 命名与兼容
 
-这轮开始，公共品牌以 `Codeksei` 为主。
+品牌上现在统一使用 `Codeksei`，兼容上仍保留旧入口。
 
 - 主名称：`Codeksei`
 - 主包名：`codeksei`
@@ -259,10 +289,10 @@ Codeksei 是在其基础上发展出来的版本，但当前已经进行了大�
 
 ## FAQ
 
-### 为什么不是直接 `npm install -g codeksei`？
+### 可以直接 `npm install -g codeksei` 吗？
 
-现在已经可以直接 `npm install -g codeksei`。  
-如果你只想安装使用，npm 就是最短路径；如果你要做本地定制、调试共享桥接脚本或直接改仓库源码，clone 仓库仍然更合适。
+可以。
+如果你只想先拿到基础 CLI，这是最短路径；如果你要按本 README 跑完整共享模式、调试共享桥接脚本或直接改仓库源码，clone 仓库会更顺手。
 
 ### 现在到底该用 `codeksei` 还是 `cyberboss`？
 
