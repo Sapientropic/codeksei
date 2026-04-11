@@ -59,6 +59,7 @@ function readConfig() {
     logDir: path.join(stateDir, "logs"),
     reminderQueueFile: path.join(stateDir, "reminder-queue.json"),
     systemMessageQueueFile: path.join(stateDir, "system-message-queue.json"),
+    systemMessageDeadLetterFile: path.join(stateDir, "system-message-dead-letter.json"),
     timelineScreenshotQueueFile: path.join(stateDir, "timeline-screenshot-queue.json"),
     weixinInstructionsFile: readPrefixedEnv(process.env, "WEIXIN_INSTRUCTIONS_FILE")
       || path.resolve(__dirname, "..", "..", "templates", "weixin-instructions.md"),

@@ -101,10 +101,13 @@ Notes:
 
 ### 2. Minimum env setup
 
-Runtime env lookup order:
+Runtime env is filled in two stages:
 
-1. `.env` in the current project directory
-2. `.env` in the current state directory
+1. Existing process environment stays in place first
+2. Load `.env` from the current project directory
+3. Recompute the state directory from the now-active `CODEKSEI_STATE_DIR` / `CYBERBOSS_STATE_DIR`, then load `.env` from that state directory
+
+Earlier values win. Later `.env` files only fill missing keys and do not overwrite values that already exist. That means a repo `.env` is allowed to define `CODEKSEI_STATE_DIR`, and the state-dir `.env` path is recalculated only after the repo `.env` has been loaded.
 
 Minimum usable variables:
 
@@ -262,10 +265,13 @@ Typical runtime contents:
 - `workspace-bootstrap.json`
 - `reminder-queue.json`
 - `system-message-queue.json`
+- `system-message-dead-letter.json`
 - `timeline-screenshot-queue.json`
 - `diary/`
 - `timeline/`
 - `logs/`
+
+The continuity-critical state files currently covered are `sessions.json`, `reminder-queue.json`, `system-message-queue.json`, and `timeline-screenshot-queue.json`. Those files now use atomic writes, and if JSON parsing or the critical top-level schema is invalid, the original file is moved aside as `*.corrupt-<timestamp>.json` before startup falls back to an empty default state.
 
 If you set `CODEKSEI_DIARY_DIR` or `CODEKSEI_TIMELINE_STATE_DIR`, business data is stored there and the state directory keeps runtime files only.
 

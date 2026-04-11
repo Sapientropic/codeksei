@@ -34,6 +34,8 @@ const BACKOFF_DELAY_MS = 30_000;
 const MAX_CONSECUTIVE_FAILURES = 3;
 const FIRST_RUNTIME_EVENT_NOTICE_TIMEOUT_MS = 8_000;
 const FIRST_RUNTIME_EVENT_FAILURE_TIMEOUT_MS = 45_000;
+const SYSTEM_MESSAGE_BUSY_RETRY_MS = 30_000;
+const SYSTEM_MESSAGE_FAILURE_RETRY_DELAYS_MS = [30_000, 2 * 60_000, 5 * 60_000];
 // Once a reply has already started streaming, the common failure mode is a
 // long tool / search / browser phase with no assistant text for a while. Keep
 // the watchdog conservative so we do not prematurely cut off healthy turns.
@@ -46,7 +48,10 @@ class CyberbossApp {
     this.runtimeAdapter = createCodexRuntimeAdapter(config);
     this.timelineIntegration = createTimelineIntegration(config);
     this.threadStateStore = new ThreadStateStore();
-    this.systemMessageQueue = new SystemMessageQueueStore({ filePath: config.systemMessageQueueFile });
+    this.systemMessageQueue = new SystemMessageQueueStore({
+      filePath: config.systemMessageQueueFile,
+      deadLetterFilePath: config.systemMessageDeadLetterFile,
+    });
     this.timelineScreenshotQueue = new TimelineScreenshotQueueStore({ filePath: config.timelineScreenshotQueueFile });
     this.reminderQueue = new ReminderQueueStore({ filePath: config.reminderQueueFile });
     this.systemMessageDispatcher = null;
@@ -258,23 +263,18 @@ class CyberbossApp {
       : [...normalizedArgs, "--output", path.join(os.tmpdir(), `codeksei-timeline-${Date.now()}.png`)];
     const savedPath = resolveTimelineScreenshotOutput(finalArgs);
 
-    await this.channelAdapter.sendTyping({
+    return this.withUserTyping({
       userId: targetUserId,
-      status: 1,
       contextToken,
-    }).catch(() => {});
-    await this.timelineIntegration.runSubcommand("screenshot", finalArgs);
-    await this.channelAdapter.sendFile({
-      userId: targetUserId,
-      filePath: savedPath,
-      contextToken,
+    }, async () => {
+      await this.timelineIntegration.runSubcommand("screenshot", finalArgs);
+      await this.channelAdapter.sendFile({
+        userId: targetUserId,
+        filePath: savedPath,
+        contextToken,
+      });
+      return { userId: targetUserId, filePath: savedPath };
     });
-    await this.channelAdapter.sendTyping({
-      userId: targetUserId,
-      status: 0,
-      contextToken,
-    }).catch(() => {});
-    return { userId: targetUserId, filePath: savedPath };
   }
 
   async sendLocalFileToCurrentChat({ senderId = "", filePath = "" } = {}) {
@@ -301,22 +301,17 @@ class CyberbossApp {
       throw new Error(`只能发送文件，不能发送目录: ${resolvedPath}`);
     }
 
-    await this.channelAdapter.sendTyping({
+    return this.withUserTyping({
       userId: targetUserId,
-      status: 1,
       contextToken,
-    }).catch(() => {});
-    await this.channelAdapter.sendFile({
-      userId: targetUserId,
-      filePath: resolvedPath,
-      contextToken,
+    }, async () => {
+      await this.channelAdapter.sendFile({
+        userId: targetUserId,
+        filePath: resolvedPath,
+        contextToken,
+      });
+      return { userId: targetUserId, filePath: resolvedPath };
     });
-    await this.channelAdapter.sendTyping({
-      userId: targetUserId,
-      status: 0,
-      contextToken,
-    }).catch(() => {});
-    return { userId: targetUserId, filePath: resolvedPath };
   }
 
   async handleIncomingMessage(message) {
@@ -336,7 +331,11 @@ class CyberbossApp {
     });
   }
 
-  async handlePreparedMessage(normalized, { allowCommands }) {
+  async handlePreparedMessage(normalized, {
+    allowCommands,
+    reportFailureToUser = true,
+    throwOnFailure = false,
+  }) {
     const bindingKey = this.runtimeAdapter.getSessionStore().buildBindingKey({
       workspaceId: normalized.workspaceId,
       accountId: normalized.accountId,
@@ -357,54 +356,31 @@ class CyberbossApp {
     const workspaceRoot = this.resolveWorkspaceRoot(bindingKey);
     const prepared = await this.prepareIncomingMessageForRuntime(normalized, workspaceRoot);
     if (!prepared) {
-      return;
+      return { status: "skipped", reason: "not_prepared" };
     }
 
-    await this.channelAdapter.sendTyping({
-      userId: normalized.senderId,
-      status: 1,
-      contextToken: normalized.contextToken,
-    }).catch(() => {});
+    const sendResult = await this.sendPreparedMessageToRuntime({
+      bindingKey,
+      workspaceRoot,
+      normalized,
+      prepared,
+    });
+    if (sendResult.status === "sent") {
+      return sendResult;
+    }
 
-      try {
-        const turn = await this.runtimeAdapter.sendTextTurn({
-          bindingKey,
-          workspaceRoot,
-          text: prepared.text,
-          model: this.runtimeAdapter.getSessionStore().getCodexParamsForWorkspace(bindingKey, workspaceRoot).model,
-          accessMode: this.config.codexAccessMode,
-          metadata: {
-            workspaceId: prepared.workspaceId,
-            accountId: prepared.accountId,
-          senderId: prepared.senderId,
-        },
-      });
-      this.streamDelivery.queueReplyTargetForThread(turn.threadId, {
-        userId: prepared.senderId,
-        contextToken: prepared.contextToken,
-        provider: prepared.provider,
-      });
-      if (turn.workspaceBootstrapPending) {
-        this.queuePendingWorkspaceBootstrap({
-          bindingKey,
-          workspaceRoot,
-          threadId: turn.threadId,
-        });
-      }
-      this.scheduleRuntimeEventWatchdog({
-        bindingKey,
-        workspaceRoot,
-        normalized: prepared,
-        threadId: turn.threadId,
-      });
-    } catch (error) {
-      const messageText = error instanceof Error ? error.message : String(error || "unknown error");
+    if (reportFailureToUser) {
+      const messageText = normalizeText(sendResult.reason) || "unknown error";
       await this.channelAdapter.sendText({
         userId: normalized.senderId,
         text: `处理失败：${messageText}`,
         contextToken: normalized.contextToken,
       }).catch(() => {});
     }
+    if (throwOnFailure) {
+      throw sendResult.error || new Error(normalizeText(sendResult.reason) || "runtime_send_failed");
+    }
+    return sendResult;
   }
 
   scheduleRuntimeEventWatchdog({ bindingKey, workspaceRoot, normalized, threadId = "" }) {
@@ -646,15 +622,58 @@ class CyberbossApp {
   }
 
   async flushPendingSystemMessages() {
-    const pendingMessages = this.systemMessageDispatcher?.drainPending() || [];
+    const pendingMessages = this.systemMessageDispatcher?.takeReadyPending(Date.now()) || [];
     for (const message of pendingMessages) {
+      let dispatchResult = null;
       try {
-        const dispatched = await this.dispatchSystemMessage(message);
-        if (!dispatched) {
-          this.systemMessageDispatcher.requeue(message);
+        // Backstage scheduling needs an explicit result enum so busy deferrals,
+        // retryable runtime failures, and terminal dead-letters do not collapse
+        // into the same boolean/throw path.
+        dispatchResult = await this.dispatchSystemMessage(message);
+      } catch (error) {
+        dispatchResult = {
+          status: "retryable_error",
+          reason: formatErrorMessage(error),
+        };
+      }
+
+      switch (dispatchResult?.status) {
+        case "sent":
+          this.systemMessageDispatcher?.complete(message);
+          break;
+        case "deferred_busy": {
+          const deferred = this.systemMessageDispatcher?.defer(message, {
+            delayMs: SYSTEM_MESSAGE_BUSY_RETRY_MS,
+            reason: dispatchResult.reason,
+            countAttempt: false,
+          });
+          if (deferred?.status === "dead_letter") {
+            console.warn(
+              `[codeksei] backstage message dead-lettered id=${message.id} reason=${dispatchResult.reason}`
+            );
+          }
+          break;
         }
-      } catch {
-        this.systemMessageDispatcher?.requeue(message);
+        case "dead_letter":
+          this.systemMessageDispatcher?.deadLetter(message, { reason: dispatchResult.reason });
+          console.warn(
+            `[codeksei] backstage message dead-lettered id=${message.id} reason=${dispatchResult.reason || "dead_letter"}`
+          );
+          break;
+        case "retryable_error":
+        default: {
+          const deferred = this.systemMessageDispatcher?.defer(message, {
+          delayMs: getSystemMessageFailureRetryDelayMs((Number(message?.attemptCount) || 0) + 1),
+          reason: normalizeText(dispatchResult?.reason) || "runtime_send_failed",
+          countAttempt: true,
+        });
+        if (deferred?.status === "dead_letter") {
+          console.warn(
+            `[codeksei] backstage message dead-lettered id=${message.id} reason=${normalizeText(dispatchResult?.reason) || "runtime_send_failed"}`
+          );
+        }
+          break;
+        }
       }
     }
   }
@@ -717,6 +736,7 @@ class CyberbossApp {
           senderId: reminder.senderId,
           workspaceRoot: this.resolveReminderWorkspaceRoot(reminder),
           text: buildReminderSystemTrigger(reminder, this.config),
+          kind: "reminder",
           createdAt: new Date().toISOString(),
         });
       } catch {
@@ -740,7 +760,7 @@ class CyberbossApp {
   async dispatchSystemMessage(message) {
     const prepared = this.systemMessageDispatcher?.buildPreparedMessage(message, this.channelAdapter.getKnownContextTokens()[message.senderId] || "");
     if (!prepared) {
-      throw new Error("system message could not be prepared");
+      return { status: "dead_letter", reason: "invalid_system_message" };
     }
     const bindingKey = this.runtimeAdapter.getSessionStore().buildBindingKey({
       workspaceId: prepared.workspaceId,
@@ -750,11 +770,24 @@ class CyberbossApp {
     const workspaceRoot = prepared.workspaceRoot || this.resolveWorkspaceRoot(bindingKey);
     const threadId = this.runtimeAdapter.getSessionStore().getThreadIdForWorkspace(bindingKey, workspaceRoot);
     const threadState = threadId ? this.threadStateStore.getThreadState(threadId) : null;
-    if (threadState?.status === "running" || hasRpcId(threadState?.pendingApproval?.requestId)) {
-      return false;
+    if (threadState?.status === "running") {
+      return { status: "deferred_busy", reason: "thread_running" };
     }
-    await this.handlePreparedMessage(prepared, { allowCommands: false });
-    return true;
+    if (hasRpcId(threadState?.pendingApproval?.requestId)) {
+      return { status: "deferred_busy", reason: "waiting_approval" };
+    }
+    const sendResult = await this.handlePreparedMessage(prepared, {
+      allowCommands: false,
+      reportFailureToUser: false,
+      throwOnFailure: false,
+    });
+    if (sendResult?.status === "sent") {
+      return { status: "sent", reason: "" };
+    }
+    return {
+      status: "retryable_error",
+      reason: normalizeText(sendResult?.reason) || "runtime_send_failed",
+    };
   }
 
   async handleReplyDeliveryFailure({
@@ -1223,6 +1256,97 @@ class CyberbossApp {
     }).catch(() => {});
   }
 
+  async withUserTyping({
+    userId,
+    contextToken = "",
+    clearOnSuccess = true,
+  }, work) {
+    const normalizedUserId = normalizeText(userId);
+    const runner = typeof work === "function" ? work : async () => undefined;
+    if (!normalizedUserId) {
+      return runner();
+    }
+
+    await this.channelAdapter.sendTyping({
+      userId: normalizedUserId,
+      status: 1,
+      contextToken,
+    }).catch(() => {});
+
+    let succeeded = false;
+    try {
+      const result = await runner();
+      succeeded = true;
+      return result;
+    } finally {
+      if (clearOnSuccess || !succeeded) {
+        await this.channelAdapter.sendTyping({
+          userId: normalizedUserId,
+          status: 0,
+          contextToken,
+        }).catch(() => {});
+      }
+    }
+  }
+
+  async sendPreparedMessageToRuntime({
+    bindingKey,
+    workspaceRoot,
+    normalized,
+    prepared,
+  }) {
+    try {
+      const turn = await this.withUserTyping({
+        userId: normalized.senderId,
+        contextToken: normalized.contextToken,
+        // A successful runtime turn keeps typing alive until the runtime event
+        // stream, watchdog, or stopTypingForThread() settles it. Only the local
+        // failure path should clear typing here.
+        clearOnSuccess: false,
+      }, async () => this.runtimeAdapter.sendTextTurn({
+        bindingKey,
+        workspaceRoot,
+        text: prepared.text,
+        model: this.runtimeAdapter.getSessionStore().getCodexParamsForWorkspace(bindingKey, workspaceRoot).model,
+        accessMode: this.config.codexAccessMode,
+        metadata: {
+          workspaceId: prepared.workspaceId,
+          accountId: prepared.accountId,
+          senderId: prepared.senderId,
+        },
+      }));
+
+      this.streamDelivery.queueReplyTargetForThread(turn.threadId, {
+        userId: prepared.senderId,
+        contextToken: prepared.contextToken,
+        provider: prepared.provider,
+      });
+      if (turn.workspaceBootstrapPending) {
+        this.queuePendingWorkspaceBootstrap({
+          bindingKey,
+          workspaceRoot,
+          threadId: turn.threadId,
+        });
+      }
+      this.scheduleRuntimeEventWatchdog({
+        bindingKey,
+        workspaceRoot,
+        normalized: prepared,
+        threadId: turn.threadId,
+      });
+      return {
+        status: "sent",
+        threadId: turn.threadId,
+      };
+    } catch (error) {
+      return {
+        status: "retryable_error",
+        reason: formatErrorMessage(error),
+        error,
+      };
+    }
+  }
+
   async sendFailureToThread(threadId, text) {
     const linked = this.runtimeAdapter.getSessionStore().findBindingForThreadId(threadId);
     const target = linked?.bindingKey ? this.resolveReplyTargetForBinding(linked.bindingKey) : null;
@@ -1398,6 +1522,11 @@ function formatErrorMessage(error) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getSystemMessageFailureRetryDelayMs(attemptCount) {
+  const index = Math.max(0, Math.min(SYSTEM_MESSAGE_FAILURE_RETRY_DELAYS_MS.length - 1, Number(attemptCount) - 1));
+  return SYSTEM_MESSAGE_FAILURE_RETRY_DELAYS_MS[index];
 }
 
 module.exports = { CyberbossApp };

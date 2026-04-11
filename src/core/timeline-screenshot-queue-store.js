@@ -1,5 +1,9 @@
-const fs = require("fs");
-const path = require("path");
+const {
+  ensureParentDirectory,
+  isPlainObject,
+  readJsonStateFile,
+  writeJsonStateFile,
+} = require("./json-state");
 
 class TimelineScreenshotQueueStore {
   constructor({ filePath }) {
@@ -10,27 +14,27 @@ class TimelineScreenshotQueueStore {
   }
 
   ensureParentDirectory() {
-    fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
+    ensureParentDirectory(this.filePath);
   }
 
   load() {
-    try {
-      const raw = fs.readFileSync(this.filePath, "utf8");
-      const parsed = JSON.parse(raw);
-      const jobs = Array.isArray(parsed?.jobs) ? parsed.jobs : [];
-      this.state = {
-        jobs: jobs
-          .map(normalizeTimelineScreenshotJob)
-          .filter(Boolean)
-          .sort(compareTimelineScreenshotJobs),
-      };
-    } catch {
-      this.state = { jobs: [] };
-    }
+    const parsed = readJsonStateFile({
+      filePath: this.filePath,
+      fallback: { jobs: [] },
+      label: "timeline screenshot queue",
+      validate: validateTimelineScreenshotQueueState,
+    });
+    const jobs = Array.isArray(parsed?.jobs) ? parsed.jobs : [];
+    this.state = {
+      jobs: jobs
+        .map(normalizeTimelineScreenshotJob)
+        .filter(Boolean)
+        .sort(compareTimelineScreenshotJobs),
+    };
   }
 
   save() {
-    fs.writeFileSync(this.filePath, JSON.stringify(this.state, null, 2));
+    writeJsonStateFile(this.filePath, this.state);
   }
 
   enqueue(job) {
@@ -129,6 +133,21 @@ function compareTimelineScreenshotJobs(left, right) {
 
 function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function validateTimelineScreenshotQueueState(state) {
+  if (!isPlainObject(state)) {
+    return "timeline screenshot queue top-level state must be an object";
+  }
+  if (!Array.isArray(state.jobs)) {
+    return "timeline screenshot queue jobs must be an array";
+  }
+  for (let index = 0; index < state.jobs.length; index += 1) {
+    if (!normalizeTimelineScreenshotJob(state.jobs[index])) {
+      return `timeline screenshot queue jobs[${index}] is invalid`;
+    }
+  }
+  return true;
 }
 
 module.exports = { TimelineScreenshotQueueStore };

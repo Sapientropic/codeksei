@@ -53,13 +53,17 @@ async function runSystemSendCommand(config) {
   if (!contextTokens[senderId]) {
     throw new Error(`找不到用户 ${senderId} 的 context token，先让这个用户和 bot 聊过一次`);
   }
-  const queue = new SystemMessageQueueStore({ filePath: config.systemMessageQueueFile });
+  const queue = new SystemMessageQueueStore({
+    filePath: config.systemMessageQueueFile,
+    deadLetterFilePath: config.systemMessageDeadLetterFile,
+  });
   const queued = queue.enqueue({
     id: crypto.randomUUID(),
     accountId: account.accountId,
     senderId,
     workspaceRoot,
     text,
+    kind: "manual",
     createdAt: new Date().toISOString(),
   });
 

@@ -1,11 +1,10 @@
 const fs = require("fs");
-const dotenv = require("dotenv");
 const path = require("path");
 const {
   ensureCompatHomeEnv,
   ensureStateDirectory,
-  listEnvFileCandidates,
 } = require("../src/core/branding");
+const { loadEnvStack } = require("../src/core/env-loader");
 
 const ALERT_COOLDOWN_MS = 10 * 60_000;
 
@@ -14,16 +13,8 @@ function ensureDefaultStateDirectory() {
 }
 
 function loadEnv() {
+  loadEnvStack();
   ensureDefaultStateDirectory();
-  const candidates = listEnvFileCandidates();
-  for (const envPath of candidates) {
-    if (!fs.existsSync(envPath)) {
-      continue;
-    }
-    dotenv.config({ path: envPath });
-    return;
-  }
-  dotenv.config();
 }
 
 function ensureRuntimeEnv() {
