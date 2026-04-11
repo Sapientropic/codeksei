@@ -74,6 +74,16 @@
 
 [⚠️ 需确认] npm 官网当前文档明确要求在包设置里添加 trusted publisher，但对“尚未首发的新包”在 UI 里的具体入口层级可能会随 npm 页面调整而变化；如果你打开后入口名字略有不同，以 npm 官方文档与实际控制台为准。
 
+## First Release Bootstrap
+
+如果 `codeksei` 还没有在 npm 上存在：
+
+1. 先在维护者本机完成一次手动首发：`npm publish --access public`
+2. 等 npm 上出现包页面后，再去 package settings 里配置 trusted publisher
+3. 之后再把 GitHub 的 `v0.1.0` draft release 正式发布
+
+当前 `publish.yml` 已经带有“版本已存在则跳过真实发包”的保护，所以首发 bootstrap 之后再发布同版本 GitHub Release，不会因为重复发 `0.1.0` 而把 workflow 打红。
+
 ## Release Steps
 
 常规后续版本发布流程：

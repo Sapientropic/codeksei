@@ -38,21 +38,51 @@ jobs:
       - name: Run test suite
         run: node --test tests/*.test.js
 
+      - name: Resolve package metadata
+        id: package_meta
+        shell: bash
+        run: |
+          echo "name=$(node -p "require('./package.json').name")" >> "$GITHUB_OUTPUT"
+          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
       - name: Validate release tag matches package version
         if: ${{ github.event_name == 'release' }}
         shell: bash
         run: |
-          package_version="$(node -p "require('./package.json').version")"
+          package_version="${{ steps.package_meta.outputs.version }}"
           tag_version="${GITHUB_REF_NAME#v}"
           if [ "${package_version}" != "${tag_version}" ]; then
             echo "package.json version ${package_version} does not match release tag ${GITHUB_REF_NAME}" >&2
             exit 1
           fi
 
+      - name: Check whether this version already exists on npm
+        if: ${{ github.event_name == 'release' }}
+        id: npm_version_check
+        shell: bash
+        run: |
+          package_ref="${{ steps.package_meta.outputs.name }}@${{ steps.package_meta.outputs.version }}"
+          tmp_err="$(mktemp)"
+          if npm view "${package_ref}" version >/dev/null 2>"${tmp_err}"; then
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+            echo "Version ${package_ref} already exists on npm; publish step will be skipped."
+            exit 0
+          fi
+          if grep -Eqi "E404|Not Found|not found" "${tmp_err}"; then
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          cat "${tmp_err}" >&2
+          exit 1
+
       - name: Dry-run publish preflight
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: npm publish --dry-run --access public
 
+      - name: Skip publish because version already exists
+        if: ${{ github.event_name == 'release' && steps.npm_version_check.outputs.already_published == 'true' }}
+        run: echo "Skipping npm publish because this version already exists."
+
       - name: Publish package
-        if: ${{ github.event_name == 'release' }}
+        if: ${{ github.event_name == 'release' && steps.npm_version_check.outputs.already_published != 'true' }}
         run: npm publish --access public
