@@ -79,7 +79,7 @@ Recommended minimum variables:
 ```dotenv
 CODEKSEI_USER_NAME=YourName
 CODEKSEI_USER_GENDER=female
-CODEKSEI_ALLOWED_USER_IDS=your-wechat-user-id
+CODEKSEI_ALLOWED_USER_IDS=bridge_observed_sender_id
 CODEKSEI_WORKSPACE_ROOT=/absolute/path/to/your/workspace
 ```
 
@@ -92,6 +92,7 @@ CODEKSEI_WEIXIN_ADAPTER=v2
 CODEKSEI_WEIXIN_REPLY_MODE=stream
 CODEKSEI_WEIXIN_ROUTE_TAG=
 CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION=2.1.1
+CODEKSEI_TIMEZONE=Asia/Shanghai
 CODEKSEI_DIARY_DIR=/absolute/path/to/your/vault/diary
 CODEKSEI_TIMELINE_STATE_DIR=/absolute/path/to/your/vault/.codex/timeline
 CODEKSEI_WORKSPACE_BOOTSTRAP_CONFIG=/absolute/path/to/workspace-bootstrap.json
@@ -106,8 +107,14 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 Notes:
 
 - Legacy `CYBERBOSS_*` variables still work, but new setups should use `CODEKSEI_*`
+- `CODEKSEI_USER_NAME` is a display/persona field for chat, not a routing id
+- `CODEKSEI_ALLOWED_USER_IDS` must use the exact sender ids observed by the bridge; the easiest way to find them is `npm run accounts`
 - The first successful run will generate `weixin-instructions.md` in the state directory
 - If you use multiple workspaces in shared mode, set `CODEKSEI_WORKSPACE_ROOT` before starting
+- `CODEKSEI_TIMEZONE` is optional; when set, it becomes the single local-time contract for reminder / diary / review / timeline flows
+- If `CODEKSEI_TIMEZONE` is unset, Codeksei first reuses any non-legacy timezone already declared by the timeline state; otherwise it falls back to the system timezone
+- Legacy `Asia/Shanghai` timeline state can be auto-migrated to the unified timezone the next time you run a timeline command
+- `CODEKSEI_TIMELINE_STATE_DIR` is the timeline-for-agent state root; the current primary layout stores runtime files under `timeline/*.json`
 - Keep `.env` local; do not commit it into the repository
 
 ### 3. Login

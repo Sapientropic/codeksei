@@ -1,9 +1,10 @@
 const { buildReview, writeReview } = require("../core/review");
+const { LEGACY_TIMELINE_TIMEZONE } = require("../core/timezone");
 
 async function runReviewCommand(config, kind, args = process.argv.slice(4)) {
   const options = parseReviewArgs(args, kind);
   if (options.help) {
-    printReviewHelp(kind);
+    printReviewHelp(kind, config?.timezone);
     return;
   }
   if (options.stdout) {
@@ -79,13 +80,14 @@ function parseReviewArgs(args, kind) {
   return options;
 }
 
-function printReviewHelp(kind) {
+function printReviewHelp(kind, timezone = LEGACY_TIMELINE_TIMEZONE) {
+  const resolvedTimezone = String(timezone || "").trim() || LEGACY_TIMELINE_TIMEZONE;
   const nightly = [
     "用法: npm run review:nightly -- [--date YYYY-MM-DD] [--stdout] [--deterministic] [--model <id>]",
     "",
     "说明：",
     "  从当前 diary 真相源生成一份 Codeksei 睡前收口。",
-    "  默认按 Asia/Shanghai 的当前日期推断今天，并给周/月复盘提供更轻的日级原料。",
+    `  默认按 ${resolvedTimezone} 的当前日期推断今天，并给周/月复盘提供更轻的日级原料。`,
     "  默认走 hybrid：脚本保骨架，Codex 负责结构化语义提炼；失败时自动回退。",
     "",
     "示例：",
@@ -98,7 +100,7 @@ function printReviewHelp(kind) {
     "",
     "说明：",
     "  从当前 diary 真相源生成一份 Codeksei 生活助理周复盘。",
-    "  默认按 Asia/Shanghai 的当前日期推断本周（周一到周日）。",
+    `  默认按 ${resolvedTimezone} 的当前日期推断本周（周一到周日）。`,
     "  默认走 hybrid：脚本保骨架，Codex 负责结构化语义提炼；失败时自动回退。",
     "",
     "示例：",
@@ -112,7 +114,7 @@ function printReviewHelp(kind) {
     "",
     "说明：",
     "  从当前 diary 真相源生成一份 Codeksei 生活助理月复盘。",
-    "  默认按 Asia/Shanghai 的当前日期推断本月。",
+    `  默认按 ${resolvedTimezone} 的当前日期推断本月。`,
     "  默认走 hybrid：脚本保骨架，Codex 负责结构化语义提炼；失败时自动回退。",
     "",
     "示例：",

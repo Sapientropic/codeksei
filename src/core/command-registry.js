@@ -469,9 +469,14 @@ function buildTopicUsage(topic) {
         "",
         "参数：",
         "  --delay 30s|10m|1h30m|2d4h",
-        "  --at 2026-04-07T21:30+08:00 | 2026-04-07 21:30",
+        "  --at 2026-04-07T21:30-04:00 | 2026-04-07 21:30",
         "  --text \"提醒内容\"",
-        "  --user <wechatUserId>  可选",
+        "  --user <senderId>  可选；必须是桥实际观测到的 sender id",
+        "",
+        "补充：",
+        "  先用 npm run accounts 看可用 sender id；不要填昵称或自己猜的微信号",
+        "  当前选中的 sender id 必须已经有可用的 context_token；否则命令会直接失败",
+        "  不带 offset 的本地时间按当前 runtime timezone 解释；显式偏移时间戳按原值保留",
       ].join("\n");
     case "diary":
       return [
@@ -507,6 +512,8 @@ function buildTopicUsage(topic) {
         "",
         "补充：",
         "  单条事件优先用 npm run timeline:event -- --date YYYY-MM-DD --start HH:mm --end HH:mm --title \"...\" ...，避免手写 JSON",
+        "  如果必须用 timeline:write --stdin，传完整 JSON 对象 {\"events\":[...]}，不要传裸数组",
+        "  不带 offset 的本地时间按当前 timezone 解释；如果 timeline state 已声明非 legacy timezone，会优先沿用它",
         "  timeline 查分类先用 npm run timeline:categories；改已有日程前先用 npm run timeline:read -- --date YYYY-MM-DD",
         "  timeline 截图稳定入口是 npm run timeline:screenshot -- --send，它会把任务交给当前微信桥执行",
       ].join("\n");

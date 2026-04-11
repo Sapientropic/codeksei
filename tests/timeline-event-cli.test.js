@@ -44,8 +44,26 @@ test("timeline:event builds a single-event write payload from friendly flags", (
 test("timeline:event normalizes full local timestamps without offset", () => {
   assert.equal(
     normalizeTimelineEventTimestamp("2026-04-10", "2026-04-10 11:20", "--start"),
-    "2026-04-10T11:20+08:00"
+    "2026-04-10T11:20:00+08:00"
   );
+});
+
+test("timeline:event can derive DST-aware offsets from configured timezone", () => {
+  const options = parseTimelineEventArgs([
+    "--date", "2026-04-10",
+    "--start", "09:30",
+    "--end", "10:15",
+    "--title", "纽约晨间整理",
+    "--subcategory", "work.dev",
+  ]);
+
+  const args = buildTimelineEventWriteArgs(options, "", {
+    timezone: "America/New_York",
+  });
+  const payload = extractJsonPayload(args);
+
+  assert.equal(payload.events[0].startAt, "2026-04-10T09:30:00-04:00");
+  assert.equal(payload.events[0].endAt, "2026-04-10T10:15:00-04:00");
 });
 
 test("timeline:event rejects missing timeline classification", () => {

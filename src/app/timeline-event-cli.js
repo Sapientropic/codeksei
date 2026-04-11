@@ -1,16 +1,20 @@
 const crypto = require("crypto");
+const {
+  LEGACY_TIMELINE_TIMEZONE,
+  coerceLocalDateTimeToIso,
+} = require("../core/timezone");
 
-const LOCAL_TIMEZONE_OFFSET = "+08:00";
-
-async function runTimelineEventCommand(timelineIntegration, args = process.argv.slice(4)) {
+async function runTimelineEventCommand(timelineIntegration, configOrArgs = {}, argsMaybe = process.argv.slice(4)) {
+  const config = Array.isArray(configOrArgs) ? {} : (configOrArgs || {});
+  const args = Array.isArray(configOrArgs) ? configOrArgs : argsMaybe;
   const options = parseTimelineEventArgs(args);
   if (options.help) {
-    printTimelineEventHelp();
+    printTimelineEventHelp(config.timezone);
     return;
   }
 
   const note = await resolveNote(options);
-  const writeArgs = buildTimelineEventWriteArgs(options, note);
+  const writeArgs = buildTimelineEventWriteArgs(options, note, config);
   await timelineIntegration.runSubcommand("write", writeArgs);
 }
 
@@ -109,11 +113,12 @@ async function resolveNote(options) {
   return normalizeText(await readStdin());
 }
 
-function buildTimelineEventWriteArgs(options, note = "") {
+function buildTimelineEventWriteArgs(options, note = "", config = {}) {
   const date = normalizeDate(options.date);
   if (!date) {
     throw new Error("缺少有效日期，使用 --date YYYY-MM-DD");
   }
+  const timezone = normalizeTimezoneConfigValue(config.timezone) || LEGACY_TIMELINE_TIMEZONE;
 
   const title = normalizeText(options.title);
   if (!title) {
@@ -129,8 +134,8 @@ function buildTimelineEventWriteArgs(options, note = "") {
     throw new Error("缺少分类信息，至少传 --event-node 或 --subcategory");
   }
 
-  const startAt = normalizeTimelineEventTimestamp(date, options.start, "--start");
-  const endAt = normalizeTimelineEventTimestamp(date, options.end, "--end");
+  const startAt = normalizeTimelineEventTimestamp(date, options.start, "--start", timezone);
+  const endAt = normalizeTimelineEventTimestamp(date, options.end, "--end", timezone);
   validateEventRange({ date, startAt, endAt });
 
   const event = {
@@ -179,26 +184,18 @@ function normalizeDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : "";
 }
 
-function normalizeTimelineEventTimestamp(date, value, flagName) {
+function normalizeTimelineEventTimestamp(date, value, flagName, timezone = LEGACY_TIMELINE_TIMEZONE) {
   const normalized = normalizeText(value);
   if (!normalized) {
     throw new Error(`缺少时间，使用 ${flagName} HH:mm 或完整时间戳`);
   }
 
-  if (/^\d{2}:\d{2}$/.test(normalized)) {
-    return `${date}T${normalized}:00${LOCAL_TIMEZONE_OFFSET}`;
-  }
-
-  if (/^\d{2}:\d{2}:\d{2}$/.test(normalized)) {
-    return `${date}T${normalized}${LOCAL_TIMEZONE_OFFSET}`;
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(normalized)) {
-    return `${normalized.replace(" ", "T")}${LOCAL_TIMEZONE_OFFSET}`;
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?([zZ]|[+-]\d{2}:\d{2})$/.test(normalized)) {
-    return normalized.replace(" ", "T");
+  const timestamp = coerceLocalDateTimeToIso(normalized, {
+    timeZone: timezone,
+    defaultDate: date,
+  });
+  if (timestamp) {
+    return timestamp;
   }
 
   throw new Error(`不支持的时间格式: ${flagName}=${normalized}`);
@@ -235,7 +232,8 @@ function normalizeText(value) {
   return String(value || "").replace(/\r\n/g, "\n").trim();
 }
 
-function printTimelineEventHelp() {
+function printTimelineEventHelp(timezone = LEGACY_TIMELINE_TIMEZONE) {
+  const resolvedTimezone = normalizeTimezoneConfigValue(timezone) || LEGACY_TIMELINE_TIMEZONE;
   console.log(`
 用法: npm run timeline:event -- --date YYYY-MM-DD --start HH:mm --end HH:mm --title "标题" (--event-node <id> | --subcategory <id>) [其他参数]
 
@@ -243,6 +241,7 @@ function printTimelineEventHelp() {
   - 写单条时间轴事件，不必手写 raw JSON
   - 适合把一个明确的时间块快速追加进当天 timeline
   - 如果要一次写多条事件，或直接替换整批 events，继续用 timeline:write
+  - 不带 offset 的本地时间默认按 ${resolvedTimezone} 解释
 
 常用参数:
   --date YYYY-MM-DD
@@ -271,3 +270,7 @@ module.exports = {
   buildTimelineEventWriteArgs,
   normalizeTimelineEventTimestamp,
 };
+
+function normalizeTimezoneConfigValue(value) {
+  return typeof value === "string" ? value.trim() : "";
+}

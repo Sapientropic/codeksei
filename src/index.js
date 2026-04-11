@@ -228,7 +228,7 @@ async function main() {
       return;
     }
     if (subcommand === "event") {
-      await runTimelineEventCommand(timelineIntegration, argv.slice(2));
+      await runTimelineEventCommand(timelineIntegration, config, argv.slice(2));
       return;
     }
     if (subcommand === "screenshot") {

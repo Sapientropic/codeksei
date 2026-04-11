@@ -79,7 +79,7 @@ npm install
 ```dotenv
 CODEKSEI_USER_NAME=你的名字
 CODEKSEI_USER_GENDER=female
-CODEKSEI_ALLOWED_USER_IDS=你的微信 user id
+CODEKSEI_ALLOWED_USER_IDS=桥实际观测到的 sender id
 CODEKSEI_WORKSPACE_ROOT=/绝对路径/你的项目目录
 ```
 
@@ -92,6 +92,7 @@ CODEKSEI_WEIXIN_ADAPTER=v2
 CODEKSEI_WEIXIN_REPLY_MODE=stream
 CODEKSEI_WEIXIN_ROUTE_TAG=
 CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION=2.1.1
+CODEKSEI_TIMEZONE=Asia/Shanghai
 CODEKSEI_DIARY_DIR=/绝对路径/你的 vault/日记
 CODEKSEI_TIMELINE_STATE_DIR=/绝对路径/你的 vault/.codex/timeline
 CODEKSEI_WORKSPACE_BOOTSTRAP_CONFIG=/绝对路径/你的 workspace-bootstrap.json
@@ -106,8 +107,14 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 说明：
 
 - 旧的 `CYBERBOSS_*` 仍可用，但新项目建议统一切到 `CODEKSEI_*`
+- `CODEKSEI_USER_NAME` 是 agent 聊天时怎么称呼你的人设字段，不参与消息路由
+- `CODEKSEI_ALLOWED_USER_IDS` 必须填写微信桥实际观测到的 sender id；最简单的做法是先跑 `npm run accounts`
 - 第一次运行任意命令时，会在状态目录生成 `weixin-instructions.md`
 - 如果你在共享模式下使用多 workspace，建议启动前就设置好 `CODEKSEI_WORKSPACE_ROOT`
+- `CODEKSEI_TIMEZONE` 可选；若显式设置，它会统一驱动 reminder / diary / review / timeline 的本地时间解释
+- 如果不设 `CODEKSEI_TIMEZONE`，Codeksei 会优先沿用 timeline state 里已声明的非 legacy timezone；否则回退到系统时区
+- 旧的 `Asia/Shanghai` legacy timeline state 在需要时会在下一次 timeline 命令时自动迁移到当前统一 timezone
+- `CODEKSEI_TIMELINE_STATE_DIR` 默认是 timeline-for-agent 的 state root；当前主布局会在它下面使用 `timeline/*.json`
 - `.env` 只应放在你的本地工作目录或状态目录里，不要提交进仓库
 
 ### 3. 扫码登录

@@ -4,6 +4,11 @@ const {
   PRIMARY_NOTE_SYNC_MARKER_PREFIX,
   LEGACY_NOTE_SYNC_MARKER_PREFIX,
 } = require("./branding");
+const {
+  normalizeDisplayPath,
+  resolveCrossPlatformPath,
+  resolveCrossPlatformPathFromRoot,
+} = require("./path-utils");
 
 const { listTrackedProjects } = require("./project-radar");
 
@@ -42,11 +47,11 @@ function resolveNoteSyncTarget(config = {}, options = {}) {
 }
 
 function resolveNotePath(workspaceRoot, targetPath) {
-  if (path.isAbsolute(targetPath)) {
-    return normalizeDisplayPath(path.resolve(targetPath));
+  if (path.isAbsolute(targetPath) || path.win32.isAbsolute(targetPath)) {
+    return resolveCrossPlatformPath(targetPath);
   }
   const baseRoot = normalizeText(workspaceRoot) || process.cwd();
-  return normalizeDisplayPath(path.resolve(baseRoot, targetPath));
+  return resolveCrossPlatformPathFromRoot(baseRoot, targetPath);
 }
 
 function syncNoteFile(options = {}) {
@@ -395,10 +400,6 @@ function normalizeHeadingText(value) {
 
 function normalizeComparableText(value) {
   return normalizeParagraphText(value).replace(/\s+/gu, " ").toLowerCase();
-}
-
-function normalizeDisplayPath(targetPath) {
-  return normalizeText(targetPath).replace(/\\/g, "/");
 }
 
 function normalizeFileEnding(value) {

@@ -8,12 +8,19 @@ const {
   resolveAppHome,
   resolveStateDir,
 } = require("./branding");
+const { resolveCrossPlatformPathFromRoot } = require("./path-utils");
+const { resolveTimezoneConfig } = require("./timezone");
 
 function readConfig() {
   const argv = process.argv.slice(2);
   const mode = argv[0] || "";
   const stateDir = resolveStateDir({ env: process.env });
   const workspaceRoot = readPrefixedEnv(process.env, "WORKSPACE_ROOT") || process.cwd();
+  const timelineStateDir = readPrefixedEnv(process.env, "TIMELINE_STATE_DIR") || stateDir;
+  const timezoneConfig = resolveTimezoneConfig({
+    explicitTimezone: readPrefixedEnv(process.env, "TIMEZONE"),
+    timelineStateDir,
+  });
   const appHome = resolveAppHome({
     env: process.env,
     fallbackRoot: path.resolve(__dirname, "..", ".."),
@@ -27,8 +34,12 @@ function readConfig() {
     cyberbossHome: appHome,
     workspaceId: readPrefixedEnv(process.env, "WORKSPACE_ID") || "default",
     workspaceRoot,
+    timezone: timezoneConfig.timezone,
+    timezoneSource: timezoneConfig.source,
+    timezoneExplicit: timezoneConfig.explicit,
+    timelineStateTimezone: timezoneConfig.timelineStateTimezone,
     diaryDir: readPrefixedEnv(process.env, "DIARY_DIR") || path.join(stateDir, "diary"),
-    timelineStateDir: readPrefixedEnv(process.env, "TIMELINE_STATE_DIR") || stateDir,
+    timelineStateDir,
     userName: readPrefixedEnv(process.env, "USER_NAME") || "用户",
     userGender: readPrefixedEnv(process.env, "USER_GENDER") || "female",
     allowedUserIds: readPrefixedListEnv(process.env, "ALLOWED_USER_IDS"),
@@ -63,11 +74,11 @@ function readConfig() {
     workspaceBootstrapConfigFile: readPrefixedEnv(process.env, "WORKSPACE_BOOTSTRAP_CONFIG")
       || path.join(stateDir, "workspace-bootstrap.json"),
     projectRadarConfigFile: readPrefixedEnv(process.env, "PROJECT_RADAR_CONFIG")
-      || path.resolve(workspaceRoot, ".codex", "code-projects.json"),
+      || resolveCrossPlatformPathFromRoot(workspaceRoot, ".codex", "code-projects.json"),
     durableNoteSchemaConfigFile: readPrefixedEnv(process.env, "DURABLE_NOTE_SCHEMA_CONFIG")
-      || path.resolve(workspaceRoot, ".codex", "durable-note-schema.json"),
+      || resolveCrossPlatformPathFromRoot(workspaceRoot, ".codex", "durable-note-schema.json"),
     reviewSchemaConfigFile: readPrefixedEnv(process.env, "REVIEW_SCHEMA_CONFIG")
-      || path.resolve(workspaceRoot, ".codex", "review-schema.json"),
+      || resolveCrossPlatformPathFromRoot(workspaceRoot, ".codex", "review-schema.json"),
     reviewSemanticMode: readPrefixedEnv(process.env, "REVIEW_SEMANTIC_MODE") || "hybrid",
     reviewSemanticModel: readPrefixedEnv(process.env, "REVIEW_SEMANTIC_MODEL"),
     reviewSemanticTimeoutMs: readPrefixedIntEnv(process.env, "REVIEW_SEMANTIC_TIMEOUT_MS") || 120000,

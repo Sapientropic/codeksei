@@ -22,4 +22,20 @@ test("timeline topic help still prefers timeline:event for single events", () =>
 
   assert.match(help, /单条事件优先用 npm run timeline:event/u);
   assert.match(help, /timeline 查分类先用 npm run timeline:categories/u);
+  assert.match(help, /完整 JSON 对象/u);
+  assert.match(help, /当前 timezone/u);
+});
+
+test("reminder topic help explains local-time interpretation", () => {
+  const help = buildTerminalTopicHelp("reminder");
+
+  assert.match(help, /不带 offset 的本地时间按当前 runtime timezone 解释/u);
+});
+
+test("reminder topic help clarifies sender id and context token requirements", () => {
+  const help = buildTerminalTopicHelp("reminder");
+
+  assert.match(help, /sender id/u);
+  assert.match(help, /npm run accounts/u);
+  assert.match(help, /context_token/u);
 });

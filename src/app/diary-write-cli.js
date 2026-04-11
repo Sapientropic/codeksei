@@ -1,6 +1,12 @@
 const fs = require("fs");
 const path = require("path");
 const { PACKAGE_NAME } = require("../core/branding");
+const {
+  LEGACY_TIMELINE_TIMEZONE,
+  formatDateInTimezone,
+  formatDateTimeInTimezone,
+  formatTimeInTimezone,
+} = require("../core/timezone");
 
 const DEFAULT_SECTION = "supplement";
 const SECTION_HEADINGS = Object.freeze({
@@ -24,8 +30,9 @@ async function runDiaryWriteCommand(config) {
   }
 
   const now = new Date();
-  const dateString = options.date || formatDate(now);
-  const timeString = options.time || formatTime(now);
+  const timezone = config?.timezone || LEGACY_TIMELINE_TIMEZONE;
+  const dateString = options.date || formatDate(now, timezone);
+  const timeString = options.time || formatTime(now, timezone);
   const section = normalizeSection(options.section);
   const todoState = normalizeTodoState(options.state, section);
   const usesLegacyTodoDoneFallback = shouldSynthesizeTodoDoneTimelineText({
@@ -50,7 +57,7 @@ async function runDiaryWriteCommand(config) {
   }
 
   fs.mkdirSync(config.diaryDir, { recursive: true });
-  ensureDiaryFile(filePath, now);
+  ensureDiaryFile(filePath, now, timezone);
   const current = fs.readFileSync(filePath, "utf8");
   const next = entryPayloads.reduce(
     (draft, payload) => insertDiaryEntry(draft, payload, dateString),
@@ -265,12 +272,12 @@ function synthesizeTodoDoneTimelineText({
   return normalizedTime ? `${normalizedTime} ${lineText}` : lineText;
 }
 
-function ensureDiaryFile(filePath, now) {
+function ensureDiaryFile(filePath, now, timezone = LEGACY_TIMELINE_TIMEZONE) {
   if (fs.existsSync(filePath) && fs.statSync(filePath).size > 0) {
     return;
   }
-  const createdAt = formatDateTime(now);
-  const updated = formatDate(now);
+  const createdAt = formatDateTime(now, timezone);
+  const updated = formatDate(now, timezone);
   fs.writeFileSync(filePath, buildDiaryFileSkeleton({ createdAt, updated }), "utf8");
 }
 
@@ -576,35 +583,16 @@ function normalizeLineItem(value) {
   return normalizeBody(value).replace(/\s*\n+\s*/g, " ").replace(/\s{2,}/g, " ").trim();
 }
 
-function formatDate(date) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
+function formatDate(date, timezone = LEGACY_TIMELINE_TIMEZONE) {
+  return formatDateInTimezone(date, timezone);
 }
 
-function formatTime(date) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    timeZone: "Asia/Shanghai",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(date);
+function formatTime(date, timezone = LEGACY_TIMELINE_TIMEZONE) {
+  return formatTimeInTimezone(date, timezone);
 }
 
-function formatDateTime(date) {
-  const formatter = new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-  return formatter.format(date).replace(" ", "T");
+function formatDateTime(date, timezone = LEGACY_TIMELINE_TIMEZONE) {
+  return formatDateTimeInTimezone(date, timezone);
 }
 
 module.exports = {

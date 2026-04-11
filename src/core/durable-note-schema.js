@@ -3,6 +3,11 @@ const path = require("path");
 
 const { listTrackedProjects } = require("./project-radar");
 const { appendSection, findSectionRange, resolveNoteSyncTarget } = require("./note-sync");
+const {
+  normalizeDisplayPath,
+  resolveCrossPlatformPath,
+  resolveCrossPlatformPathFromRoot,
+} = require("./path-utils");
 
 function loadDurableNoteSchemaConfig(config = {}) {
   const filePath = normalizeText(config.durableNoteSchemaConfigFile);
@@ -26,7 +31,7 @@ function loadDurableNoteSchemaConfig(config = {}) {
 }
 
 function resolveDurableNoteProfile(config = {}) {
-  const workspaceRoot = normalizeDisplayPath(path.resolve(String(config.workspaceRoot || process.cwd())));
+  const workspaceRoot = resolveCrossPlatformPath(String(config.workspaceRoot || process.cwd()));
   const schemaConfig = loadDurableNoteSchemaConfig(config);
   const workspaceProfile = selectWorkspaceProfile(schemaConfig.workspaces, workspaceRoot);
   const projectDefaults = normalizeFamily(workspaceProfile?.projectDefaults);
@@ -285,10 +290,10 @@ function resolveWorkspaceNotePath(workspaceRoot, targetPath) {
   if (!normalizedTargetPath) {
     return "";
   }
-  if (path.isAbsolute(normalizedTargetPath)) {
-    return normalizeDisplayPath(path.resolve(normalizedTargetPath));
+  if (path.isAbsolute(normalizedTargetPath) || path.win32.isAbsolute(normalizedTargetPath)) {
+    return resolveCrossPlatformPath(normalizedTargetPath);
   }
-  return normalizeDisplayPath(path.resolve(workspaceRoot, ...normalizedTargetPath.split("/")));
+  return resolveCrossPlatformPathFromRoot(workspaceRoot, ...normalizedTargetPath.split("/"));
 }
 
 function listAvailableScopes(profile) {
@@ -297,10 +302,6 @@ function listAvailableScopes(profile) {
 
 function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function normalizeDisplayPath(targetPath) {
-  return normalizeText(targetPath).replace(/\\/g, "/");
 }
 
 function normalizeLineEnding(value) {
