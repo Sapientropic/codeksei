@@ -52,6 +52,13 @@ shared-mode lifecycle, also read the relevant source of truth in:
 - If a task is really about the private Website vault or local runtime state,
   keep those edits in that workspace. Do not silently turn private cleanup into
   a public repo change.
+- Obsidian, private vaults, local review/note workspaces, and other operator
+  workflows are optional integrations. Public docs and examples should describe
+  them as optional, env-configured, and replaceable rather than implying that a
+  contributor needs your exact local setup.
+- When an example only needs to show shape, prefer generic placeholders like
+  `/absolute/path/to/note.md` or `<workspace note>` instead of personal note
+  titles, vault names, or machine-specific workspace labels.
 
 ## Change Discipline
 
@@ -78,6 +85,9 @@ tests together.
   `node --test tests/review.test.js tests/note-sync.test.js`
 - Before release-facing changes, prefer the repo's real scripts and docs over
   chat memory summaries.
+- Before pushing public-facing doc/help/example changes, sanity-check that the
+  staged diff does not accidentally encode personal workspace names, private
+  note titles, or local absolute paths as if they were product defaults.
 
 ## Documentation Hygiene
 

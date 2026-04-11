@@ -90,7 +90,7 @@ README 和帮助文本默认都按新入口书写；旧名字只作为兼容层�
 - `npm run note:maybe -- --project <slug>`
 - `npm run note:maybe -- --scope assistant --kind preference`
 - `npm run note:sync -- --project <slug> --section "最近动作" --text "..."`
-- `npm run note:sync -- --path "项目/Codeksei 生活助理/README.md" --section "当前定位" --text "..."`
+- `npm run note:sync -- --path "/absolute/path/to/note.md" --section "当前定位" --text "..."`
 
 建议：
 
