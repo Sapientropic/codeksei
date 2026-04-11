@@ -20,7 +20,7 @@ It is a local operational layer for keeping state, reconnecting context, and mov
 | Positioning | Local-first personal life-assistant bridge |
 | Main interfaces | WeChat + `codeksei` CLI |
 | Core value | Shared thread, shared state, low-friction re-entry |
-| Current package | `codeksei@0.1.0` |
+| Current package | `codeksei@0.1.1` |
 | Compatibility layer | `cyberboss` / `CYBERBOSS_*` / `~/.cyberboss` |
 
 ## Why It Is More Than a Chat Shell
@@ -258,7 +258,7 @@ Codeksei grew from that base, but this version has been substantially reworked. 
 
 ### Why not just `npm install -g codeksei`?
 
-You can. `codeksei@0.1.0` is already on npm.  
+You can. `codeksei@0.1.1` is already on npm.  
 Use npm if you only want to install it; clone the repository when you want customization, debugging, or source-level changes.
 
 ### Should I use `codeksei` or `cyberboss`?
