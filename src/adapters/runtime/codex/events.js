@@ -1,4 +1,5 @@
 const {
+  extractAssistantPhase,
   extractAssistantText,
   extractFailureText,
   extractThreadIdFromParams,
@@ -54,6 +55,7 @@ function mapCodexMessageToRuntimeEvent(message) {
 
   if (method === "item/agentMessage/delta") {
     const text = extractAssistantText(params);
+    const phase = extractAssistantPhase(params);
     if (!text) {
       return null;
     }
@@ -64,12 +66,14 @@ function mapCodexMessageToRuntimeEvent(message) {
         turnId,
         itemId: normalizeString(params?.itemId || params?.item?.id),
         text,
+        phase,
       },
     };
   }
 
   if (method === "item/completed" && normalizeString(params?.item?.type).toLowerCase() === "agentmessage") {
     const text = extractAssistantText(params);
+    const phase = extractAssistantPhase(params);
     return {
       type: "runtime.reply.completed",
       payload: {
@@ -77,6 +81,7 @@ function mapCodexMessageToRuntimeEvent(message) {
         turnId,
         itemId: normalizeString(params?.item?.id),
         text,
+        phase,
       },
     };
   }

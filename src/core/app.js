@@ -42,6 +42,7 @@ class CyberbossApp {
     this.streamDelivery = new StreamDelivery({
       channelAdapter: this.channelAdapter,
       sessionStore: this.runtimeAdapter.getSessionStore(),
+      weixinReplyMode: config.weixinReplyMode,
       onDeliveryFailure: (payload) => this.handleReplyDeliveryFailure(payload),
     });
     this.pendingRuntimeEventWatchdogs = new Map();

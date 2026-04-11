@@ -483,14 +483,18 @@ function waitForTurnCompletion(client, threadId) {
           return;
         }
         cleanup();
+        // A single Codex turn can emit many assistant messages: progress notes,
+        // compacted-context check-ins, then the final reply. Callers waiting for
+        // turn completion expect the latest user-facing answer, not the whole
+        // turn history concatenated together.
         const text = itemOrder
+          .slice()
+          .reverse()
           .map((itemId) => completedTextByItemId.get(itemId) || "")
-          .filter(Boolean)
-          .join("\n\n")
-          .trim();
+          .find((value) => String(value || "").trim()) || "";
         resolve({
           turnId: completedTurnId || activeTurnId,
-          text: text || "已完成。",
+          text: String(text || "").trim() || "已完成。",
         });
       }
     });

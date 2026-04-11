@@ -1,36 +1,28 @@
 const http = require("http");
-const { readSharedBridgeHeartbeat, classifySharedBridgeHeartbeat } = require("../src/core/shared-bridge-heartbeat");
 const {
   listenUrl,
   appServerPidFile,
   bridgePidFile,
   supervisorPidFile,
-  bridgeHeartbeatFile,
   watchdogStateFile,
   readPidFile,
   isPidAlive,
+  readSharedBridgeHealth,
   resolveReadyAppServerPid,
   readJsonFile,
-  BRIDGE_HEARTBEAT_MAX_AGE_MS,
 } = require("./shared-common");
 
 async function main() {
   const ready = await checkReadyz();
   const readyAppServerPid = ready ? await resolveReadyAppServerPid() : 0;
-  const bridgePid = readPidFile(bridgePidFile);
-  const bridgeAlive = bridgePid ? isPidAlive(bridgePid) : false;
-  const bridgeHeartbeat = readSharedBridgeHeartbeat(bridgeHeartbeatFile);
-  const bridgeHeartbeatState = classifySharedBridgeHeartbeat(bridgeHeartbeat, {
-    expectedPid: bridgeAlive ? bridgePid : 0,
-    maxAgeMs: BRIDGE_HEARTBEAT_MAX_AGE_MS,
-  });
+  const bridgeHealth = readSharedBridgeHealth();
   const watchdogState = readJsonFile(watchdogStateFile) || {};
   console.log(`listen=${listenUrl}`);
   printPidState("shared_supervisor_pid", supervisorPidFile);
   printPidState("shared_app_server_pid", appServerPidFile, readyAppServerPid);
   printPidState("shared_cyberboss_pid", bridgePidFile);
-  console.log(`shared_bridge_heartbeat=${bridgeHeartbeatState.status}`);
-  console.log(`shared_bridge_heartbeat_at=${bridgeHeartbeatState.updatedAt || "missing"}`);
+  console.log(`shared_bridge_heartbeat=${bridgeHealth.classification.status}`);
+  console.log(`shared_bridge_heartbeat_at=${bridgeHealth.classification.updatedAt || "missing"}`);
   console.log(`shared_watchdog_last_run=${normalizeText(watchdogState.lastRunAt) || "missing"}`);
   console.log(`shared_watchdog_last_result=${normalizeText(watchdogState.result) || "missing"}`);
   console.log(`readyz=${ready ? "ok" : "down"}`);

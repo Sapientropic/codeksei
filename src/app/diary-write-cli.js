@@ -27,19 +27,34 @@ async function runDiaryWriteCommand(config) {
   const timeString = options.time || formatTime(now);
   const section = normalizeSection(options.section);
   const todoState = normalizeTodoState(options.state, section);
+  const usesLegacyTodoDoneFallback = shouldSynthesizeTodoDoneTimelineText({
+    section,
+    todoState,
+    timelineText: options.timelineText,
+  });
   const filePath = path.join(config.diaryDir, `${dateString}.md`);
-  const entryPayload = buildDiaryEntryPayload({
+  const entryPayloads = buildDiaryWriteEntryPayloads({
     section,
     timeString,
     title: options.title,
     body,
     todoState,
+    timelineText: options.timelineText,
   });
+  if (usesLegacyTodoDoneFallback) {
+    console.warn(
+      "[cyberboss] diary:write legacy todo-done call omitted --timeline-text; "
+      + "synthesized a minimal point-in-time diary fact to keep the cutover atomic."
+    );
+  }
 
   fs.mkdirSync(config.diaryDir, { recursive: true });
   ensureDiaryFile(filePath, now);
   const current = fs.readFileSync(filePath, "utf8");
-  const next = insertDiaryEntry(current, entryPayload, dateString);
+  const next = entryPayloads.reduce(
+    (draft, payload) => insertDiaryEntry(draft, payload, dateString),
+    current
+  );
   fs.writeFileSync(filePath, next, "utf8");
   console.log(`diary written: ${filePath}`);
 }
@@ -52,37 +67,43 @@ function parseArgs(args) {
     time: "",
     section: DEFAULT_SECTION,
     state: "",
+    timelineText: "",
     useStdin: false,
   };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === "--text") {
-      options.text = String(args[index + 1] || "");
+      options.text = readOptionValue(args, index, "--text");
       index += 1;
       continue;
     }
     if (arg === "--title") {
-      options.title = String(args[index + 1] || "");
+      options.title = readOptionValue(args, index, "--title");
       index += 1;
       continue;
     }
     if (arg === "--date") {
-      options.date = String(args[index + 1] || "");
+      options.date = readOptionValue(args, index, "--date");
       index += 1;
       continue;
     }
     if (arg === "--time") {
-      options.time = String(args[index + 1] || "");
+      options.time = readOptionValue(args, index, "--time");
       index += 1;
       continue;
     }
     if (arg === "--section") {
-      options.section = String(args[index + 1] || "");
+      options.section = readOptionValue(args, index, "--section");
       index += 1;
       continue;
     }
     if (arg === "--state") {
-      options.state = String(args[index + 1] || "");
+      options.state = readOptionValue(args, index, "--state");
+      index += 1;
+      continue;
+    }
+    if (arg === "--timeline-text") {
+      options.timelineText = readOptionValue(args, index, "--timeline-text");
       index += 1;
       continue;
     }
@@ -93,6 +114,14 @@ function parseArgs(args) {
     throw new Error(`未知参数: ${arg}`);
   }
   return options;
+}
+
+function readOptionValue(args, index, optionName) {
+  const next = args[index + 1];
+  if (typeof next !== "string" || next.startsWith("--")) {
+    throw new Error(`${optionName} 需要一个值`);
+  }
+  return String(next);
 }
 
 async function resolveBody(options) {
@@ -164,6 +193,75 @@ function buildDiaryEntryPayload({ section = DEFAULT_SECTION, timeString, title, 
     entry: `- ${lineText}`,
     text: lineText,
   };
+}
+
+function buildDiaryWriteEntryPayloads({
+  section = DEFAULT_SECTION,
+  timeString,
+  title,
+  body,
+  todoState = "open",
+  timelineText = "",
+}) {
+  const normalizedSection = normalizeSection(section);
+  const normalizedTodoState = normalizeTodoState(todoState, normalizedSection);
+  const normalizedTimelineText = normalizeLineItem(timelineText)
+    || synthesizeTodoDoneTimelineText({ section, timeString, title, body, todoState });
+
+  if (normalizedTimelineText && (normalizedSection !== "todo" || normalizedTodoState !== "done")) {
+    throw new Error("--timeline-text 只支持和 --section todo --state done 一起使用");
+  }
+
+  const entries = [
+    buildDiaryEntryPayload({
+      section: normalizedSection,
+      timeString,
+      title,
+      body,
+      todoState: normalizedTodoState,
+    }),
+  ];
+
+  if (normalizedTimelineText) {
+    entries.push(buildDiaryEntryPayload({
+      section: "timeline",
+      timeString,
+      body: normalizedTimelineText,
+    }));
+  }
+
+  return entries;
+}
+
+function shouldSynthesizeTodoDoneTimelineText({ section = DEFAULT_SECTION, todoState = "open", timelineText = "" }) {
+  const normalizedSection = normalizeSection(section);
+  const normalizedTodoState = normalizeTodoState(todoState, normalizedSection);
+  return normalizedSection === "todo"
+    && normalizedTodoState === "done"
+    && !normalizeLineItem(timelineText);
+}
+
+function synthesizeTodoDoneTimelineText({
+  section = DEFAULT_SECTION,
+  timeString = "",
+  title = "",
+  body = "",
+  todoState = "open",
+}) {
+  if (!shouldSynthesizeTodoDoneTimelineText({ section, todoState })) {
+    return "";
+  }
+
+  const lineText = buildSectionLineText({ title, body });
+  if (!lineText) {
+    return "";
+  }
+
+  // Keep stale prompts from dropping the diary hard fact entirely. This
+  // compatibility bridge records only a minimal point-in-time fact; fresh
+  // callers should still pass --timeline-text with the real cutover context.
+  const normalizedTime = normalizeLineItem(timeString);
+  return normalizedTime ? `${normalizedTime} ${lineText}` : lineText;
 }
 
 function ensureDiaryFile(filePath, now) {
@@ -511,6 +609,7 @@ function formatDateTime(date) {
 module.exports = {
   buildDiaryEntry,
   buildDiaryEntryPayload,
+  buildDiaryWriteEntryPayloads,
   buildDiaryFileSkeleton,
   insertDiaryEntry,
   normalizeSection,

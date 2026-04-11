@@ -41,6 +41,17 @@ function classifySharedBridgeHeartbeat(record, { expectedPid = 0, maxAgeMs = DEF
     };
   }
 
+  // The managed pid is the truth source for "is the shared bridge actually
+  // online right now". A fresh heartbeat without a live adopted pid only means
+  // we have leftover state on disk, not a bridge the operator can trust.
+  if (!expectedPid) {
+    return {
+      status: "missing_process",
+      healthy: false,
+      updatedAt: record.updatedAt,
+    };
+  }
+
   if (expectedPid && Number(record.pid) !== Number(expectedPid)) {
     return {
       status: "pid_mismatch",

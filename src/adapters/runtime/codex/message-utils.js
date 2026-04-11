@@ -40,6 +40,22 @@ function extractAssistantText(params) {
   return "";
 }
 
+function extractAssistantPhase(params) {
+  const candidates = [
+    params?.phase,
+    params?.item?.phase,
+    params?.item?.metadata?.phase,
+    params?.metadata?.phase,
+  ];
+  for (const value of candidates) {
+    const normalized = normalizeAssistantPhase(value);
+    if (normalized) {
+      return normalized;
+    }
+  }
+  return "";
+}
+
 function extractFailureText(params) {
   const rawMessage = normalizeIdentifier(params?.turn?.error?.message || params?.error?.message);
   return rawMessage ? `执行失败：${rawMessage}` : "执行失败";
@@ -51,6 +67,20 @@ function normalizeIdentifier(value) {
 
 function normalizeLineEndings(value) {
   return String(value || "").replace(/\r\n/g, "\n");
+}
+
+function normalizeAssistantPhase(value) {
+  const normalized = normalizeIdentifier(value).toLowerCase();
+  if (normalized === "commentary") {
+    return "commentary";
+  }
+  // Raw Codex sessions currently emit `commentary` and `final_answer`.
+  // Keep this alias list here so stream-delivery does not fall back to fragile
+  // text heuristics just because the upstream phase label changed shape.
+  if (normalized === "final" || normalized === "final_answer") {
+    return "final";
+  }
+  return "";
 }
 
 function extractRawTextFromContent(content) {
@@ -100,10 +130,12 @@ function extractRawTextFromContent(content) {
 }
 
 module.exports = {
+  extractAssistantPhase,
   extractAssistantText,
   extractFailureText,
   extractThreadId,
   extractThreadIdFromParams,
   extractTurnIdFromParams,
   isAssistantItemCompleted,
+  normalizeAssistantPhase,
 };

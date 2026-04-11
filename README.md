@@ -142,6 +142,7 @@ CYBERBOSS_WORKSPACE_ROOT=/绝对路径/你的项目目录
 CYBERBOSS_ACCOUNT_ID=
 CYBERBOSS_CODEX_ENDPOINT=ws://127.0.0.1:8765
 CYBERBOSS_WEIXIN_ADAPTER=v2
+CYBERBOSS_WEIXIN_REPLY_MODE=stream
 CYBERBOSS_WEIXIN_ROUTE_TAG=
 CYBERBOSS_WEIXIN_PROTOCOL_CLIENT_VERSION=2.1.1
 CYBERBOSS_DIARY_DIR=/绝对路径/你的 vault/日记
@@ -166,7 +167,7 @@ CYBERBOSS_SHARED_DISABLE_SHELL_SNAPSHOT=0
 
 如果你要跑共享线程，建议也在第一次启动前就把 `CYBERBOSS_WORKSPACE_ROOT` 配好。这样 `shared:open` 会优先接到你当前项目对应的那条线程，而不是回退到别的历史绑定。
 
-如果你在 `v2` 适配器下需要走特定路由网关，可以额外设置 `CYBERBOSS_WEIXIN_ROUTE_TAG`。`CYBERBOSS_WORKSPACE_BOOTSTRAP_CONFIG` 默认会落到 `${HOME}/.cyberboss/workspace-bootstrap.json`，用来声明“某个 workspace 开新线程时先读哪些稳定入口文件”，这样就不用再把某个 vault 的文件结构写死进仓库源码。`CYBERBOSS_PROJECT_RADAR_CONFIG` 默认会指向 `${CYBERBOSS_WORKSPACE_ROOT}/.codex/code-projects.json`，用于声明“这个 workspace 里有哪些代码项目值得做轻量 git radar”。`CYBERBOSS_DURABLE_NOTE_SCHEMA_CONFIG` 默认会指向 `${CYBERBOSS_WORKSPACE_ROOT}/.codex/durable-note-schema.json`，用于声明“不同 durable note family 的固定章节骨架和自动路由规则”。`CYBERBOSS_REVIEW_SCHEMA_CONFIG` 默认会指向 `${CYBERBOSS_WORKSPACE_ROOT}/.codex/review-schema.json`，用于声明“睡前收口 / 周复盘 / 月复盘应该写到哪里，以及使用哪套生活助理复盘模型”。`CYBERBOSS_REVIEW_SEMANTIC_MODE` 默认是 `hybrid`，表示 review 先由脚本收窗口和落盘，再让 Codex 产结构化语义提炼；传 `deterministic` 可关闭语义层。`CYBERBOSS_REVIEW_SEMANTIC_MODEL` 可覆盖 review semantic pass 使用的模型；`CYBERBOSS_REVIEW_SEMANTIC_TIMEOUT_MS` 控制 semantic pass 的超时预算。
+如果你在 `v2` 适配器下需要走特定路由网关，可以额外设置 `CYBERBOSS_WEIXIN_ROUTE_TAG`。`CYBERBOSS_WEIXIN_REPLY_MODE` 现在支持 `stream | settled`，默认 `stream`；这里的 `stream` 不是按 token/单字喷出，而是“短进度块实时发，长总结在 turn 完成后整块发”。同一 turn 里完全相同的消息块也会自动去重，避免微信里再看到整段重复。如果你想回到整轮收齐后再发，可以显式设成 `settled`。`CYBERBOSS_WORKSPACE_BOOTSTRAP_CONFIG` 默认会落到 `${HOME}/.cyberboss/workspace-bootstrap.json`，用来声明“某个 workspace 开新线程时先读哪些稳定入口文件”，这样就不用再把某个 vault 的文件结构写死进仓库源码。`CYBERBOSS_PROJECT_RADAR_CONFIG` 默认会指向 `${CYBERBOSS_WORKSPACE_ROOT}/.codex/code-projects.json`，用于声明“这个 workspace 里有哪些代码项目值得做轻量 git radar”。`CYBERBOSS_DURABLE_NOTE_SCHEMA_CONFIG` 默认会指向 `${CYBERBOSS_WORKSPACE_ROOT}/.codex/durable-note-schema.json`，用于声明“不同 durable note family 的固定章节骨架和自动路由规则”。`CYBERBOSS_REVIEW_SCHEMA_CONFIG` 默认会指向 `${CYBERBOSS_WORKSPACE_ROOT}/.codex/review-schema.json`，用于声明“睡前收口 / 周复盘 / 月复盘应该写到哪里，以及使用哪套生活助理复盘模型”。`CYBERBOSS_REVIEW_SEMANTIC_MODE` 默认是 `hybrid`，表示 review 先由脚本收窗口和落盘，再让 Codex 产结构化语义提炼；传 `deterministic` 可关闭语义层。`CYBERBOSS_REVIEW_SEMANTIC_MODEL` 可覆盖 review semantic pass 使用的模型；`CYBERBOSS_REVIEW_SEMANTIC_TIMEOUT_MS` 控制 semantic pass 的超时预算。
 
 `CYBERBOSS_SHARED_USE_BUNDLED_CODEX_BINARY` 只影响共享 `app-server` 在 Windows 下如何启动：
 
@@ -265,6 +266,7 @@ npm run shared:open
 注意：
 
 - 共享启动就是默认启动方式；README 里的所有正常使用场景都默认建立在 `npm run shared:start` / `npm run shared:open` 之上
+- `shared_bridge_heartbeat=ok` 现在只表示“live managed bridge pid 仍在，且 fresh heartbeat 属于这条 pid”；如果 pid 文件丢了、进程死了或 heartbeat 对不上，会改成 `missing_process` / `pid_mismatch` 之类的非健康状态
 - 不要单独执行 `node ./bin/cyberboss.js start --checkin`，除非已经明确设置 `CYBERBOSS_CODEX_ENDPOINT=ws://127.0.0.1:8765`
 - 不要让微信桥接走 `spawn` 私有 runtime；微信和终端必须连接同一个共享 `codex app-server`
 - 不要同时保留多套 `cyberboss` 进程
@@ -354,6 +356,8 @@ ${HOME}/.cyberboss
   写明确时间点 reminder
 - `npm run diary:write -- --section todo --state open --text "内容"`
   写当天仍在跟进的活 Todo
+- `npm run diary:write -- --section todo --state done --text "内容" --timeline-text "22:39-23:04 做完了什么"`
+  在同一个 cutover 里同时收掉 Todo，并把对应硬事实写进日记的时间线事实
 - `npm run diary:write -- --section timeline --text "17:30-17:58 把药单发出去了"`
   把切换点或硬事实写回日记的时间线事实
 - `npm run diary:write -- --date 2026-04-06 --section supplement --title "4.6" --text "内容"`

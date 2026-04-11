@@ -1,12 +1,16 @@
 const crypto = require("crypto");
 const { sanitizeProtocolLeakText } = require("../adapters/runtime/codex/protocol-leak-monitor");
+const { normalizeAssistantPhase } = require("../adapters/runtime/codex/message-utils");
 
 const RECENT_WEIXIN_DELIVERY_TTL_MS = 30_000;
+const STREAM_PROGRESS_MAX_CHARS = 120;
+const STREAM_PROGRESS_MAX_LINES = 2;
 
 class StreamDelivery {
-  constructor({ channelAdapter, sessionStore, onDeliveryFailure = null }) {
+  constructor({ channelAdapter, sessionStore, weixinReplyMode = "settled", onDeliveryFailure = null }) {
     this.channelAdapter = channelAdapter;
     this.sessionStore = sessionStore;
+    this.weixinReplyMode = normalizeWeixinReplyMode(weixinReplyMode);
     this.onDeliveryFailure = typeof onDeliveryFailure === "function" ? onDeliveryFailure : null;
     this.replyTargetByBindingKey = new Map();
     this.pendingReplyTargetsByThreadId = new Map();
@@ -67,6 +71,7 @@ class StreamDelivery {
           itemId: normalizeText(event.payload.itemId) || `item-${state.itemOrder.length + 1}`,
           text: normalizeLineEndings(event.payload.text),
           completed: false,
+          phase: normalizeAssistantPhase(event.payload.phase),
         });
         return;
       }
@@ -76,6 +81,7 @@ class StreamDelivery {
           itemId: normalizeText(event.payload.itemId) || `item-${state.itemOrder.length + 1}`,
           text: normalizeLineEndings(event.payload.text),
           completed: true,
+          phase: normalizeAssistantPhase(event.payload.phase),
         });
         await this.flush(state, { force: false });
         return;
@@ -179,6 +185,7 @@ class StreamDelivery {
       turnId: normalizeText(turnId),
       itemOrder: [],
       items: new Map(),
+      weixinReplyMode: this.weixinReplyMode,
       sentText: "",
       sendChain: Promise.resolve(),
       flushPromise: null,
@@ -238,7 +245,7 @@ class StreamDelivery {
     }
   }
 
-  upsertItem(state, { itemId, text, completed }) {
+  upsertItem(state, { itemId, text, completed, phase = "" }) {
     if (!text) {
       return;
     }
@@ -248,10 +255,15 @@ class StreamDelivery {
         currentText: "",
         completedText: "",
         completed: false,
+        phase: "",
       });
     }
 
     const current = state.items.get(itemId);
+    const normalizedPhase = normalizeAssistantPhase(phase);
+    if (normalizedPhase) {
+      current.phase = normalizedPhase;
+    }
     if (completed) {
       const merged = mergeCompletedItemText(current.currentText, text);
       current.currentText = merged;
@@ -269,11 +281,12 @@ class StreamDelivery {
     }
     if (!state.items.has(itemId)) {
       state.itemOrder.push(itemId);
-      state.items.set(itemId, {
-        currentText: "",
-        completedText: "",
-        completed: false,
-      });
+        state.items.set(itemId, {
+          currentText: "",
+          completedText: "",
+          completed: false,
+          phase: "",
+        });
     }
 
     const current = state.items.get(itemId);
@@ -303,21 +316,27 @@ class StreamDelivery {
     if (!state.replyTarget) {
       return;
     }
-    // WeChat transport is much more sensitive to repeated partial sends than
-    // desktop chat. Prefer settled whole-turn delivery here so ambiguous send
-    // failures do not surface as duplicate or truncated fragments.
+    // WeChat reply mode is explicit. `settled` waits for the terminal snapshot;
+    // `stream` ships user-visible assistant message blocks as they complete.
+    // Keep the modes distinct here so future "optimize the stream" tweaks do
+    // not accidentally reintroduce token-level spam or repeated block sends.
     if (!force && prefersSettledDelivery(state)) {
       return;
     }
 
     const plainText = markdownToPlainText(buildReplyText(state, {
       completedOnly: !force,
-      collapseConsecutiveDuplicateParts: prefersSettledDelivery(state),
+      preferLatestMessage: prefersSettledDelivery(state),
+      force,
     }));
     const sanitized = sanitizeReplyText(state.replyTarget, plainText);
     if (sanitized.suppress) {
       state.sentText = sanitized.text;
-      console.log(`[cyberboss] suppressed system reply thread=${state.threadId} preview=${JSON.stringify(plainText.slice(0, 80))}`);
+      console.log(
+        `[cyberboss] suppressed system reply `
+        + `thread=${state.threadId} turn=${state.turnId || "(pending)"} `
+        + `preview=${JSON.stringify(plainText.slice(0, 80))}`
+      );
       return;
     }
     const safeText = sanitized.text;
@@ -330,7 +349,10 @@ class StreamDelivery {
       return;
     }
 
-    const delta = safeText.slice(state.sentText.length);
+    const delta = normalizeDeliveryDelta(
+      safeText.slice(state.sentText.length),
+      { streaming: prefersStreamingDelivery(state) }
+    );
     if (!delta) {
       return;
     }
@@ -360,7 +382,8 @@ class StreamDelivery {
         this.rememberRecentDelivery(deliveryDedupKey);
         console.log(
           `[cyberboss] delivered weixin reply `
-          + `thread=${state.threadId} chars=${safeText.length} hash=${hashReplyText(safeText)}`
+          + `thread=${state.threadId} turn=${state.turnId || "(pending)"} `
+          + `chars=${safeText.length} hash=${hashReplyText(safeText)}`
         );
       }
     }).catch((error) => {
@@ -431,26 +454,147 @@ function buildRunKey(threadId, turnId = "") {
     : `${normalizedThreadId}:pending`;
 }
 
-function buildReplyText(state, { completedOnly, collapseConsecutiveDuplicateParts = false }) {
+function buildReplyText(state, { completedOnly, preferLatestMessage = false, force = false }) {
+  if (force && hasWatchdogTail(state, { completedOnly })) {
+    return buildSettledReplyText(state, { completedOnly });
+  }
+
+  if (preferLatestMessage) {
+    return buildSettledReplyText(state, { completedOnly });
+  }
+
+  if (prefersStreamingDelivery(state)) {
+    return buildStreamingReplyText(state, { completedOnly, force });
+  }
+
+  return buildAllVisibleReplyText(state, { completedOnly });
+}
+
+function buildStreamingReplyText(state, { completedOnly, force }) {
+  const visibleItems = collectVisibleItems(state, { completedOnly });
   const parts = [];
-  for (const itemId of state.itemOrder) {
-    const item = state.items.get(itemId);
-    if (!item) {
+  const seenParts = new Set();
+  const lastVisibleReplyIndex = findLastVisibleReplyIndex(visibleItems);
+
+  for (let index = 0; index < visibleItems.length; index += 1) {
+    const item = visibleItems[index];
+    if (!shouldStreamImmediately(item, { isTerminalVisibleItem: index === lastVisibleReplyIndex })) {
       continue;
     }
+    rememberVisiblePart(parts, seenParts, item.text);
+  }
 
-    const sourceText = completedOnly
-      ? (item.completed ? item.completedText : "")
-      : (item.completed ? item.completedText : item.currentText);
-    const normalized = trimOuterBlankLines(sourceText);
-    if (normalized) {
-      if (collapseConsecutiveDuplicateParts && parts[parts.length - 1] === normalized) {
-        continue;
-      }
-      parts.push(normalized);
-    }
+  if (!force) {
+    return parts.join("\n\n");
+  }
+
+  const terminal = findStreamingTerminalReplyText(visibleItems);
+  if (terminal) {
+    rememberVisiblePart(parts, seenParts, terminal.text);
   }
   return parts.join("\n\n");
+}
+
+function buildSettledReplyText(state, { completedOnly }) {
+  const tail = readStateItemText(state, "__watchdog__", { completedOnly });
+  if (!tail) {
+    // Codex can emit several assistant messages inside one turn. In settled
+    // WeChat delivery we only want the latest user-facing reply, otherwise all
+    // intermediate progress updates get stitched onto the final answer.
+    return findLatestVisibleReplyText(state, { completedOnly });
+  }
+
+  // The watchdog message says "目前拿到的内容". When a turn never reaches its
+  // final assistant item, silently dropping earlier completed items here would
+  // contradict that promise and hide already-generated user-visible text.
+  const visible = buildAllVisibleReplyText(state, {
+    completedOnly,
+    skipItemIds: new Set(["__watchdog__"]),
+  });
+  return [visible, tail].filter(Boolean).join("\n\n");
+}
+
+function buildAllVisibleReplyText(
+  state,
+  { completedOnly, skipItemIds = null, collapseDuplicateVisibleItems = false }
+) {
+  const parts = [];
+  const seenVisibleParts = collapseDuplicateVisibleItems ? new Set() : null;
+  for (const item of collectVisibleItems(state, { completedOnly, skipItemIds })) {
+    if (!seenVisibleParts) {
+      parts.push(item.text);
+      continue;
+    }
+    rememberVisiblePart(parts, seenVisibleParts, item.text);
+  }
+  return parts.join("\n\n");
+}
+
+function findLatestVisibleReplyText(state, { completedOnly }) {
+  const visibleItems = collectVisibleItems(state, { completedOnly });
+  for (let index = visibleItems.length - 1; index >= 0; index -= 1) {
+    if (visibleItems[index].itemId !== "__watchdog__") {
+      return visibleItems[index].text;
+    }
+  }
+  return "";
+}
+
+function findStreamingTerminalReplyText(visibleItems) {
+  const lastVisibleReplyIndex = findLastVisibleReplyIndex(visibleItems);
+  if (lastVisibleReplyIndex < 0) {
+    return null;
+  }
+  for (let index = visibleItems.length - 1; index >= 0; index -= 1) {
+    const item = visibleItems[index];
+    if (item.itemId === "__watchdog__") {
+      continue;
+    }
+    if (!shouldStreamImmediately(item, { isTerminalVisibleItem: index === lastVisibleReplyIndex })) {
+      return item;
+    }
+  }
+  return visibleItems[lastVisibleReplyIndex] || null;
+}
+
+function findLastVisibleReplyIndex(visibleItems) {
+  for (let index = visibleItems.length - 1; index >= 0; index -= 1) {
+    if (visibleItems[index]?.itemId !== "__watchdog__") {
+      return index;
+    }
+  }
+  return -1;
+}
+
+function readStateItemText(state, itemId, { completedOnly }) {
+  const item = state.items.get(itemId);
+  if (!item) {
+    return "";
+  }
+  const sourceText = completedOnly
+    ? (item.completed ? item.completedText : "")
+    : (item.completed ? item.completedText : item.currentText);
+  return trimOuterBlankLines(sourceText);
+}
+
+function collectVisibleItems(state, { completedOnly, skipItemIds = null }) {
+  const items = [];
+  for (const itemId of state.itemOrder) {
+    if (skipItemIds?.has(itemId)) {
+      continue;
+    }
+    const text = readStateItemText(state, itemId, { completedOnly });
+    if (!text) {
+      continue;
+    }
+    const item = state.items.get(itemId);
+    items.push({
+      itemId,
+      text,
+      phase: normalizeAssistantPhase(item?.phase),
+    });
+  }
+  return items;
 }
 
 function markdownToPlainText(text) {
@@ -507,7 +651,13 @@ function appendStreamingText(current, next) {
 }
 
 function prefersSettledDelivery(state) {
-  return normalizeText(state?.replyTarget?.provider) === "weixin";
+  return normalizeText(state?.replyTarget?.provider) === "weixin"
+    && normalizeWeixinReplyMode(state?.weixinReplyMode) === "settled";
+}
+
+function prefersStreamingDelivery(state) {
+  return normalizeText(state?.replyTarget?.provider) === "weixin"
+    && normalizeWeixinReplyMode(state?.weixinReplyMode) === "stream";
 }
 
 function buildSettledWeixinDeliveryKey(state, safeText) {
@@ -555,8 +705,87 @@ function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizeWeixinReplyMode(value) {
+  return normalizeText(value).toLowerCase() === "settled" ? "settled" : "stream";
+}
+
 function normalizeLineEndings(value) {
   return String(value || "").replace(/\r\n/g, "\n");
+}
+
+function normalizeDeliveryDelta(delta, { streaming = false } = {}) {
+  const normalized = String(delta || "");
+  if (!streaming) {
+    return normalized;
+  }
+  // Stream mode ships completed assistant items one message at a time. The
+  // snapshot diff can therefore start with the joiner's blank lines; trim only
+  // that transport artifact so the next item lands as a clean standalone send.
+  return normalized.replace(/^\n+/u, "");
+}
+
+function buildVisibleItemDedupKey(text) {
+  return trimOuterBlankLines(markdownToPlainText(normalizeLineEndings(text)));
+}
+
+function hasWatchdogTail(state, { completedOnly }) {
+  return Boolean(readStateItemText(state, "__watchdog__", { completedOnly }));
+}
+
+function rememberVisiblePart(parts, seenParts, text) {
+  const dedupeKey = buildVisibleItemDedupKey(text);
+  if (dedupeKey && seenParts.has(dedupeKey)) {
+    return;
+  }
+  if (dedupeKey) {
+    seenParts.add(dedupeKey);
+  }
+  parts.push(text);
+}
+
+function shouldStreamImmediately(item, { isTerminalVisibleItem = false } = {}) {
+  if (!item?.text || item.itemId === "__watchdog__") {
+    return false;
+  }
+  const phase = normalizeAssistantPhase(item.phase);
+  if (phase === "final") {
+    return false;
+  }
+  if (!isBriefStreamingProgressText(item.text)) {
+    return false;
+  }
+  if (phase === "commentary") {
+    return true;
+  }
+  // When phase is missing, the current terminal short block could still be the
+  // user's final answer. Hold only that trailing block until another visible
+  // item arrives or the turn completes, so we do not leak a short final reply
+  // early just because upstream omitted phase metadata once.
+  return !isTerminalVisibleItem;
+}
+
+function isBriefStreamingProgressText(text) {
+  const raw = trimOuterBlankLines(normalizeLineEndings(text));
+  if (!raw) {
+    return false;
+  }
+  if (
+    raw.includes("```")
+    || raw.includes("\n\n")
+    || /\[[^\]]+\]\([^)]+\)/u.test(raw)
+    || /^\s*(?:[-*]|\d+\.)\s/mu.test(raw)
+    || raw.includes("【继续任务】")
+    || raw.includes("【当前状态】")
+    || raw.includes("【执行前检查】")
+  ) {
+    return false;
+  }
+  const plain = buildVisibleItemDedupKey(raw);
+  if (!plain || plain.length > STREAM_PROGRESS_MAX_CHARS) {
+    return false;
+  }
+  const lineCount = plain.split("\n").filter(Boolean).length;
+  return lineCount > 0 && lineCount <= STREAM_PROGRESS_MAX_LINES;
 }
 
 function trimOuterBlankLines(text) {

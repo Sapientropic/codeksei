@@ -294,16 +294,19 @@ function waitForSemanticTurnCompletion(client, threadId, timeoutMs) {
           return;
         }
         cleanup();
+        // Semantic review expects the terminal JSON payload. Codex can emit
+        // multiple assistant messages within one turn, so concatenating every
+        // message here risks mixing progress chatter into the final JSON blob.
         const text = itemOrder
+          .slice()
+          .reverse()
           .map((itemId) => textByItemId.get(itemId) || "")
-          .filter(Boolean)
-          .join("\n\n")
-          .trim();
+          .find((value) => String(value || "").trim()) || "";
         if (!text) {
           reject(new Error("semantic review returned empty text"));
           return;
         }
-        resolve(text);
+        resolve(String(text).trim());
       }
     });
   });

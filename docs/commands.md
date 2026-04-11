@@ -90,12 +90,14 @@
 ### diary
 
 - `npm run diary:write -- --section todo --state open --text "内容"`
+- `npm run diary:write -- --section todo --state done --text "内容" --timeline-text "22:39-23:04 做完了什么"`
 - `npm run diary:write -- --section timeline --text "17:30-17:58 把药单发出去了"`
 - `npm run diary:write -- --date 2026-04-06 --section supplement --title "4.6" --text "内容"`
 
 说明：
 - `--section` 决定写到 `Todo / 时间线事实 / 今日碎片 / 补充记录 / 总结` 里的哪一层
 - `--state` 只和 `--section todo` 一起用，支持 `open | done`
+- 新调用在 `--section todo --state done` 时默认应同时带 `--timeline-text`，这样 cutover 会在一个命令里同时写 `Todo + 时间线事实`
 - `--title` 默认主要给 `supplement` 用；其他 section 会和 `--text` 合成单行内容
 - `--date` 才决定写入哪个日记文件
 - `--time` 可选，用来覆盖条目时间

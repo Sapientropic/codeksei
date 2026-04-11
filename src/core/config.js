@@ -26,6 +26,7 @@ function readConfig() {
     weixinBaseUrl: readTextEnv("CYBERBOSS_WEIXIN_BASE_URL") || "https://ilinkai.weixin.qq.com",
     weixinCdnBaseUrl: readTextEnv("CYBERBOSS_WEIXIN_CDN_BASE_URL") || "https://novac2c.cdn.weixin.qq.com/c2c",
     weixinAdapterVariant: readTextEnv("CYBERBOSS_WEIXIN_ADAPTER") || "v2",
+    weixinReplyMode: normalizeWeixinReplyMode(readTextEnv("CYBERBOSS_WEIXIN_REPLY_MODE") || "stream"),
     weixinQrBotType: readTextEnv("CYBERBOSS_WEIXIN_QR_BOT_TYPE") || "3",
     weixinRouteTag: readTextEnv("CYBERBOSS_WEIXIN_ROUTE_TAG"),
     weixinProtocolClientVersion: readTextEnv("CYBERBOSS_WEIXIN_PROTOCOL_CLIENT_VERSION") || "2.1.1",
@@ -56,6 +57,10 @@ function readConfig() {
     sharedWatchdogStateFile: path.join(stateDir, "logs", "shared-watchdog-state.json"),
     startWithCheckin: (mode === "start" && hasArgFlag(argv, "--checkin")) || readBoolEnv("CYBERBOSS_ENABLE_CHECKIN"),
   };
+}
+
+function normalizeWeixinReplyMode(value) {
+  return String(value || "").trim().toLowerCase() === "settled" ? "settled" : "stream";
 }
 
 function readListEnv(name) {

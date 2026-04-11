@@ -3,8 +3,10 @@ const assert = require("node:assert/strict");
 
 const {
   buildDiaryEntryPayload,
+  buildDiaryWriteEntryPayloads,
   buildDiaryFileSkeleton,
   insertDiaryEntry,
+  parseArgs,
 } = require("../src/app/diary-write-cli");
 
 function buildSkeleton() {
@@ -76,6 +78,61 @@ test("timeline, fragment, and summary entries land in their own sections", () =>
   assert.match(content, /## 时间线事实\n\n- 17:30-17:58 把药单发出去了/);
   assert.match(content, /## 今日碎片\n\n- 今天切换点统一收口比边聊边记更稳。/);
   assert.match(content, /## 总结\n\n- 明天第一步先验证 Apple Watch 最小提醒链路。/);
+});
+
+test("todo done cutover writes timeline fact in the same command batch", () => {
+  const payloads = buildDiaryWriteEntryPayloads({
+    section: "todo",
+    timeString: "23:04",
+    body: "明天继续观察并收口 Cyberboss 微信回复重复 / 截断问题",
+    todoState: "done",
+    timelineText: "22:39-23:04 连续压测 Cyberboss 微信回复与 timeline 截图发送链路；这条问题今晚可以先收尾。",
+  });
+
+  const content = payloads.reduce(
+    (draft, payload) => insertDiaryEntry(draft, payload, "2026-04-10"),
+    buildSkeleton()
+  );
+
+  assert.match(content, /## Todo\n\n- \[x\] 明天继续观察并收口 Cyberboss 微信回复重复 \/ 截断问题/);
+  assert.match(content, /## 时间线事实[\s\S]*- 22:39-23:04 连续压测 Cyberboss 微信回复与 timeline 截图发送链路；这条问题今晚可以先收尾。/);
+});
+
+test("todo done cutover synthesizes a minimal timeline fact for legacy callers", () => {
+  const payloads = buildDiaryWriteEntryPayloads({
+    section: "todo",
+    timeString: "23:04",
+    body: "明天继续观察并收口 Cyberboss 微信回复重复 / 截断问题",
+    todoState: "done",
+  });
+
+  const content = payloads.reduce(
+    (draft, payload) => insertDiaryEntry(draft, payload, "2026-04-10"),
+    buildSkeleton()
+  );
+
+  assert.match(content, /## Todo\n\n- \[x\] 明天继续观察并收口 Cyberboss 微信回复重复 \/ 截断问题/);
+  assert.match(content, /## 时间线事实[\s\S]*- 23:04 明天继续观察并收口 Cyberboss 微信回复重复 \/ 截断问题/);
+});
+
+test("--timeline-text still rejects non todo-done writes", () => {
+  assert.throws(
+    () => buildDiaryWriteEntryPayloads({
+      section: "todo",
+      timeString: "23:04",
+      body: "还没完成的事情",
+      todoState: "open",
+      timelineText: "23:04 单独写 timeline",
+    }),
+    /--timeline-text 只支持和 --section todo --state done 一起使用/
+  );
+});
+
+test("parseArgs reports missing option values explicitly", () => {
+  assert.throws(
+    () => parseArgs(["--section", "todo", "--state", "done", "--text", "x", "--timeline-text", "--time", "22:00"]),
+    /--timeline-text 需要一个值/
+  );
 });
 
 test("supplement remains the default section and dedupes identical body/title pairs", () => {

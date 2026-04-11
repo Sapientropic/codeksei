@@ -481,12 +481,14 @@ function buildTopicUsage(topic) {
         "  --text \"内容\"",
         "  --section todo|timeline|fragment|supplement|summary",
         "  --state open|done     只和 --section todo 一起用",
+        "  --timeline-text \"...\"  只和 --section todo --state done 一起用；同一切换点会同步写入“时间线事实”",
         "  --title \"标题\"        默认主要给 supplement 用；其他 section 会和正文合成单行内容",
         "  --date YYYY-MM-DD     决定写入哪个日记文件",
         "  --time HH:mm          可选，覆盖条目时间",
         "",
         "示例：",
         "  npm run diary:write -- --section todo --state open --text \"把药单发给 Alex\"",
+        "  npm run diary:write -- --section todo --state done --text \"收住 Cyberboss 微信回复问题\" --timeline-text \"22:39-23:04 连续压测 Cyberboss 微信回复链路；这条问题今晚可以先收尾。\"",
         "  npm run diary:write -- --section timeline --text \"17:30-17:58 把药单发出去了\"",
       ].join("\n");
     case "channel":
