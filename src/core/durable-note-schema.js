@@ -9,6 +9,14 @@ const {
   resolveCrossPlatformPathFromRoot,
 } = require("./path-utils");
 
+const DURABLE_NOTE_SCOPE_ALIASES = {
+  assistant: "companion",
+  "life-assistant": "companion",
+  life_assistant: "companion",
+  companion: "companion",
+  inspiration: "inspiration",
+};
+
 function loadDurableNoteSchemaConfig(config = {}) {
   const filePath = normalizeText(config.durableNoteSchemaConfigFile);
   if (!filePath) {
@@ -46,7 +54,7 @@ function resolveDurableNoteProfile(config = {}) {
 function inspectDurableNoteRouting(config = {}, options = {}) {
   const profile = resolveDurableNoteProfile(config);
   const project = normalizeText(options.project);
-  const scope = normalizeText(options.scope).toLowerCase();
+  const scope = canonicalizeDurableNoteScope(options.scope);
   const kind = normalizeText(options.kind).toLowerCase();
 
   if (project) {
@@ -209,17 +217,33 @@ function normalizeNamedFamilies(rawFamilies) {
   if (!rawFamilies || typeof rawFamilies !== "object") {
     return {};
   }
-  const entries = Object.entries(rawFamilies)
-    .map(([familyId, rawFamily]) => {
-      const normalizedId = normalizeText(familyId).toLowerCase();
-      const family = normalizeFamily(rawFamily);
-      if (!normalizedId || !family.filePath || !Object.keys(family.kinds).length) {
-        return null;
-      }
-      return [normalizedId, { ...family, label: normalizeText(rawFamily?.label) || normalizedId }];
-    })
-    .filter(Boolean);
-  return Object.fromEntries(entries);
+  const families = new Map();
+
+  for (const [familyId, rawFamily] of Object.entries(rawFamilies)) {
+    const canonicalId = canonicalizeDurableNoteScope(familyId);
+    const family = normalizeFamily(rawFamily);
+    if (!canonicalId || !family.filePath || !Object.keys(family.kinds).length) {
+      continue;
+    }
+
+    const priority = canonicalId === normalizeText(familyId).toLowerCase() ? 2 : 1;
+    const current = families.get(canonicalId);
+    if (current && current.priority > priority) {
+      continue;
+    }
+
+    families.set(canonicalId, {
+      priority,
+      value: {
+        ...family,
+        label: normalizeText(rawFamily?.label) || canonicalId,
+      },
+    });
+  }
+
+  return Object.fromEntries(
+    Array.from(families.entries()).map(([familyId, entry]) => [familyId, entry.value])
+  );
 }
 
 function normalizeFamily(rawFamily) {
@@ -300,6 +324,14 @@ function listAvailableScopes(profile) {
   return Object.keys(profile.notes || {});
 }
 
+function canonicalizeDurableNoteScope(value) {
+  const normalized = normalizeText(value).toLowerCase();
+  if (!normalized) {
+    return "";
+  }
+  return DURABLE_NOTE_SCOPE_ALIASES[normalized] || normalized;
+}
+
 function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -318,6 +350,7 @@ function formatErrorMessage(error) {
 }
 
 module.exports = {
+  canonicalizeDurableNoteScope,
   ensureDurableNoteSections,
   inspectDurableNoteRouting,
   loadDurableNoteSchemaConfig,

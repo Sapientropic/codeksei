@@ -40,7 +40,7 @@ function readConfig() {
     timelineStateTimezone: timezoneConfig.timelineStateTimezone,
     diaryDir: readPrefixedEnv(process.env, "DIARY_DIR") || path.join(stateDir, "diary"),
     timelineStateDir,
-    userName: readPrefixedEnv(process.env, "USER_NAME") || "用户",
+    userName: readPrefixedEnv(process.env, "USER_NAME") || "",
     userGender: readPrefixedEnv(process.env, "USER_GENDER") || "female",
     allowedUserIds: readPrefixedListEnv(process.env, "ALLOWED_USER_IDS"),
     channel: readPrefixedEnv(process.env, "CHANNEL") || "weixin",

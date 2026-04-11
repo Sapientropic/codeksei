@@ -14,27 +14,27 @@ const { syncNoteFile } = require("../src/core/note-sync");
 function setupWorkspaceFixture() {
   const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cyberboss-note-auto-"));
   const codexDir = path.join(workspaceRoot, ".codex");
-  const projectNotePath = path.join(workspaceRoot, "项目", "代码工程", "Cyberboss.md");
-  const assistantNotePath = path.join(workspaceRoot, "项目", "Cyberboss 生活助理", "README.md");
-  const inspirationNotePath = path.join(workspaceRoot, "项目", "Cyberboss 生活助理", "灵感收集.md");
+  const projectNotePath = path.join(workspaceRoot, "项目", "代码工程", "Codeksei.md");
+  const companionNotePath = path.join(workspaceRoot, "项目", "Codeksei 生活助理", "README.md");
+  const inspirationNotePath = path.join(workspaceRoot, "项目", "Codeksei 生活助理", "灵感收集.md");
 
   fs.mkdirSync(codexDir, { recursive: true });
   fs.mkdirSync(path.dirname(projectNotePath), { recursive: true });
-  fs.mkdirSync(path.dirname(assistantNotePath), { recursive: true });
+  fs.mkdirSync(path.dirname(companionNotePath), { recursive: true });
   fs.mkdirSync(path.dirname(inspirationNotePath), { recursive: true });
 
-  fs.writeFileSync(projectNotePath, "# Cyberboss\n", "utf8");
-  fs.writeFileSync(assistantNotePath, "# Cyberboss 生活助理\n", "utf8");
+  fs.writeFileSync(projectNotePath, "# Codeksei\n", "utf8");
+  fs.writeFileSync(companionNotePath, "# Codeksei 生活助理\n", "utf8");
   fs.writeFileSync(inspirationNotePath, "# 灵感收集\n", "utf8");
 
   fs.writeFileSync(path.join(codexDir, "code-projects.json"), JSON.stringify({
     projects: [
       {
         slug: "cyberboss",
-        title: "Cyberboss",
-        aliases: ["微信桥"],
+        title: "Codeksei",
+        aliases: ["生活助理"],
         repoRoot: workspaceRoot,
-        notePath: "项目/代码工程/Cyberboss.md",
+        notePath: "项目/代码工程/Codeksei.md",
       },
     ],
   }, null, 2), "utf8");
@@ -51,15 +51,15 @@ function setupWorkspaceFixture() {
           },
         },
         notes: {
-          assistant: {
-            path: "项目/Cyberboss 生活助理/README.md",
+          companion: {
+            path: "项目/Codeksei 生活助理/README.md",
             sections: ["当前定位", "协作节奏", "支持偏好", "能力边界", "当前实验"],
             kinds: {
               preference: { section: "支持偏好", style: "bullet", maxItems: 8 },
             },
           },
           inspiration: {
-            path: "项目/Cyberboss 生活助理/灵感收集.md",
+            path: "项目/Codeksei 生活助理/灵感收集.md",
             sections: ["当前焦点", "最近灵感", "待孵化", "值得回看"],
             kinds: {
               idea: { section: "最近灵感", style: "bullet", maxItems: 10 },
@@ -74,7 +74,7 @@ function setupWorkspaceFixture() {
   return {
     workspaceRoot,
     projectNotePath,
-    assistantNotePath,
+    companionNotePath,
     inspirationNotePath,
     config: {
       workspaceRoot,
@@ -84,18 +84,30 @@ function setupWorkspaceFixture() {
   };
 }
 
-test("note:auto resolves assistant durable note routes from workspace schema", () => {
+test("note:auto resolves companion durable note routes from workspace schema", () => {
+  const fixture = setupWorkspaceFixture();
+  const route = resolveDurableNoteRoute(fixture.config, {
+    scope: "companion",
+    kind: "preference",
+  });
+
+  assert.equal(route.family, "companion");
+  assert.equal(route.section, "支持偏好");
+  assert.equal(route.style, "bullet");
+  assert.equal(route.maxItems, 8);
+  assert.equal(route.filePath.replace(/\\/g, "/"), fixture.companionNotePath.replace(/\\/g, "/"));
+});
+
+test("note:auto still accepts the legacy assistant scope and maps it to companion", () => {
   const fixture = setupWorkspaceFixture();
   const route = resolveDurableNoteRoute(fixture.config, {
     scope: "assistant",
     kind: "preference",
   });
 
-  assert.equal(route.family, "assistant");
+  assert.equal(route.family, "companion");
   assert.equal(route.section, "支持偏好");
-  assert.equal(route.style, "bullet");
-  assert.equal(route.maxItems, 8);
-  assert.equal(route.filePath.replace(/\\/g, "/"), fixture.assistantNotePath.replace(/\\/g, "/"));
+  assert.equal(route.filePath.replace(/\\/g, "/"), fixture.companionNotePath.replace(/\\/g, "/"));
 });
 
 test("note:auto ensures missing project sections before writing a status snapshot", () => {

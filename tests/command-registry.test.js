@@ -21,8 +21,8 @@ test("timeline topic help still prefers timeline:event for single events", () =>
   const help = buildTerminalTopicHelp("timeline");
 
   assert.match(help, /单条事件优先用 npm run timeline:event/u);
-  assert.match(help, /完整 JSON 对象/u);
   assert.match(help, /timeline 查分类先用 npm run timeline:categories/u);
+  assert.match(help, /完整 JSON 对象/u);
   assert.match(help, /当前 timezone/u);
 });
 
@@ -48,5 +48,5 @@ test("diary topic help explains captured Todo start time for later timeline accu
   assert.match(help, /open loop .*-> todo/u);
   assert.match(help, /事后完成块 -> timeline/u);
   assert.match(help, /灵感碎片 -> fragment/u);
-  assert.match(help, /不要为了记一条已完成事实而先补造一个 Todo/u);
+  assert.match(help, /如果只是补记一条已经完成的事实，直接写 timeline 会更顺手/u);
 });

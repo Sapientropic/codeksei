@@ -25,22 +25,22 @@ const DEFAULT_REVIEW_MODELS = {
     cadenceLabel: "夜",
     titleSuffix: "睡前收口",
     carryLabel: "明天第一步",
-    intro: "这是一份 Codeksei 睡前收口，不是学习项目模板。它只收今天真实推进了什么、现在还挂着什么、明天从哪里更容易接上，好把周/月复盘的原料先压成一层低摩擦摘要。",
-    tags: ["codeksei", "life-assistant", "review", "nightly"],
+    intro: "这是一份 Codeksei 睡前收口。它只收今天真实推进了什么、现在还挂着什么、明天从哪里更容易接上，好把周/月复盘的原料先压成一层低摩擦摘要。",
+    tags: ["codeksei", "companion", "review", "nightly"],
   },
   weekly: {
     cadenceLabel: "周",
     titleSuffix: "周复盘",
     carryLabel: "下周第一步",
-    intro: "这是一份 Codeksei 生活助理周复盘，不是学习项目模板。它只关心这周真实推进了什么、摩擦在哪里、线头还挂着什么，以及下周如何更容易重新接上。",
-    tags: ["codeksei", "life-assistant", "review", "weekly"],
+    intro: "这是一份 Codeksei 周复盘。它关心这周真实推进了什么、摩擦在哪里、线头还挂着什么，以及下周如何更容易重新接上。",
+    tags: ["codeksei", "companion", "review", "weekly"],
   },
   monthly: {
     cadenceLabel: "月",
     titleSuffix: "月复盘",
     carryLabel: "下月第一步",
-    intro: "这是一份 Codeksei 生活助理月复盘，不是学习项目模板。它优先收口这个月真实推进的线、反复出现的摩擦、仍未解决的线头，以及下个月应该从哪里接上。",
-    tags: ["codeksei", "life-assistant", "review", "monthly"],
+    intro: "这是一份 Codeksei 月复盘。它优先收口这个月真实推进的线、反复出现的摩擦、仍未解决的线头，以及下个月应该从哪里接上。",
+    tags: ["codeksei", "companion", "review", "monthly"],
   },
 };
 

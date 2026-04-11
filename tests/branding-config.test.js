@@ -62,6 +62,18 @@ test("readConfig still accepts legacy CYBERBOSS_* values", () => {
   }
 });
 
+test("readConfig leaves userName empty when no name is configured", () => {
+  const originalArgv = process.argv;
+  process.argv = ["node", "codeksei.js"];
+
+  try {
+    const config = withPatchedEnv({}, () => readConfig());
+    assert.equal(config.userName, "");
+  } finally {
+    process.argv = originalArgv;
+  }
+});
+
 test("readConfig exposes local overlay files and lets env override them", () => {
   const originalArgv = process.argv;
   process.argv = ["node", "codeksei.js"];

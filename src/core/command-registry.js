@@ -499,7 +499,7 @@ function buildTopicUsage(topic) {
         "说明：",
         "  open loop / 明确待跟进 -> todo；事后完成块 -> timeline；灵感碎片 -> fragment；解释判断 -> supplement；收口带走 -> summary",
         "  如果 todo done 省略 --timeline-text，会优先复用同一 Todo 已捕获的开始时间来补 HH:mm-HH:mm 硬事实；只有找不到开始时间时才退回成单点时间。",
-        "  不要为了记一条已完成事实而先补造一个 Todo 再立刻 done。",
+        "  如果只是补记一条已经完成的事实，直接写 timeline 会更顺手。",
       ].join("\n");
     case "channel":
       return [
@@ -538,6 +538,7 @@ function buildTopicUsage(topic) {
         "",
         "补充：",
         "  默认先用 note:auto，让 schema 决定 file / section / style / slot",
+        "  公开示例默认用 --scope companion；旧的 --scope assistant 仍兼容",
         "  note:maybe 只看路由，适合先确认 scope 或 kind 会落到哪里",
         "  默认写成 bullet；需要维护一个稳定状态块时传 --slot",
         "  note:sync 保留给自定义 section 或一次性低层回写",
@@ -608,7 +609,7 @@ function toNpmRunExample(commandText) {
     case "note auto":
       return "npm run note:auto -- --project <slug> --kind recent --text \"...\"";
     case "note maybe":
-      return "npm run note:maybe -- --scope assistant --kind preference";
+      return "npm run note:maybe -- --scope companion --kind preference";
     case "review weekly":
       return "npm run review:weekly";
     case "review nightly":
