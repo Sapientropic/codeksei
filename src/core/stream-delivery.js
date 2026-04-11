@@ -6,6 +6,8 @@ const RECENT_WEIXIN_DELIVERY_TTL_MS = 30_000;
 const STREAM_PROGRESS_MAX_CHARS = 120;
 const STREAM_PROGRESS_MAX_LINES = 2;
 const STREAM_SNAPSHOT_REPLACEMENT_MIN_CHARS = 40;
+const WEIXIN_DUPLICATE_BLOCK_MIN_CHARS = 120;
+const WEIXIN_DUPLICATE_BLOCK_MIN_SEGMENTS = 2;
 
 class StreamDelivery {
   constructor({
@@ -1025,6 +1027,81 @@ function chooseCompletedSnapshotReplacement(streamed, finalized) {
   return "";
 }
 
+function collapseRepeatedWechatReplyText(text) {
+  let collapsed = trimOuterBlankLines(normalizeLineEndings(text));
+  if (!collapsed || collapsed.length < WEIXIN_DUPLICATE_BLOCK_MIN_CHARS * 2) {
+    return collapsed;
+  }
+
+  const splitters = [
+    { pattern: /\n{2,}/u, joiner: "\n\n" },
+    { pattern: /\n+/u, joiner: "\n" },
+  ];
+  for (let pass = 0; pass < 4; pass += 1) {
+    let next = collapsed;
+    for (const splitter of splitters) {
+      next = collapseAdjacentRepeatedSegments(next, splitter);
+      if (next !== collapsed) {
+        break;
+      }
+    }
+    if (next === collapsed) {
+      return collapsed;
+    }
+    collapsed = next;
+  }
+  return collapsed;
+}
+
+function collapseAdjacentRepeatedSegments(text, { pattern, joiner }) {
+  const segments = String(text || "")
+    .split(pattern)
+    .map((segment) => trimOuterBlankLines(segment))
+    .filter(Boolean);
+  if (segments.length < WEIXIN_DUPLICATE_BLOCK_MIN_SEGMENTS * 2) {
+    return trimOuterBlankLines(text);
+  }
+
+  const normalizedSegments = segments.map((segment) => normalizeVisibleStreamingText(segment));
+  for (let span = Math.floor(segments.length / 2); span >= 1; span -= 1) {
+    for (let start = 0; (start + span * 2) <= segments.length; start += 1) {
+      const left = normalizedSegments.slice(start, start + span);
+      const right = normalizedSegments.slice(start + span, start + span * 2);
+      if (!left.length || !arraysEqual(left, right)) {
+        continue;
+      }
+
+      const normalizedBlock = left.join("\n");
+      if (
+        normalizedBlock.length < WEIXIN_DUPLICATE_BLOCK_MIN_CHARS
+        || left.length < WEIXIN_DUPLICATE_BLOCK_MIN_SEGMENTS
+      ) {
+        continue;
+      }
+
+      return trimOuterBlankLines([
+        ...segments.slice(0, start),
+        ...segments.slice(start, start + span),
+        ...segments.slice(start + span * 2),
+      ].join(joiner));
+    }
+  }
+
+  return trimOuterBlankLines(text);
+}
+
+function arraysEqual(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
+    return false;
+  }
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function hasWatchdogTail(state, { completedOnly }) {
   return Boolean(readStateItemText(state, "__watchdog__", { completedOnly }));
 }
@@ -1130,9 +1207,12 @@ function sanitizeReplyText(replyTarget, plainReplyText) {
     return { suppress: true, text: "" };
   }
   const cleaned = stripSilentSentinelArtifacts(safeText);
+  const deduped = normalizeText(replyTarget?.provider) === "weixin"
+    ? collapseRepeatedWechatReplyText(cleaned)
+    : cleaned;
   return {
     suppress: false,
-    text: trimOuterBlankLines(cleaned),
+    text: trimOuterBlankLines(deduped),
   };
 }
 

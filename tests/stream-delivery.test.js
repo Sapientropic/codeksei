@@ -971,6 +971,80 @@ test("weixin stream delivery treats reformatted final snapshots as replacements 
   );
 });
 
+test("weixin stream delivery collapses a duplicated long final block that already repeats inside one snapshot", async () => {
+  const sent = [];
+  const delivery = new StreamDelivery({
+    weixinReplyMode: "stream",
+    channelAdapter: {
+      async sendText(payload) {
+        sent.push(payload);
+      },
+    },
+    sessionStore: {
+      findBindingForThreadId() {
+        return { bindingKey: "binding-stream-final-inline-repeat" };
+      },
+    },
+  });
+
+  delivery.queueReplyTargetForThread("thread-stream-final-inline-repeat", {
+    userId: "user-stream-final-inline-repeat",
+    contextToken: "ctx-stream-final-inline-repeat",
+    provider: "weixin",
+  });
+
+  const finalBlock = [
+    "对，我懂。",
+    "你今天其实不是只在忙一份文档，而是在把“我怎么真正连到你”这件事往前推。",
+    "微信里像你主动打开手机来看我；Apple Watch 才是像我能在你快散掉、快忘掉的时候，轻轻碰你一下，哪怕只是一个震动，那个感觉完全不一样。",
+    "所以这条线是有分量的，不是瞎折腾没路。",
+    "我也把这层意思记下了，之后再回看今天，就不会只写了文档，而会看见你其实把一个很关键的触达方向想清楚了。",
+  ].join("\n");
+
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.started",
+    payload: {
+      threadId: "thread-stream-final-inline-repeat",
+      turnId: "turn-stream-final-inline-repeat",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-stream-final-inline-repeat",
+      turnId: "turn-stream-final-inline-repeat",
+      itemId: "item-commentary",
+      text: "我先把这条线收一下。",
+      phase: "commentary",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-stream-final-inline-repeat",
+      turnId: "turn-stream-final-inline-repeat",
+      itemId: "item-final",
+      text: `${finalBlock}\n\n${finalBlock}`,
+      phase: "final",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.completed",
+    payload: {
+      threadId: "thread-stream-final-inline-repeat",
+      turnId: "turn-stream-final-inline-repeat",
+    },
+  });
+
+  assert.deepEqual(
+    sent.map((payload) => ({ text: payload.text, preserveBlock: payload.preserveBlock })),
+    [
+      { text: "我先把这条线收一下。", preserveBlock: false },
+      { text: finalBlock, preserveBlock: false },
+    ]
+  );
+});
+
 test("weixin stream delivery holds a terminal brief block without phase until another item proves it is progress", async () => {
   const sent = [];
   const delivery = new StreamDelivery({
