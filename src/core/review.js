@@ -510,7 +510,7 @@ function parseTodoSection(body) {
     if (!match) {
       continue;
     }
-    const text = normalizeLineItem(match[2]);
+    const text = normalizeLineItem(stripTodoMetadata(match[2]));
     if (!text) {
       continue;
     }
@@ -521,6 +521,12 @@ function parseTodoSection(body) {
     }
   }
   return { open, done };
+}
+
+function stripTodoMetadata(value) {
+  return String(value || "")
+    .replace(/\s*<!--\s*codeksei-todo:start=\d{2}:\d{2}\s*-->\s*$/u, "")
+    .trim();
 }
 
 function parseBulletSection(body) {

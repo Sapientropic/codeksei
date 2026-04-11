@@ -49,6 +49,32 @@ test("todo entries update state in place without duplicate lines", () => {
   assert.equal((done.match(/把药单发给 Alex/g) || []).length, 1);
 });
 
+test("repeated todo open keeps the original start time while the item is still open", () => {
+  const opened = insertDiaryEntry(
+    buildSkeleton(),
+    buildDiaryEntryPayload({
+      section: "todo",
+      timeString: "18:00",
+      body: "把药单发给 Alex",
+      todoState: "open",
+    }),
+    "2026-04-10"
+  );
+
+  const reopenedWhileStillOpen = insertDiaryEntry(
+    opened,
+    buildDiaryEntryPayload({
+      section: "todo",
+      timeString: "18:12",
+      body: "把药单发给 Alex",
+      todoState: "open",
+    }),
+    "2026-04-10"
+  );
+
+  assert.match(reopenedWhileStillOpen, /## Todo\n\n- \[ \] 把药单发给 Alex <!-- codeksei-todo:start=18:00 -->/);
+});
+
 test("timeline, fragment, and summary entries land in their own sections", () => {
   let content = buildSkeleton();
   content = insertDiaryEntry(
@@ -146,6 +172,57 @@ test("todo done cutover still synthesizes a point-in-time fact when no Todo star
 
   assert.match(content, /## Todo\n\n- \[x\] 明天继续观察并收口 Cyberboss 微信回复重复 \/ 截断问题/);
   assert.match(content, /## 时间线事实[\s\S]*- 23:04 明天继续观察并收口 Cyberboss 微信回复重复 \/ 截断问题/);
+});
+
+test("todo reopen with the same text resets the captured start time for the new block", () => {
+  const opened = insertDiaryEntry(
+    buildSkeleton(),
+    buildDiaryEntryPayload({
+      section: "todo",
+      timeString: "17:30",
+      body: "把药单发给 Alex",
+      todoState: "open",
+    }),
+    "2026-04-10"
+  );
+  const finished = insertDiaryEntry(
+    opened,
+    buildDiaryEntryPayload({
+      section: "todo",
+      timeString: "17:58",
+      body: "把药单发给 Alex",
+      todoState: "done",
+    }),
+    "2026-04-10"
+  );
+  const reopened = insertDiaryEntry(
+    finished,
+    buildDiaryEntryPayload({
+      section: "todo",
+      timeString: "20:00",
+      body: "把药单发给 Alex",
+      todoState: "open",
+    }),
+    "2026-04-10"
+  );
+
+  assert.match(reopened, /## Todo\n\n- \[ \] 把药单发给 Alex <!-- codeksei-todo:start=20:00 -->/);
+
+  const payloads = buildDiaryWriteEntryPayloads({
+    existingContent: reopened,
+    section: "todo",
+    timeString: "20:30",
+    body: "把药单发给 Alex",
+    todoState: "done",
+  });
+
+  const content = payloads.reduce(
+    (draft, payload) => insertDiaryEntry(draft, payload, "2026-04-10"),
+    buildSkeleton()
+  );
+
+  assert.match(content, /## 时间线事实[\s\S]*- 20:00-20:30 把药单发给 Alex/);
+  assert.doesNotMatch(content, /17:30-20:30 把药单发给 Alex/);
 });
 
 test("--timeline-text still rejects non todo-done writes", () => {

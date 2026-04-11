@@ -86,6 +86,28 @@ test("readConfig exposes local overlay files and lets env override them", () => 
   }
 });
 
+test("readConfig uses the repo persona template by default instead of a stale state snapshot", () => {
+  const originalArgv = process.argv;
+  process.argv = ["node", "codeksei.js"];
+
+  try {
+    const config = withPatchedEnv({
+      CODEKSEI_STATE_DIR: "E:/state",
+    }, () => readConfig());
+
+    assert.equal(
+      config.weixinInstructionsFile.replace(/\\/g, "/"),
+      path.join(__dirname, "..", "templates", "weixin-instructions.md").replace(/\\/g, "/")
+    );
+    assert.equal(
+      config.weixinInstructionsOverlayFile.replace(/\\/g, "/"),
+      "E:/state/weixin-instructions.local.md"
+    );
+  } finally {
+    process.argv = originalArgv;
+  }
+});
+
 test("readConfig keeps Windows workspace roots absolute across platforms", () => {
   const originalArgv = process.argv;
   process.argv = ["node", "codeksei.js"];

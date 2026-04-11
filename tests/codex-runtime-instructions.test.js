@@ -44,4 +44,20 @@ test("actual weixin operations contract stays flexible about Todo vs timeline vs
   assert.match(content, /spark \/ idea \/ observation \/ mood -> `fragment`/u);
   assert.match(content, /do not backfill a fake Todo just to close it/u);
   assert.match(content, /The order depends on what kind of thing you are closing, not on a hard Todo-first ritual/u);
+  assert.doesNotMatch(content, /state-check|body-double|chief of staff/u);
+  assert.doesNotMatch(content, /第一物理动作|先接住，再定向，再推进/u);
+});
+
+test("weixin persona template keeps a natural collaboration contract without old prompt-shape slogans", () => {
+  const personaPath = path.join(__dirname, "..", "templates", "weixin-instructions.md");
+  const content = loadWechatInstructions({
+    userName: "单道杨",
+    userGender: "male",
+    weixinInstructionsFile: personaPath,
+  });
+
+  assert.match(content, /默认像微信聊天，不像说明书/u);
+  assert.match(content, /当他在整理灵感、回看近况、做复盘/u);
+  assert.doesNotMatch(content, /chief of staff|body double/u);
+  assert.doesNotMatch(content, /第一物理动作|先接住，再定向，再推进/u);
 });

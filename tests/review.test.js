@@ -23,8 +23,8 @@ function setupReviewFixture() {
     "type: diary",
     "---",
     "## Todo",
-    "- [ ] 明天验证一条 Apple Watch 提醒链路",
-    "- [x] 收住 Cyberboss 回复重复发送问题",
+    "- [ ] 明天验证一条 Apple Watch 提醒链路 <!-- codeksei-todo:start=08:40 -->",
+    "- [x] 收住 Cyberboss 回复重复发送问题 <!-- codeksei-todo:start=21:49 -->",
     "",
     "## 时间线事实",
     "- 18:59-20:46 回到注册营养师 Part 1 Intake，继续做配套图表并把今天第一轮真正收住。",
@@ -103,6 +103,7 @@ test("review:nightly builds a nightly closeout note from diary truth source", as
   assert.match(content, /# 2026-04-10 睡前收口/u);
   assert.match(content, /## 睡前收口摘录/u);
   assert.match(content, /## 值得带走的信号/u);
+  assert.doesNotMatch(content, /codeksei-todo:start/u);
 });
 
 test("review:weekly builds a weekly review note from diary truth source", async () => {
@@ -138,6 +139,7 @@ test("review:monthly rewrites managed blocks idempotently", async () => {
   const content = fs.readFileSync(notePath, "utf8");
   assert.match(content, /# 2026-04 月复盘/u);
   assert.match(content, /明天验证一条 Apple Watch 提醒链路/u);
+  assert.doesNotMatch(content, /codeksei-todo:start/u);
 });
 
 test("review hybrid v2 lets semantic pass replace noisy deterministic lines", async () => {
