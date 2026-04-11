@@ -1,62 +1,65 @@
 # Codeksei
 
 [![CI](https://github.com/Sapientropic/codeksei/actions/workflows/ci.yml/badge.svg)](https://github.com/Sapientropic/codeksei/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/codeksei)](https://www.npmjs.com/package/codeksei)
+[![License: AGPL-3.0-only](https://img.shields.io/badge/license-AGPL--3.0--only-111111.svg)](https://github.com/Sapientropic/codeksei/blob/main/LICENSE)
 
 [中文 README](./README.md)
 
-Codeksei is a local-first life-assistant agent bridge.  
-It connects Codex runtime, WeChat messaging, timeline, diary, review, durable notes, and workspace continuity into one operational loop so the agent can keep state, reconnect context, and carry work forward instead of acting like a stateless chat shell.
+> A local-first life-assistant agent bridge that connects WeChat, Codex runtime, timeline, diary, review, durable notes, and workspace continuity into one ongoing personal workflow.
 
-This repository is no longer a lightly modified fork whose original README still applies. The current codebase has been heavily reshaped around shared app-server lifecycle management, WeChat v2 routing and delivery hardening, timeline/diary/review tooling, durable note routing, workspace bootstrap, and project radar. The documentation below describes this repository as it exists today.
+`Codeksei` is not a hosted SaaS, and it is not a stateless personality shell.  
+It is a local operational layer for keeping state, reconnecting context, and moving work forward across WeChat, terminal sessions, and workspace tools.
 
-## What It Is
+> This repository has diverged substantially from the original `cyberboss` README and usage model. Treat this repository’s `README`, `docs/`, and actual code as the current source of truth.
 
-- A personal, locally deployed life-assistant bridge, not a hosted SaaS.
-- A runtime that links WeChat conversations, Codex threads, timeline events, diaries, reviews, and lightweight project memory.
-- A system designed for real continuity and low-friction re-entry, especially when executive function is the bottleneck.
+## At a Glance
+
+| Item | What it means |
+| --- | --- |
+| Positioning | Local-first personal life-assistant bridge |
+| Main interfaces | WeChat + `codeksei` CLI |
+| Core value | Shared thread, shared state, low-friction re-entry |
+| Current package | `codeksei@0.1.0` |
+| Compatibility layer | `cyberboss` / `CYBERBOSS_*` / `~/.cyberboss` |
+
+## Why It Is More Than a Chat Shell
+
+- It is designed for continuity, not one-off prompts.
+- WeChat and terminal sessions can attach to the same shared thread.
+- `timeline`, `diary`, `review`, and `note` are built-in workflows, not afterthought scripts.
+- State and tooling stay local, auditable, and modifiable.
+
+## Who It Fits
+
+- People who want WeChat to be the main interaction surface
+- People who need the agent to remember thread state, unfinished work, and review clues
+- People who prefer local control over hosted products
+- People who benefit from low-friction re-entry, especially when executive function is the bottleneck
 
 ## Current Capabilities
 
-- WeChat bridge: QR login, long polling, file send-back, shared thread attach
-- Codex runtime: shared `app-server`, thread/session binding, approvals, stop/resume
-- Timeline: event write, batch write, taxonomy lookup, build/serve/screenshot
-- Diary: Todo, factual timeline, fragments, supplements, summaries
-- Review: nightly / weekly / monthly, with hybrid semantic pass by default
-- Durable notes: `note:auto`, `note:maybe`, `note:sync`
-- Workspace continuity: workspace bootstrap, project radar, shared-thread recovery
-
-## Naming and Compatibility
-
-`Codeksei` is now the primary public name.
-
-- Primary package name: `codeksei`
-- Primary CLI name: `codeksei`
-- Primary env prefix: `CODEKSEI_*`
-- Primary state directory: `~/.codeksei`
-
-Compatibility is still preserved for existing local setups:
-
-- Legacy CLI: `cyberboss`
-- Legacy env prefix: `CYBERBOSS_*`
-- Legacy state directory: `~/.cyberboss`
-
-Rules:
-
-- New-prefixed env vars override legacy-prefixed env vars.
-- If `~/.codeksei` does not exist but `~/.cyberboss` does, the runtime will reuse the legacy state directory.
-- Windows scheduled tasks are installed as `Codeksei Shared *` and remove legacy `Cyberboss Shared *` task names during reinstall.
+| Area | What it currently does |
+| --- | --- |
+| WeChat bridge | QR login, long polling, file send-back, shared-thread attach |
+| Codex runtime | Shared `app-server`, thread/session binding, approvals, stop/resume |
+| Timeline | Event write, batch write, taxonomy lookup, build, preview, screenshot |
+| Diary | Todo, factual timeline, fragments, supplements, summaries |
+| Review | nightly / weekly / monthly, with hybrid semantic extraction by default |
+| Durable notes | `note:auto`, `note:maybe`, `note:sync` |
+| Workspace continuity | workspace bootstrap, project radar, shared-thread recovery by workspace |
 
 ## Quick Start
 
-### 1. Clone and install
+### 1. Fastest install path
 
-`codeksei` is now available on npm. If you only want to install and use it, npm is the shortest path; if you need local customization or source-level changes, cloning the repository is still the better default:
+If you just want to install and use it:
 
 ```bash
 npm install -g codeksei
 ```
 
-Or:
+If you want source-level customization, debugging, or local script changes:
 
 ```bash
 git clone https://github.com/Sapientropic/codeksei.git
@@ -64,9 +67,14 @@ cd codeksei
 npm install
 ```
 
-### 2. Configure env vars
+### 2. Minimum env setup
 
-Recommended minimum setup:
+Runtime env lookup order:
+
+1. `.env` in the current project directory
+2. `.env` in the current state directory
+
+Recommended minimum variables:
 
 ```dotenv
 CODEKSEI_USER_NAME=YourName
@@ -82,15 +90,25 @@ CODEKSEI_ACCOUNT_ID=
 CODEKSEI_CODEX_ENDPOINT=ws://127.0.0.1:8765
 CODEKSEI_WEIXIN_ADAPTER=v2
 CODEKSEI_WEIXIN_REPLY_MODE=stream
+CODEKSEI_WEIXIN_ROUTE_TAG=
+CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION=2.1.1
 CODEKSEI_DIARY_DIR=/absolute/path/to/your/vault/diary
 CODEKSEI_TIMELINE_STATE_DIR=/absolute/path/to/your/vault/.codex/timeline
 CODEKSEI_WORKSPACE_BOOTSTRAP_CONFIG=/absolute/path/to/workspace-bootstrap.json
 CODEKSEI_PROJECT_RADAR_CONFIG=/absolute/path/to/.codex/code-projects.json
 CODEKSEI_DURABLE_NOTE_SCHEMA_CONFIG=/absolute/path/to/.codex/durable-note-schema.json
 CODEKSEI_REVIEW_SCHEMA_CONFIG=/absolute/path/to/.codex/review-schema.json
+CODEKSEI_SHARED_USE_BUNDLED_CODEX_BINARY=1
+CODEKSEI_SHARED_DISABLE_PLUGINS=0
+CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 ```
 
-Legacy `CYBERBOSS_*` variables still work, but new setups should move to `CODEKSEI_*`.
+Notes:
+
+- Legacy `CYBERBOSS_*` variables still work, but new setups should use `CODEKSEI_*`
+- The first successful run will generate `weixin-instructions.md` in the state directory
+- If you use multiple workspaces in shared mode, set `CODEKSEI_WORKSPACE_ROOT` before starting
+- Keep `.env` local; do not commit it into the repository
 
 ### 3. Login
 
@@ -106,7 +124,7 @@ Shared mode is the default operational path:
 npm run shared:start
 ```
 
-Attach your current WeChat-bound thread from the terminal:
+Attach the current WeChat-bound shared thread:
 
 ```bash
 npm run shared:open
@@ -132,7 +150,7 @@ npm run background:uninstall
 
 ## Common Commands
 
-Most frequently used local commands:
+Most frequently used terminal commands:
 
 - `npm run login`
 - `npm run accounts`
@@ -140,6 +158,8 @@ Most frequently used local commands:
 - `npm run shared:open`
 - `npm run shared:status`
 - `npm run shared:watchdog`
+- `npm run background:install`
+- `npm run background:uninstall`
 - `npm run doctor`
 - `npm run help`
 
@@ -162,15 +182,30 @@ More detailed references:
 
 - [docs/commands.md](./docs/commands.md)
 - [docs/architecture.md](./docs/architecture.md)
-
-## Release and CI
-
-The repository now includes GitHub Actions CI and an npm publish workflow.  
-The canonical release instructions, required secrets, tag rules, and slug-migration constraints live in:
-
 - [docs/release.md](./docs/release.md)
 
-## Local State
+## Naming and Compatibility
+
+`Codeksei` is now the primary public name.
+
+- Primary package name: `codeksei`
+- Primary CLI name: `codeksei`
+- Primary env prefix: `CODEKSEI_*`
+- Primary state directory: `~/.codeksei`
+
+Compatibility is still preserved for existing local setups:
+
+- Legacy CLI: `cyberboss`
+- Legacy env prefix: `CYBERBOSS_*`
+- Legacy state directory: `~/.cyberboss`
+
+Rules:
+
+- New-prefixed env vars override legacy-prefixed env vars
+- If `~/.codeksei` does not exist but `~/.cyberboss` does, the runtime reuses the legacy state directory
+- Windows scheduled tasks are installed as `Codeksei Shared *` and remove legacy `Cyberboss Shared *` task names during reinstall
+
+## Local State and Public Boundary
 
 Primary state directory:
 
@@ -184,7 +219,7 @@ Legacy-compatible state directory:
 ~/.cyberboss
 ```
 
-Typical contents:
+Typical runtime contents:
 
 - `accounts/`
 - `sessions.json`
@@ -198,6 +233,10 @@ Typical contents:
 - `timeline/`
 - `logs/`
 
+If you set `CODEKSEI_DIARY_DIR` or `CODEKSEI_TIMELINE_STATE_DIR`, business data is stored there and the state directory keeps runtime files only.
+
+The repository and npm package are meant to contain code, scripts, templates, and docs only. Your accounts, sessions, logs, personal `.env`, and local business data should stay outside version control.
+
 ## Timeline Can Be Used Separately
 
 Codeksei builds its timeline layer on top of [`timeline-for-agent`](https://github.com/WenXiaoWendy/timeline-for-agent).  
@@ -210,11 +249,20 @@ Codeksei grew from that base, but this version has been substantially reworked. 
 
 ## FAQ
 
-### Why not `npm install codeksei` directly?
+### Why not just `npm install -g codeksei`?
 
-Because the primary install path is still local clone + run.  
-`codeksei@0.1.0` is now published on npm, so `npm install -g codeksei` works.  
-Cloning the repository is still the better path when you want to customize, debug, or contribute to the source.
+You can. `codeksei@0.1.0` is already on npm.  
+Use npm if you only want to install it; clone the repository when you want customization, debugging, or source-level changes.
+
+### Should I use `codeksei` or `cyberboss`?
+
+New setups and current docs should use `Codeksei / codeksei / CODEKSEI_*`.  
+The old naming still exists only as a compatibility layer for existing local state and scripts.
+
+### How is shared mode different from `npm run start`?
+
+`npm run start` / `npm run start:checkin` is better for minimal-path debugging.  
+Shared mode is the default for daily use, WeChat + terminal continuity, recovery, and multi-window attach.
 
 ## License
 

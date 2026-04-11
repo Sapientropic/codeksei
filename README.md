@@ -1,76 +1,65 @@
 # Codeksei
 
 [![CI](https://github.com/Sapientropic/codeksei/actions/workflows/ci.yml/badge.svg)](https://github.com/Sapientropic/codeksei/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/codeksei)](https://www.npmjs.com/package/codeksei)
+[![License: AGPL-3.0-only](https://img.shields.io/badge/license-AGPL--3.0--only-111111.svg)](https://github.com/Sapientropic/codeksei/blob/main/LICENSE)
 
 [English README](./README.en.md)
 
-Codeksei 是一个面向个人本地部署的生活助理 Agent Bridge。  
-它把 Codex runtime、微信桥接、timeline、diary、review、durable note 这些能力接到同一条工作流里，让一个长期在线的 agent 不只是“回答问题”，而是能在真实生活与项目上下文里持续接线、记账、回看和推进。
+> 一个本地优先的生活助理 Agent Bridge，把 WeChat、Codex runtime、timeline、diary、review、durable note 和 workspace continuity 接到同一条可持续运行的个人工作流里。
 
-这个仓库已经不是对原仓 README 原样适用的轻量 fork。现在的实现包含共享 app-server 生命周期、WeChat v2 路由与回复去重、timeline/diary/review 命令链路、durable note 自动路由、workspace bootstrap、project radar 等大量改造，因此文档以当前仓库现状为准。
+`Codeksei` 不是云端 SaaS，也不是只靠提示词扮演人格的聊天外壳。  
+它更像一个本地运行的协作底座：让 agent 能持续记住线程、接住上下文、把事情往前推，并在你掉线之后还能低摩擦重新接上。
 
-## 这是什么
+> 这个仓库已经显著偏离上游 `cyberboss` 的原始 README 和使用方式。当前行为请以本仓 `README`、`docs/` 和实际代码实现为准。
 
-- 一个本地优先的个人生活助理桥接层，不是云端 SaaS。
-- 一个把微信消息、Codex 线程、时间轴、日记、复盘和轻量项目索引接起来的运行时。
-- 一个更适合“需要外部脚手架、需要被重新接住、需要低摩擦收口”的个人协作系统。
+## 一眼看懂
 
-它不是：
+| 项目 | 说明 |
+| --- | --- |
+| 定位 | 本地优先的个人生活助理桥接层 |
+| 主要入口 | WeChat + `codeksei` CLI |
+| 核心价值 | 同一条线程、同一份状态、低摩擦续接 |
+| 当前发布 | `codeksei@0.1.0` |
+| 兼容层 | `cyberboss` / `CYBERBOSS_*` / `~/.cyberboss` |
 
-- 通用聊天机器人托管平台
-- 多租户服务端产品
-- 只靠提示词演戏、没有状态与工具落盘的“人格壳”
+## 为什么它不是普通聊天壳
+
+- 持续运行，而不是每次对话都从零开始。
+- 微信和终端可以接到同一条共享线程，而不是两个互不相认的入口。
+- `timeline`、`diary`、`review`、`note` 是内建工作流，不是后贴的边缘脚本。
+- 数据与脚本本地可控、可改、可审计，更适合长期陪跑而不是一次性问答。
 
 ## 适合谁
 
-- 希望把微信当成主要交互入口，而不是再开一个新 App 的人
+- 希望把微信当成主要交互入口，而不是再开一个单独助手 App 的人
 - 需要 agent 帮自己记住线程状态、时间线、未收口事项和复盘线索的人
 - 更在意本地数据可控、可改、可审计，而不是云端托管的人
-- 有 ADHD / 执行功能摩擦，想把“重新接上”做成默认能力的人
+- 有 ADHD 或执行功能摩擦，想把“重新接上”做成默认能力的人
 
 ## 当前能力
 
-- 微信桥接：扫码登录、长轮询收发、文件发送、共享线程接管
-- Codex runtime：共享 `app-server`、thread/session 绑定、审批流、stop / resume
-- 时间轴：单条事件写入、批量写入、分类查询、构建/预览/截图
-- 日记：Todo、时间线事实、碎片、补充记录、总结
-- Review：nightly / weekly / monthly，默认 hybrid 语义提炼
-- Durable note：`note:auto` / `note:maybe` / `note:sync`
-- Workspace continuity：workspace bootstrap、project radar、共享线程按 workspace 恢复
-
-## 命名与兼容
-
-这轮开始，公共品牌以 `Codeksei` 为主。
-
-- 主名称：`Codeksei`
-- 主包名：`codeksei`
-- 主 CLI 名：`codeksei`
-- 主环境变量前缀：`CODEKSEI_*`
-- 主状态目录：`~/.codeksei`
-
-为了不打断已有本地使用，当前仍保留兼容层：
-
-- 旧 CLI：`cyberboss`
-- 旧环境变量前缀：`CYBERBOSS_*`
-- 旧状态目录：`~/.cyberboss`
-
-兼容规则：
-
-- 新前缀优先于旧前缀
-- 如果 `~/.codeksei` 不存在但 `~/.cyberboss` 已存在，运行时会优先复用旧状态
-- Windows 后台任务会安装为 `Codeksei Shared *`，同时清理旧 `Cyberboss Shared *`
+| 模块 | 当前能力 |
+| --- | --- |
+| WeChat bridge | 扫码登录、长轮询收发、文件发送、共享线程接管 |
+| Codex runtime | 共享 `app-server`、thread/session 绑定、审批流、stop/resume |
+| Timeline | 单条事件写入、批量写入、分类查询、构建、预览、截图 |
+| Diary | Todo、时间线事实、碎片、补充记录、总结 |
+| Review | nightly / weekly / monthly，默认 hybrid 语义提炼 |
+| Durable note | `note:auto`、`note:maybe`、`note:sync` |
+| Workspace continuity | workspace bootstrap、project radar、按 workspace 恢复共享线程 |
 
 ## 快速开始
 
-### 1. 获取源码
+### 1. 最短安装路径
 
-现在已经可以直接通过 npm 安装 `codeksei`，但如果你要改源码、跑共享脚本或做本地定制，仍然建议直接 clone 仓库：
+如果你只是要安装和使用：
 
 ```bash
 npm install -g codeksei
 ```
 
-或：
+如果你要改源码、调试共享脚本或做本地定制：
 
 ```bash
 git clone https://github.com/Sapientropic/codeksei.git
@@ -78,7 +67,7 @@ cd codeksei
 npm install
 ```
 
-### 2. 先配环境变量
+### 2. 最小环境变量
 
 运行时默认读取：
 
@@ -119,6 +108,7 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - 旧的 `CYBERBOSS_*` 仍可用，但新项目建议统一切到 `CODEKSEI_*`
 - 第一次运行任意命令时，会在状态目录生成 `weixin-instructions.md`
 - 如果你在共享模式下使用多 workspace，建议启动前就设置好 `CODEKSEI_WORKSPACE_ROOT`
+- `.env` 只应放在你的本地工作目录或状态目录里，不要提交进仓库
 
 ### 3. 扫码登录
 
@@ -148,7 +138,7 @@ npm run shared:status
 
 ### 5. Windows 后台常驻
 
-如果你希望登录后自动拉起，并在解锁/恢复睡眠后快速自愈：
+如果你希望登录后自动拉起，并在解锁或恢复睡眠后快速自愈：
 
 ```powershell
 npm run background:install
@@ -162,7 +152,7 @@ npm run background:uninstall
 
 ## 常用命令
 
-普通用户最常用的是这些：
+终端里最常用的是这些：
 
 - `npm run login`
 - `npm run accounts`
@@ -175,7 +165,7 @@ npm run background:uninstall
 - `npm run doctor`
 - `npm run help`
 
-微信里常用的是这些：
+微信里最常用的是这些：
 
 - `/bind /绝对路径`
 - `/status`
@@ -190,19 +180,35 @@ npm run background:uninstall
 - `/model <id>`
 - `/help`
 
-更完整的命令说明见：
+更完整的命令与架构说明见：
 
 - [docs/commands.md](./docs/commands.md)
 - [docs/architecture.md](./docs/architecture.md)
-
-## 发布与 CI
-
-仓库现在已经内置 GitHub Actions CI 与 npm 发布 workflow。  
-发布流程、所需 secret、tag 约定和 slug 迁移约束统一见：
-
 - [docs/release.md](./docs/release.md)
 
-## 本地数据在哪里
+## 命名与兼容
+
+这轮开始，公共品牌以 `Codeksei` 为主。
+
+- 主名称：`Codeksei`
+- 主包名：`codeksei`
+- 主 CLI 名：`codeksei`
+- 主环境变量前缀：`CODEKSEI_*`
+- 主状态目录：`~/.codeksei`
+
+为了不打断已有本地使用，当前仍保留兼容层：
+
+- 旧 CLI：`cyberboss`
+- 旧环境变量前缀：`CYBERBOSS_*`
+- 旧状态目录：`~/.cyberboss`
+
+兼容规则：
+
+- 新前缀优先于旧前缀
+- 如果 `~/.codeksei` 不存在但 `~/.cyberboss` 已存在，运行时会优先复用旧状态
+- Windows 后台任务会安装为 `Codeksei Shared *`，同时清理旧 `Cyberboss Shared *`
+
+## 本地数据与公开边界
 
 当前默认状态目录是：
 
@@ -216,7 +222,7 @@ npm run background:uninstall
 ~/.cyberboss
 ```
 
-常见内容包括：
+常见运行态内容包括：
 
 - `accounts/`
 - `sessions.json`
@@ -232,6 +238,8 @@ npm run background:uninstall
 
 如果你单独设置了 `CODEKSEI_DIARY_DIR` 或 `CODEKSEI_TIMELINE_STATE_DIR`，真正的数据会写到你指定的位置，状态目录只保留运行态文件。
 
+这个仓库和 npm 包默认只放代码、脚本、模板与文档，不应包含你的账号、会话、日志、个人 `.env` 或本地业务数据。
+
 ## Timeline 可单独复用
 
 Codeksei 的时间轴能力建立在 [`timeline-for-agent`](https://github.com/WenXiaoWendy/timeline-for-agent) 之上。  
@@ -244,11 +252,10 @@ Codeksei 是在其基础上发展出来的版本，但当前已经进行了大�
 
 ## FAQ
 
-### 为什么不是直接 `npm install codeksei`？
+### 为什么不是直接 `npm install -g codeksei`？
 
-因为当前默认入口仍是 clone 仓库后本地运行。  
-现在 `codeksei@0.1.0` 已经发布到 npm，可以直接 `npm install -g codeksei`。  
-如果你要做本地定制、调试共享桥接脚本、或直接改仓库源码，clone 仓库仍然是更合适的入口。
+现在已经可以直接 `npm install -g codeksei`。  
+如果你只想安装使用，npm 就是最短路径；如果你要做本地定制、调试共享桥接脚本或直接改仓库源码，clone 仓库仍然更合适。
 
 ### 现在到底该用 `codeksei` 还是 `cyberboss`？
 

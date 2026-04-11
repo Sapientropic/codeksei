@@ -1,27 +1,21 @@
-# Release
+# Release Guide
 
-`Codeksei` 的仓库发布与 npm 发包约定统一收口在这里。README 只保留入口说明，不再重复完整流程。
+`Codeksei` 的仓库发布与 npm 发包约定统一收口在这里。README 只保留入口说明，本页只保留维护者真正需要的流程与边界。
 
-## Canonical Slug
+## Canonical Names
 
-- GitHub 仓库主地址：`https://github.com/Sapientropic/codeksei`
-- npm 包主名：`codeksei`
-- 当前 npm `latest`：`0.1.0`
-- 旧 slug `Sapientropic/cyberboss` 只应视为 GitHub redirect，不再作为文档、badge、workflow 或包元数据里的正式地址
+- GitHub 仓库：`https://github.com/Sapientropic/codeksei`
+- npm 包名：`codeksei`
+- 旧仓库 slug `Sapientropic/cyberboss` 只应视为 GitHub redirect，不再作为正式地址继续写回文档、badge、workflow 或包元数据
 
-如果你本地同时保留上游原仓和个人远端，当前约定可以继续是：
+## Workflows
 
-- `origin` = `WenXiaoWendy/cyberboss`
-- `fork` = `Sapientropic/codeksei`
-
-## GitHub Actions
-
-当前仓库内置两条工作流：
+当前仓库内置两条 GitHub Actions workflow：
 
 - `.github/workflows/ci.yml`
 - `.github/workflows/publish.yml`
 
-`ci.yml` 会在 `push` 和 `pull_request` 时执行：
+`ci.yml` 在 `push` 和 `pull_request` 时执行：
 
 - `npm ci`
 - `npm run check`
@@ -33,24 +27,18 @@
 - `workflow_dispatch`
 - GitHub Release `published`
 
-其中：
+约定如下：
 
 - `workflow_dispatch` 只做 dry-run 预检，不会真的发包
-- GitHub Release `published` 才会真正执行 `npm publish --access public`
+- GitHub Release `published` 才会真正执行 publish
+- 发布工作流会先跑安装、语法检查和测试，再进入发包阶段
+- workflow 当前直接使用 GitHub Actions 上的 Node 24 运行
 
-发布工作流会先跑安装、语法检查和测试，再进入 publish 阶段。  
-当前 workflow 直接使用 GitHub Actions 上的 Node 24 运行，以满足 npm trusted publishing 对运行时版本的要求。
+## Trusted Publishing
 
-## Trusted Publishing Setup
+当前仓库使用 npm trusted publishing 主链路，不依赖长期存在的 `NPM_TOKEN`。
 
-当前仓库已经切到 npm trusted publishing 主链路，不再依赖 `NPM_TOKEN` 这类长期写权限 secret。
-
-你需要在 npm 的包设置里做一次性配置：
-
-1. 打开 npm 的 trusted publishing 文档：
-   https://docs.npmjs.com/trusted-publishers/
-2. 在 npmjs.com 为 `codeksei` 配置 GitHub Actions trusted publisher
-3. 按下面这组字段填写：
+npm 侧需要的 GitHub Actions trusted publisher 配置：
 
 - Organization or user: `Sapientropic`
 - Repository: `codeksei`
@@ -61,57 +49,35 @@
 
 - 这里只填 workflow 文件名，不填 `.github/workflows/` 全路径
 - 当前仓库是 public repo，满足 npm trusted publishing 的 GitHub Actions 前提
-- trusted publishing 下，npm 会自动生成 provenance；不需要再手动加 `--provenance`
+- trusted publishing 下，npm 会自动生成 provenance，不需要额外加 `--provenance`
 
-## First Release Checklist
+官方入口见：
 
-首发前建议按这条顺序做：
-
-1. 在 npm 侧完成 trusted publisher 配置
-2. 手动触发一次 `publish.yml` 的 `workflow_dispatch`，确认 dry-run 预检通过
-3. 本地确认版本号、README 和 packlist 都准备好
-4. 创建 GitHub Release，tag 形如 `v0.1.0`
-5. 等 `publish.yml` 在 `release.published` 事件上真正发包
-
-[⚠️ 需确认] npm 官网当前文档明确要求在包设置里添加 trusted publisher，但对“尚未首发的新包”在 UI 里的具体入口层级可能会随 npm 页面调整而变化；如果你打开后入口名字略有不同，以 npm 官方文档与实际控制台为准。
-
-## First Release Bootstrap
-
-如果 `codeksei` 还没有在 npm 上存在：
-
-1. 先在维护者本机完成一次手动首发：`npm publish --access public`
-2. 等 npm 上出现包页面后，再去 package settings 里配置 trusted publisher
-3. 之后再把 GitHub 的 `v0.1.0` draft release 正式发布
-
-当前 `publish.yml` 已经带有“版本已存在则跳过真实发包”的保护，所以首发 bootstrap 之后再发布同版本 GitHub Release，不会因为重复发 `0.1.0` 而把 workflow 打红。
-
-`v0.1.0` 已经按这条 bootstrap 路径完成首发。  
-后续版本默认直接走 GitHub Release + trusted publishing，不需要再重复这套手动首发流程。
+- https://docs.npmjs.com/trusted-publishers/
 
 ## Release Steps
 
-常规后续版本发布流程：
+常规版本发布流程：
 
 1. 本地确认改动、测试和 packlist 都通过
 2. 更新 `package.json` 版本号
-3. push 到 `fork/main`
-4. 可选：先手动触发一次 `publish.yml` 的 `workflow_dispatch` 做 dry-run 预检
-5. 创建 GitHub Release，tag 形如 `v0.1.0`
+3. push 到 `main`
+4. 可选：手动触发一次 `publish.yml` 的 `workflow_dispatch` 做 dry-run 预检
+5. 创建 GitHub Release，tag 形如 `v0.1.1`
 6. 等 `publish.yml` 自动发包
 
 补充约束：
 
 - GitHub Release 触发时，workflow 会校验 `package.json` 版本和 tag 去掉前缀 `v` 后一致
-- `workflow_dispatch` 现在固定只做 dry-run，避免误发
+- `workflow_dispatch` 固定只做 dry-run，避免误发
 - 兼容入口 `cyberboss` 不会再单独发布 npm 包
+- workflow 已带“版本已存在则跳过真实发包”的保护，避免重复发布同版本时把 CI 打红
 
-## Post-First-Release Hardening
+## Hardening
 
-在 trusted publishing 首次验证成功后，建议继续做这一步：
+在 trusted publishing 验证稳定后，建议继续把 npm 包设置里的 `Publishing access` 设为：
 
-1. 打开 npm 包设置里的 Publishing access
-2. 选择 `Require two-factor authentication and disallow tokens`
-3. 保存设置
+- `Require two-factor authentication and disallow tokens`
 
 这样可以把传统 publish token 彻底降为不可用，只保留 OIDC trusted publishing。
 
