@@ -50,7 +50,13 @@ Rules:
 
 ### 1. Clone and install
 
-The default path is still to clone and run locally. The repository now includes GitHub Actions CI and an npm publish workflow, but until the first package release exists, clone-based local usage remains the primary install path:
+`codeksei` is now available on npm. If you only want to install and use it, npm is the shortest path; if you need local customization or source-level changes, cloning the repository is still the better default:
+
+```bash
+npm install -g codeksei
+```
+
+Or:
 
 ```bash
 git clone https://github.com/Sapientropic/codeksei.git
@@ -207,7 +213,8 @@ Codeksei grew from that base, but this version has been substantially reworked. 
 ### Why not `npm install codeksei` directly?
 
 Because the primary install path is still local clone + run.  
-CI and npm trusted publishing automation are now in place, but the first public release still requires a one-time trusted publisher setup on npm plus the release/tag flow.
+`codeksei@0.1.0` is now published on npm, so `npm install -g codeksei` works.  
+Cloning the repository is still the better path when you want to customize, debug, or contribute to the source.
 
 ## License
 

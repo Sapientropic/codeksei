@@ -64,7 +64,13 @@ Codeksei 是一个面向个人本地部署的生活助理 Agent Bridge。
 
 ### 1. 获取源码
 
-当前默认仍推荐直接拉源码使用。仓库已经补上 GitHub Actions CI 和 npm publish workflow，但在首发 npm 包之前，日常安装入口仍以 clone 仓库为主：
+现在已经可以直接通过 npm 安装 `codeksei`，但如果你要改源码、跑共享脚本或做本地定制，仍然建议直接 clone 仓库：
+
+```bash
+npm install -g codeksei
+```
+
+或：
 
 ```bash
 git clone https://github.com/Sapientropic/codeksei.git
@@ -241,7 +247,8 @@ Codeksei 是在其基础上发展出来的版本，但当前已经进行了大�
 ### 为什么不是直接 `npm install codeksei`？
 
 因为当前默认入口仍是 clone 仓库后本地运行。  
-现在已经有 GitHub Actions CI 和 npm trusted publishing workflow，但真正首发前仍需要先在 npm 后台完成一次 trusted publisher 配置，再走 release/tag 流程。
+现在 `codeksei@0.1.0` 已经发布到 npm，可以直接 `npm install -g codeksei`。  
+如果你要做本地定制、调试共享桥接脚本、或直接改仓库源码，clone 仓库仍然是更合适的入口。
 
 ### 现在到底该用 `codeksei` 还是 `cyberboss`？
 

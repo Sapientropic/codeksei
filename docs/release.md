@@ -6,6 +6,7 @@
 
 - GitHub 仓库主地址：`https://github.com/Sapientropic/codeksei`
 - npm 包主名：`codeksei`
+- 当前 npm `latest`：`0.1.0`
 - 旧 slug `Sapientropic/cyberboss` 只应视为 GitHub redirect，不再作为文档、badge、workflow 或包元数据里的正式地址
 
 如果你本地同时保留上游原仓和个人远端，当前约定可以继续是：
@@ -83,6 +84,9 @@
 3. 之后再把 GitHub 的 `v0.1.0` draft release 正式发布
 
 当前 `publish.yml` 已经带有“版本已存在则跳过真实发包”的保护，所以首发 bootstrap 之后再发布同版本 GitHub Release，不会因为重复发 `0.1.0` 而把 workflow 打红。
+
+`v0.1.0` 已经按这条 bootstrap 路径完成首发。  
+后续版本默认直接走 GitHub Release + trusted publishing，不需要再重复这套手动首发流程。
 
 ## Release Steps
 
