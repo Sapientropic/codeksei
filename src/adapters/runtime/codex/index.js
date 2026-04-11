@@ -320,7 +320,9 @@ function buildInstructionBlocks(config = {}, workspaceRoot = "") {
 function loadWechatInstructions(config = {}) {
   const persona = loadInstructionFile(config.weixinInstructionsFile, config);
   const operations = loadInstructionFile(config.weixinOperationsFile, config);
-  return [persona, operations].filter(Boolean).join("\n\n").trim();
+  const personaOverlay = loadInstructionFile(config.weixinInstructionsOverlayFile, config);
+  const operationsOverlay = loadInstructionFile(config.weixinOperationsOverlayFile, config);
+  return [persona, operations, personaOverlay, operationsOverlay].filter(Boolean).join("\n\n").trim();
 }
 
 function loadInstructionFile(filePath, config = {}) {
@@ -336,7 +338,10 @@ function loadInstructionFile(filePath, config = {}) {
   }
 }
 
-module.exports = { createCodexRuntimeAdapter };
+module.exports = {
+  createCodexRuntimeAdapter,
+  loadWechatInstructions,
+};
 
 async function startThreadWithWorkspaceDiagnostics({
   runtimeClient,

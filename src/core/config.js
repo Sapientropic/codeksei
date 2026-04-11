@@ -50,7 +50,11 @@ function readConfig() {
     systemMessageQueueFile: path.join(stateDir, "system-message-queue.json"),
     timelineScreenshotQueueFile: path.join(stateDir, "timeline-screenshot-queue.json"),
     weixinInstructionsFile: path.join(stateDir, "weixin-instructions.md"),
+    weixinInstructionsOverlayFile: readPrefixedEnv(process.env, "WEIXIN_INSTRUCTIONS_OVERLAY_FILE")
+      || path.join(stateDir, "weixin-instructions.local.md"),
     weixinOperationsFile: path.resolve(__dirname, "..", "..", "templates", "weixin-operations.md"),
+    weixinOperationsOverlayFile: readPrefixedEnv(process.env, "WEIXIN_OPERATIONS_OVERLAY_FILE")
+      || path.join(stateDir, "weixin-operations.local.md"),
     syncBufferDir: path.join(stateDir, "sync-buffers"),
     codexEndpoint: readPrefixedEnv(process.env, "CODEX_ENDPOINT"),
     codexCommand: readPrefixedEnv(process.env, "CODEX_COMMAND"),

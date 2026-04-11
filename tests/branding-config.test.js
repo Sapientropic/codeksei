@@ -62,6 +62,26 @@ test("readConfig still accepts legacy CYBERBOSS_* values", () => {
   }
 });
 
+test("readConfig exposes local overlay files and lets env override them", () => {
+  const originalArgv = process.argv;
+  process.argv = ["node", "codeksei.js"];
+
+  try {
+    const config = withPatchedEnv({
+      CODEKSEI_STATE_DIR: "E:/state",
+      CODEKSEI_WEIXIN_INSTRUCTIONS_OVERLAY_FILE: "E:/custom/persona.local.md",
+    }, () => readConfig());
+
+    assert.equal(config.weixinInstructionsOverlayFile, "E:/custom/persona.local.md");
+    assert.equal(
+      config.weixinOperationsOverlayFile.replace(/\\/g, "/"),
+      "E:/state/weixin-operations.local.md"
+    );
+  } finally {
+    process.argv = originalArgv;
+  }
+});
+
 test("resolveStateDir reuses legacy directory until new directory exists", () => {
   const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-home-"));
   const legacyStateDir = path.join(tempHome, ".cyberboss");
