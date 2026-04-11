@@ -10,10 +10,11 @@
 
 ## Workflows
 
-当前仓库内置两条 GitHub Actions workflow：
+当前仓库内置三条 GitHub Actions workflow：
 
 - `.github/workflows/ci.yml`
 - `.github/workflows/publish.yml`
+- `.github/workflows/secret-scan.yml`
 
 `ci.yml` 在 `push` 和 `pull_request` 时执行：
 
@@ -33,6 +34,13 @@
 - GitHub Release `published` 才会真正执行 publish
 - 发布工作流会先跑安装、语法检查和测试，再进入发包阶段
 - workflow 当前直接使用 GitHub Actions 上的 Node 24 运行
+
+`secret-scan.yml` 在 `push`、`pull_request` 和手动触发时执行：
+
+- 使用 `actions/checkout@v6` 且 `fetch-depth: 0`
+- 用 Gitleaks 扫描当前仓库与 git 历史里的硬编码 secret
+- 默认关闭 PR 自动评论，只保留 workflow summary 与失败信号
+- 当前仓库 owner 是 GitHub 用户账号，不需要额外配置 `GITLEAKS_LICENSE`；如果未来迁到 organization，再按 Gitleaks 官方要求补 license secret
 
 ## Trusted Publishing
 
