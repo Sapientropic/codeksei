@@ -43,6 +43,7 @@ class CyberbossApp {
       channelAdapter: this.channelAdapter,
       sessionStore: this.runtimeAdapter.getSessionStore(),
       weixinReplyMode: config.weixinReplyMode,
+      deliveryTraceEnabled: config.weixinDeliveryTrace,
       onDeliveryFailure: (payload) => this.handleReplyDeliveryFailure(payload),
     });
     this.pendingRuntimeEventWatchdogs = new Map();
@@ -134,6 +135,8 @@ class CyberbossApp {
     console.log(`[cyberboss] workspaceRoot=${this.config.workspaceRoot}`);
     console.log(`[cyberboss] knownContextTokens=${knownContextTokens}`);
     console.log(`[cyberboss] syncBuffer=${syncBuffer ? "ready" : "empty"}`);
+    console.log(`[cyberboss] weixinReplyMode=${this.config.weixinReplyMode}`);
+    console.log(`[cyberboss] weixinDeliveryTrace=${this.config.weixinDeliveryTrace ? "on" : "off"}`);
     console.log(`[cyberboss] codexEndpoint=${runtimeState.endpoint}`);
     console.log(`[cyberboss] codexModels=${runtimeState.models.length}`);
     console.log("[cyberboss] 最小消息链路已启动，正在等待微信消息。");

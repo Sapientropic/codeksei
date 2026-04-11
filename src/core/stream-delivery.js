@@ -7,10 +7,17 @@ const STREAM_PROGRESS_MAX_CHARS = 120;
 const STREAM_PROGRESS_MAX_LINES = 2;
 
 class StreamDelivery {
-  constructor({ channelAdapter, sessionStore, weixinReplyMode = "settled", onDeliveryFailure = null }) {
+  constructor({
+    channelAdapter,
+    sessionStore,
+    weixinReplyMode = "settled",
+    deliveryTraceEnabled = false,
+    onDeliveryFailure = null,
+  }) {
     this.channelAdapter = channelAdapter;
     this.sessionStore = sessionStore;
     this.weixinReplyMode = normalizeWeixinReplyMode(weixinReplyMode);
+    this.deliveryTraceEnabled = Boolean(deliveryTraceEnabled);
     this.onDeliveryFailure = typeof onDeliveryFailure === "function" ? onDeliveryFailure : null;
     this.replyTargetByBindingKey = new Map();
     this.pendingReplyTargetsByThreadId = new Map();
@@ -77,19 +84,31 @@ class StreamDelivery {
       }
       case "runtime.reply.completed": {
         const state = this.ensureRunState(threadId, turnId);
+        const itemId = normalizeText(event.payload.itemId) || `item-${state.itemOrder.length + 1}`;
+        const phase = normalizeAssistantPhase(event.payload.phase);
         this.upsertItem(state, {
-          itemId: normalizeText(event.payload.itemId) || `item-${state.itemOrder.length + 1}`,
+          itemId,
           text: normalizeLineEndings(event.payload.text),
           completed: true,
-          phase: normalizeAssistantPhase(event.payload.phase),
+          phase,
         });
-        await this.flush(state, { force: false });
+        await this.flush(state, {
+          force: false,
+          trigger: {
+            source: event.type,
+            itemId,
+            phase,
+          },
+        });
         return;
       }
       case "runtime.turn.completed": {
         const state = this.ensureRunState(threadId, turnId);
         state.turnId = turnId || state.turnId;
-        await this.flush(state, { force: true });
+        await this.flush(state, {
+          force: true,
+          trigger: { source: event.type },
+        });
         this.disposeRunState(state.runKey);
         return;
       }
@@ -128,7 +147,13 @@ class StreamDelivery {
       }
     }
 
-    await this.flush(state, { force: true });
+    await this.flush(state, {
+      force: true,
+      trigger: {
+        source: "finishTurn",
+        itemId: state.itemOrder[state.itemOrder.length - 1] || "final",
+      },
+    });
     this.disposeRunState(state.runKey);
   }
 
@@ -165,7 +190,13 @@ class StreamDelivery {
         completed: true,
       });
     }
-    await this.flush(state, { force: true });
+    await this.flush(state, {
+      force: true,
+      trigger: {
+        source: "finalizeAbandonedTurn",
+        itemId: normalizedTrailingText ? "__watchdog__" : "",
+      },
+    });
     this.ignoredRunKeys.add(state.runKey);
     this.disposeRunState(state.runKey);
   }
@@ -297,11 +328,11 @@ class StreamDelivery {
     current.completed = Boolean(completed);
   }
 
-  async flush(state, { force }) {
+  async flush(state, { force, trigger = null }) {
     const previous = state.flushPromise || Promise.resolve();
     const current = previous
       .catch(() => {})
-      .then(() => this.flushNow(state, { force }));
+      .then(() => this.flushNow(state, { force, trigger }));
     const tracked = current.finally(() => {
       const latestState = this.stateByRunKey.get(state.runKey);
       if (latestState && latestState.flushPromise === tracked) {
@@ -312,7 +343,7 @@ class StreamDelivery {
     await tracked;
   }
 
-  async flushNow(state, { force }) {
+  async flushNow(state, { force, trigger = null }) {
     if (!state.replyTarget) {
       return;
     }
@@ -369,15 +400,31 @@ class StreamDelivery {
       return;
     }
 
+    const settledWechatDelivery = prefersSettledDelivery(state);
+    const tracePayload = buildDeliveryTracePayload(state, {
+      force,
+      trigger,
+      traceId: this.deliveryTraceEnabled ? crypto.randomUUID().slice(0, 8) : "",
+      safeText,
+      delta,
+    });
     state.sendChain = state.sendChain.then(async () => {
-      const settledWechatDelivery = prefersSettledDelivery(state);
+      this.logDeliveryTrace("attempt", tracePayload);
       await this.channelAdapter.sendText({
         userId: state.replyTarget.userId,
         text: delta,
         contextToken: state.replyTarget.contextToken,
         preserveBlock: settledWechatDelivery,
+        trace: this.deliveryTraceEnabled
+          ? {
+            ...tracePayload,
+            origin: "stream-delivery",
+            preserveBlock: settledWechatDelivery,
+          }
+          : null,
       });
       state.sentText = safeText;
+      this.logDeliveryTrace("delivered", tracePayload);
       if (deliveryDedupKey) {
         this.rememberRecentDelivery(deliveryDedupKey);
         console.log(
@@ -387,6 +434,7 @@ class StreamDelivery {
         );
       }
     }).catch((error) => {
+      this.logDeliveryTrace("failed", tracePayload, error);
       console.error(`[cyberboss] failed to deliver reply thread=${state.threadId}: ${error.message}`);
       this.handleDeliveryFailure(state, error);
     });
@@ -443,6 +491,33 @@ class StreamDelivery {
         this.recentSettledWeixinDeliveries.delete(key);
       }
     }
+  }
+
+  logDeliveryTrace(stage, payload, error = null) {
+    if (!this.deliveryTraceEnabled || !payload) {
+      return;
+    }
+    const parts = [
+      `[cyberboss] weixin delivery trace stage=${stage}`,
+      `pid=${process.pid}`,
+      `trace=${payload.traceId || "(none)"}`,
+      `thread=${payload.threadId}`,
+      `turn=${payload.turnId || "(pending)"}`,
+      `mode=${payload.mode}`,
+      `force=${payload.force ? "1" : "0"}`,
+      payload.trigger ? `trigger=${payload.trigger}` : "",
+      `sentCharsBefore=${payload.sentCharsBefore}`,
+      `safeChars=${payload.safeChars}`,
+      `deltaChars=${payload.deltaChars}`,
+      `safeHash=${payload.safeHash}`,
+      `deltaHash=${payload.deltaHash}`,
+    ].filter(Boolean);
+    if (error) {
+      parts.push(`error=${JSON.stringify(String(error?.message || error || ""))}`);
+      console.error(parts.join(" "));
+      return;
+    }
+    console.log(parts.join(" "));
   }
 }
 
@@ -675,6 +750,49 @@ function buildSettledWeixinDeliveryKey(state, safeText) {
   // WeChat thread shortly after a successful send, which is where we see
   // accidental duplicate terminal deliveries.
   return `${threadId}|${userId}|${contextToken}|${text}`;
+}
+
+function buildDeliveryMode(state) {
+  if (prefersSettledDelivery(state)) {
+    return "settled";
+  }
+  if (prefersStreamingDelivery(state)) {
+    return "stream";
+  }
+  return normalizeText(state?.replyTarget?.provider) || "unknown";
+}
+
+function buildDeliveryTracePayload(state, {
+  force = false,
+  trigger = null,
+  traceId = "",
+  safeText = "",
+  delta = "",
+} = {}) {
+  return {
+    traceId: normalizeText(traceId),
+    threadId: normalizeText(state?.threadId),
+    turnId: normalizeText(state?.turnId),
+    mode: buildDeliveryMode(state),
+    force: Boolean(force),
+    trigger: formatDeliveryTrigger(trigger),
+    sentCharsBefore: String(state?.sentText || "").length,
+    safeChars: String(safeText || "").length,
+    deltaChars: String(delta || "").length,
+    safeHash: hashReplyText(safeText),
+    deltaHash: hashReplyText(delta),
+  };
+}
+
+function formatDeliveryTrigger(trigger) {
+  if (!trigger || typeof trigger !== "object") {
+    return "";
+  }
+  return [
+    normalizeText(trigger.source),
+    normalizeText(trigger.itemId),
+    normalizeText(trigger.phase),
+  ].filter(Boolean).join("/");
 }
 
 function hashReplyText(text) {

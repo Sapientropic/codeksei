@@ -69,7 +69,7 @@ function createWeixinChannelAdapter(config) {
     return ensureContextTokenCache()[normalizedUserId] || "";
   }
 
-  function sendTextChunks({ userId, text, contextToken = "", preserveBlock = false }) {
+  function sendTextChunks({ userId, text, contextToken = "", preserveBlock = false, trace = null }) {
     const account = ensureAccount();
     const resolvedToken = resolveContextToken(userId, contextToken);
     if (!resolvedToken) {
@@ -88,9 +88,17 @@ function createWeixinChannelAdapter(config) {
         WEIXIN_MAX_DELIVERY_MESSAGES,
         MAX_WEIXIN_CHUNK
       );
+    const traceContext = buildWeixinTraceContext(trace, {
+      enabled: config.weixinDeliveryTrace,
+      origin: "adapter.sendText",
+      variant: "v2",
+      preserveBlock,
+      chunkTotal: sendChunks.length,
+    });
     return sendChunks.reduce((promise, chunk, index) => promise
       .then(() => {
         const compactChunk = compactPlainTextForWeixin(chunk) || "已完成。";
+        const clientId = `cb-${crypto.randomUUID()}`;
         return sendV2TextChunk({
           baseUrl: account.baseUrl,
           token: account.token,
@@ -99,6 +107,14 @@ function createWeixinChannelAdapter(config) {
           toUserId: userId,
           text: compactChunk,
           contextToken: resolvedToken,
+          clientId,
+          trace: {
+            ...traceContext,
+            chunkIndex: index + 1,
+            chars: compactChunk.length,
+            textHash: hashTraceText(compactChunk),
+            clientId,
+          },
         });
       })
       .then(() => {
@@ -185,8 +201,8 @@ function createWeixinChannelAdapter(config) {
       const account = ensureAccount();
       return inboundFilter.normalize(message, config, account.accountId);
     },
-    async sendText({ userId, text, contextToken = "", preserveBlock = false }) {
-      await sendTextChunks({ userId, text, contextToken, preserveBlock });
+    async sendText({ userId, text, contextToken = "", preserveBlock = false, trace = null }) {
+      await sendTextChunks({ userId, text, contextToken, preserveBlock, trace });
     },
     async sendTyping({ userId, status = 1, contextToken = "" }) {
       const account = ensureAccount();
@@ -434,14 +450,31 @@ function collectStreamingBoundaries(text) {
   return Array.from(boundaries).sort((left, right) => left - right);
 }
 
-async function sendTextChunkWithRetry(send) {
+async function sendTextChunkWithRetry(send, { trace = null } = {}) {
   let lastError = null;
   for (let attempt = 0; attempt <= SEND_RETRY_DELAYS_MS.length; attempt += 1) {
+    const attemptNumber = attempt + 1;
     try {
-      return await send();
+      logWeixinSendTrace("attempt", {
+        ...buildWeixinTraceContext(trace),
+        attempt: attemptNumber,
+      });
+      const result = await send();
+      logWeixinSendTrace("success", {
+        ...buildWeixinTraceContext(trace),
+        attempt: attemptNumber,
+      });
+      return result;
     } catch (error) {
       lastError = error;
-      if (!isRetryableSendError(error) || attempt >= SEND_RETRY_DELAYS_MS.length) {
+      const retryable = isRetryableSendError(error);
+      logWeixinSendTrace("error", {
+        ...buildWeixinTraceContext(trace),
+        attempt: attemptNumber,
+        retryable,
+        error: String(error?.message || error || ""),
+      });
+      if (!retryable || attempt >= SEND_RETRY_DELAYS_MS.length) {
         throw error;
       }
       await sleep(SEND_RETRY_DELAYS_MS[attempt]);
@@ -460,18 +493,29 @@ function sendV2TextChunk({
   text,
   contextToken,
   clientId = "",
+  trace = null,
 }) {
   const stableClientId = String(clientId || "").trim() || `cb-${crypto.randomUUID()}`;
-  return sendTextChunkWithRetry(() => sendTextImpl({
-    baseUrl,
-    token,
-    routeTag,
-    clientVersion,
-    toUserId,
-    text,
-    contextToken,
-    clientId: stableClientId,
-  }));
+  return sendTextChunkWithRetry(
+    () => sendTextImpl({
+      baseUrl,
+      token,
+      routeTag,
+      clientVersion,
+      toUserId,
+      text,
+      contextToken,
+      clientId: stableClientId,
+    }),
+    {
+      trace: buildWeixinTraceContext(trace, {
+        variant: "v2",
+        clientId: stableClientId,
+        chars: String(text || "").length,
+        textHash: hashTraceText(text),
+      }),
+    }
+  );
 }
 
 function isRetryableSendError(error) {
@@ -486,6 +530,63 @@ function isRetryableSendError(error) {
     || message.includes("ECONNRESET")
     || message.includes("ETIMEDOUT")
     || /http 5\d\d/.test(message);
+}
+
+function buildWeixinTraceContext(trace, defaults = {}) {
+  const normalizedTrace = normalizeTraceContext(trace);
+  return {
+    ...defaults,
+    ...normalizedTrace,
+    enabled: Boolean(normalizedTrace.enabled ?? defaults.enabled),
+    traceId: normalizeTraceText(normalizedTrace.traceId)
+      || normalizeTraceText(defaults.traceId)
+      || `wx-${crypto.randomUUID().slice(0, 8)}`,
+  };
+}
+
+function normalizeTraceContext(trace) {
+  if (!trace || typeof trace !== "object") {
+    return {};
+  }
+  return { ...trace };
+}
+
+function normalizeTraceText(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function logWeixinSendTrace(stage, trace) {
+  if (!Boolean(trace?.enabled)) {
+    return;
+  }
+  const parts = [
+    `[cyberboss] weixin send trace stage=${stage}`,
+    `pid=${process.pid}`,
+    `trace=${trace.traceId || "(none)"}`,
+    `origin=${trace.origin || "adapter.sendText"}`,
+    `variant=${trace.variant || "v2"}`,
+    trace.threadId ? `thread=${trace.threadId}` : "",
+    `turn=${trace.turnId || "(pending)"}`,
+    trace.mode ? `mode=${trace.mode}` : "",
+    trace.trigger ? `trigger=${trace.trigger}` : "",
+    `chunk=${trace.chunkIndex || 1}/${trace.chunkTotal || 1}`,
+    `preserveBlock=${trace.preserveBlock ? "1" : "0"}`,
+    `attempt=${trace.attempt || 1}`,
+    trace.retryable === undefined ? "" : `retryable=${trace.retryable ? "1" : "0"}`,
+    `clientId=${trace.clientId || "(none)"}`,
+    `chars=${trace.chars || 0}`,
+    `hash=${trace.textHash || hashTraceText("")}`,
+  ].filter(Boolean);
+  if (trace.error) {
+    parts.push(`error=${JSON.stringify(String(trace.error || ""))}`);
+    console.error(parts.join(" "));
+    return;
+  }
+  console.log(parts.join(" "));
+}
+
+function hashTraceText(text) {
+  return crypto.createHash("sha1").update(String(text || ""), "utf8").digest("hex").slice(0, 12);
 }
 
 function trimOuterBlankLines(text) {

@@ -27,6 +27,7 @@ function readConfig() {
     weixinCdnBaseUrl: readTextEnv("CYBERBOSS_WEIXIN_CDN_BASE_URL") || "https://novac2c.cdn.weixin.qq.com/c2c",
     weixinAdapterVariant: readTextEnv("CYBERBOSS_WEIXIN_ADAPTER") || "v2",
     weixinReplyMode: normalizeWeixinReplyMode(readTextEnv("CYBERBOSS_WEIXIN_REPLY_MODE") || "stream"),
+    weixinDeliveryTrace: readBoolEnv("CYBERBOSS_WEIXIN_DELIVERY_TRACE"),
     weixinQrBotType: readTextEnv("CYBERBOSS_WEIXIN_QR_BOT_TYPE") || "3",
     weixinRouteTag: readTextEnv("CYBERBOSS_WEIXIN_ROUTE_TAG"),
     weixinProtocolClientVersion: readTextEnv("CYBERBOSS_WEIXIN_PROTOCOL_CLIENT_VERSION") || "2.1.1",
