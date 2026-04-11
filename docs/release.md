@@ -38,7 +38,7 @@
 - GitHub Release `published` 才会真正执行 `npm publish --access public`
 
 发布工作流会先跑安装、语法检查和测试，再进入 publish 阶段。  
-当前 workflow 会显式升级到最新 npm，以满足 trusted publishing 对 npm CLI 版本的要求。
+当前 workflow 直接使用 GitHub Actions 上的 Node 24 运行，以满足 npm trusted publishing 对运行时版本的要求。
 
 ## Trusted Publishing Setup
 
