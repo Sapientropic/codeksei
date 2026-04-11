@@ -184,7 +184,4 @@ Project radar 用于回答“项目现在在哪、应该从哪里重新进去”
 - 主 bin 是 `codeksei`，旧 `cyberboss` 仍可调用
 - 新 managed marker 前缀写成 `codeksei-*`，但旧 `cyberboss-*` marker 仍能继续被读取和更新
 
-## 发布与 CI
-
-发布流程、GitHub Actions 和仓库 slug 迁移约定统一见 [release.md](./release.md)。
-这页只管“怎么使用这些入口”，不再重复维护第二份发布说明。
+这页只管“怎么使用这些入口”；维护与发布流程留在本地维护材料里。

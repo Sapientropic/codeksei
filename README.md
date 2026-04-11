@@ -7,19 +7,18 @@
   <p>
     <a href="https://github.com/Sapientropic/codeksei/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sapientropic/codeksei/actions/workflows/ci.yml/badge.svg"></a>
     <a href="https://www.npmjs.com/package/codeksei"><img alt="npm version" src="https://img.shields.io/npm/v/codeksei"></a>
-    <a href="https://github.com/Sapientropic/codeksei/blob/main/LICENSE"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/license-AGPL--3.0--only-111111.svg"></a>
+    <a href="./LICENSE"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/license-AGPL--3.0--only-111111.svg"></a>
   </p>
   <h3>会主动分忧、替你守住时间感，也陪你把一天和项目慢慢接回正轨</h3>
   <p><strong>一个本地优先、会持续在场，也会先替你搭把手的陪伴者助理。</strong></p>
-  <p>很多时候，先断掉的不是事情本身，而是时间感、线头和重新开口的力气。Codeksei 会在该出现时出现，也会把一天里已经发生过的东西慢慢钉成时间线和记忆锚点，让你不用老是从一团雾里重来。</p>
+  <p>很多时候，先松开的会是时间感、线头和重新开口的力气。Codeksei 会在该出现时出现，也会把一天里已经发生过的东西慢慢钉成时间线和记忆锚点，让你不用老是从一团雾里重来。</p>
   <p>
     <a href="#day-with-codeksei">一天会怎么相处</a> ·
     <a href="#快速开始">快速开始</a> ·
     <a href="#现在可以做什么">当前能力</a> ·
     <a href="#why-the-name">名字寓意</a> ·
     <a href="./docs/commands.md">命令</a> ·
-    <a href="./docs/architecture.md">架构</a> ·
-    <a href="./docs/release.md">发布</a>
+    <a href="./docs/architecture.md">架构</a>
   </p>
 </div>
 
@@ -34,12 +33,12 @@
 - **开始一天时**：你也许只说一句“我现在准备开始了”，或者问“昨天那条线停在哪来着？”。它会把挂着的提醒、最近状态、项目线索和更适合眼前的第一步慢慢接回来，让起步不必从空白和慌乱开始。
 - **白天推进中**：你把念头、待办、做完的时间块、突然想到的事丢给它。它会把该留的留下来：有的去 diary，有的钉进 timeline，有的变成提醒，脑子不用一直替未来的自己硬撑记忆。
 - **一抬头发现半天过去了**：你问“我刚刚到底干嘛去了？”或者“今天怎么又糊了”。它会把已经发生过的时间块、切换点和留下的线索慢慢钉回时间线，让这一天重新有形。
-- **你安静了一阵子**：它不一定来打断你。它会先掂量现在更适合问一句、跟进一条线、补一条记录、留给未来一个提醒，还是先安静不打扰。
+- **你安静了一阵子**：它不会急着冒出来。它会先掂量现在更适合问一句、跟进一条线、补一条记录、留给未来一个提醒，还是先安静陪着这条线往后走。
 - **项目做到一半又切回来**：你只说“继续这条”或者“我现在卡在哪了？”。它会顺着同一条线程、项目脉络和最近动作，把重新进去的入口慢慢接回来。
 - **卡住、切换、想躲一下的时候**：你说“我有点散”、“我想逃一下”，或者“我现在不知道先做哪件”。它会帮你把线缩回眼前，留下一步可做的动作，必要时替你补一个提醒或收一个尾。
 - **一天要收口的时候**：睡前、出门前、做完一段之后，让它陪你收一下。它会把今天真实发生过的东西压成 timeline、review 和明天更容易接上的入口，让明天回来时，线还在，时间感也还在。
 
-> `主动分忧` 更像一种会先替你照看一点点的在场感。
+> `主动分忧` 更像一种有人轻轻替你照看着的在场感。
 >
 > 它会先替你守住时间感、线头和已经发生过的痕迹；该留痕时留痕，该接话时接话，该安静时也会安静。
 
@@ -47,7 +46,7 @@
 
 - `Timeline`：把已经发生过的时间块、切换点和生活事实钉成时间感与记忆锚点，不让一天只剩模糊印象
 - `Diary`：Todo、碎片、补充记录、总结，以及和 timeline 紧密联动的时间线事实，帮你把零散日常慢慢收成可用痕迹
-- `Check-ins`：随机唤醒与主动分忧。发一句消息只是其中一种；它也会先回看上下文、整理后台、补一条 diary / timeline、留一个提醒，再决定要不要来打扰你
+- `Check-ins`：随机唤醒与主动分忧。发一句消息只是其中一种；它也会先回看上下文、整理后台、补一条 diary / timeline、留一个提醒，再决定是不是该主动露个面
 - `Reminders`：提醒写入与调度，给生活节奏和待办推进一个外部支点
 - `Review`：nightly / weekly / monthly，把日常记录压成更稳定的节奏校准与复盘材料
 - `Project support`：workspace bootstrap、project radar、按 workspace 恢复共享线程。项目切走再回来时，不用先把整条线在脑子里重建一遍
@@ -61,7 +60,7 @@
 - 有 ADHD 或执行功能摩擦，希望得到持续陪伴和轻推的人
 - 希望对方会主动来问、主动跟进，也愿意替你分担一点琐碎的人
 - 一天常常糊成一团，事后很难想起自己到底做了什么的人
-- 项目一被别的事打断，再回来就像整条线一起断掉的人
+- 项目一被别的事岔开，再回来就像整条线一起断掉的人
 - 想把项目推进、日常记录和复盘整理放进同一条工作流的人
 - 想把微信保留成主要交互入口，同时保留本地可控性的人
 
@@ -73,9 +72,8 @@
   <p><strong>一个名字，留下两层感觉。</strong></p>
 </div>
 
-| `Code` | `-ksei` |
-| --- | --- |
-| 散落日常里的隐秘书写。<br>稍纵即逝的念头、半途停下的线索、以及你本来想记住的生活纹理。 | 取自 `Aleksei` 的后半段。<br>在这里，它借来“守护 / 帮助 / 同行”的意象，像一位安静的陪跑者。 |
+- `Code`：散落日常里的隐秘书写。那些稍纵即逝的念头、半途停下的线索、以及你本来想记住的生活纹理，都留在这里。
+- `-ksei`：取自 `Aleksei` 的后半段。在这里，它借来“守护 / 帮助 / 同行”的意象，像一位安静陪在身边的同行者。
 
 <div align="center">
   <p><em>线索有人照看，离开之后仍能顺着原来的温度回来。</em></p>
@@ -235,7 +233,6 @@ npm run help
 
 - [docs/commands.md](./docs/commands.md)
 - [docs/architecture.md](./docs/architecture.md)
-- [docs/release.md](./docs/release.md)
 
 ## 如果你是从 cyberboss 过来
 

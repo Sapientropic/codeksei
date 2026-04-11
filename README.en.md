@@ -7,47 +7,44 @@
   <p>
     <a href="https://github.com/Sapientropic/codeksei/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Sapientropic/codeksei/actions/workflows/ci.yml/badge.svg"></a>
     <a href="https://www.npmjs.com/package/codeksei"><img alt="npm version" src="https://img.shields.io/npm/v/codeksei"></a>
-    <a href="https://github.com/Sapientropic/codeksei/blob/main/LICENSE"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/license-AGPL--3.0--only-111111.svg"></a>
+    <a href="./LICENSE"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/license-AGPL--3.0--only-111111.svg"></a>
   </p>
   <h3>It keeps time from blurring, checks in on its own, and helps days and projects come back into shape</h3>
   <p><strong>A local-first companion that stays present and lends a hand first.</strong></p>
-  <p>What often breaks first is not the task itself, but your sense of time, the loose thread, and the energy to begin again. Codeksei shows up when it should, and turns what already happened into timeline anchors and memory traces, so you do not have to keep restarting from fog.</p>
+  <p>What often slips away first is your sense of time, the loose thread, and the energy to begin again. Codeksei shows up when it should, and turns what already happened into timeline anchors and memory traces, so you do not have to keep restarting from fog.</p>
   <p>
     <a href="#a-day-with-codeksei">A Day With Codeksei</a> ·
     <a href="#quick-start">Quick Start</a> ·
     <a href="#what-it-can-do">Capabilities</a> ·
     <a href="#why-the-name">Why the Name</a> ·
     <a href="./docs/commands.md">Commands</a> ·
-    <a href="./docs/architecture.md">Architecture</a> ·
-    <a href="./docs/release.md">Release</a>
+    <a href="./docs/architecture.md">Architecture</a>
   </p>
 </div>
 
-| Where you meet it | What it takes off your plate | What you gradually get back |
-| --- | --- | --- |
-| WeChat + `codeksei` | keeps hold of time, memory anchors, and when to show up | days that blur less easily, and projects that are easier to step back into |
+- **Entry**: WeChat + `codeksei`
+- **What it carries with you**: time sense, memory anchors, and the judgment of when to gently show up
+- **What you slowly get back**: days that blur less easily, and projects that are easier to step back into
 
 ## A Day With Codeksei
 
-| When this happens often | You might say | What it quietly does first | What gets lighter |
-| --- | --- | --- | --- |
-| At the start of the day | “I’m starting now.” / “Where did that thread stop yesterday?” | It brings back reminders, recent state, project context, and the most reachable next move | You do not have to restart from blankness |
-| While moving through the day | You drop thoughts, todos, finished time blocks, and sudden fragments into chat | It keeps what matters: some things become diary, some become timeline, some become reminders for later | Your head does not have to keep brute-forcing memory |
-| You look up and half the day seems gone | “What did I even do?” / “Why does today feel like a blur again?” | It turns time blocks, switches, and surviving clues back into a timeline so the day has shape again | Less distortion, less blankness, less shame |
-| You have gone quiet for a while | You may not say anything at all, or the line may simply go silent | It weighs whether to check in, follow up, leave a reminder for later, write something down first, or stay quiet | The companionship does not depend on you manually summoning it every time |
-| You return to a project and your mind goes blank for a second | “Continue this.” / “Where exactly am I stuck?” | It follows the same thread, project context, and recent actions until the way back in becomes visible again | Re-entry does not require carrying the whole context stack alone |
-| You stall, switch, or want to disappear for a bit | “I’m scattered.” / “I want to avoid this.” / “I don’t know what to do first.” | It narrows things back to one reachable move, and may quietly leave a reminder or close a loose loop | Switching costs less, and the whole thread is less likely to collapse |
-| The day is closing | You let it help you close out before sleep, before leaving, or after a work block | It compresses the day into timeline, review, and a gentler way back in tomorrow | The thread is still there when you return, and so is the sense of time |
+- **At the start of the day**: you might only say “I’m starting now” or “Where did that thread stop yesterday?” It brings back reminders, recent state, project context, and the most reachable next move so you do not have to restart from blankness.
+- **While moving through the day**: you drop thoughts, todos, finished time blocks, and fragments into chat. It keeps what matters: some things become diary, some become timeline, some become reminders for later, and your head does not have to keep brute-forcing memory.
+- **You look up and half the day seems gone**: you ask “What did I even do?” or “Why does today feel like a blur again?” It turns time blocks, switches, and surviving clues back into a timeline so the day has shape again.
+- **You go quiet for a while**: it does not rush to jump in. It weighs whether this is the moment to check in, follow up, write something down first, leave a reminder for later, or simply stay with the thread quietly.
+- **You return to a project and your mind goes blank for a second**: you say “Continue this” or “Where exactly am I stuck?” It follows the same thread, project context, and recent actions until the way back in becomes visible again.
+- **You stall, switch, or want to disappear for a bit**: you say “I’m scattered,” “I want to avoid this,” or “I don’t know what to do first.” It narrows things back to one reachable move, and may quietly leave a reminder or close a loose loop.
+- **The day is closing**: you let it help you close out before sleep, before leaving, or after a work block. It compresses the day into timeline, review, and a gentler way back in tomorrow.
 
-> `Proactive help` is not just more frequent messages.
+> `Proactive help` feels more like having something gently keep watch over the day.
 >
-> It keeps hold of time, loose threads, and what already happened. It shows up when it should, and leaves anchors behind so the day does not dissolve into blur.
+> It keeps hold of time, loose threads, and what already happened. It shows up when it should, leaves anchors behind, and knows how to stay quietly present too.
 
 ## What It Can Do
 
 - `Timeline`: time blocks, switches, and lived facts become anchors for memory and time sense instead of fading into a blur
 - `Diary`: todos, fragments, supplements, summaries, and timeline-linked facts for daily traces that want to stay
-- `Check-ins`: random wake-ups and proactive help; it can message, stay quiet, write something down first, update diary/timeline, or leave a reminder for later
+- `Check-ins`: random wake-ups and proactive help; it can message, stay quiet, write something down first, update diary/timeline, or leave a reminder for later before deciding whether it should step in
 - `Reminders`: reminder write and scheduling support for rhythm and follow-through
 - `Review`: nightly / weekly / monthly review, with hybrid semantic extraction by default
 - `Project support`: workspace bootstrap, project radar, and shared-thread recovery by workspace, so re-entry does not always start from scratch
@@ -61,9 +58,8 @@
   <p><strong>One name, held in two moods.</strong></p>
 </div>
 
-| `Code` | `-ksei` |
-| --- | --- |
-| The quiet shorthand of everyday life.<br>Fleeting thoughts, paused threads, and the texture you meant to remember. | Taken from the latter half of `Aleksei`.<br>Here it carries an image of care, help, and companionship. |
+- `Code`: the quiet shorthand of everyday life. Fleeting thoughts, paused threads, and the texture you meant to remember all leave a trace here.
+- `-ksei`: taken from the latter half of `Aleksei`. Here it carries an image of care, help, and companionship, like someone walking beside you without making a show of it.
 
 <div align="center">
   <p><em>Your threads are watched over, and returning can still feel warm and continuous.</em></p>
@@ -231,7 +227,6 @@ More detailed references:
 
 - [docs/commands.md](./docs/commands.md)
 - [docs/architecture.md](./docs/architecture.md)
-- [docs/release.md](./docs/release.md)
 
 ## If You Are Coming From `cyberboss`
 

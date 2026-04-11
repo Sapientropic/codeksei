@@ -24,8 +24,6 @@ Read these in order when you first enter this repo:
    - command surface, compatibility details, public-facing usage expectations
 4. `docs/architecture.md`
    - module boundaries, shared-mode structure, persistence model
-5. `docs/release.md`
-   - public repo / npm / release workflow truth
 
 When a task changes compatibility, managed markers, bootstrap behavior, or
 shared-mode lifecycle, also read the relevant source of truth in:
@@ -45,6 +43,8 @@ shared-mode lifecycle, also read the relevant source of truth in:
 - Local `main` is a maintainer branch, not a public push target.
   Push release-ready history to remote `public` only unless the user
   explicitly asks for a different branch workflow.
+- Maintainer-only release checklists should stay in local-only notes or
+  private overlays, not in the public repo docs.
 - Public docs and new examples should default to `Codeksei / codeksei /
   CODEKSEI_*`.
 - Legacy `cyberboss / CYBERBOSS_* / ~/.cyberboss` mentions are allowed only for
