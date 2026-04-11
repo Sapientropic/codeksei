@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 
 const { StreamDelivery } = require("../src/core/stream-delivery");
 
-test("finalizeAbandonedTurn flushes partial text and ignores late terminal events", async () => {
+test("finalizeAbandonedTurn flushes partial text and auto-continues when the terminal event arrives later", async () => {
   const sent = [];
   const delivery = new StreamDelivery({
     weixinReplyMode: "settled",
@@ -69,7 +69,188 @@ test("finalizeAbandonedTurn flushes partial text and ignores late terminal event
     },
   });
 
-  assert.equal(sent.length, 1);
+  assert.equal(sent.length, 2);
+  assert.match(sent[1], /第一段正式收尾/);
+});
+
+test("finalizeAbandonedTurn lets a late stream completion auto-continue from the partial text", async () => {
+  const sent = [];
+  const delivery = new StreamDelivery({
+    weixinReplyMode: "stream",
+    channelAdapter: {
+      async sendText(payload) {
+        sent.push(payload.text);
+      },
+    },
+    sessionStore: {
+      findBindingForThreadId() {
+        return { bindingKey: "binding-stream-watchdog-resume" };
+      },
+    },
+  });
+
+  delivery.queueReplyTargetForThread("thread-stream-watchdog-resume", {
+    userId: "user-stream-watchdog-resume",
+    contextToken: "ctx-stream-watchdog-resume",
+    provider: "weixin",
+  });
+
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.started",
+    payload: {
+      threadId: "thread-stream-watchdog-resume",
+      turnId: "turn-stream-watchdog-resume",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-stream-watchdog-resume",
+      turnId: "turn-stream-watchdog-resume",
+      itemId: "item-1",
+      text: "我先把已确认的范围告诉你。",
+      phase: "commentary",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.delta",
+    payload: {
+      threadId: "thread-stream-watchdog-resume",
+      turnId: "turn-stream-watchdog-resume",
+      itemId: "item-2",
+      text: "这一段还在等工具结果，",
+      phase: "final",
+    },
+  });
+
+  await delivery.finalizeAbandonedTurn({
+    threadId: "thread-stream-watchdog-resume",
+    turnId: "turn-stream-watchdog-resume",
+    trailingText: "【系统提示】\n这一轮回复没有正常收尾。",
+  });
+
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-stream-watchdog-resume",
+      turnId: "turn-stream-watchdog-resume",
+      itemId: "item-2",
+      text: "这一段还在等工具结果，现在结果已经回来，可以继续给你完整结论。",
+      phase: "final",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.completed",
+    payload: {
+      threadId: "thread-stream-watchdog-resume",
+      turnId: "turn-stream-watchdog-resume",
+    },
+  });
+
+  assert.deepEqual(sent, [
+    "我先把已确认的范围告诉你。",
+    "这一段还在等工具结果，\n\n【系统提示】\n这一轮回复没有正常收尾。",
+    "现在结果已经回来，可以继续给你完整结论。",
+  ]);
+});
+
+test("a new turn suppresses late completion from an older abandoned turn", async () => {
+  const sent = [];
+  const delivery = new StreamDelivery({
+    weixinReplyMode: "stream",
+    channelAdapter: {
+      async sendText(payload) {
+        sent.push(payload.text);
+      },
+    },
+    sessionStore: {
+      findBindingForThreadId() {
+        return { bindingKey: "binding-stream-supersede" };
+      },
+    },
+  });
+
+  delivery.queueReplyTargetForThread("thread-stream-supersede", {
+    userId: "user-stream-supersede",
+    contextToken: "ctx-stream-supersede",
+    provider: "weixin",
+  });
+  delivery.setReplyTarget("binding-stream-supersede", {
+    userId: "user-stream-supersede",
+    contextToken: "ctx-stream-supersede",
+    provider: "weixin",
+  });
+
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.started",
+    payload: {
+      threadId: "thread-stream-supersede",
+      turnId: "turn-old",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.delta",
+    payload: {
+      threadId: "thread-stream-supersede",
+      turnId: "turn-old",
+      itemId: "item-old",
+      text: "旧 turn 只发出了一半。",
+      phase: "final",
+    },
+  });
+
+  await delivery.finalizeAbandonedTurn({
+    threadId: "thread-stream-supersede",
+    turnId: "turn-old",
+    trailingText: "【系统提示】\n这一轮回复没有正常收尾。",
+  });
+
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.started",
+    payload: {
+      threadId: "thread-stream-supersede",
+      turnId: "turn-new",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-stream-supersede",
+      turnId: "turn-old",
+      itemId: "item-old",
+      text: "旧 turn 后来又偷偷补完了。",
+      phase: "final",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.completed",
+    payload: {
+      threadId: "thread-stream-supersede",
+      turnId: "turn-old",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-stream-supersede",
+      turnId: "turn-new",
+      itemId: "item-new",
+      text: "这是新 turn 的正常回复。",
+      phase: "final",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.completed",
+    payload: {
+      threadId: "thread-stream-supersede",
+      turnId: "turn-new",
+    },
+  });
+
+  assert.deepEqual(sent, [
+    "旧 turn 只发出了一半。\n\n【系统提示】\n这一轮回复没有正常收尾。",
+    "这是新 turn 的正常回复。",
+  ]);
 });
 
 test("weixin replies wait until turn completion before sending", async () => {

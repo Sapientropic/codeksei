@@ -67,13 +67,16 @@ class StreamDelivery {
 
     switch (event.type) {
       case "runtime.turn.started": {
+        this.disposeSupersededAbandonedRuns(threadId, turnId);
         const state = this.ensureRunState(threadId, turnId);
         state.turnId = turnId || state.turnId;
+        state.abandonedAt = 0;
         this.attachReplyTarget(state);
         return;
       }
       case "runtime.reply.delta": {
         const state = this.ensureRunState(threadId, turnId);
+        state.abandonedAt = 0;
         this.upsertItem(state, {
           itemId: normalizeText(event.payload.itemId) || `item-${state.itemOrder.length + 1}`,
           text: normalizeLineEndings(event.payload.text),
@@ -84,6 +87,7 @@ class StreamDelivery {
       }
       case "runtime.reply.completed": {
         const state = this.ensureRunState(threadId, turnId);
+        state.abandonedAt = 0;
         const itemId = normalizeText(event.payload.itemId) || `item-${state.itemOrder.length + 1}`;
         const phase = normalizeAssistantPhase(event.payload.phase);
         this.upsertItem(state, {
@@ -105,6 +109,7 @@ class StreamDelivery {
       case "runtime.turn.completed": {
         const state = this.ensureRunState(threadId, turnId);
         state.turnId = turnId || state.turnId;
+        state.abandonedAt = 0;
         await this.flush(state, {
           force: true,
           trigger: { source: event.type },
@@ -197,8 +202,9 @@ class StreamDelivery {
         itemId: normalizedTrailingText ? "__watchdog__" : "",
       },
     });
-    this.ignoredRunKeys.add(state.runKey);
-    this.disposeRunState(state.runKey);
+    removeStateItem(state, "__watchdog__");
+    state.sentText = buildCurrentSafeReplyText(state, { force: true });
+    state.abandonedAt = Date.now();
   }
 
   ensureRunState(threadId, turnId = "") {
@@ -220,6 +226,7 @@ class StreamDelivery {
       sentText: "",
       sendChain: Promise.resolve(),
       flushPromise: null,
+      abandonedAt: 0,
     };
     this.stateByRunKey.set(runKey, created);
     this.attachReplyTarget(created);
@@ -465,6 +472,24 @@ class StreamDelivery {
     });
   }
 
+  disposeSupersededAbandonedRuns(threadId, activeTurnId = "") {
+    const normalizedThreadId = normalizeText(threadId);
+    const normalizedActiveTurnId = normalizeText(activeTurnId);
+    if (!normalizedThreadId) {
+      return;
+    }
+    for (const candidate of this.stateByRunKey.values()) {
+      if (candidate.threadId !== normalizedThreadId || !candidate.abandonedAt) {
+        continue;
+      }
+      if (normalizedActiveTurnId && candidate.turnId === normalizedActiveTurnId) {
+        continue;
+      }
+      this.ignoredRunKeys.add(candidate.runKey);
+      this.disposeRunState(candidate.runKey);
+    }
+  }
+
   disposeRunState(runKey) {
     const normalizedRunKey = normalizeText(runKey);
     if (!normalizedRunKey) {
@@ -531,6 +556,9 @@ function buildRunKey(threadId, turnId = "") {
 
 function buildReplyText(state, { completedOnly, preferLatestMessage = false, force = false }) {
   if (force && hasWatchdogTail(state, { completedOnly })) {
+    if (prefersStreamingDelivery(state)) {
+      return buildStreamingWatchdogReplyText(state, { completedOnly });
+    }
     return buildSettledReplyText(state, { completedOnly });
   }
 
@@ -568,6 +596,21 @@ function buildStreamingReplyText(state, { completedOnly, force }) {
     rememberVisiblePart(parts, seenParts, terminal.text);
   }
   return parts.join("\n\n");
+}
+
+function buildStreamingWatchdogReplyText(state, { completedOnly }) {
+  const visible = buildStreamingReplyText(state, { completedOnly, force: true });
+  const tail = readStateItemText(state, "__watchdog__", { completedOnly });
+  return [visible, tail].filter(Boolean).join("\n\n");
+}
+
+function buildCurrentSafeReplyText(state, { force = false, completedOnly = false } = {}) {
+  const plainText = markdownToPlainText(buildReplyText(state, {
+    completedOnly,
+    preferLatestMessage: prefersSettledDelivery(state),
+    force,
+  }));
+  return sanitizeReplyText(state.replyTarget, plainText).text;
 }
 
 function buildSettledReplyText(state, { completedOnly }) {
@@ -703,6 +746,15 @@ function collectVisibleItems(state, { completedOnly, skipItemIds = null }) {
     });
   }
   return items;
+}
+
+function removeStateItem(state, itemId) {
+  const normalizedItemId = normalizeText(itemId);
+  if (!normalizedItemId || !state?.items?.has(normalizedItemId)) {
+    return;
+  }
+  state.items.delete(normalizedItemId);
+  state.itemOrder = state.itemOrder.filter((candidateId) => candidateId !== normalizedItemId);
 }
 
 function markdownToPlainText(text) {

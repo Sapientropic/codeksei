@@ -30,7 +30,10 @@ const BACKOFF_DELAY_MS = 30_000;
 const MAX_CONSECUTIVE_FAILURES = 3;
 const FIRST_RUNTIME_EVENT_NOTICE_TIMEOUT_MS = 8_000;
 const FIRST_RUNTIME_EVENT_FAILURE_TIMEOUT_MS = 45_000;
-const STREAM_SETTLEMENT_TIMEOUT_MS = 90_000;
+// Once a reply has already started streaming, the common failure mode is a
+// long tool / search / browser phase with no assistant text for a while. Keep
+// the watchdog conservative so we do not prematurely cut off healthy turns.
+const STREAM_SETTLEMENT_TIMEOUT_MS = 5 * 60_000;
 
 class CyberbossApp {
   constructor(config) {
@@ -523,7 +526,8 @@ class CyberbossApp {
           "【系统提示】",
           "这一轮回复已经开始输出，但 Codex runtime 一直没有发回完成或失败事件。",
           "我先把目前拿到的内容停在这里，避免你继续看到假 typing。",
-          "如果要继续，请直接再发一句“继续刚才那条未完回复”。",
+          "如果 runtime 稍后恢复并补发完成事件，我会自动续发剩下的内容。",
+          "只有在长时间都没有新内容时，再发一句“继续刚才那条未完回复”就行。",
         ].join("\n"),
       });
       this.threadStateStore.markTurnFailed(
