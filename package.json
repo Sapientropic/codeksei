@@ -15,8 +15,8 @@
     "url": "https://github.com/Sapientropic/codeksei/issues"
   },
   "bin": {
-    "codeksei": "./bin/codeksei.js",
-    "cyberboss": "./bin/cyberboss.js"
+    "codeksei": "bin/codeksei.js",
+    "cyberboss": "bin/cyberboss.js"
   },
   "files": [
     "bin",
