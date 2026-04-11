@@ -21,6 +21,7 @@ function renderInstructionTemplate(template, config = {}) {
   ).trim();
   return String(template || "")
     .replaceAll("{{USER_NAME}}", userName)
+    .replaceAll("{{CODEKSEI_HOME}}", codekseiHome)
     .replaceAll("{{CYBERBOSS_HOME}}", codekseiHome)
     .replaceAll("她", pronoun);
 }
