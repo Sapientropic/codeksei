@@ -69,7 +69,7 @@ npm 侧需要的 GitHub Actions trusted publisher 配置：
 
 1. 本地确认改动、测试和 packlist 都通过
 2. 更新 `package.json` 版本号
-3. push 到 `main`
+3. push 到 `public`
 4. 可选：手动触发一次 `publish.yml` 的 `workflow_dispatch` 做 dry-run 预检
 5. 创建 GitHub Release，tag 形如 `v0.1.1`
 6. 等 `publish.yml` 自动发包

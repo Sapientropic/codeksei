@@ -20,7 +20,7 @@
 | 定位 | 本地优先的个人生活助理桥接层 |
 | 主要入口 | WeChat + `codeksei` CLI |
 | 核心价值 | 同一条线程、同一份状态、低摩擦续接 |
-| 当前发布 | `codeksei@0.1.0` |
+| 当前发布 | `codeksei@0.1.1` |
 | 兼容层 | `cyberboss` / `CYBERBOSS_*` / `~/.cyberboss` |
 
 ## 为什么它不是普通聊天壳
