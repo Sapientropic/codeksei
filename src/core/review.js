@@ -6,6 +6,12 @@ const {
   LEGACY_REVIEW_MARKER_PREFIX,
 } = require("./branding");
 const {
+  LEGACY_TIMELINE_TIMEZONE,
+  formatDateInTimezone,
+  formatDateTimeInTimezone,
+  getCurrentDateStringInTimezone,
+} = require("./timezone");
+const {
   normalizeDisplayPath,
   resolveCrossPlatformPath,
   resolveCrossPlatformPathFromRoot,
@@ -95,7 +101,11 @@ function resolveReviewProfile(config = {}, kind, options = {}) {
 
 async function buildReview(config = {}, kind, options = {}) {
   const profile = resolveReviewProfile(config, kind);
-  const window = resolveReviewWindow(profile.kind, options);
+  const timezone = config.timezone || LEGACY_TIMELINE_TIMEZONE;
+  const window = resolveReviewWindow(profile.kind, {
+    ...options,
+    timezone,
+  });
   const diaryEntries = collectDiaryEntries(config.diaryDir, window.startDate, window.endDate);
   const nightlyEntries = profile.kind === "nightly"
     ? []
@@ -149,8 +159,9 @@ async function writeReview(config = {}, kind, options = {}) {
 }
 
 function buildReviewFileSkeleton(review, now = new Date()) {
-  const createdAt = formatDateTime(now);
-  const updated = formatDate(now);
+  const timezone = review?.window?.timezone || LEGACY_TIMELINE_TIMEZONE;
+  const createdAt = formatDateTime(now, timezone);
+  const updated = formatDate(now, timezone);
   const frontmatter = [
     "---",
     `created: ${createdAt}`,
@@ -192,8 +203,9 @@ function buildReviewFileSkeleton(review, now = new Date()) {
 }
 
 function syncReviewContent(content, review, now = new Date()) {
+  const timezone = review?.window?.timezone || LEGACY_TIMELINE_TIMEZONE;
   let next = ensureReviewSections(normalizeLineEnding(content), review);
-  next = updateFrontmatterValue(next, "updated", formatDate(now));
+  next = updateFrontmatterValue(next, "updated", formatDate(now, timezone));
   next = updateFrontmatterValue(next, "period_label", review.draft.periodLabel);
   next = updateFrontmatterValue(next, "period_start", review.window.startDate);
   next = updateFrontmatterValue(next, "period_end", review.window.endDate);
@@ -771,12 +783,13 @@ function resolveReviewWindow(kind, options = {}) {
 function resolveNightlyWindow(options = {}) {
   const baseDate = normalizeText(options.date)
     ? parseDateString(normalizeText(options.date))
-    : getCurrentUtcDateInShanghai();
+    : parseDateString(getCurrentDateStringInTimezone(options.timezone || LEGACY_TIMELINE_TIMEZONE));
   const label = formatUtcDate(baseDate);
   return {
     label,
     startDate: label,
     endDate: label,
+    timezone: options.timezone || LEGACY_TIMELINE_TIMEZONE,
   };
 }
 
@@ -795,12 +808,13 @@ function resolveWeeklyWindow(options = {}) {
       label: `${year}-W${String(week).padStart(2, "0")}`,
       startDate: formatUtcDate(start),
       endDate: formatUtcDate(end),
+      timezone: options.timezone || LEGACY_TIMELINE_TIMEZONE,
     };
   }
 
   const baseDate = normalizeText(options.date)
     ? parseDateString(normalizeText(options.date))
-    : getCurrentUtcDateInShanghai();
+    : parseDateString(getCurrentDateStringInTimezone(options.timezone || LEGACY_TIMELINE_TIMEZONE));
   const start = startOfIsoWeek(baseDate);
   const end = addDays(start, 6);
   const week = isoWeekNumber(baseDate);
@@ -808,6 +822,7 @@ function resolveWeeklyWindow(options = {}) {
     label: `${baseDate.getUTCFullYear()}-W${String(week).padStart(2, "0")}`,
     startDate: formatUtcDate(start),
     endDate: formatUtcDate(end),
+    timezone: options.timezone || LEGACY_TIMELINE_TIMEZONE,
   };
 }
 
@@ -824,7 +839,7 @@ function resolveMonthlyWindow(options = {}) {
   } else {
     const baseDate = normalizeText(options.date)
       ? parseDateString(normalizeText(options.date))
-      : getCurrentUtcDateInShanghai();
+      : parseDateString(getCurrentDateStringInTimezone(options.timezone || LEGACY_TIMELINE_TIMEZONE));
     year = baseDate.getUTCFullYear();
     month = baseDate.getUTCMonth() + 1;
   }
@@ -834,6 +849,7 @@ function resolveMonthlyWindow(options = {}) {
     label: `${year}-${String(month).padStart(2, "0")}`,
     startDate: formatUtcDate(start),
     endDate: formatUtcDate(end),
+    timezone: options.timezone || LEGACY_TIMELINE_TIMEZONE,
   };
 }
 
@@ -1011,37 +1027,12 @@ function formatUtcDate(date) {
   return `${year}-${month}-${day}`;
 }
 
-function getCurrentUtcDateInShanghai() {
-  const now = new Date();
-  const shanghai = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now);
-  return parseDateString(shanghai);
+function formatDate(date, timezone = LEGACY_TIMELINE_TIMEZONE) {
+  return formatDateInTimezone(date, timezone);
 }
 
-function formatDate(date) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
-
-function formatDateTime(date) {
-  const formatter = new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-  return formatter.format(date).replace(" ", "T");
+function formatDateTime(date, timezone = LEGACY_TIMELINE_TIMEZONE) {
+  return formatDateTimeInTimezone(date, timezone);
 }
 
 function normalizeBody(value) {

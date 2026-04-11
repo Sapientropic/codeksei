@@ -5,6 +5,10 @@ const { loadPersistedContextTokens } = require("../adapters/channel/weixin/conte
 const { ReminderQueueStore } = require("../adapters/channel/weixin/reminder-queue-store");
 const { SessionStore } = require("../adapters/runtime/codex/session-store");
 const { resolvePreferredSenderId } = require("../core/default-targets");
+const {
+  LEGACY_TIMELINE_TIMEZONE,
+  coerceLocalDateTimeToIso,
+} = require("../core/timezone");
 
 const DELAY_UNIT_MS = {
   s: 1_000,
@@ -12,7 +16,6 @@ const DELAY_UNIT_MS = {
   h: 60 * 60_000,
   d: 24 * 60 * 60_000,
 };
-const LOCAL_TIMEZONE_OFFSET = "+08:00";
 
 async function runReminderWriteCommand(config) {
   const args = process.argv.slice(4);
@@ -22,9 +25,12 @@ async function runReminderWriteCommand(config) {
     throw new Error("提醒内容不能为空，传 --text 或通过 stdin 输入");
   }
 
-  const dueAtMs = resolveDueAtMs(options);
+  const timezone = config?.timezone || LEGACY_TIMELINE_TIMEZONE;
+  const dueAtMs = resolveDueAtMs(options, timezone);
   if (!Number.isFinite(dueAtMs) || dueAtMs <= Date.now()) {
-    throw new Error("缺少有效时间，使用 --delay 30s|10m|1h30m|2d4h20m 或 --at 2026-04-07T21:30+08:00");
+    throw new Error(
+      `缺少有效时间，使用 --delay 30s|10m|1h30m|2d4h20m 或 --at ${buildAbsoluteTimeExample(timezone)}`
+    );
   }
 
   const account = resolveSelectedAccount(config);
@@ -97,9 +103,9 @@ function parseArgs(args) {
   return options;
 }
 
-function resolveDueAtMs(options) {
+function resolveDueAtMs(options, timezone = LEGACY_TIMELINE_TIMEZONE) {
   const delayMs = parseDelay(options.delay);
-  const scheduledAtMs = parseAbsoluteTime(options.at);
+  const scheduledAtMs = parseAbsoluteTime(options.at, timezone);
   if (delayMs && scheduledAtMs) {
     throw new Error("--delay 和 --at 不能同时传");
   }
@@ -146,38 +152,26 @@ function parseDelay(rawValue) {
   return totalMs > 0 ? totalMs : 0;
 }
 
-function parseAbsoluteTime(rawValue) {
+function parseAbsoluteTime(rawValue, timezone = LEGACY_TIMELINE_TIMEZONE) {
   const normalized = String(rawValue || "").trim();
   if (!normalized) {
     return 0;
   }
 
-  const normalizedIso = normalizeAbsoluteTimeString(normalized);
+  const normalizedIso = normalizeAbsoluteTimeString(normalized, timezone);
   const parsed = Date.parse(normalizedIso);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function normalizeAbsoluteTimeString(value) {
+function normalizeAbsoluteTimeString(value, timezone = LEGACY_TIMELINE_TIMEZONE) {
   const normalized = String(value || "").trim();
   if (!normalized) {
     return "";
   }
-
-  if (/([zZ]|[+-]\d{2}:\d{2})$/.test(normalized)) {
-    return normalized.replace(" ", "T");
-  }
-
-  const dateTimeMatch = normalized.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2})?)$/);
-  if (dateTimeMatch) {
-    return `${dateTimeMatch[1]}T${dateTimeMatch[2]}${LOCAL_TIMEZONE_OFFSET}`;
-  }
-
-  const dateOnlyMatch = normalized.match(/^(\d{4}-\d{2}-\d{2})$/);
-  if (dateOnlyMatch) {
-    return `${dateOnlyMatch[1]}T09:00:00${LOCAL_TIMEZONE_OFFSET}`;
-  }
-
-  return normalized;
+  return coerceLocalDateTimeToIso(normalized, {
+    timeZone: timezone,
+    defaultTime: "09:00:00",
+  }) || normalized;
 }
 
 async function resolveBody(options) {
@@ -207,4 +201,15 @@ function normalizeBody(value) {
   return String(value || "").replace(/\r\n/g, "\n").trim();
 }
 
-module.exports = { runReminderWriteCommand };
+function buildAbsoluteTimeExample(timezone = LEGACY_TIMELINE_TIMEZONE) {
+  const explicit = normalizeAbsoluteTimeString("2026-04-07 21:30", timezone);
+  return `${explicit || "2026-04-07T21:30+08:00"} 或 2026-04-07 21:30（后者按当前 timezone 解释）`;
+}
+
+module.exports = {
+  buildAbsoluteTimeExample,
+  normalizeAbsoluteTimeString,
+  parseAbsoluteTime,
+  resolveDueAtMs,
+  runReminderWriteCommand,
+};

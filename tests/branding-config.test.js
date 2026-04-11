@@ -134,6 +134,24 @@ test("resolveStateDir still resolves relative explicit paths from cwd", () => {
   }
 });
 
+test("readConfig exposes unified timezone metadata", () => {
+  const originalArgv = process.argv;
+  process.argv = ["node", "codeksei.js"];
+
+  try {
+    const config = withPatchedEnv({
+      CODEKSEI_TIMEZONE: "Europe/Paris",
+      CODEKSEI_STATE_DIR: "E:/state",
+    }, () => readConfig());
+
+    assert.equal(config.timezone, "Europe/Paris");
+    assert.equal(config.timezoneSource, "env");
+    assert.equal(config.timezoneExplicit, true);
+  } finally {
+    process.argv = originalArgv;
+  }
+});
+
 test("resolveStateDir reuses legacy directory until new directory exists", () => {
   const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-home-"));
   const legacyStateDir = path.join(tempHome, ".cyberboss");

@@ -17,6 +17,10 @@ const { TimelineScreenshotQueueStore } = require("./timeline-screenshot-queue-st
 const { writeSharedBridgeHeartbeat } = require("./shared-bridge-heartbeat");
 const { ReminderQueueStore } = require("../adapters/channel/weixin/reminder-queue-store");
 const { runSystemCheckinPoller } = require("../app/system-checkin-poller");
+const {
+  LEGACY_TIMELINE_TIMEZONE,
+  formatDateTimeInTimezone,
+} = require("./timezone");
 
 const DEFAULT_LONG_POLL_TIMEOUT_MS = 35_000;
 const MIN_LONG_POLL_TIMEOUT_MS = 2_000;
@@ -1714,7 +1718,7 @@ function buildCodexInboundText(normalized, persisted = {}, config = {}) {
   const saved = Array.isArray(persisted?.saved) ? persisted.saved : [];
   const failed = Array.isArray(persisted?.failed) ? persisted.failed : [];
   const userName = String(config?.userName || "").trim() || "用户";
-  const localTime = formatWechatLocalTime(normalized?.receivedAt);
+  const localTime = formatWechatLocalTime(normalized?.receivedAt, config.timezone);
   const lines = [];
   if (localTime) {
     lines.push(`[${localTime}]`);
@@ -1753,7 +1757,7 @@ function buildCodexInboundText(normalized, persisted = {}, config = {}) {
   return lines.join("\n").trim();
 }
 
-function formatWechatLocalTime(receivedAt) {
+function formatWechatLocalTime(receivedAt, timezone = LEGACY_TIMELINE_TIMEZONE) {
   const value = typeof receivedAt === "string" ? receivedAt.trim() : "";
   if (!value) {
     return "";
@@ -1762,15 +1766,7 @@ function formatWechatLocalTime(receivedAt) {
   if (Number.isNaN(parsed.getTime())) {
     return value;
   }
-  return new Intl.DateTimeFormat("zh-CN", {
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(parsed).replace(/\//g, "-");
+  return formatDateTimeInTimezone(parsed, timezone).replace("T", " ");
 }
 
 function stringifyRpcId(value) {

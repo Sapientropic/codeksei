@@ -1,9 +1,12 @@
 const path = require("path");
 const { spawn } = require("child_process");
 const { readPrefixedEnv } = require("../../core/branding");
+const { resolveTimelineStateFiles } = require("../../core/timezone");
+const { ensureTimelineStateTimezone } = require("./state-sync");
 
 function createTimelineIntegration(config) {
   const binPath = resolveTimelineBinPath();
+  const timelineFiles = resolveTimelineStateFiles(config.timelineStateDir);
 
   return {
     describe() {
@@ -12,6 +15,7 @@ function createTimelineIntegration(config) {
         kind: "integration",
         command: `${process.execPath} ${binPath}`,
         stateDir: config.timelineStateDir,
+        timelineDir: timelineFiles.dir,
       };
     },
     async runSubcommand(subcommand, args = []) {
@@ -19,8 +23,19 @@ function createTimelineIntegration(config) {
       if (!normalizedSubcommand) {
         throw new Error("timeline 子命令不能为空");
       }
+      ensureTimelineStateTimezone(config);
+      // Pass the fully resolved files so Codeksei, state sync, and
+      // timeline-for-agent all operate on the same layout during direct,
+      // nested, and migrated state-dir variants.
       return runTimelineCommand(binPath, [normalizedSubcommand, ...normalizeTimelineArgs(normalizedSubcommand, args)], {
         TIMELINE_FOR_AGENT_STATE_DIR: config.timelineStateDir,
+        TIMELINE_FOR_AGENT_DIR: timelineFiles.dir,
+        TIMELINE_FOR_AGENT_STATE_FILE: timelineFiles.stateFile,
+        TIMELINE_FOR_AGENT_TAXONOMY_FILE: timelineFiles.taxonomyFile,
+        TIMELINE_FOR_AGENT_FACTS_FILE: timelineFiles.factsFile,
+        TIMELINE_FOR_AGENT_DB_FILE: path.join(timelineFiles.dir, "timeline-db.json"),
+        TIMELINE_FOR_AGENT_SITE_DIR: path.join(timelineFiles.dir, "site"),
+        TIMELINE_FOR_AGENT_WRITE_LOCK_DIR: path.join(timelineFiles.dir, "timeline-write.lock"),
         TIMELINE_FOR_AGENT_CHROME_PATH: resolveTimelineChromePath(),
       }, {
         subcommand: normalizedSubcommand,

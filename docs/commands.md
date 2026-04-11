@@ -70,6 +70,7 @@ README 和帮助文本默认都按新入口书写；旧名字只作为兼容层�
 - 已有完整 JSON、或要批量写入时再用 `timeline:write`
 - `timeline:write --stdin` 也要传完整 JSON 对象 `{"events":[...]}`，不要传裸数组
 - 不确定分类 id 时先跑 `timeline:categories`，改已有日程前先跑 `timeline:read`
+- 不带 offset 的本地时间按当前 runtime timezone 解释；如果 timeline state 已声明非 legacy timezone，会优先沿用它
 - 截图回微信统一走 `timeline:screenshot -- --send`
 
 ## Diary
@@ -82,6 +83,7 @@ README 和帮助文本默认都按新入口书写；旧名字只作为兼容层�
 约定：
 
 - `todo + done + --timeline-text` 是原子 cutover 写法
+- 当前日期与默认时间都跟随统一 timezone contract，不再写死 `Asia/Shanghai`
 - `summary` 主要给 nightly closeout
 - `supplement` 用于背景、判断、补充说明，不是第二条 live log
 
@@ -112,6 +114,7 @@ README 和帮助文本默认都按新入口书写；旧名字只作为兼容层�
 说明：
 
 - 默认走 hybrid review：脚本保骨架，Codex 做结构化语义提炼
+- 不传 `--date/--week/--month` 时，当前日期按统一 timezone contract 推断
 - 失败或超时会回退 deterministic
 - nightly 是周/月复盘的前置压缩层
 
