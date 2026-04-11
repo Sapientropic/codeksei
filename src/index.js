@@ -63,6 +63,8 @@ function ensureInstructionsTemplate(config) {
     return;
   }
 
+  // The repo template is now the default persona source. Keep this bootstrap
+  // path only for explicit custom file paths that may still need seeding.
   const templatePath = path.resolve(__dirname, "..", "templates", "weixin-instructions.md");
   let template = "";
   try {

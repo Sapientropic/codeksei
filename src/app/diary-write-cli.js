@@ -509,7 +509,7 @@ function upsertTodoLine(lines, payload) {
     nextLines[index] = buildTodoLine({
       text: payload.text,
       todoState: payload.todoState,
-      todoStartedAt: parsed.todoStartedAt || payload.todoStartedAt,
+      todoStartedAt: resolveTodoStartedAtForUpsert(parsed, payload),
     });
     return nextLines;
   }
@@ -519,6 +519,26 @@ function upsertTodoLine(lines, payload) {
     todoStartedAt: payload.todoStartedAt,
   }));
   return nextLines;
+}
+
+function resolveTodoStartedAtForUpsert(parsed, payload) {
+  const existingState = parsed?.todoState || "open";
+  const existingStartedAt = normalizeTodoClock(parsed?.todoStartedAt);
+  const payloadStartedAt = normalizeTodoClock(payload?.todoStartedAt);
+  const nextState = normalizeTodoState(payload?.todoState, "todo");
+
+  // Repeated writes against the same live open Todo should keep the original
+  // block start. But if the same text gets reopened after it was already done,
+  // the new open write represents a fresh block and must reset the captured
+  // start time instead of leaking the old finished block's timestamp.
+  if (nextState === "open") {
+    if (existingState === "open") {
+      return existingStartedAt || payloadStartedAt;
+    }
+    return payloadStartedAt || existingStartedAt;
+  }
+
+  return existingStartedAt || payloadStartedAt;
 }
 
 function upsertBulletLine(lines, payload) {
