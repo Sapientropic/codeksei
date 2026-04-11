@@ -36,7 +36,7 @@ function cleanupStaleAccountsForUserId(config, activeAccount) {
   for (const staleAccount of staleAccounts) {
     deleteWeixinAccount(config, staleAccount.accountId);
     clearPersistedContextTokens(config, staleAccount.accountId);
-    console.log(`[cyberboss] removed stale account ${staleAccount.accountId} for userId ${activeUserId}`);
+    console.log(`[codeksei] removed stale account ${staleAccount.accountId} for userId ${activeUserId}`);
   }
   return staleAccounts;
 }

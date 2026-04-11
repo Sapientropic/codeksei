@@ -20,6 +20,7 @@ async function main() {
   console.log(`listen=${listenUrl}`);
   printPidState("shared_supervisor_pid", supervisorPidFile);
   printPidState("shared_app_server_pid", appServerPidFile, readyAppServerPid);
+  printPidState("shared_codeksei_pid", bridgePidFile);
   printPidState("shared_cyberboss_pid", bridgePidFile);
   console.log(`shared_bridge_heartbeat=${bridgeHealth.classification.status}`);
   console.log(`shared_bridge_heartbeat_at=${bridgeHealth.classification.updatedAt || "missing"}`);

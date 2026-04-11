@@ -123,7 +123,7 @@ test("review:weekly builds a weekly review note from diary truth source", async 
   assert.match(content, /source_nightly_days: 1/u);
   assert.match(content, /## 这段时间最真实的推进/u);
   assert.match(content, /## 下周第一步/u);
-  assert.match(content, /cyberboss-review:daily-summaries:start/u);
+  assert.match(content, /codeksei-review:daily-summaries:start/u);
 });
 
 test("review:monthly rewrites managed blocks idempotently", async () => {
@@ -191,4 +191,39 @@ test("review hybrid v2 lets semantic pass replace noisy deterministic lines", as
   ]);
   assert.doesNotMatch(review.draft.content.progress, /00:21 本来想刷牙/u);
   assert.match(review.draft.content.supplements, /本周值得带走的模式/u);
+});
+
+test("review can upgrade legacy managed markers to codeksei markers", async () => {
+  const fixture = setupReviewFixture();
+  const legacyNotePath = path.join(fixture.workspaceRoot, "项目", "Cyberboss 生活助理", "复盘", "Monthly", "2026-04.md");
+  fs.mkdirSync(path.dirname(legacyNotePath), { recursive: true });
+  fs.writeFileSync(legacyNotePath, [
+    "---",
+    "created: 2026-04-11T00:00",
+    "updated: 2026-04-11",
+    "type: review",
+    "review_period: monthly",
+    "period_label: 2026-04",
+    "period_start: 2026-04-01",
+    "period_end: 2026-04-30",
+    "source_diary_days: 1",
+    "source_nightly_days: 0",
+    "status: working",
+    "tags:",
+    "  - cyberboss",
+    "---",
+    "# 2026-04 月复盘",
+    "",
+    "## 每天收口摘录",
+    "<!-- cyberboss-review:daily-summaries:start -->",
+    "- 旧内容",
+    "<!-- cyberboss-review:daily-summaries:end -->",
+    "",
+  ].join("\n"), "utf8");
+
+  const result = await writeReview(fixture.config, "monthly", { month: "2026-04" });
+  assert.equal(result.changed, true);
+  const content = fs.readFileSync(legacyNotePath, "utf8");
+  assert.match(content, /codeksei-review:daily-summaries:start/u);
+  assert.doesNotMatch(content, /cyberboss-review:daily-summaries:start/u);
 });

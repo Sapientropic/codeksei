@@ -560,7 +560,7 @@ function logWeixinSendTrace(stage, trace) {
     return;
   }
   const parts = [
-    `[cyberboss] weixin send trace stage=${stage}`,
+    `[codeksei] weixin send trace stage=${stage}`,
     `pid=${process.pid}`,
     `trace=${trace.traceId || "(none)"}`,
     `origin=${trace.origin || "adapter.sendText"}`,

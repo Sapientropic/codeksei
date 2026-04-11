@@ -364,7 +364,7 @@ class StreamDelivery {
     if (sanitized.suppress) {
       state.sentText = sanitized.text;
       console.log(
-        `[cyberboss] suppressed system reply `
+        `[codeksei] suppressed system reply `
         + `thread=${state.threadId} turn=${state.turnId || "(pending)"} `
         + `preview=${JSON.stringify(plainText.slice(0, 80))}`
       );
@@ -376,7 +376,7 @@ class StreamDelivery {
     }
 
     if (state.sentText && !safeText.startsWith(state.sentText)) {
-      console.warn(`[cyberboss] skip non-monotonic reply thread=${state.threadId}`);
+      console.warn(`[codeksei] skip non-monotonic reply thread=${state.threadId}`);
       return;
     }
 
@@ -396,7 +396,7 @@ class StreamDelivery {
     const deliveryDedupKey = buildSettledWeixinDeliveryKey(state, safeText);
     if (deliveryDedupKey && this.wasRecentlyDelivered(deliveryDedupKey)) {
       state.sentText = safeText;
-      console.warn(`[cyberboss] suppress duplicate weixin delivery thread=${state.threadId}`);
+      console.warn(`[codeksei] suppress duplicate weixin delivery thread=${state.threadId}`);
       return;
     }
 
@@ -428,14 +428,14 @@ class StreamDelivery {
       if (deliveryDedupKey) {
         this.rememberRecentDelivery(deliveryDedupKey);
         console.log(
-          `[cyberboss] delivered weixin reply `
+          `[codeksei] delivered weixin reply `
           + `thread=${state.threadId} turn=${state.turnId || "(pending)"} `
           + `chars=${safeText.length} hash=${hashReplyText(safeText)}`
         );
       }
     }).catch((error) => {
       this.logDeliveryTrace("failed", tracePayload, error);
-      console.error(`[cyberboss] failed to deliver reply thread=${state.threadId}: ${error.message}`);
+      console.error(`[codeksei] failed to deliver reply thread=${state.threadId}: ${error.message}`);
       this.handleDeliveryFailure(state, error);
     });
 
@@ -461,7 +461,7 @@ class StreamDelivery {
       sentText: state.sentText,
       replyTarget: state.replyTarget ? { ...state.replyTarget } : null,
     })).catch((callbackError) => {
-      console.error(`[cyberboss] delivery failure callback crashed thread=${state.threadId}: ${callbackError.message}`);
+      console.error(`[codeksei] delivery failure callback crashed thread=${state.threadId}: ${callbackError.message}`);
     });
   }
 
@@ -498,7 +498,7 @@ class StreamDelivery {
       return;
     }
     const parts = [
-      `[cyberboss] weixin delivery trace stage=${stage}`,
+      `[codeksei] weixin delivery trace stage=${stage}`,
       `pid=${process.pid}`,
       `trace=${payload.traceId || "(none)"}`,
       `thread=${payload.threadId}`,

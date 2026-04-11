@@ -1,20 +1,21 @@
 const fs = require("fs");
-const os = require("os");
-const path = require("path");
 const dotenv = require("dotenv");
+const path = require("path");
+const {
+  ensureCompatHomeEnv,
+  ensureStateDirectory,
+  listEnvFileCandidates,
+} = require("../src/core/branding");
 
 const ALERT_COOLDOWN_MS = 10 * 60_000;
 
 function ensureDefaultStateDirectory() {
-  fs.mkdirSync(path.join(os.homedir(), ".cyberboss"), { recursive: true });
+  ensureStateDirectory();
 }
 
 function loadEnv() {
   ensureDefaultStateDirectory();
-  const candidates = [
-    path.join(process.cwd(), ".env"),
-    path.join(os.homedir(), ".cyberboss", ".env"),
-  ];
+  const candidates = listEnvFileCandidates();
   for (const envPath of candidates) {
     if (!fs.existsSync(envPath)) {
       continue;
@@ -26,9 +27,7 @@ function loadEnv() {
 }
 
 function ensureRuntimeEnv() {
-  if (!process.env.CYBERBOSS_HOME) {
-    process.env.CYBERBOSS_HOME = path.resolve(__dirname, "..");
-  }
+  ensureCompatHomeEnv({ fallbackRoot: path.resolve(__dirname, "..") });
 }
 
 loadEnv();
@@ -73,7 +72,7 @@ async function runWatchdogOnce({ shouldPrintSummary = true } = {}) {
 
     const bridge = await ensureManagedBridge({ restartUnhealthy: true });
     if (bridge.status !== "already_running") {
-      actions.push(`shared cyberboss ${bridge.status} pid=${bridge.pid}`);
+      actions.push(`shared codeksei ${bridge.status} pid=${bridge.pid}`);
     }
   } catch (error) {
     result = "failed";
@@ -256,6 +255,7 @@ function printSummary(state) {
   console.log(`result=${state.result}`);
   console.log(`readyz=${state.after?.appServer?.ready ? "ok" : "down"}`);
   console.log(`shared_app_server_pid=${state.after?.appServer?.readyPid || "missing"}`);
+  console.log(`shared_codeksei_pid=${state.after?.bridge?.pid || "missing"}`);
   console.log(`shared_cyberboss_pid=${state.after?.bridge?.pid || "missing"}`);
   console.log(`shared_bridge_heartbeat=${state.after?.bridge?.heartbeatStatus || "missing"}`);
   console.log(`shared_bridge_heartbeat_at=${state.after?.bridge?.heartbeatUpdatedAt || "missing"}`);

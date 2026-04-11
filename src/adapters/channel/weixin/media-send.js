@@ -319,7 +319,7 @@ async function sendFileFallback({
         throw error;
       }
       console.warn(
-        `[cyberboss] weixin media upload fallback `
+        `[codeksei] weixin media upload fallback `
         + `file=${path.basename(filePath)} reason=${String(error.message || error)}`
       );
     }

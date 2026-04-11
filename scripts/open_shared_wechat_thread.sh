@@ -2,9 +2,12 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PORT="${CYBERBOSS_SHARED_PORT:-8765}"
+PORT="${CODEKSEI_SHARED_PORT:-${CYBERBOSS_SHARED_PORT:-8765}}"
 REMOTE_URL="ws://127.0.0.1:${PORT}"
-STATE_DIR="${CYBERBOSS_STATE_DIR:-$HOME/.cyberboss}"
+STATE_DIR="${CODEKSEI_STATE_DIR:-${CYBERBOSS_STATE_DIR:-$HOME/.codeksei}}"
+if [[ ! -d "${STATE_DIR}" && -d "$HOME/.cyberboss" ]]; then
+  STATE_DIR="$HOME/.cyberboss"
+fi
 LOG_DIR="${STATE_DIR}/logs"
 PID_FILE="${LOG_DIR}/shared-wechat.pid"
 
@@ -16,7 +19,7 @@ function resolve_pid_cwd() {
 }
 
 function list_bridge_processes() {
-  ps -ax -o pid=,ppid=,command= | awk '/node \.\/bin\/cyberboss\.js start --checkin/ { print }'
+  ps -ax -o pid=,ppid=,command= | awk '/node \.\/bin\/(codeksei|cyberboss)\.js start --checkin/ { print }'
 }
 
 function find_bridge_child_pid() {
@@ -75,7 +78,7 @@ function find_existing_bridge_pid() {
 EXISTING_PID="$(find_existing_bridge_pid || true)"
 
 if [[ -z "${EXISTING_PID}" ]]; then
-  echo "shared cyberboss is not running." >&2
+  echo "shared codeksei is not running." >&2
   echo "start it in a separate terminal and keep it in the foreground:" >&2
   echo "  cd ${ROOT_DIR}" >&2
   echo "  ./scripts/start_shared_wechat.sh" >&2
@@ -84,7 +87,8 @@ fi
 
 echo "${EXISTING_PID}" > "${PID_FILE}"
 
-echo "shared cyberboss running pid=${EXISTING_PID} endpoint=${REMOTE_URL}"
+echo "shared codeksei running pid=${EXISTING_PID} endpoint=${REMOTE_URL}"
 
+export CODEKSEI_CODEX_ENDPOINT="${REMOTE_URL}"
 export CYBERBOSS_CODEX_ENDPOINT="${REMOTE_URL}"
 exec "${ROOT_DIR}/scripts/open_wechat_thread.sh" "$@"

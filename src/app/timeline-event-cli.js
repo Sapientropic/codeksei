@@ -258,7 +258,7 @@ function printTimelineEventHelp() {
   --finalize               按 timeline-for-agent 的 finalize 语义写入
 
 示例:
-  npm run timeline:event -- --date 2026-04-10 --start 09:30 --end 10:15 --title "看 cyberboss 提交历史" --subcategory work.dev --category work --note "为了补日记和时间线先核对最近改动。"
+  npm run timeline:event -- --date 2026-04-10 --start 09:30 --end 10:15 --title "看 Codeksei 提交历史" --subcategory work.dev --category work --note "为了补日记和时间线先核对最近改动。"
   @'
 补充背景和为什么要记录这段。
 '@ | npm run timeline:event -- --date 2026-04-10 --start 10:20 --end 10:45 --title "整理营养师笔记结构" --subcategory study.reading --stdin

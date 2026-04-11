@@ -3,6 +3,12 @@ const os = require("os");
 const path = require("path");
 const dotenv = require("dotenv");
 
+const {
+  PACKAGE_NAME,
+  ensureCompatHomeEnv,
+  ensureStateDirectory,
+  listEnvFileCandidates,
+} = require("./core/branding");
 const { readConfig } = require("./core/config");
 const { renderInstructionTemplate } = require("./core/instructions-template");
 const { CyberbossApp } = require("./core/app");
@@ -25,15 +31,12 @@ const {
 } = require("./core/command-registry");
 
 function ensureDefaultStateDirectory() {
-  fs.mkdirSync(path.join(os.homedir(), ".cyberboss"), { recursive: true });
+  ensureStateDirectory();
 }
 
 function loadEnv() {
   ensureDefaultStateDirectory();
-  const candidates = [
-    path.join(process.cwd(), ".env"),
-    path.join(os.homedir(), ".cyberboss", ".env"),
-  ];
+  const candidates = listEnvFileCandidates();
   for (const envPath of candidates) {
     if (!fs.existsSync(envPath)) {
       continue;
@@ -45,9 +48,7 @@ function loadEnv() {
 }
 
 function ensureRuntimeEnv() {
-  if (!process.env.CYBERBOSS_HOME) {
-    process.env.CYBERBOSS_HOME = path.resolve(__dirname, "..");
-  }
+  ensureCompatHomeEnv({ fallbackRoot: path.resolve(__dirname, "..") });
 }
 
 function ensureBootstrapFiles(config) {
@@ -93,12 +94,12 @@ function installRuntimeErrorHooks() {
 
   process.on("unhandledRejection", (reason) => {
     const message = reason instanceof Error ? reason.stack || reason.message : String(reason);
-    console.error(`[cyberboss] unhandled rejection ${message}`);
+    console.error(`[${PACKAGE_NAME}] unhandled rejection ${message}`);
   });
 
   process.on("uncaughtException", (error) => {
     const message = error instanceof Error ? error.stack || error.message : String(error);
-    console.error(`[cyberboss] uncaught exception ${message}`);
+    console.error(`[${PACKAGE_NAME}] uncaught exception ${message}`);
     process.exitCode = 1;
   });
 }

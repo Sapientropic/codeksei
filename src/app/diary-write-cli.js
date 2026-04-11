@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { PACKAGE_NAME } = require("../core/branding");
 
 const DEFAULT_SECTION = "supplement";
 const SECTION_HEADINGS = Object.freeze({
@@ -43,7 +44,7 @@ async function runDiaryWriteCommand(config) {
   });
   if (usesLegacyTodoDoneFallback) {
     console.warn(
-      "[cyberboss] diary:write legacy todo-done call omitted --timeline-text; "
+      `[${PACKAGE_NAME}] diary:write legacy todo-done call omitted --timeline-text; `
       + "synthesized a minimal point-in-time diary fact to keep the cutover atomic."
     );
   }

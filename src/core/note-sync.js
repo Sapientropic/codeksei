@@ -1,9 +1,14 @@
 const fs = require("fs");
 const path = require("path");
+const {
+  PRIMARY_NOTE_SYNC_MARKER_PREFIX,
+  LEGACY_NOTE_SYNC_MARKER_PREFIX,
+} = require("./branding");
 
 const { listTrackedProjects } = require("./project-radar");
 
-const SLOT_MARKER_PREFIX = "cyberboss-note-sync";
+const SLOT_MARKER_PREFIX = PRIMARY_NOTE_SYNC_MARKER_PREFIX;
+const SLOT_MARKER_PREFIXES = [PRIMARY_NOTE_SYNC_MARKER_PREFIX, LEGACY_NOTE_SYNC_MARKER_PREFIX];
 
 function resolveNoteSyncTarget(config = {}, options = {}) {
   const normalizedProject = normalizeText(options.project);
@@ -129,12 +134,7 @@ function upsertManagedSlot(sectionBody, parentLevel, options = {}) {
     throw new Error("slot 不能为空");
   }
   const block = buildManagedBlock(slot, options.text, options.style);
-  const markerStart = `<!-- ${SLOT_MARKER_PREFIX}:${slot}:start -->`;
-  const markerEnd = `<!-- ${SLOT_MARKER_PREFIX}:${slot}:end -->`;
-  const existingPattern = new RegExp(
-    `${escapeRegExp(markerStart)}[\\s\\S]*?${escapeRegExp(markerEnd)}`,
-    "u"
-  );
+  const existingPattern = buildManagedSlotPattern(slot);
 
   const normalizedBody = normalizeFileEnding(sectionBody);
   if (existingPattern.test(normalizedBody)) {
@@ -150,6 +150,15 @@ function buildManagedBlock(slot, text, style) {
   const markerEnd = `<!-- ${SLOT_MARKER_PREFIX}:${slot}:end -->`;
   const body = renderEntryText(text, style);
   return [markerStart, body, markerEnd].join("\n");
+}
+
+function buildManagedSlotPattern(slot) {
+  const prefixPattern = SLOT_MARKER_PREFIXES.map(escapeRegExp).join("|");
+  const normalizedSlot = escapeRegExp(slot);
+  return new RegExp(
+    `<!--\\s*(?:${prefixPattern}):${normalizedSlot}:start\\s*-->[\\s\\S]*?<!--\\s*(?:${prefixPattern}):${normalizedSlot}:end\\s*-->`,
+    "u"
+  );
 }
 
 function upsertSectionEntry(sectionBody, parentLevel, options = {}) {

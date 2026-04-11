@@ -170,7 +170,7 @@ async function runV2LoginFlow(config) {
   const routeTag = normalizeRouteTag(config.weixinRouteTag);
   const clientVersion = normalizeProtocolClientVersion(config.weixinProtocolClientVersion);
   const routeTagLabel = routeTag ? ` routeTag=${routeTag}` : "";
-  console.log(`[cyberboss] 正在启动微信扫码登录（v2）...${routeTagLabel}`);
+  console.log(`[codeksei] 正在启动微信扫码登录（v2）...${routeTagLabel}`);
   const result = await waitForV2WeixinLogin({
     apiBaseUrl: config.weixinBaseUrl,
     botType: config.weixinQrBotType,

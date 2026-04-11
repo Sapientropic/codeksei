@@ -1,15 +1,13 @@
 const { spawn } = require("child_process");
 const os = require("os");
 const WebSocket = require("ws");
+const { PRIMARY_RPC_CLIENT_INFO } = require("../../../core/branding");
+const { readPrefixedEnv } = require("../../../core/branding");
 
 const IS_WINDOWS = os.platform() === "win32";
 const DEFAULT_CODEX_COMMAND = "codex";
 const WINDOWS_EXECUTABLE_SUFFIX_RE = /\.(cmd|exe|bat)$/i;
-const CODEX_CLIENT_INFO = {
-  name: "cyberboss_agent",
-  title: "Cyberboss Agent",
-  version: "0.1.0",
-};
+const CODEX_CLIENT_INFO = PRIMARY_RPC_CLIENT_INFO;
 
 class CodexRpcClient {
   constructor({ endpoint = "", env = process.env, codexCommand = "", extraWritableRoots = [] }) {
@@ -316,7 +314,7 @@ class CodexRpcClient {
 }
 
 function resolveDefaultCodexCommand(env = process.env) {
-  return normalizeNonEmptyString(env.CYBERBOSS_CODEX_COMMAND) || DEFAULT_CODEX_COMMAND;
+  return normalizeNonEmptyString(readPrefixedEnv(env, "CODEX_COMMAND")) || DEFAULT_CODEX_COMMAND;
 }
 
 function buildCodexCommandCandidates(configuredCommand) {

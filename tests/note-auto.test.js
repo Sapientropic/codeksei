@@ -121,7 +121,7 @@ test("note:auto ensures missing project sections before writing a status snapsho
   assert.equal(writeResult.changed, true);
   const content = fs.readFileSync(fixture.projectNotePath, "utf8");
   assert.match(content, /## 当前状态/u);
-  assert.match(content, /current-status:start -->\nshared bridge 正常，durable note schema 已接入。\n<!-- cyberboss-note-sync:current-status:end -->/u);
+  assert.match(content, /current-status:start -->\nshared bridge 正常，durable note schema 已接入。\n<!-- codeksei-note-sync:current-status:end -->/u);
   assert.match(content, /## 决策与约束/u);
 });
 

@@ -4,6 +4,7 @@ const {
   ensureManagedBridge,
   ensureManagedSupervisor,
 } = require("./shared-common");
+const { readPrefixedEnv } = require("../src/core/branding");
 
 function parseIntervalMinutes() {
   for (const rawArg of process.argv.slice(2)) {
@@ -16,7 +17,7 @@ function parseIntervalMinutes() {
     }
   }
   const value = Number.parseInt(
-    String(process.env.CYBERBOSS_SHARED_WATCHDOG_INTERVAL_MINUTES || "5"),
+    String(readPrefixedEnv(process.env, "SHARED_WATCHDOG_INTERVAL_MINUTES") || "5"),
     10
   );
   return Number.isInteger(value) && value >= 1 ? value : 5;
@@ -28,7 +29,7 @@ async function main() {
   console.log(`shared app-server ${appServer.status}${appServerPidLabel} listen=${listenUrl}`);
 
   const bridge = await ensureManagedBridge({ restartUnhealthy: true });
-  console.log(`shared cyberboss ${bridge.status} pid=${bridge.pid}`);
+  console.log(`shared codeksei ${bridge.status} pid=${bridge.pid}`);
 
   const supervisor = await ensureManagedSupervisor({ intervalMinutes: parseIntervalMinutes() });
   console.log(`shared supervisor ${supervisor.status} pid=${supervisor.pid}`);

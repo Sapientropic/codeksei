@@ -60,7 +60,7 @@ class CyberbossApp {
         .then(() => this.handleRuntimeEvent(event))
         .catch((error) => {
           const message = error instanceof Error ? error.stack || error.message : String(error);
-          console.error(`[cyberboss] runtime event handling failed type=${event?.type || "(unknown)"} ${message}`);
+          console.error(`[codeksei] runtime event handling failed type=${event?.type || "(unknown)"} ${message}`);
         });
     });
   }
@@ -91,7 +91,7 @@ class CyberbossApp {
     try {
       writeSharedBridgeHeartbeat(filePath, patch);
     } catch (error) {
-      console.error(`[cyberboss] bridge heartbeat write failed: ${formatErrorMessage(error)}`);
+      console.error(`[codeksei] bridge heartbeat write failed: ${formatErrorMessage(error)}`);
     }
   }
 
@@ -126,24 +126,24 @@ class CyberbossApp {
       lastError: "",
     });
 
-    console.log("[cyberboss] bootstrap ok");
-    console.log(`[cyberboss] channel=${this.channelAdapter.describe().id}`);
-    console.log(`[cyberboss] runtime=${this.runtimeAdapter.describe().id}`);
-    console.log(`[cyberboss] timeline=${this.timelineIntegration.describe().id}`);
-    console.log(`[cyberboss] account=${account.accountId}`);
-    console.log(`[cyberboss] baseUrl=${account.baseUrl}`);
-    console.log(`[cyberboss] workspaceRoot=${this.config.workspaceRoot}`);
-    console.log(`[cyberboss] knownContextTokens=${knownContextTokens}`);
-    console.log(`[cyberboss] syncBuffer=${syncBuffer ? "ready" : "empty"}`);
-    console.log(`[cyberboss] weixinReplyMode=${this.config.weixinReplyMode}`);
-    console.log(`[cyberboss] weixinDeliveryTrace=${this.config.weixinDeliveryTrace ? "on" : "off"}`);
-    console.log(`[cyberboss] codexEndpoint=${runtimeState.endpoint}`);
-    console.log(`[cyberboss] codexModels=${runtimeState.models.length}`);
-    console.log("[cyberboss] 最小消息链路已启动，正在等待微信消息。");
+    console.log("[codeksei] bootstrap ok");
+    console.log(`[codeksei] channel=${this.channelAdapter.describe().id}`);
+    console.log(`[codeksei] runtime=${this.runtimeAdapter.describe().id}`);
+    console.log(`[codeksei] timeline=${this.timelineIntegration.describe().id}`);
+    console.log(`[codeksei] account=${account.accountId}`);
+    console.log(`[codeksei] baseUrl=${account.baseUrl}`);
+    console.log(`[codeksei] workspaceRoot=${this.config.workspaceRoot}`);
+    console.log(`[codeksei] knownContextTokens=${knownContextTokens}`);
+    console.log(`[codeksei] syncBuffer=${syncBuffer ? "ready" : "empty"}`);
+    console.log(`[codeksei] weixinReplyMode=${this.config.weixinReplyMode}`);
+    console.log(`[codeksei] weixinDeliveryTrace=${this.config.weixinDeliveryTrace ? "on" : "off"}`);
+    console.log(`[codeksei] codexEndpoint=${runtimeState.endpoint}`);
+    console.log(`[codeksei] codexModels=${runtimeState.models.length}`);
+    console.log("[codeksei] 最小消息链路已启动，正在等待微信消息。");
     if (this.config.startWithCheckin) {
-      console.log("[cyberboss] checkin: enabled");
+      console.log("[codeksei] checkin: enabled");
       void runSystemCheckinPoller(this.config).catch((error) => {
-        console.error(`[cyberboss] checkin poller stopped: ${error.message}`);
+        console.error(`[codeksei] checkin poller stopped: ${error.message}`);
       });
     }
 
@@ -213,7 +213,7 @@ class CyberbossApp {
             consecutiveFailures,
             lastError: errorMessage,
           });
-          console.error(`[cyberboss] poll failed: ${errorMessage}`);
+          console.error(`[codeksei] poll failed: ${errorMessage}`);
           await sleep(consecutiveFailures >= MAX_CONSECUTIVE_FAILURES ? BACKOFF_DELAY_MS : RETRY_DELAY_MS);
         }
       }
@@ -231,7 +231,7 @@ class CyberbossApp {
   async sendTimelineScreenshot({ senderId = "", args = [], outputFile = "" } = {}) {
     const targetUserId = normalizeText(senderId) || this.resolveDefaultTerminalUser();
     if (!targetUserId) {
-      throw new Error("无法确定时间轴截图要发送给哪个微信用户，先配置 CYBERBOSS_ALLOWED_USER_IDS");
+      throw new Error("无法确定时间轴截图要发送给哪个微信用户，先配置 CODEKSEI_ALLOWED_USER_IDS（或旧的 CYBERBOSS_ALLOWED_USER_IDS）");
     }
     const contextToken = this.channelAdapter.getKnownContextTokens()[targetUserId] || "";
     if (!contextToken) {
@@ -244,7 +244,7 @@ class CyberbossApp {
     const resolvedOutputFile = normalizeText(outputFile) || resolveTimelineScreenshotOutput(normalizedArgs);
     const finalArgs = resolvedOutputFile
       ? normalizedArgs
-      : [...normalizedArgs, "--output", path.join(os.tmpdir(), `cyberboss-timeline-${Date.now()}.png`)];
+      : [...normalizedArgs, "--output", path.join(os.tmpdir(), `codeksei-timeline-${Date.now()}.png`)];
     const savedPath = resolveTimelineScreenshotOutput(finalArgs);
 
     await this.channelAdapter.sendTyping({
@@ -269,7 +269,7 @@ class CyberbossApp {
   async sendLocalFileToCurrentChat({ senderId = "", filePath = "" } = {}) {
     const targetUserId = normalizeText(senderId) || this.resolveDefaultTerminalUser();
     if (!targetUserId) {
-      throw new Error("无法确定文件要发送给哪个微信用户，先配置 CYBERBOSS_ALLOWED_USER_IDS");
+      throw new Error("无法确定文件要发送给哪个微信用户，先配置 CODEKSEI_ALLOWED_USER_IDS（或旧的 CYBERBOSS_ALLOWED_USER_IDS）");
     }
 
     const contextToken = this.channelAdapter.getKnownContextTokens()[targetUserId] || "";
@@ -509,7 +509,7 @@ class CyberbossApp {
       // than surfacing a partial answer. We only trip this guard after a long
       // quiet period to avoid fighting normal long-running tool calls.
       console.error(
-        `[cyberboss] runtime settlement watchdog expired `
+        `[codeksei] runtime settlement watchdog expired `
         + `thread=${threadId} turn=${turnId} workspace=${workspaceRoot || "(unknown)"}`
       );
       await this.streamDelivery.finalizeAbandonedTurn({
@@ -658,7 +658,7 @@ class CyberbossApp {
         });
       } catch (error) {
         const messageText = error instanceof Error ? error.message : String(error || "unknown error");
-        console.error(`[cyberboss] timeline screenshot failed job=${job.id} ${messageText}`);
+        console.error(`[codeksei] timeline screenshot failed job=${job.id} ${messageText}`);
         await this.channelAdapter.sendTyping({
           userId: job.senderId,
           status: 0,
@@ -765,7 +765,7 @@ class CyberbossApp {
     const workspaceRoot = normalizeText(linked?.workspaceRoot);
 
     console.error(
-      `[cyberboss] reply delivery degraded `
+      `[codeksei] reply delivery degraded `
       + `thread=${normalizedThreadId} turn=${normalizedTurnId || "(pending)"} `
       + `workspace=${workspaceRoot || "(unknown)"} `
       + `sentChars=${String(sentText || "").length} `
@@ -1061,7 +1061,7 @@ class CyberbossApp {
 
     const decision = command.name === "no" ? "decline" : "accept";
     console.log(
-      `[cyberboss] approval response requested thread=${threadId} requestId=${approval.requestId} decision=${decision} workspace=${workspaceRoot}`
+      `[codeksei] approval response requested thread=${threadId} requestId=${approval.requestId} decision=${decision} workspace=${workspaceRoot}`
     );
     await this.runtimeAdapter.respondApproval({
       requestId: approval.requestId,
@@ -1069,7 +1069,7 @@ class CyberbossApp {
     });
     this.runtimeAdapter.getSessionStore().clearApprovalPrompt(threadId);
     console.log(
-      `[cyberboss] approval response delivered thread=${threadId} requestId=${approval.requestId} decision=${decision}`
+      `[codeksei] approval response delivered thread=${threadId} requestId=${approval.requestId} decision=${decision}`
     );
     if (command.name === "always" && decision === "accept") {
       this.runtimeAdapter.getSessionStore().rememberApprovalPrefixForWorkspace(workspaceRoot, approval.commandTokens);
@@ -1177,7 +1177,7 @@ class CyberbossApp {
       if (promptState?.signature && promptState.signature === promptSignature) {
         sessionStore.rememberApprovalPrompt(event.payload.threadId, event.payload.requestId, promptSignature);
         console.log(
-          `[cyberboss] approval prompt deduped thread=${event.payload.threadId} requestId=${event.payload.requestId}`
+          `[codeksei] approval prompt deduped thread=${event.payload.threadId} requestId=${event.payload.requestId}`
         );
         return;
       }
@@ -1228,12 +1228,12 @@ class CyberbossApp {
     const target = this.resolveReplyTargetForBinding(bindingKey);
     if (!target) {
       console.warn(
-        `[cyberboss] approval prompt skipped binding=${bindingKey} requestId=${approval?.requestId || ""} reason=no_reply_target`
+        `[codeksei] approval prompt skipped binding=${bindingKey} requestId=${approval?.requestId || ""} reason=no_reply_target`
       );
       return;
     }
     console.log(
-      `[cyberboss] approval prompt sending binding=${bindingKey} user=${target.userId} requestId=${approval?.requestId || ""}`
+      `[codeksei] approval prompt sending binding=${bindingKey} user=${target.userId} requestId=${approval?.requestId || ""}`
     );
     await this.channelAdapter.sendTyping({
       userId: target.userId,
@@ -1247,7 +1247,7 @@ class CyberbossApp {
       preserveBlock: true,
     });
     console.log(
-      `[cyberboss] approval prompt delivered binding=${bindingKey} user=${target.userId} requestId=${approval?.requestId || ""}`
+      `[codeksei] approval prompt delivered binding=${bindingKey} user=${target.userId} requestId=${approval?.requestId || ""}`
     );
   }
 
@@ -1537,12 +1537,18 @@ function matchesBuiltInCommandPrefix(commandTokens) {
   }
   if (executable === "node" || executable === "node.exe") {
     const binPath = normalizeCommandArgument(normalized[1]);
-    if (binPath === "./bin/cyberboss.js" || binPath.endsWith("/bin/cyberboss.js")) {
+    if (binPath === "./bin/cyberboss.js"
+      || binPath.endsWith("/bin/cyberboss.js")
+      || binPath === "./bin/codeksei.js"
+      || binPath.endsWith("/bin/codeksei.js")) {
       return matchesBuiltInCliCommand(normalized.slice(2));
     }
   }
 
-  if (executable === "cyberboss" || executable === "cyberboss.js") {
+  if (executable === "cyberboss"
+    || executable === "cyberboss.js"
+    || executable === "codeksei"
+    || executable === "codeksei.js") {
     return matchesBuiltInCliCommand(normalized.slice(1));
   }
 

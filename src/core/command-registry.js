@@ -488,7 +488,7 @@ function buildTopicUsage(topic) {
         "",
         "示例：",
         "  npm run diary:write -- --section todo --state open --text \"把药单发给 Alex\"",
-        "  npm run diary:write -- --section todo --state done --text \"收住 Cyberboss 微信回复问题\" --timeline-text \"22:39-23:04 连续压测 Cyberboss 微信回复链路；这条问题今晚可以先收尾。\"",
+        "  npm run diary:write -- --section todo --state done --text \"收住 Codeksei 微信回复问题\" --timeline-text \"22:39-23:04 连续压测 Codeksei 微信回复链路；这条问题今晚可以先收尾。\"",
         "  npm run diary:write -- --section timeline --text \"17:30-17:58 把药单发出去了\"",
       ].join("\n");
     case "channel":

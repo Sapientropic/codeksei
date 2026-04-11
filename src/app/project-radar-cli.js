@@ -90,7 +90,7 @@ function printProjectRadarHelp(config = {}) {
     "",
     "示例：",
     "  npm run project:radar -- --list",
-    "  npm run project:radar -- --project cyberboss --json",
+    "  npm run project:radar -- --project <slug> --json",
     "  npm run project:radar -- --project engineering-issues --commits 8 --changes 30",
   ].join("\n"));
 }

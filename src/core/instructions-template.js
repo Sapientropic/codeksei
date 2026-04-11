@@ -12,10 +12,16 @@ function resolveUserPronoun(gender) {
 function renderInstructionTemplate(template, config = {}) {
   const userName = String(config?.userName || "").trim() || "用户";
   const pronoun = resolveUserPronoun(config?.userGender);
-  const cyberbossHome = String(config?.cyberbossHome || process.env.CYBERBOSS_HOME || "").trim();
+  const codekseiHome = String(
+    config?.codekseiHome
+    || config?.cyberbossHome
+    || process.env.CODEKSEI_HOME
+    || process.env.CYBERBOSS_HOME
+    || ""
+  ).trim();
   return String(template || "")
     .replaceAll("{{USER_NAME}}", userName)
-    .replaceAll("{{CYBERBOSS_HOME}}", cyberbossHome)
+    .replaceAll("{{CYBERBOSS_HOME}}", codekseiHome)
     .replaceAll("她", pronoun);
 }
 

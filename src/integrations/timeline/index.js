@@ -1,5 +1,6 @@
 const path = require("path");
 const { spawn } = require("child_process");
+const { readPrefixedEnv } = require("../../core/branding");
 
 function createTimelineIntegration(config) {
   const binPath = resolveTimelineBinPath();
@@ -165,7 +166,7 @@ function normalizeText(value) {
 
 function resolveTimelineChromePath() {
   const configured = normalizeText(process.env.TIMELINE_FOR_AGENT_CHROME_PATH)
-    || normalizeText(process.env.CYBERBOSS_SCREENSHOT_CHROME_PATH);
+    || normalizeText(readPrefixedEnv(process.env, "SCREENSHOT_CHROME_PATH"));
   if (configured) {
     return configured;
   }

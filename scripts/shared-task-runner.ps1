@@ -9,10 +9,18 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $repoRoot
 
-$stateDir = if ($env:CYBERBOSS_STATE_DIR) {
+$stateDir = if ($env:CODEKSEI_STATE_DIR) {
+  $env:CODEKSEI_STATE_DIR
+} elseif ($env:CYBERBOSS_STATE_DIR) {
   $env:CYBERBOSS_STATE_DIR
 } else {
-  Join-Path $env:USERPROFILE ".cyberboss"
+  $newStateDir = Join-Path $env:USERPROFILE ".codeksei"
+  $legacyStateDir = Join-Path $env:USERPROFILE ".cyberboss"
+  if ((Test-Path -LiteralPath $newStateDir) -or -not (Test-Path -LiteralPath $legacyStateDir)) {
+    $newStateDir
+  } else {
+    $legacyStateDir
+  }
 }
 $logDir = Join-Path $stateDir "logs"
 $null = New-Item -ItemType Directory -Force -Path $logDir

@@ -52,7 +52,8 @@ test("note sync replaces managed slot blocks inside a section", () => {
     style: "paragraph",
   });
 
-  assert.match(result.content, /current-status:start -->\n新状态\n<!-- cyberboss-note-sync:current-status:end/u);
+  assert.match(result.content, /current-status:start -->\n新状态\n<!-- codeksei-note-sync:current-status:end/u);
+  assert.doesNotMatch(result.content, /cyberboss-note-sync:current-status:end/u);
   assert.doesNotMatch(result.content, /旧状态/u);
 });
 

@@ -5,6 +5,15 @@ const path = require("path");
 const { execFileSync, spawn } = require("child_process");
 const dotenv = require("dotenv");
 const {
+  APP_NAME,
+  PACKAGE_NAME,
+  ensureStateDirectory,
+  listEnvFileCandidates,
+  readPrefixedBoolEnv,
+  readPrefixedEnv,
+  resolveStateDir,
+} = require("../src/core/branding");
+const {
   DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS,
   classifySharedBridgeHeartbeat,
   readSharedBridgeHeartbeat,
@@ -12,9 +21,9 @@ const {
 
 const rootDir = path.resolve(__dirname, "..");
 loadSharedEnv();
-const port = String(process.env.CYBERBOSS_SHARED_PORT || "8765");
+const port = String(readPrefixedEnv(process.env, "SHARED_PORT") || "8765");
 const listenUrl = `ws://127.0.0.1:${port}`;
-const stateDir = process.env.CYBERBOSS_STATE_DIR || path.join(os.homedir(), ".cyberboss");
+const stateDir = resolveStateDir({ env: process.env });
 const logDir = path.join(stateDir, "logs");
 const appServerPidFile = path.join(logDir, "shared-app-server.pid");
 const bridgePidFile = path.join(logDir, "shared-wechat.pid");
@@ -25,34 +34,32 @@ const supervisorLogFile = path.join(logDir, "shared-supervisor.log");
 const bridgeHeartbeatFile = path.join(logDir, "shared-wechat-heartbeat.json");
 const watchdogStateFile = path.join(logDir, "shared-watchdog-state.json");
 const accountsDir = path.join(stateDir, "accounts");
-const sessionFile = process.env.CYBERBOSS_SESSIONS_FILE || path.join(stateDir, "sessions.json");
+const sessionFile = readPrefixedEnv(process.env, "SESSIONS_FILE") || path.join(stateDir, "sessions.json");
 const WINDOWS_CMD_SUFFIX_RE = /\.(cmd|bat)$/i;
 const WINDOWS_EXE_SUFFIX_RE = /\.(exe|com)$/i;
 const BRIDGE_HEARTBEAT_MAX_AGE_MS = Number.parseInt(
-  String(process.env.CYBERBOSS_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS || ""),
+  String(readPrefixedEnv(process.env, "SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS") || ""),
   10
 ) || DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS;
-const SHARED_USE_BUNDLED_CODEX_BINARY = readBoolEnv(
-  "CYBERBOSS_SHARED_USE_BUNDLED_CODEX_BINARY",
+const SHARED_USE_BUNDLED_CODEX_BINARY = readPrefixedBoolEnv(
+  process.env,
+  "SHARED_USE_BUNDLED_CODEX_BINARY",
   true
 );
-const SHARED_DISABLE_PLUGINS = readBoolEnv(
-  "CYBERBOSS_SHARED_DISABLE_PLUGINS",
+const SHARED_DISABLE_PLUGINS = readPrefixedBoolEnv(
+  process.env,
+  "SHARED_DISABLE_PLUGINS",
   false
 );
-const SHARED_DISABLE_SHELL_SNAPSHOT = readBoolEnv(
-  "CYBERBOSS_SHARED_DISABLE_SHELL_SNAPSHOT",
+const SHARED_DISABLE_SHELL_SNAPSHOT = readPrefixedBoolEnv(
+  process.env,
+  "SHARED_DISABLE_SHELL_SNAPSHOT",
   false
 );
 
 function loadSharedEnv() {
-  const defaultStateDir = path.join(os.homedir(), ".cyberboss");
-  fs.mkdirSync(defaultStateDir, { recursive: true });
-
-  const candidates = [
-    path.join(rootDir, ".env"),
-    path.join(defaultStateDir, ".env"),
-  ];
+  ensureStateDirectory({ env: process.env });
+  const candidates = listEnvFileCandidates({ cwd: rootDir, env: process.env });
   for (const envPath of candidates) {
     if (!fs.existsSync(envPath)) {
       continue;
@@ -60,20 +67,6 @@ function loadSharedEnv() {
     dotenv.config({ path: envPath });
     return;
   }
-}
-
-function readBoolEnv(name, defaultValue = false) {
-  const raw = String(process.env[name] || "").trim().toLowerCase();
-  if (!raw) {
-    return defaultValue;
-  }
-  if (["1", "true", "yes", "on"].includes(raw)) {
-    return true;
-  }
-  if (["0", "false", "no", "off"].includes(raw)) {
-    return false;
-  }
-  return defaultValue;
 }
 
 function ensureLogDir() {
@@ -495,10 +488,11 @@ async function waitForSharedBridgeHealthy({ attempts = 30, delayMs = 1000 } = {}
 }
 
 function startSharedBridge() {
-  const pid = spawnDetachedCommand(process.execPath, ["./bin/cyberboss.js", "start", "--checkin"], {
+  const pid = spawnDetachedCommand(process.execPath, ["./bin/codeksei.js", "start", "--checkin"], {
     logFile: bridgeLogFile,
     cwd: rootDir,
     env: {
+      CODEKSEI_CODEX_ENDPOINT: listenUrl,
       CYBERBOSS_CODEX_ENDPOINT: listenUrl,
     },
   });
@@ -524,18 +518,19 @@ async function ensureSharedAppServer() {
   }
 
   const env = {
+    CODEKSEI_STATE_DIR: stateDir,
     CYBERBOSS_STATE_DIR: stateDir,
     TIMELINE_FOR_AGENT_STATE_DIR: stateDir,
   };
   if (!process.env.TIMELINE_FOR_AGENT_CHROME_PATH) {
     env.TIMELINE_FOR_AGENT_CHROME_PATH =
-      process.env.CYBERBOSS_SCREENSHOT_CHROME_PATH
+      readPrefixedEnv(process.env, "SCREENSHOT_CHROME_PATH")
       || (process.platform === "darwin"
         ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
         : "");
   }
 
-  const command = process.env.CYBERBOSS_CODEX_COMMAND || "codex";
+  const command = readPrefixedEnv(process.env, "CODEX_COMMAND") || "codex";
   // Some Windows setups behave better when the shared app-server is launched
   // through the npm codex.cmd shim, because later shell_command children can
   // inherit that console environment instead of spawning a fresh visible one.
@@ -630,11 +625,11 @@ async function ensureManagedBridge({ restartUnhealthy = false } = {}) {
   let recovered = false;
   if (restartUnhealthy && health.pid) {
     const stopped = await stopManagedProcess(bridgePidFile, {
-      expectedSubstrings: ["cyberboss", "start", "checkin"],
-      label: "shared cyberboss bridge",
+      expectedSubstrings: ["start", "checkin"],
+      label: "shared codeksei bridge",
     });
     if (stopped.status === "unexpected_command") {
-      throw new Error(`refusing to stop shared cyberboss bridge pid=${stopped.pid}: unexpected command line`);
+      throw new Error(`refusing to stop shared codeksei bridge pid=${stopped.pid}: unexpected command line`);
     }
     recovered = stopped.status === "terminated";
   } else if (health.pid && !health.alive) {
@@ -644,7 +639,7 @@ async function ensureManagedBridge({ restartUnhealthy = false } = {}) {
   const pid = startSharedBridge();
   const readyHealth = await waitForSharedBridgeHealthy();
   if (!readyHealth) {
-    throw new Error(`failed to start shared cyberboss bridge; check ${bridgeLogFile}`);
+    throw new Error(`failed to start shared codeksei bridge; check ${bridgeLogFile}`);
   }
   return {
     pid: readyHealth.pid || pid,

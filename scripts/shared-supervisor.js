@@ -8,6 +8,7 @@ const {
   readProcessCommandLine,
 } = require("./shared-common");
 const { runWatchdogOnce } = require("./shared-watchdog");
+const { readPrefixedEnv } = require("../src/core/branding");
 
 const DEFAULT_INTERVAL_MINUTES = 5;
 
@@ -26,7 +27,7 @@ function parseIntervalMinutes(argv) {
   }
 
   const fromEnv = Number.parseInt(
-    String(process.env.CYBERBOSS_SHARED_WATCHDOG_INTERVAL_MINUTES || ""),
+    String(readPrefixedEnv(process.env, "SHARED_WATCHDOG_INTERVAL_MINUTES") || ""),
     10
   );
   if (Number.isInteger(fromEnv) && fromEnv >= 1) {

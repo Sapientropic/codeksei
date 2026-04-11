@@ -10,10 +10,18 @@ if ($WatchdogMinutes -lt 1) {
 
 $runnerPath = Join-Path $PSScriptRoot "shared-task-runner.ps1"
 $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-$startTaskName = "Cyberboss Shared Start"
-$unlockTaskName = "Cyberboss Shared Unlock"
-$resumeTaskName = "Cyberboss Shared Resume"
-$watchdogTaskName = "Cyberboss Shared Watchdog"
+$taskNames = @{
+  start = "Codeksei Shared Start"
+  unlock = "Codeksei Shared Unlock"
+  resume = "Codeksei Shared Resume"
+  watchdog = "Codeksei Shared Watchdog"
+}
+$legacyTaskNames = @(
+  "Cyberboss Shared Start",
+  "Cyberboss Shared Unlock",
+  "Cyberboss Shared Resume",
+  "Cyberboss Shared Watchdog"
+)
 
 function Escape-XmlText {
   param([string]$Value)
@@ -80,7 +88,7 @@ $TriggerXml
   Register-ScheduledTask -TaskName $TaskName -Xml $taskXml -Force | Out-Null
 }
 
-foreach ($taskName in @($startTaskName, $unlockTaskName, $resumeTaskName, $watchdogTaskName)) {
+foreach ($taskName in @($taskNames.start, $taskNames.unlock, $taskNames.resume, $taskNames.watchdog) + $legacyTaskNames) {
   try {
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction Stop | Out-Null
   } catch {
@@ -114,14 +122,14 @@ $resumeTriggerXml = @"
 # The detached supervisor keeps idle checks quiet, while logon/unlock/resume
 # pokes recover quickly after session lifecycle changes without relaunching a
 # watchdog shell every few minutes.
-Register-CyberbossTaskXml -TaskName $startTaskName -TriggerXml $logonTriggerXml -ArgumentsXml $bootstrapArguments
-Register-CyberbossTaskXml -TaskName $unlockTaskName -TriggerXml $unlockTriggerXml -ArgumentsXml $bootstrapArguments
-Register-CyberbossTaskXml -TaskName $resumeTaskName -TriggerXml $resumeTriggerXml -ArgumentsXml $bootstrapArguments
+Register-CyberbossTaskXml -TaskName $taskNames.start -TriggerXml $logonTriggerXml -ArgumentsXml $bootstrapArguments
+Register-CyberbossTaskXml -TaskName $taskNames.unlock -TriggerXml $unlockTriggerXml -ArgumentsXml $bootstrapArguments
+Register-CyberbossTaskXml -TaskName $taskNames.resume -TriggerXml $resumeTriggerXml -ArgumentsXml $bootstrapArguments
 
-Start-ScheduledTask -TaskName $startTaskName
+Start-ScheduledTask -TaskName $taskNames.start
 
-Write-Host "installed=$startTaskName"
-Write-Host "installed=$unlockTaskName"
-Write-Host "installed=$resumeTaskName"
-Write-Host "removed=$watchdogTaskName"
+Write-Host "installed=$($taskNames.start)"
+Write-Host "installed=$($taskNames.unlock)"
+Write-Host "installed=$($taskNames.resume)"
+Write-Host "removed=$($taskNames.watchdog)"
 Write-Host "supervisor_interval_minutes=$WatchdogMinutes"

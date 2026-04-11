@@ -1,11 +1,12 @@
 const crypto = require("crypto");
 const { buildJsonHeaders } = require("./protocol");
+const { PRIMARY_CHANNEL_VERSION } = require("../../../core/branding");
 
 const DEFAULT_LONG_POLL_TIMEOUT_MS = 35_000;
 const DEFAULT_API_TIMEOUT_MS = 15_000;
 const DEFAULT_CONFIG_TIMEOUT_MS = 10_000;
 const MAX_RESPONSE_BODY_BYTES = 64 << 20;
-const CHANNEL_VERSION = "cyberboss-weixin/2.0";
+const CHANNEL_VERSION = PRIMARY_CHANNEL_VERSION;
 
 function buildBaseInfo() {
   return { channel_version: CHANNEL_VERSION };

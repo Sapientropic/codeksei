@@ -397,7 +397,7 @@ function logInvalidWorkspaceError({
     return;
   }
   console.error(
-    `[cyberboss] codex ${operation} invalid workspace cwd `
+    `[codeksei] codex ${operation} invalid workspace cwd `
     + `thread=${normalizeLogValue(threadId) || "(new)"} `
     + `binding=${normalizeLogValue(bindingKey) || "(none)"} `
     + `workspaceRoot=${normalizeLogValue(workspaceRoot) || "(empty)"} `

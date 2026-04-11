@@ -118,9 +118,9 @@ function printNoteSyncHelp() {
     "  不传 --slot 时会做轻量追加，并对相同内容去重。",
     "",
     "示例：",
-    "  npm run note:sync -- --project cyberboss --section \"最近动作\" --text \"把微信 prompt 收口为更温柔的 chief-of-staff 风格\" --max-items 6",
-    "  npm run note:sync -- --project cyberboss --section \"当前状态\" --slot current-status --style paragraph --text \"当前默认主 workspace 是 Website，shared bridge 正常运行。\"",
-    "  npm run note:sync -- --path \"项目/Cyberboss 生活助理/README.md\" --section \"当前定位\" --text \"默认先接住，再定向，再推进，不做催债式主动提醒。\"",
+    "  npm run note:sync -- --project <slug> --section \"最近动作\" --text \"把微信 prompt 收口为更温柔的 chief-of-staff 风格\" --max-items 6",
+    "  npm run note:sync -- --project <slug> --section \"当前状态\" --slot current-status --style paragraph --text \"当前默认主 workspace 是 Website，shared bridge 正常运行。\"",
+    "  npm run note:sync -- --path \"项目/Codeksei 生活助理/README.md\" --section \"当前定位\" --text \"默认先接住，再定向，再推进，不做催债式主动提醒。\"",
   ].join("\n"));
 }
 

@@ -3,6 +3,10 @@ param()
 $ErrorActionPreference = "Stop"
 
 $taskNames = @(
+  "Codeksei Shared Start",
+  "Codeksei Shared Unlock",
+  "Codeksei Shared Resume",
+  "Codeksei Shared Watchdog",
   "Cyberboss Shared Start",
   "Cyberboss Shared Unlock",
   "Cyberboss Shared Resume",

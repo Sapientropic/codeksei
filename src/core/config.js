@@ -1,36 +1,49 @@
 const os = require("os");
 const path = require("path");
+const {
+  readPrefixedBoolEnv,
+  readPrefixedEnv,
+  readPrefixedIntEnv,
+  readPrefixedListEnv,
+  resolveAppHome,
+  resolveStateDir,
+} = require("./branding");
 
 function readConfig() {
   const argv = process.argv.slice(2);
   const mode = argv[0] || "";
-  const stateDir = process.env.CYBERBOSS_STATE_DIR || path.join(os.homedir(), ".cyberboss");
-  const workspaceRoot = readTextEnv("CYBERBOSS_WORKSPACE_ROOT") || process.cwd();
+  const stateDir = resolveStateDir({ env: process.env });
+  const workspaceRoot = readPrefixedEnv(process.env, "WORKSPACE_ROOT") || process.cwd();
+  const appHome = resolveAppHome({
+    env: process.env,
+    fallbackRoot: path.resolve(__dirname, "..", ".."),
+  }) || path.resolve(__dirname, "..", "..");
 
   return {
     mode,
     argv,
     stateDir,
-    cyberbossHome: readTextEnv("CYBERBOSS_HOME") || path.resolve(__dirname, "..", ".."),
-    workspaceId: readTextEnv("CYBERBOSS_WORKSPACE_ID") || "default",
+    codekseiHome: appHome,
+    cyberbossHome: appHome,
+    workspaceId: readPrefixedEnv(process.env, "WORKSPACE_ID") || "default",
     workspaceRoot,
-    diaryDir: readTextEnv("CYBERBOSS_DIARY_DIR") || path.join(stateDir, "diary"),
-    timelineStateDir: readTextEnv("CYBERBOSS_TIMELINE_STATE_DIR") || stateDir,
-    userName: readTextEnv("CYBERBOSS_USER_NAME") || "用户",
-    userGender: readTextEnv("CYBERBOSS_USER_GENDER") || "female",
-    allowedUserIds: readListEnv("CYBERBOSS_ALLOWED_USER_IDS"),
-    channel: readTextEnv("CYBERBOSS_CHANNEL") || "weixin",
-    runtime: readTextEnv("CYBERBOSS_RUNTIME") || "codex",
-    timelineCommand: readTextEnv("CYBERBOSS_TIMELINE_COMMAND") || "timeline-for-agent",
-    accountId: readTextEnv("CYBERBOSS_ACCOUNT_ID"),
-    weixinBaseUrl: readTextEnv("CYBERBOSS_WEIXIN_BASE_URL") || "https://ilinkai.weixin.qq.com",
-    weixinCdnBaseUrl: readTextEnv("CYBERBOSS_WEIXIN_CDN_BASE_URL") || "https://novac2c.cdn.weixin.qq.com/c2c",
-    weixinAdapterVariant: readTextEnv("CYBERBOSS_WEIXIN_ADAPTER") || "v2",
-    weixinReplyMode: normalizeWeixinReplyMode(readTextEnv("CYBERBOSS_WEIXIN_REPLY_MODE") || "stream"),
-    weixinDeliveryTrace: readBoolEnv("CYBERBOSS_WEIXIN_DELIVERY_TRACE"),
-    weixinQrBotType: readTextEnv("CYBERBOSS_WEIXIN_QR_BOT_TYPE") || "3",
-    weixinRouteTag: readTextEnv("CYBERBOSS_WEIXIN_ROUTE_TAG"),
-    weixinProtocolClientVersion: readTextEnv("CYBERBOSS_WEIXIN_PROTOCOL_CLIENT_VERSION") || "2.1.1",
+    diaryDir: readPrefixedEnv(process.env, "DIARY_DIR") || path.join(stateDir, "diary"),
+    timelineStateDir: readPrefixedEnv(process.env, "TIMELINE_STATE_DIR") || stateDir,
+    userName: readPrefixedEnv(process.env, "USER_NAME") || "用户",
+    userGender: readPrefixedEnv(process.env, "USER_GENDER") || "female",
+    allowedUserIds: readPrefixedListEnv(process.env, "ALLOWED_USER_IDS"),
+    channel: readPrefixedEnv(process.env, "CHANNEL") || "weixin",
+    runtime: readPrefixedEnv(process.env, "RUNTIME") || "codex",
+    timelineCommand: readPrefixedEnv(process.env, "TIMELINE_COMMAND") || "timeline-for-agent",
+    accountId: readPrefixedEnv(process.env, "ACCOUNT_ID"),
+    weixinBaseUrl: readPrefixedEnv(process.env, "WEIXIN_BASE_URL") || "https://ilinkai.weixin.qq.com",
+    weixinCdnBaseUrl: readPrefixedEnv(process.env, "WEIXIN_CDN_BASE_URL") || "https://novac2c.cdn.weixin.qq.com/c2c",
+    weixinAdapterVariant: readPrefixedEnv(process.env, "WEIXIN_ADAPTER") || "v2",
+    weixinReplyMode: normalizeWeixinReplyMode(readPrefixedEnv(process.env, "WEIXIN_REPLY_MODE") || "stream"),
+    weixinDeliveryTrace: readPrefixedBoolEnv(process.env, "WEIXIN_DELIVERY_TRACE"),
+    weixinQrBotType: readPrefixedEnv(process.env, "WEIXIN_QR_BOT_TYPE") || "3",
+    weixinRouteTag: readPrefixedEnv(process.env, "WEIXIN_ROUTE_TAG"),
+    weixinProtocolClientVersion: readPrefixedEnv(process.env, "WEIXIN_PROTOCOL_CLIENT_VERSION") || "2.1.1",
     accountsDir: path.join(stateDir, "accounts"),
     logDir: path.join(stateDir, "logs"),
     reminderQueueFile: path.join(stateDir, "reminder-queue.json"),
@@ -39,51 +52,29 @@ function readConfig() {
     weixinInstructionsFile: path.join(stateDir, "weixin-instructions.md"),
     weixinOperationsFile: path.resolve(__dirname, "..", "..", "templates", "weixin-operations.md"),
     syncBufferDir: path.join(stateDir, "sync-buffers"),
-    codexEndpoint: readTextEnv("CYBERBOSS_CODEX_ENDPOINT"),
-    codexCommand: readTextEnv("CYBERBOSS_CODEX_COMMAND"),
-    codexAccessMode: readTextEnv("CYBERBOSS_CODEX_ACCESS_MODE"),
+    codexEndpoint: readPrefixedEnv(process.env, "CODEX_ENDPOINT"),
+    codexCommand: readPrefixedEnv(process.env, "CODEX_COMMAND"),
+    codexAccessMode: readPrefixedEnv(process.env, "CODEX_ACCESS_MODE"),
     sessionsFile: path.join(stateDir, "sessions.json"),
-    workspaceBootstrapConfigFile: readTextEnv("CYBERBOSS_WORKSPACE_BOOTSTRAP_CONFIG")
+    workspaceBootstrapConfigFile: readPrefixedEnv(process.env, "WORKSPACE_BOOTSTRAP_CONFIG")
       || path.join(stateDir, "workspace-bootstrap.json"),
-    projectRadarConfigFile: readTextEnv("CYBERBOSS_PROJECT_RADAR_CONFIG")
+    projectRadarConfigFile: readPrefixedEnv(process.env, "PROJECT_RADAR_CONFIG")
       || path.resolve(workspaceRoot, ".codex", "code-projects.json"),
-    durableNoteSchemaConfigFile: readTextEnv("CYBERBOSS_DURABLE_NOTE_SCHEMA_CONFIG")
+    durableNoteSchemaConfigFile: readPrefixedEnv(process.env, "DURABLE_NOTE_SCHEMA_CONFIG")
       || path.resolve(workspaceRoot, ".codex", "durable-note-schema.json"),
-    reviewSchemaConfigFile: readTextEnv("CYBERBOSS_REVIEW_SCHEMA_CONFIG")
+    reviewSchemaConfigFile: readPrefixedEnv(process.env, "REVIEW_SCHEMA_CONFIG")
       || path.resolve(workspaceRoot, ".codex", "review-schema.json"),
-    reviewSemanticMode: readTextEnv("CYBERBOSS_REVIEW_SEMANTIC_MODE") || "hybrid",
-    reviewSemanticModel: readTextEnv("CYBERBOSS_REVIEW_SEMANTIC_MODEL"),
-    reviewSemanticTimeoutMs: readIntEnv("CYBERBOSS_REVIEW_SEMANTIC_TIMEOUT_MS") || 120000,
+    reviewSemanticMode: readPrefixedEnv(process.env, "REVIEW_SEMANTIC_MODE") || "hybrid",
+    reviewSemanticModel: readPrefixedEnv(process.env, "REVIEW_SEMANTIC_MODEL"),
+    reviewSemanticTimeoutMs: readPrefixedIntEnv(process.env, "REVIEW_SEMANTIC_TIMEOUT_MS") || 120000,
     sharedBridgeHeartbeatFile: path.join(stateDir, "logs", "shared-wechat-heartbeat.json"),
     sharedWatchdogStateFile: path.join(stateDir, "logs", "shared-watchdog-state.json"),
-    startWithCheckin: (mode === "start" && hasArgFlag(argv, "--checkin")) || readBoolEnv("CYBERBOSS_ENABLE_CHECKIN"),
+    startWithCheckin: (mode === "start" && hasArgFlag(argv, "--checkin")) || readPrefixedBoolEnv(process.env, "ENABLE_CHECKIN"),
   };
 }
 
 function normalizeWeixinReplyMode(value) {
   return String(value || "").trim().toLowerCase() === "settled" ? "settled" : "stream";
-}
-
-function readListEnv(name) {
-  return String(process.env[name] || "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function readTextEnv(name) {
-  const value = process.env[name];
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function readBoolEnv(name) {
-  const value = readTextEnv(name).toLowerCase();
-  return value === "1" || value === "true" || value === "yes" || value === "on";
-}
-
-function readIntEnv(name) {
-  const value = Number.parseInt(readTextEnv(name), 10);
-  return Number.isFinite(value) ? value : 0;
 }
 
 function hasArgFlag(argv, flag) {

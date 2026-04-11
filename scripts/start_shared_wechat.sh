@@ -2,8 +2,11 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PORT="${CYBERBOSS_SHARED_PORT:-8765}"
-STATE_DIR="${CYBERBOSS_STATE_DIR:-$HOME/.cyberboss}"
+PORT="${CODEKSEI_SHARED_PORT:-${CYBERBOSS_SHARED_PORT:-8765}}"
+STATE_DIR="${CODEKSEI_STATE_DIR:-${CYBERBOSS_STATE_DIR:-$HOME/.codeksei}}"
+if [[ ! -d "${STATE_DIR}" && -d "$HOME/.cyberboss" ]]; then
+  STATE_DIR="$HOME/.cyberboss"
+fi
 LOG_DIR="${STATE_DIR}/logs"
 PID_FILE="${LOG_DIR}/shared-wechat.pid"
 
@@ -13,7 +16,7 @@ function resolve_pid_cwd() {
 }
 
 function list_bridge_processes() {
-  ps -ax -o pid=,ppid=,command= | awk '/node \.\/bin\/cyberboss\.js start --checkin/ { print }'
+  ps -ax -o pid=,ppid=,command= | awk '/node \.\/bin\/(codeksei|cyberboss)\.js start --checkin/ { print }'
 }
 
 function find_bridge_child_pid() {
@@ -83,7 +86,7 @@ mkdir -p "${LOG_DIR}"
 EXISTING_PID="$(find_existing_bridge_pid || true)"
 if [[ -n "${EXISTING_PID}" ]]; then
   echo "${EXISTING_PID}" > "${PID_FILE}"
-  echo "shared cyberboss already running pid=${EXISTING_PID}"
+  echo "shared codeksei already running pid=${EXISTING_PID}"
   exit 0
 fi
 
@@ -97,8 +100,9 @@ function shutdown_bridge() {
 
 trap shutdown_bridge EXIT INT TERM
 cd "${ROOT_DIR}"
+export CODEKSEI_CODEX_ENDPOINT="ws://127.0.0.1:${PORT}"
 export CYBERBOSS_CODEX_ENDPOINT="ws://127.0.0.1:${PORT}"
-node ./bin/cyberboss.js start --checkin &
+node ./bin/codeksei.js start --checkin &
 BRIDGE_PID="$!"
 echo "${BRIDGE_PID}" > "${PID_FILE}"
 wait "${BRIDGE_PID}"

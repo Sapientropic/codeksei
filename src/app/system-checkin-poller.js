@@ -2,6 +2,7 @@ const crypto = require("crypto");
 
 const { resolveSelectedAccount } = require("../adapters/channel/weixin/account-store");
 const { SessionStore } = require("../adapters/runtime/codex/session-store");
+const { PACKAGE_NAME, readPrefixedEnv } = require("../core/branding");
 const { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } = require("../core/default-targets");
 const { SystemMessageQueueStore } = require("../core/system-message-queue-store");
 
@@ -14,23 +15,23 @@ async function runSystemCheckinPoller(config) {
   const queue = new SystemMessageQueueStore({ filePath: config.systemMessageQueueFile });
   const sessionStore = new SessionStore({ filePath: config.sessionsFile });
   const target = resolvePollerTarget({ config, account, sessionStore });
-  const minIntervalMs = readIntervalMs(process.env.CYBERBOSS_CHECKIN_MIN_INTERVAL_MS, DEFAULT_MIN_INTERVAL_MS);
+  const minIntervalMs = readIntervalMs(readPrefixedEnv(process.env, "CHECKIN_MIN_INTERVAL_MS"), DEFAULT_MIN_INTERVAL_MS);
   const maxIntervalMs = Math.max(
     minIntervalMs,
-    readIntervalMs(process.env.CYBERBOSS_CHECKIN_MAX_INTERVAL_MS, DEFAULT_MAX_INTERVAL_MS)
+    readIntervalMs(readPrefixedEnv(process.env, "CHECKIN_MAX_INTERVAL_MS"), DEFAULT_MAX_INTERVAL_MS)
   );
 
-  console.log(`[cyberboss] checkin poller ready user=${target.senderId} workspace=${target.workspaceRoot}`);
-  console.log(`[cyberboss] checkin interval range ${Math.round(minIntervalMs / 60000)}m-${Math.round(maxIntervalMs / 60000)}m`);
+  console.log(`[${PACKAGE_NAME}] checkin poller ready user=${target.senderId} workspace=${target.workspaceRoot}`);
+  console.log(`[${PACKAGE_NAME}] checkin interval range ${Math.round(minIntervalMs / 60000)}m-${Math.round(maxIntervalMs / 60000)}m`);
 
   while (true) {
     const delayMs = pickRandomDelayMs(minIntervalMs, maxIntervalMs);
     const wakeAt = new Date(Date.now() + delayMs).toISOString();
-    console.log(`[cyberboss] next checkin in ${Math.round(delayMs / 60000)}m at ${wakeAt}`);
+    console.log(`[${PACKAGE_NAME}] next checkin in ${Math.round(delayMs / 60000)}m at ${wakeAt}`);
     await sleep(delayMs);
 
     if (queue.hasPendingForAccount(account.accountId)) {
-      console.log("[cyberboss] checkin skipped: pending system message still in queue");
+      console.log(`[${PACKAGE_NAME}] checkin skipped: pending system message still in queue`);
       continue;
     }
 
@@ -42,7 +43,7 @@ async function runSystemCheckinPoller(config) {
       text: buildCheckinTrigger(config),
       createdAt: new Date().toISOString(),
     });
-    console.log(`[cyberboss] checkin queued id=${queued.id}`);
+    console.log(`[${PACKAGE_NAME}] checkin queued id=${queued.id}`);
   }
 }
 
@@ -50,22 +51,22 @@ function resolvePollerTarget({ config, account, sessionStore }) {
   const senderId = resolvePreferredSenderId({
     config,
     accountId: account.accountId,
-    explicitUser: process.env.CYBERBOSS_CHECKIN_USER_ID || "",
+    explicitUser: readPrefixedEnv(process.env, "CHECKIN_USER_ID") || "",
     sessionStore,
   });
   const workspaceRoot = resolvePreferredWorkspaceRoot({
     config,
     accountId: account.accountId,
     senderId,
-    explicitWorkspace: process.env.CYBERBOSS_CHECKIN_WORKSPACE || "",
+    explicitWorkspace: readPrefixedEnv(process.env, "CHECKIN_WORKSPACE") || "",
     sessionStore,
   });
 
   if (!senderId) {
-    throw new Error("无法确定 checkin poller 的微信用户，先配置 CYBERBOSS_CHECKIN_USER_ID 或让唯一活跃用户先和 bot 聊过一次");
+    throw new Error("无法确定 checkin poller 的微信用户，先配置 CODEKSEI_CHECKIN_USER_ID（或旧的 CYBERBOSS_CHECKIN_USER_ID）或让唯一活跃用户先和 bot 聊过一次");
   }
   if (!workspaceRoot) {
-    throw new Error("无法确定 checkin poller 的 workspace，先设置 CYBERBOSS_WORKSPACE_ROOT");
+    throw new Error("无法确定 checkin poller 的 workspace，先设置 CODEKSEI_WORKSPACE_ROOT（或旧的 CYBERBOSS_WORKSPACE_ROOT）");
   }
 
   return { senderId, workspaceRoot };

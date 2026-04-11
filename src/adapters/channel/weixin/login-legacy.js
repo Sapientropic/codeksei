@@ -112,7 +112,7 @@ async function waitForLegacyWeixinLogin({ apiBaseUrl, botType, timeoutMs }) {
 }
 
 async function runLegacyLoginFlow(config) {
-  console.log("[cyberboss] 正在启动微信扫码登录（legacy）...");
+  console.log("[codeksei] 正在启动微信扫码登录（legacy）...");
   const result = await waitForLegacyWeixinLogin({
     apiBaseUrl: config.weixinBaseUrl,
     botType: config.weixinQrBotType,
