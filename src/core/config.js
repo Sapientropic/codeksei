@@ -8,6 +8,7 @@ const {
   resolveAppHome,
   resolveStateDir,
 } = require("./branding");
+const { resolveCrossPlatformPathFromRoot } = require("./path-utils");
 
 function readConfig() {
   const argv = process.argv.slice(2);
@@ -63,11 +64,11 @@ function readConfig() {
     workspaceBootstrapConfigFile: readPrefixedEnv(process.env, "WORKSPACE_BOOTSTRAP_CONFIG")
       || path.join(stateDir, "workspace-bootstrap.json"),
     projectRadarConfigFile: readPrefixedEnv(process.env, "PROJECT_RADAR_CONFIG")
-      || path.resolve(workspaceRoot, ".codex", "code-projects.json"),
+      || resolveCrossPlatformPathFromRoot(workspaceRoot, ".codex", "code-projects.json"),
     durableNoteSchemaConfigFile: readPrefixedEnv(process.env, "DURABLE_NOTE_SCHEMA_CONFIG")
-      || path.resolve(workspaceRoot, ".codex", "durable-note-schema.json"),
+      || resolveCrossPlatformPathFromRoot(workspaceRoot, ".codex", "durable-note-schema.json"),
     reviewSchemaConfigFile: readPrefixedEnv(process.env, "REVIEW_SCHEMA_CONFIG")
-      || path.resolve(workspaceRoot, ".codex", "review-schema.json"),
+      || resolveCrossPlatformPathFromRoot(workspaceRoot, ".codex", "review-schema.json"),
     reviewSemanticMode: readPrefixedEnv(process.env, "REVIEW_SEMANTIC_MODE") || "hybrid",
     reviewSemanticModel: readPrefixedEnv(process.env, "REVIEW_SEMANTIC_MODEL"),
     reviewSemanticTimeoutMs: readPrefixedIntEnv(process.env, "REVIEW_SEMANTIC_TIMEOUT_MS") || 120000,

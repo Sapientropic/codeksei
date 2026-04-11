@@ -77,7 +77,59 @@ test("readConfig exposes local overlay files and lets env override them", () => 
       config.weixinOperationsOverlayFile.replace(/\\/g, "/"),
       "E:/state/weixin-operations.local.md"
     );
+    assert.equal(
+      config.workspaceBootstrapConfigFile.replace(/\\/g, "/"),
+      "E:/state/workspace-bootstrap.json"
+    );
   } finally {
+    process.argv = originalArgv;
+  }
+});
+
+test("readConfig keeps Windows workspace roots absolute across platforms", () => {
+  const originalArgv = process.argv;
+  process.argv = ["node", "codeksei.js"];
+
+  try {
+    const config = withPatchedEnv({
+      CODEKSEI_WORKSPACE_ROOT: "E:/workspace/codeksei",
+    }, () => readConfig());
+
+    assert.equal(
+      config.projectRadarConfigFile.replace(/\\/g, "/"),
+      "E:/workspace/codeksei/.codex/code-projects.json"
+    );
+    assert.equal(
+      config.durableNoteSchemaConfigFile.replace(/\\/g, "/"),
+      "E:/workspace/codeksei/.codex/durable-note-schema.json"
+    );
+    assert.equal(
+      config.reviewSchemaConfigFile.replace(/\\/g, "/"),
+      "E:/workspace/codeksei/.codex/review-schema.json"
+    );
+  } finally {
+    process.argv = originalArgv;
+  }
+});
+
+test("resolveStateDir still resolves relative explicit paths from cwd", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-relative-state-"));
+  const originalArgv = process.argv;
+  const originalCwd = process.cwd();
+  process.argv = ["node", "codeksei.js"];
+
+  process.chdir(tempRoot);
+  try {
+    const config = withPatchedEnv({
+      CODEKSEI_STATE_DIR: ".codeksei-state",
+    }, () => readConfig());
+
+    assert.equal(
+      config.stateDir.replace(/\\/g, "/"),
+      `${tempRoot.replace(/\\/g, "/")}/.codeksei-state`
+    );
+  } finally {
+    process.chdir(originalCwd);
     process.argv = originalArgv;
   }
 });

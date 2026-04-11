@@ -88,3 +88,12 @@ test("note sync can resolve tracked project notes by slug or alias", () => {
     path.join(workspaceRoot, "项目", "代码工程", "Codeksei.md").replace(/\\/g, "/")
   );
 });
+
+test("note sync keeps Windows absolute note paths stable across platforms", () => {
+  const target = resolveNoteSyncTarget(
+    { workspaceRoot: "E:/workspace/Website" },
+    { path: "E:/workspace/Website/项目/代码工程/Codeksei.md" }
+  );
+
+  assert.equal(target.filePath, "E:/workspace/Website/项目/代码工程/Codeksei.md");
+});

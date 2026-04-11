@@ -1,12 +1,17 @@
 const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
+const {
+  normalizeDisplayPath,
+  resolveCrossPlatformPath,
+  resolveCrossPlatformPathFromRoot,
+} = require("./path-utils");
 
 function loadProjectRadarConfig(config = {}) {
-  const workspaceRoot = normalizeDisplayPath(path.resolve(String(config.workspaceRoot || process.cwd())));
-  const configFile = normalizeDisplayPath(path.resolve(String(
+  const workspaceRoot = resolveCrossPlatformPath(String(config.workspaceRoot || process.cwd()));
+  const configFile = resolveCrossPlatformPath(String(
     config.projectRadarConfigFile || path.join(workspaceRoot, ".codex", "code-projects.json")
-  )));
+  ));
 
   let raw = "";
   try {
@@ -196,7 +201,7 @@ function buildMissingRepoFacts(repoRoot) {
 function buildWorkspaceFileInfo(root, relativePath, kind) {
   const normalizedRelativePath = normalizeRelativePath(relativePath);
   const absolutePath = normalizedRelativePath
-    ? normalizeDisplayPath(path.resolve(root, ...normalizedRelativePath.split("/")))
+    ? resolveCrossPlatformPathFromRoot(root, ...normalizedRelativePath.split("/"))
     : "";
   return {
     kind,
@@ -218,9 +223,9 @@ function normalizeProjectEntry(entry, workspaceRoot) {
     slug,
     title: normalizeText(project.title) || slug,
     aliases: normalizeAliases(project.aliases),
-    repoRoot: normalizeDisplayPath(path.resolve(repoRoot)),
+    repoRoot: resolveCrossPlatformPath(repoRoot),
     notePath,
-    noteAbsolutePath: normalizeDisplayPath(path.resolve(workspaceRoot, ...notePath.split("/"))),
+    noteAbsolutePath: resolveCrossPlatformPathFromRoot(workspaceRoot, ...notePath.split("/")),
     overviewFiles: normalizeRelativePathList(project.overviewFiles),
     graphReportPath: normalizeRelativePath(project.graphReportPath),
     timelineLabel: normalizeText(project.timelineLabel),
@@ -381,10 +386,6 @@ function normalizeCommandStdout(value) {
 
 function normalizeCommandStderr(value) {
   return String(value || "").replace(/\r\n/g, "\n").trim();
-}
-
-function normalizeDisplayPath(targetPath) {
-  return normalizeText(targetPath).replace(/\\/g, "/");
 }
 
 function normalizeText(value) {

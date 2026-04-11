@@ -5,6 +5,11 @@ const {
   PRIMARY_REVIEW_MARKER_PREFIX,
   LEGACY_REVIEW_MARKER_PREFIX,
 } = require("./branding");
+const {
+  normalizeDisplayPath,
+  resolveCrossPlatformPath,
+  resolveCrossPlatformPathFromRoot,
+} = require("./path-utils");
 
 const REVIEW_MARKER_PREFIX = PRIMARY_REVIEW_MARKER_PREFIX;
 const REVIEW_MARKER_PREFIXES = [PRIMARY_REVIEW_MARKER_PREFIX, LEGACY_REVIEW_MARKER_PREFIX];
@@ -54,7 +59,7 @@ function resolveReviewProfile(config = {}, kind, options = {}) {
   const normalizedKind = normalizeReviewKind(kind);
   const defaults = DEFAULT_REVIEW_MODELS[normalizedKind];
   const required = options.required !== false;
-  const workspaceRoot = normalizeDisplayPath(path.resolve(String(config.workspaceRoot || process.cwd())));
+  const workspaceRoot = resolveCrossPlatformPath(String(config.workspaceRoot || process.cwd()));
   const schemaConfig = loadReviewSchemaConfig(config);
   const workspaceProfile = selectWorkspaceProfile(schemaConfig.workspaces, workspaceRoot);
   const reviews = workspaceProfile?.reviews && typeof workspaceProfile.reviews === "object"
@@ -956,10 +961,10 @@ function selectWorkspaceProfile(workspaces, workspaceRoot) {
 }
 
 function resolveWorkspacePath(workspaceRoot, targetPath) {
-  if (path.isAbsolute(targetPath)) {
-    return normalizeDisplayPath(path.resolve(targetPath));
+  if (path.isAbsolute(targetPath) || path.win32.isAbsolute(targetPath)) {
+    return resolveCrossPlatformPath(targetPath);
   }
-  return normalizeDisplayPath(path.resolve(workspaceRoot, ...String(targetPath || "").split("/")));
+  return resolveCrossPlatformPathFromRoot(workspaceRoot, ...String(targetPath || "").split("/"));
 }
 
 function normalizeRelativeOrAbsolutePath(value) {
@@ -1058,10 +1063,6 @@ function normalizeText(value) {
 function ensureTrailingNewline(value) {
   const normalized = normalizeLineEnding(value);
   return normalized.endsWith("\n") ? normalized : `${normalized}\n`;
-}
-
-function normalizeDisplayPath(targetPath) {
-  return normalizeText(targetPath).replace(/\\/g, "/");
 }
 
 function escapeRegExp(value) {

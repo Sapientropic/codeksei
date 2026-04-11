@@ -1,6 +1,7 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { resolveCrossPlatformPath } = require("./path-utils");
 
 const APP_NAME = "Codeksei";
 const LEGACY_APP_NAME = "Cyberboss";
@@ -90,7 +91,7 @@ function getLegacyStateDir() {
 function resolveStateDir({ env = process.env } = {}) {
   const explicit = readPrefixedEnv(env, "STATE_DIR");
   if (explicit) {
-    return path.resolve(explicit);
+    return resolveCrossPlatformPath(explicit);
   }
 
   const primary = getPrimaryStateDir();
