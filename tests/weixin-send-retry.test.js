@@ -143,18 +143,26 @@ test("legacy chunk retry keeps the same client_id across network retries", async
   assert.deepEqual(seenClientIds, ["legacy-1", "legacy-1", "legacy-1"]);
 });
 
-test("v2 delivery packing coalesces short semantic chunks into fewer bubbles", () => {
-  const chunks = Array.from({ length: 24 }, (_, index) => `第${index + 1}段很短。`);
+test("v2 delivery packing preserves semantic chunk boundaries and paragraphs", () => {
+  const chunks = [
+    "第一段。",
+    "第二段。\n\n还有一个空行。",
+    "第三段。",
+  ];
   const packed = packV2ChunksForWeixinDelivery(chunks, 10, 200);
 
-  assert.ok(packed.length < 10);
-  assert.equal(packed.join("\n"), chunks.join("\n"));
+  assert.deepEqual(packed, chunks);
+  assert.ok(packed[1].includes("\n\n"));
 });
 
-test("legacy delivery packing coalesces short semantic chunks into fewer bubbles", () => {
-  const chunks = Array.from({ length: 24 }, (_, index) => `第${index + 1}段很短。`);
+test("legacy delivery packing preserves semantic chunk boundaries and paragraphs", () => {
+  const chunks = [
+    "第一段。",
+    "第二段。\n\n还有一个空行。",
+    "第三段。",
+  ];
   const packed = packLegacyChunksForWeixinDelivery(chunks, 10, 200);
 
-  assert.ok(packed.length < 10);
-  assert.equal(packed.join("\n"), chunks.join("\n"));
+  assert.deepEqual(packed, chunks);
+  assert.ok(packed[1].includes("\n\n"));
 });
