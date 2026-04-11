@@ -207,7 +207,7 @@ Codeksei grew from that base, but this version has been substantially reworked. 
 ### Why not `npm install codeksei` directly?
 
 Because the primary install path is still local clone + run.  
-CI and npm publish automation are now in place, but the first public release still requires `NPM_TOKEN` and a release/tag flow.
+CI and npm trusted publishing automation are now in place, but the first public release still requires a one-time trusted publisher setup on npm plus the release/tag flow.
 
 ## License
 

@@ -241,7 +241,7 @@ Codeksei 是在其基础上发展出来的版本，但当前已经进行了大�
 ### 为什么不是直接 `npm install codeksei`？
 
 因为当前默认入口仍是 clone 仓库后本地运行。  
-现在已经有 GitHub Actions CI 和 npm publish workflow，但真正首发前仍需要先配置 `NPM_TOKEN` 并走 release/tag 流程。
+现在已经有 GitHub Actions CI 和 npm trusted publishing workflow，但真正首发前仍需要先在 npm 后台完成一次 trusted publisher 配置，再走 release/tag 流程。
 
 ### 现在到底该用 `codeksei` 还是 `cyberboss`？
 

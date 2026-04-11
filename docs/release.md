@@ -32,31 +32,74 @@
 - `workflow_dispatch`
 - GitHub Release `published`
 
-发布工作流会先跑安装、语法检查和测试，再执行 `npm publish --provenance --access public`。
+其中：
 
-## Required Secret
+- `workflow_dispatch` 只做 dry-run 预检，不会真的发包
+- GitHub Release `published` 才会真正执行 `npm publish --access public`
 
-真正发包前，需要在 GitHub 仓库 `Sapientropic/codeksei` 里配置：
+发布工作流会先跑安装、语法检查和测试，再进入 publish 阶段。  
+当前 workflow 会显式升级到最新 npm，以满足 trusted publishing 对 npm CLI 版本的要求。
 
-- `NPM_TOKEN`：npm automation token
+## Trusted Publishing Setup
 
-当前工作流使用 `NPM_TOKEN` 发包，并开启 provenance；还没有切成 npm trusted publishing-only 路线。
+当前仓库已经切到 npm trusted publishing 主链路，不再依赖 `NPM_TOKEN` 这类长期写权限 secret。
+
+你需要在 npm 的包设置里做一次性配置：
+
+1. 打开 npm 的 trusted publishing 文档：
+   https://docs.npmjs.com/trusted-publishers/
+2. 在 npmjs.com 为 `codeksei` 配置 GitHub Actions trusted publisher
+3. 按下面这组字段填写：
+
+- Organization or user: `Sapientropic`
+- Repository: `codeksei`
+- Workflow filename: `publish.yml`
+- Environment name: 留空
+
+说明：
+
+- 这里只填 workflow 文件名，不填 `.github/workflows/` 全路径
+- 当前仓库是 public repo，满足 npm trusted publishing 的 GitHub Actions 前提
+- trusted publishing 下，npm 会自动生成 provenance；不需要再手动加 `--provenance`
+
+## First Release Checklist
+
+首发前建议按这条顺序做：
+
+1. 在 npm 侧完成 trusted publisher 配置
+2. 手动触发一次 `publish.yml` 的 `workflow_dispatch`，确认 dry-run 预检通过
+3. 本地确认版本号、README 和 packlist 都准备好
+4. 创建 GitHub Release，tag 形如 `v0.1.0`
+5. 等 `publish.yml` 在 `release.published` 事件上真正发包
+
+[⚠️ 需确认] npm 官网当前文档明确要求在包设置里添加 trusted publisher，但对“尚未首发的新包”在 UI 里的具体入口层级可能会随 npm 页面调整而变化；如果你打开后入口名字略有不同，以 npm 官方文档与实际控制台为准。
 
 ## Release Steps
 
-推荐流程：
+常规后续版本发布流程：
 
 1. 本地确认改动、测试和 packlist 都通过
 2. 更新 `package.json` 版本号
 3. push 到 `fork/main`
-4. 创建 GitHub Release，tag 形如 `v0.1.0`
-5. 等 `publish.yml` 自动发包，或手动 `workflow_dispatch` 且把 `dry_run` 设为 `false`
+4. 可选：先手动触发一次 `publish.yml` 的 `workflow_dispatch` 做 dry-run 预检
+5. 创建 GitHub Release，tag 形如 `v0.1.0`
+6. 等 `publish.yml` 自动发包
 
 补充约束：
 
 - GitHub Release 触发时，workflow 会校验 `package.json` 版本和 tag 去掉前缀 `v` 后一致
-- `workflow_dispatch` 默认是 dry run，避免误发
+- `workflow_dispatch` 现在固定只做 dry-run，避免误发
 - 兼容入口 `cyberboss` 不会再单独发布 npm 包
+
+## Post-First-Release Hardening
+
+在 trusted publishing 首次验证成功后，建议继续做这一步：
+
+1. 打开 npm 包设置里的 Publishing access
+2. 选择 `Require two-factor authentication and disallow tokens`
+3. 保存设置
+
+这样可以把传统 publish token 彻底降为不可用，只保留 OIDC trusted publishing。
 
 ## Migration Checklist
 
