@@ -32,7 +32,7 @@ const DEFAULT_BOOTSTRAP_PROFILE = Object.freeze({
     {
       path: ".codex/timeline/README.md",
       role: "timeline write/read contract for this workspace",
-      when: "timeline read/write/build/screenshot work",
+      when: "timeline read/write/build/screenshot work, or cutover/closeout bookkeeping that may append timeline facts/events",
     },
   ],
   recentFiles: [],
