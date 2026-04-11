@@ -8,6 +8,10 @@ const DEFAULT_BOOTSTRAP_PROFILE = Object.freeze({
       role: "workspace routing and boundary contract",
     },
     {
+      path: "AGENTS.local.md",
+      role: "private operator overlay for this workspace",
+    },
+    {
       path: "README.md",
       role: "workspace overview and operating instructions",
     },
@@ -18,6 +22,10 @@ const DEFAULT_BOOTSTRAP_PROFILE = Object.freeze({
     {
       path: ".codex/AGENT_GUIDE.md",
       role: "agent write/update rules for this workspace",
+    },
+    {
+      path: ".codex/AGENT_GUIDE.local.md",
+      role: "private agent write/update overlay for this workspace",
     },
   ],
   conditionalFiles: [

@@ -59,6 +59,12 @@ shared-mode lifecycle, also read the relevant source of truth in:
 - When an example only needs to show shape, prefer generic placeholders like
   `/absolute/path/to/note.md` or `<workspace note>` instead of personal note
   titles, vault names, or machine-specific workspace labels.
+- For private operator customizations, prefer local-only overlays instead of
+  editing the public repo defaults:
+  - repo root: `AGENTS.local.md`
+  - repo root: `.codex/AGENT_GUIDE.local.md`
+  - state dir: `weixin-instructions.local.md`
+  - state dir: `weixin-operations.local.md`
 
 ## Change Discipline
 

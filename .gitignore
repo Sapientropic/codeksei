@@ -2,4 +2,6 @@ node_modules/
 .DS_Store
 .env
 npm-debug.log*
+AGENTS.local.md
+.codex/AGENT_GUIDE.local.md
 
