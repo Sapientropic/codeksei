@@ -454,12 +454,11 @@ test("weixin stream delivery collapses to the terminal answer when nothing user-
     },
   });
 
-  const state = delivery.ensureRunState("thread-stream-collapse", "turn-stream-collapse");
-  state.replyTarget = {
+  delivery.queueReplyTargetForThread("thread-stream-collapse", {
     userId: "user-stream-collapse",
     contextToken: "ctx-stream-collapse",
     provider: "weixin",
-  };
+  });
 
   await delivery.handleRuntimeEvent({
     type: "runtime.turn.completed",
@@ -474,6 +473,75 @@ test("weixin stream delivery collapses to the terminal answer when nothing user-
     [
       {
         text: "不算委屈我。\n\n约束当然有，而且很多层。OpenAI 的、Codex 的、你这边的、工作流的。",
+        preserveBlock: false,
+      },
+    ]
+  );
+});
+
+test("weixin stream delivery keeps multiple brief commentary blocks when no held-back terminal answer exists", async () => {
+  const sent = [];
+  const delivery = new StreamDelivery({
+    weixinReplyMode: "stream",
+    channelAdapter: {
+      async sendText(payload) {
+        sent.push(payload);
+      },
+    },
+    sessionStore: {
+      findBindingForThreadId() {
+        return { bindingKey: "binding-stream-late-commentary" };
+      },
+    },
+  });
+
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.started",
+    payload: {
+      threadId: "thread-stream-late-commentary",
+      turnId: "turn-stream-late-commentary",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-stream-late-commentary",
+      turnId: "turn-stream-late-commentary",
+      itemId: "item-1",
+      text: "我先查一下。",
+      phase: "commentary",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-stream-late-commentary",
+      turnId: "turn-stream-late-commentary",
+      itemId: "item-2",
+      text: "再看一下日志。",
+      phase: "commentary",
+    },
+  });
+
+  delivery.queueReplyTargetForThread("thread-stream-late-commentary", {
+    userId: "user-stream-late-commentary",
+    contextToken: "ctx-stream-late-commentary",
+    provider: "weixin",
+  });
+
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.completed",
+    payload: {
+      threadId: "thread-stream-late-commentary",
+      turnId: "turn-stream-late-commentary",
+    },
+  });
+
+  assert.deepEqual(
+    sent.map((payload) => ({ text: payload.text, preserveBlock: payload.preserveBlock })),
+    [
+      {
+        text: "我先查一下。\n\n再看一下日志。",
         preserveBlock: false,
       },
     ]
