@@ -36,7 +36,6 @@ async function runDiaryWriteCommand(config) {
   const dateString = options.date || formatDate(now, timezone);
   const timeString = options.time || formatTime(now, timezone);
   const section = normalizeSection(options.section);
-  const todoState = normalizeTodoState(options.state, section);
   const filePath = path.join(config.diaryDir, `${dateString}.md`);
   fs.mkdirSync(config.diaryDir, { recursive: true });
   ensureDiaryFile(filePath, now, timezone);
@@ -47,7 +46,10 @@ async function runDiaryWriteCommand(config) {
     timeString,
     title: options.title,
     body,
-    todoState,
+    // Keep the raw CLI flag here too. Otherwise non-todo writes inherit the
+    // synthesized internal "open" default and trip the same guard that is
+    // meant only for explicit --state misuse.
+    todoState: options.state,
     timelineText: options.timelineText,
   });
   if (timelineResolution.mode === "point_in_time") {
@@ -62,7 +64,11 @@ async function runDiaryWriteCommand(config) {
     timeString,
     title: options.title,
     body,
-    todoState,
+    // Keep the raw CLI flag here. Non-todo writes internally normalize the
+    // missing state to "open" for cutover bookkeeping, but treating that
+    // synthesized default as an explicit --state would wrongly reject
+    // fragment/timeline writes.
+    todoState: options.state,
     timelineText: options.timelineText,
   });
   const next = entryPayloads.reduce(
@@ -221,7 +227,7 @@ function buildDiaryWriteEntryPayloads({
   timeString,
   title,
   body,
-  todoState = "open",
+  todoState = "",
   timelineText = "",
 }) {
   const normalizedSection = normalizeSection(section);
