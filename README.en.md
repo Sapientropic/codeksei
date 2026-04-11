@@ -1,5 +1,7 @@
 # Codeksei
 
+[![CI](https://github.com/Sapientropic/codeksei/actions/workflows/ci.yml/badge.svg)](https://github.com/Sapientropic/codeksei/actions/workflows/ci.yml)
+
 [中文 README](./README.md)
 
 Codeksei is a local-first life-assistant agent bridge.  
@@ -48,7 +50,7 @@ Rules:
 
 ### 1. Clone and install
 
-There is no published npm package at the moment. Clone the repository and install locally:
+The default path is still to clone and run locally. The repository now includes GitHub Actions CI and an npm publish workflow, but until the first package release exists, clone-based local usage remains the primary install path:
 
 ```bash
 git clone https://github.com/Sapientropic/codeksei.git
@@ -155,6 +157,13 @@ More detailed references:
 - [docs/commands.md](./docs/commands.md)
 - [docs/architecture.md](./docs/architecture.md)
 
+## Release and CI
+
+The repository now includes GitHub Actions CI and an npm publish workflow.  
+The canonical release instructions, required secrets, tag rules, and slug-migration constraints live in:
+
+- [docs/release.md](./docs/release.md)
+
 ## Local State
 
 Primary state directory:
@@ -192,6 +201,13 @@ If you only want the timeline runtime and not the WeChat/life-assistant stack, y
 
 Thanks to [`WenXiaoWendy/cyberboss`](https://github.com/WenXiaoWendy/cyberboss) for open-sourcing the original repository.  
 Codeksei grew from that base, but this version has been substantially reworked. Please treat this repository’s README, `docs/`, and actual code as the source of truth for current behavior.
+
+## FAQ
+
+### Why not `npm install codeksei` directly?
+
+Because the primary install path is still local clone + run.  
+CI and npm publish automation are now in place, but the first public release still requires `NPM_TOKEN` and a release/tag flow.
 
 ## License
 

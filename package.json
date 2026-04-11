@@ -1,17 +1,44 @@
 {
   "name": "codeksei",
   "version": "0.1.0",
-  "description": "A personal agent bridge core for life operations.",
+  "description": "Local-first life-assistant agent bridge for Codex, WeChat, timeline, diary, and review workflows.",
   "license": "AGPL-3.0-only",
   "private": false,
   "type": "commonjs",
   "main": "src/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sapientropic/codeksei.git"
+  },
+  "homepage": "https://github.com/Sapientropic/codeksei#readme",
+  "bugs": {
+    "url": "https://github.com/Sapientropic/codeksei/issues"
+  },
   "bin": {
     "codeksei": "./bin/codeksei.js",
     "cyberboss": "./bin/cyberboss.js"
   },
+  "files": [
+    "bin",
+    "src",
+    "scripts",
+    "templates",
+    "README.en.md"
+  ],
+  "keywords": [
+    "codeksei",
+    "codex",
+    "wechat",
+    "weixin",
+    "timeline",
+    "review",
+    "life-assistant"
+  ],
   "engines": {
     "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "start": "node ./bin/codeksei.js start",

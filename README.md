@@ -1,5 +1,7 @@
 # Codeksei
 
+[![CI](https://github.com/Sapientropic/codeksei/actions/workflows/ci.yml/badge.svg)](https://github.com/Sapientropic/codeksei/actions/workflows/ci.yml)
+
 [English README](./README.en.md)
 
 Codeksei 是一个面向个人本地部署的生活助理 Agent Bridge。  
@@ -62,7 +64,7 @@ Codeksei 是一个面向个人本地部署的生活助理 Agent Bridge。
 
 ### 1. 获取源码
 
-当前没有发布 npm 包。推荐直接拉仓库源码使用：
+当前默认仍推荐直接拉源码使用。仓库已经补上 GitHub Actions CI 和 npm publish workflow，但在首发 npm 包之前，日常安装入口仍以 clone 仓库为主：
 
 ```bash
 git clone https://github.com/Sapientropic/codeksei.git
@@ -187,6 +189,13 @@ npm run background:uninstall
 - [docs/commands.md](./docs/commands.md)
 - [docs/architecture.md](./docs/architecture.md)
 
+## 发布与 CI
+
+仓库现在已经内置 GitHub Actions CI 与 npm 发布 workflow。  
+发布流程、所需 secret、tag 约定和 slug 迁移约束统一见：
+
+- [docs/release.md](./docs/release.md)
+
 ## 本地数据在哪里
 
 当前默认状态目录是：
@@ -231,7 +240,8 @@ Codeksei 是在其基础上发展出来的版本，但当前已经进行了大�
 
 ### 为什么不是直接 `npm install codeksei`？
 
-因为当前没有发布 npm 包。正确方式是 clone 仓库后在本地运行。
+因为当前默认入口仍是 clone 仓库后本地运行。  
+现在已经有 GitHub Actions CI 和 npm publish workflow，但真正首发前仍需要先配置 `NPM_TOKEN` 并走 release/tag 流程。
 
 ### 现在到底该用 `codeksei` 还是 `cyberboss`？
 
