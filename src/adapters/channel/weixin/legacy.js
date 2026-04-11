@@ -14,6 +14,7 @@ const WEIXIN_SEND_CHUNK_LIMIT = 80;
 const MAX_WEIXIN_CHUNK = 3800;
 const WEIXIN_MAX_DELIVERY_MESSAGES = 10;
 const SEND_RETRY_DELAYS_MS = [900, 1800];
+const AMBIGUOUS_SEND_RETRY_DELAYS_MS = [1200];
 
 function createLegacyWeixinChannelAdapter(config) {
   let selectedAccount = null;
@@ -317,55 +318,60 @@ function packChunksForWeixinDelivery(chunks, maxMessages = 10, maxChunkChars = 3
   const normalizedChunks = Array.isArray(chunks)
     ? chunks.map((chunk) => compactPlainTextForWeixin(chunk)).filter(Boolean)
     : [];
-  if (!normalizedChunks.length || normalizedChunks.length <= maxMessages) {
+  if (!normalizedChunks.length) {
     return normalizedChunks;
   }
 
-  const packed = normalizedChunks.slice(0, Math.max(0, maxMessages - 1));
-  const tailChunks = normalizedChunks.slice(Math.max(0, maxMessages - 1));
-  if (!tailChunks.length) {
-    return packed;
+  const groupedChunks = groupChunksWithinBudget(normalizedChunks, maxChunkChars);
+  if (groupedChunks.length <= maxMessages) {
+    return groupedChunks;
   }
 
-  const tailText = compactPlainTextForWeixin(tailChunks.join("\n")) || "已完成。";
-  if (tailText.length <= maxChunkChars) {
-    packed.push(tailText);
-    return packed;
+  const fullText = compactPlainTextForWeixin(normalizedChunks.join("\n")) || "已完成。";
+  const hardChunks = splitUtf8(fullText, maxChunkChars);
+  if (hardChunks.length <= maxMessages) {
+    return hardChunks;
   }
 
-  const tailHardChunks = splitUtf8(tailText, maxChunkChars);
-  if (tailHardChunks.length === 1) {
-    packed.push(tailHardChunks[0]);
-    return packed;
-  }
+  // `maxMessages` is only a spam guard. If the full reply still needs more
+  // chunks at the hard per-message budget, prefer complete delivery over
+  // silently dropping the tail.
+  return hardChunks;
+}
 
-  const preserveCount = Math.max(0, maxMessages - tailHardChunks.length);
-  const preserved = normalizedChunks.slice(0, preserveCount);
-  const rebundledTail = normalizedChunks.slice(preserveCount);
-  const groupedTail = [];
+function groupChunksWithinBudget(chunks, maxChunkChars) {
+  const grouped = [];
   let current = "";
-  for (const chunk of rebundledTail) {
-    const joined = current ? `${current}\n${chunk}` : chunk;
-    if (current && joined.length > maxChunkChars) {
-      groupedTail.push(current);
-      current = chunk;
+
+  for (const rawChunk of Array.isArray(chunks) ? chunks : []) {
+    const normalizedChunk = compactPlainTextForWeixin(rawChunk);
+    if (!normalizedChunk) {
       continue;
     }
-    current = joined;
+
+    const units = normalizedChunk.length > maxChunkChars
+      ? splitUtf8(normalizedChunk, maxChunkChars)
+      : [normalizedChunk];
+
+    for (const unit of units) {
+      if (!current) {
+        current = unit;
+        continue;
+      }
+      const joined = `${current}\n${unit}`;
+      if (joined.length > maxChunkChars) {
+        grouped.push(current);
+        current = unit;
+        continue;
+      }
+      current = joined;
+    }
   }
+
   if (current) {
-    groupedTail.push(current);
+    grouped.push(current);
   }
-
-  const normalizedGroupedTail = groupedTail.map((item) => compactPlainTextForWeixin(item) || "已完成。");
-  if (preserved.length + normalizedGroupedTail.length <= maxMessages) {
-    return preserved.concat(normalizedGroupedTail);
-  }
-
-  // Never silently drop the tail of a long reply. If grouping by semantic
-  // chunk boundaries still overflows the per-message budget, fall back to hard
-  // UTF-8 splits of the already-joined tail so the full answer is still sent.
-  return preserved.concat(tailHardChunks.slice(0, Math.max(1, maxMessages - preserved.length)));
+  return grouped;
 }
 
 function collectStreamingBoundaries(text) {
@@ -406,7 +412,7 @@ function collectStreamingBoundaries(text) {
 
 async function sendTextChunkWithRetry(send, { trace = null } = {}) {
   let lastError = null;
-  for (let attempt = 0; attempt <= SEND_RETRY_DELAYS_MS.length; attempt += 1) {
+  for (let attempt = 0; ; attempt += 1) {
     const attemptNumber = attempt + 1;
     try {
       logWeixinSendTrace("attempt", {
@@ -421,17 +427,18 @@ async function sendTextChunkWithRetry(send, { trace = null } = {}) {
       return result;
     } catch (error) {
       lastError = error;
-      const retryable = isRetryableSendError(error);
+      const retryDelays = getSendRetryDelaysMs(error);
+      const retryable = attempt < retryDelays.length;
       logWeixinSendTrace("error", {
         ...buildWeixinTraceContext(trace),
         attempt: attemptNumber,
         retryable,
         error: String(error?.message || error || ""),
       });
-      if (!retryable || attempt >= SEND_RETRY_DELAYS_MS.length) {
+      if (!retryable) {
         throw error;
       }
-      await sleep(SEND_RETRY_DELAYS_MS[attempt]);
+      await sleep(retryDelays[attempt]);
     }
   }
   throw lastError || new Error("sendText chunk failed");
@@ -480,18 +487,23 @@ function sendLegacyTextChunk({
   );
 }
 
-function isRetryableSendError(error) {
+function getSendRetryDelaysMs(error) {
   const message = String(error?.message || error || "");
-  // Legacy sendmessage shows the same live ambiguity as v2: `ret=-2` can mean
-  // "client saw an error even though WeChat already accepted the message".
-  // Do not auto-retry it, or one failed bridge turn can fan out into duplicate
-  // bubbles on the user side.
-  return message.includes("AbortError")
+  // Legacy sendmessage sees the same `ret=-2` ambiguity as v2. Retry it once
+  // with the same client_id so we bias toward complete delivery without
+  // turning one flaky send into a burst of duplicate assistant bubbles.
+  if (message.includes("ret=-2")) {
+    return AMBIGUOUS_SEND_RETRY_DELAYS_MS;
+  }
+  if (message.includes("AbortError")
     || message.includes("aborted")
     || message.includes("fetch failed")
     || message.includes("ECONNRESET")
     || message.includes("ETIMEDOUT")
-    || /http 5\d\d/.test(message);
+    || /http 5\d\d/.test(message)) {
+    return SEND_RETRY_DELAYS_MS;
+  }
+  return [];
 }
 
 function buildWeixinTraceContext(trace, defaults = {}) {
@@ -563,5 +575,6 @@ function sleep(ms) {
 
 module.exports = {
   createLegacyWeixinChannelAdapter,
+  packChunksForWeixinDelivery,
   sendLegacyTextChunk,
 };

@@ -2,11 +2,18 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const crypto = require("crypto");
 
-const { sendV2TextChunk } = require("../src/adapters/channel/weixin/index");
-const { sendLegacyTextChunk } = require("../src/adapters/channel/weixin/legacy");
+const {
+  packChunksForWeixinDelivery: packV2ChunksForWeixinDelivery,
+  sendV2TextChunk,
+} = require("../src/adapters/channel/weixin/index");
+const {
+  packChunksForWeixinDelivery: packLegacyChunksForWeixinDelivery,
+  sendLegacyTextChunk,
+} = require("../src/adapters/channel/weixin/legacy");
 
-test("v2 chunk does not retry ambiguous ret=-2 send failures", async () => {
+test("v2 chunk retries ambiguous ret=-2 once with the same client_id", async () => {
   const seenClientIds = [];
+  let attempts = 0;
   let randomCounter = 0;
   const originalRandomUUID = crypto.randomUUID;
   crypto.randomUUID = () => {
@@ -15,26 +22,31 @@ test("v2 chunk does not retry ambiguous ret=-2 send failures", async () => {
   };
 
   try {
-    await assert.rejects(() => sendV2TextChunk({
+    await sendV2TextChunk({
       sendTextImpl: async (payload) => {
+        attempts += 1;
         seenClientIds.push(payload.clientId);
-        throw new Error("sendMessage ret=-2 errcode= errmsg=");
+        if (attempts === 1) {
+          throw new Error("sendMessage ret=-2 errcode= errmsg=");
+        }
+        return { ok: true };
       },
       baseUrl: "http://localhost",
       token: "token",
       toUserId: "user-1",
       text: "hello",
       contextToken: "ctx-1",
-    }), /ret=-2/);
+    });
   } finally {
     crypto.randomUUID = originalRandomUUID;
   }
 
-  assert.deepEqual(seenClientIds, ["cb-uuid-1"]);
+  assert.deepEqual(seenClientIds, ["cb-uuid-1", "cb-uuid-1"]);
 });
 
-test("legacy chunk does not retry ambiguous ret=-2 send failures", async () => {
+test("legacy chunk retries ambiguous ret=-2 once with the same client_id", async () => {
   const seenClientIds = [];
+  let attempts = 0;
   let randomCounter = 0;
   const originalRandomUUID = crypto.randomUUID;
   crypto.randomUUID = () => {
@@ -43,22 +55,26 @@ test("legacy chunk does not retry ambiguous ret=-2 send failures", async () => {
   };
 
   try {
-    await assert.rejects(() => sendLegacyTextChunk({
+    await sendLegacyTextChunk({
       sendMessageImpl: async (payload) => {
+        attempts += 1;
         seenClientIds.push(payload.body.msg.client_id);
-        throw new Error("sendMessage ret=-2 errcode= errmsg=");
+        if (attempts === 1) {
+          throw new Error("sendMessage ret=-2 errcode= errmsg=");
+        }
+        return { ok: true };
       },
       baseUrl: "http://localhost",
       token: "token",
       toUserId: "user-1",
       text: "hello",
       contextToken: "ctx-1",
-    }), /ret=-2/);
+    });
   } finally {
     crypto.randomUUID = originalRandomUUID;
   }
 
-  assert.deepEqual(seenClientIds, ["legacy-1"]);
+  assert.deepEqual(seenClientIds, ["legacy-1", "legacy-1"]);
 });
 
 test("v2 chunk retry keeps the same client_id across network retries", async () => {
@@ -125,4 +141,20 @@ test("legacy chunk retry keeps the same client_id across network retries", async
   }
 
   assert.deepEqual(seenClientIds, ["legacy-1", "legacy-1", "legacy-1"]);
+});
+
+test("v2 delivery packing coalesces short semantic chunks into fewer bubbles", () => {
+  const chunks = Array.from({ length: 24 }, (_, index) => `第${index + 1}段很短。`);
+  const packed = packV2ChunksForWeixinDelivery(chunks, 10, 200);
+
+  assert.ok(packed.length < 10);
+  assert.equal(packed.join("\n"), chunks.join("\n"));
+});
+
+test("legacy delivery packing coalesces short semantic chunks into fewer bubbles", () => {
+  const chunks = Array.from({ length: 24 }, (_, index) => `第${index + 1}段很短。`);
+  const packed = packLegacyChunksForWeixinDelivery(chunks, 10, 200);
+
+  assert.ok(packed.length < 10);
+  assert.equal(packed.join("\n"), chunks.join("\n"));
 });
