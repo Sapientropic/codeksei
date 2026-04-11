@@ -3,16 +3,15 @@ const http = require("http");
 const os = require("os");
 const path = require("path");
 const { execFileSync, spawn } = require("child_process");
-const dotenv = require("dotenv");
 const {
   APP_NAME,
   PACKAGE_NAME,
   ensureStateDirectory,
-  listEnvFileCandidates,
   readPrefixedBoolEnv,
   readPrefixedEnv,
   resolveStateDir,
 } = require("../src/core/branding");
+const { loadEnvStack } = require("../src/core/env-loader");
 const {
   DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS,
   classifySharedBridgeHeartbeat,
@@ -58,15 +57,8 @@ const SHARED_DISABLE_SHELL_SNAPSHOT = readPrefixedBoolEnv(
 );
 
 function loadSharedEnv() {
+  loadEnvStack({ cwd: rootDir, env: process.env });
   ensureStateDirectory({ env: process.env });
-  const candidates = listEnvFileCandidates({ cwd: rootDir, env: process.env });
-  for (const envPath of candidates) {
-    if (!fs.existsSync(envPath)) {
-      continue;
-    }
-    dotenv.config({ path: envPath });
-    return;
-  }
 }
 
 function ensureLogDir() {

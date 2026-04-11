@@ -13,7 +13,10 @@ const INTERNAL_CHECKIN_TRIGGER_TEMPLATE = "Take a quiet look at whether now is a
 
 async function runSystemCheckinPoller(config) {
   const account = resolveSelectedAccount(config);
-  const queue = new SystemMessageQueueStore({ filePath: config.systemMessageQueueFile });
+  const queue = new SystemMessageQueueStore({
+    filePath: config.systemMessageQueueFile,
+    deadLetterFilePath: config.systemMessageDeadLetterFile,
+  });
   const sessionStore = new SessionStore({ filePath: config.sessionsFile });
   const target = resolvePollerTarget({ config, account, sessionStore });
   const minIntervalMs = readIntervalMs(readPrefixedEnv(process.env, "CHECKIN_MIN_INTERVAL_MS"), DEFAULT_MIN_INTERVAL_MS);
@@ -42,6 +45,7 @@ async function runSystemCheckinPoller(config) {
       senderId: target.senderId,
       workspaceRoot: target.workspaceRoot,
       text: buildCheckinTrigger(config),
+      kind: "checkin",
       createdAt: new Date().toISOString(),
     });
     console.log(`[${PACKAGE_NAME}] checkin queued id=${queued.id}`);

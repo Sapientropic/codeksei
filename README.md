@@ -105,10 +105,13 @@ codeksei help
 
 ### 2. 配置最小环境变量
 
-运行时会依次读取：
+运行时会按“两阶段”补全环境变量：
 
-1. 当前项目目录下的 `.env`
-2. 当前状态目录下的 `.env`
+1. 先保留当前进程里已经存在的环境变量
+2. 读取当前项目目录下的 `.env`
+3. 再根据这一步已经生效的 `CODEKSEI_STATE_DIR` / `CYBERBOSS_STATE_DIR` 重新计算状态目录，并读取该状态目录下的 `.env`
+
+前面的值优先，后面的 `.env` 只补缺省，不会覆盖已经存在的 key。也就是说，如果 repo `.env` 里才定义了 `CODEKSEI_STATE_DIR`，运行时会在读完 repo `.env` 之后，重新定位 state-dir `.env`。
 
 最小可用配置：
 
@@ -270,10 +273,13 @@ npm run help
 - `workspace-bootstrap.json`
 - `reminder-queue.json`
 - `system-message-queue.json`
+- `system-message-dead-letter.json`
 - `timeline-screenshot-queue.json`
 - `diary/`
 - `timeline/`
 - `logs/`
+
+连续性关键的状态文件目前包括 `sessions.json`、`reminder-queue.json`、`system-message-queue.json`、`timeline-screenshot-queue.json`。这几类文件现在会走原子写；如果 JSON 可读但关键 schema 已坏、或者文件本身损坏，运行时会把原文件隔离成 `*.corrupt-<timestamp>.json` 再回到空默认状态继续启动。
 
 如果你单独设置了 `CODEKSEI_DIARY_DIR` 或 `CODEKSEI_TIMELINE_STATE_DIR`，真正的数据会写到你指定的位置，状态目录只保留运行态文件。
 

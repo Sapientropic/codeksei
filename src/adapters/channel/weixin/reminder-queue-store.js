@@ -1,5 +1,9 @@
-const fs = require("fs");
-const path = require("path");
+const {
+  ensureParentDirectory,
+  isPlainObject,
+  readJsonStateFile,
+  writeJsonStateFile,
+} = require("../../../core/json-state");
 
 class ReminderQueueStore {
   constructor({ filePath }) {
@@ -10,27 +14,27 @@ class ReminderQueueStore {
   }
 
   ensureParentDirectory() {
-    fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
+    ensureParentDirectory(this.filePath);
   }
 
   load() {
-    try {
-      const raw = fs.readFileSync(this.filePath, "utf8");
-      const parsed = JSON.parse(raw);
-      const reminders = Array.isArray(parsed?.reminders) ? parsed.reminders : [];
-      this.state = {
-        reminders: reminders
-          .map(normalizeReminder)
-          .filter(Boolean)
-          .sort((left, right) => left.dueAtMs - right.dueAtMs),
-      };
-    } catch {
-      this.state = { reminders: [] };
-    }
+    const parsed = readJsonStateFile({
+      filePath: this.filePath,
+      fallback: { reminders: [] },
+      label: "reminder queue",
+      validate: validateReminderQueueState,
+    });
+    const reminders = Array.isArray(parsed?.reminders) ? parsed.reminders : [];
+    this.state = {
+      reminders: reminders
+        .map(normalizeReminder)
+        .filter(Boolean)
+        .sort((left, right) => left.dueAtMs - right.dueAtMs),
+    };
   }
 
   save() {
-    fs.writeFileSync(this.filePath, JSON.stringify(this.state, null, 2));
+    writeJsonStateFile(this.filePath, this.state);
   }
 
   enqueue(reminder) {
@@ -96,6 +100,21 @@ function normalizeReminder(reminder) {
     dueAtMs,
     createdAt: createdAt || new Date().toISOString(),
   };
+}
+
+function validateReminderQueueState(state) {
+  if (!isPlainObject(state)) {
+    return "reminder queue top-level state must be an object";
+  }
+  if (!Array.isArray(state.reminders)) {
+    return "reminder queue reminders must be an array";
+  }
+  for (let index = 0; index < state.reminders.length; index += 1) {
+    if (!normalizeReminder(state.reminders[index])) {
+      return `reminder queue reminders[${index}] is invalid`;
+    }
+  }
+  return true;
 }
 
 module.exports = { ReminderQueueStore };

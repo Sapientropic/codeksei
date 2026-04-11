@@ -1,6 +1,10 @@
-const fs = require("fs");
-const path = require("path");
 const { normalizeModelCatalog } = require("./model-catalog");
+const {
+  ensureParentDirectory,
+  isPlainObject,
+  readJsonStateFile,
+  writeJsonStateFile,
+} = require("../../../core/json-state");
 
 class SessionStore {
   constructor({ filePath }) {
@@ -11,33 +15,31 @@ class SessionStore {
   }
 
   ensureParentDirectory() {
-    fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
+    ensureParentDirectory(this.filePath);
   }
 
   load() {
-    try {
-      const raw = fs.readFileSync(this.filePath, "utf8");
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object" && parsed.bindings) {
-        this.state = {
-          ...createEmptyState(),
-          ...parsed,
-          bindings: parsed.bindings || {},
-          approvalCommandAllowlistByWorkspaceRoot: parsed.approvalCommandAllowlistByWorkspaceRoot || {},
-          approvalPromptStateByThreadId: parsed.approvalPromptStateByThreadId || {},
-          availableModelCatalog: parsed.availableModelCatalog || {
-            models: [],
-            updatedAt: "",
-          },
-        };
-      }
-    } catch {
-      this.state = createEmptyState();
-    }
+    const parsed = readJsonStateFile({
+      filePath: this.filePath,
+      fallback: createEmptyState(),
+      label: "session store",
+      validate: validateSessionStoreState,
+    });
+    this.state = {
+      ...createEmptyState(),
+      ...parsed,
+      bindings: parsed.bindings || {},
+      approvalCommandAllowlistByWorkspaceRoot: parsed.approvalCommandAllowlistByWorkspaceRoot || {},
+      approvalPromptStateByThreadId: parsed.approvalPromptStateByThreadId || {},
+      availableModelCatalog: parsed.availableModelCatalog || {
+        models: [],
+        updatedAt: "",
+      },
+    };
   }
 
   save() {
-    fs.writeFileSync(this.filePath, JSON.stringify(this.state, null, 2));
+    writeJsonStateFile(this.filePath, this.state);
   }
 
   getBinding(bindingKey) {
@@ -335,6 +337,45 @@ function createEmptyState() {
       updatedAt: "",
     },
   };
+}
+
+function validateSessionStoreState(state) {
+  if (!isPlainObject(state)) {
+    return "session store top-level state must be an object";
+  }
+  if ("bindings" in state && !isPlainObject(state.bindings)) {
+    return "session store bindings must be an object";
+  }
+  if (
+    "approvalCommandAllowlistByWorkspaceRoot" in state
+    && !isPlainObject(state.approvalCommandAllowlistByWorkspaceRoot)
+  ) {
+    return "session store approvalCommandAllowlistByWorkspaceRoot must be an object";
+  }
+  if (
+    "approvalPromptStateByThreadId" in state
+    && !isPlainObject(state.approvalPromptStateByThreadId)
+  ) {
+    return "session store approvalPromptStateByThreadId must be an object";
+  }
+  if ("availableModelCatalog" in state) {
+    if (!isPlainObject(state.availableModelCatalog)) {
+      return "session store availableModelCatalog must be an object";
+    }
+    if (
+      "models" in state.availableModelCatalog
+      && !Array.isArray(state.availableModelCatalog.models)
+    ) {
+      return "session store availableModelCatalog.models must be an array";
+    }
+    if (
+      "updatedAt" in state.availableModelCatalog
+      && typeof state.availableModelCatalog.updatedAt !== "string"
+    ) {
+      return "session store availableModelCatalog.updatedAt must be a string";
+    }
+  }
+  return true;
 }
 
 function normalizeValue(value) {

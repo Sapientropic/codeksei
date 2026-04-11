@@ -206,18 +206,6 @@ class CodexRpcClient {
     });
   }
 
-  async cancelTurn({ threadId, turnId }) {
-    const normalizedThreadId = normalizeNonEmptyString(threadId);
-    const normalizedTurnId = normalizeNonEmptyString(turnId);
-    if (!normalizedThreadId || !normalizedTurnId) {
-      throw new Error("turn/cancel requires threadId and turnId");
-    }
-    return this.sendRequest("turn/cancel", {
-      threadId: normalizedThreadId,
-      turnId: normalizedTurnId,
-    });
-  }
-
   async close() {
     this.rejectPending(new Error("Codex RPC client closed"));
     if (this.socket) {

@@ -1,14 +1,12 @@
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
-const dotenv = require("dotenv");
 
 const {
   PACKAGE_NAME,
   ensureCompatHomeEnv,
   ensureStateDirectory,
-  listEnvFileCandidates,
 } = require("./core/branding");
+const { loadEnvStack } = require("./core/env-loader");
 const { readConfig } = require("./core/config");
 const { renderInstructionTemplate } = require("./core/instructions-template");
 const { CyberbossApp } = require("./core/app");
@@ -36,16 +34,8 @@ function ensureDefaultStateDirectory() {
 }
 
 function loadEnv() {
+  loadEnvStack();
   ensureDefaultStateDirectory();
-  const candidates = listEnvFileCandidates();
-  for (const envPath of candidates) {
-    if (!fs.existsSync(envPath)) {
-      continue;
-    }
-    dotenv.config({ path: envPath });
-    return;
-  }
-  dotenv.config();
 }
 
 function ensureRuntimeEnv() {

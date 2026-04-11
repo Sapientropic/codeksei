@@ -11,12 +11,20 @@ class SystemMessageDispatcher {
     return this.queueStore.hasPendingForAccount(this.accountId);
   }
 
-  drainPending() {
-    return this.queueStore.drainForAccount(this.accountId);
+  takeReadyPending(nowMs = Date.now()) {
+    return this.queueStore.takeReadyForAccount(this.accountId, { nowMs });
   }
 
-  requeue(message) {
-    return this.queueStore.enqueue(message);
+  defer(message, options = {}) {
+    return this.queueStore.defer(message, options);
+  }
+
+  deadLetter(message, options = {}) {
+    return this.queueStore.deadLetter(message, options);
+  }
+
+  complete(message, options = {}) {
+    return this.queueStore.complete(message, options);
   }
 
   resolveWorkspaceRoot(message) {
