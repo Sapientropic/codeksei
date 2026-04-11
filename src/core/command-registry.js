@@ -489,12 +489,17 @@ function buildTopicUsage(topic) {
         "  --timeline-text \"...\"  只和 --section todo --state done 一起用；同一切换点会同步写入“时间线事实”",
         "  --title \"标题\"        默认主要给 supplement 用；其他 section 会和正文合成单行内容",
         "  --date YYYY-MM-DD     决定写入哪个日记文件",
-        "  --time HH:mm          可选，覆盖条目时间",
+        "  --time HH:mm          可选，覆盖条目时间；todo open 时也会把它记成这条 live block 的开始时间",
         "",
         "示例：",
         "  npm run diary:write -- --section todo --state open --text \"把药单发给 Alex\"",
         "  npm run diary:write -- --section todo --state done --text \"收住 Codeksei 微信回复问题\" --timeline-text \"22:39-23:04 连续压测 Codeksei 微信回复链路；这条问题今晚可以先收尾。\"",
         "  npm run diary:write -- --section timeline --text \"17:30-17:58 把药单发出去了\"",
+        "",
+        "说明：",
+        "  open loop / 明确待跟进 -> todo；事后完成块 -> timeline；灵感碎片 -> fragment；解释判断 -> supplement；收口带走 -> summary",
+        "  如果 todo done 省略 --timeline-text，会优先复用同一 Todo 已捕获的开始时间来补 HH:mm-HH:mm 硬事实；只有找不到开始时间时才退回成单点时间。",
+        "  不要为了记一条已完成事实而先补造一个 Todo 再立刻 done。",
       ].join("\n");
     case "channel":
       return [
