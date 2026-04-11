@@ -119,8 +119,8 @@ function printNoteSyncHelp() {
     "",
     "示例：",
     "  npm run note:sync -- --project <slug> --section \"最近动作\" --text \"把微信 prompt 收口为更温柔的 chief-of-staff 风格\" --max-items 6",
-    "  npm run note:sync -- --project <slug> --section \"当前状态\" --slot current-status --style paragraph --text \"当前默认主 workspace 是 Website，shared bridge 正常运行。\"",
-    "  npm run note:sync -- --path \"项目/Codeksei 生活助理/README.md\" --section \"当前定位\" --text \"默认先接住，再定向，再推进，不做催债式主动提醒。\"",
+    "  npm run note:sync -- --project <slug> --section \"当前状态\" --slot current-status --style paragraph --text \"当前 shared bridge 正常运行，默认入口稳定。\"",
+    "  npm run note:sync -- --path \"/absolute/path/to/note.md\" --section \"当前定位\" --text \"默认先接住，再定向，再推进。\"",
   ].join("\n"));
 }
 
