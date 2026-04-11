@@ -79,7 +79,7 @@ npm install
 ```dotenv
 CODEKSEI_USER_NAME=你的名字
 CODEKSEI_USER_GENDER=female
-CODEKSEI_ALLOWED_USER_IDS=你的微信 user id
+CODEKSEI_ALLOWED_USER_IDS=桥实际观测到的 sender id
 CODEKSEI_WORKSPACE_ROOT=/绝对路径/你的项目目录
 ```
 
@@ -106,6 +106,8 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 说明：
 
 - 旧的 `CYBERBOSS_*` 仍可用，但新项目建议统一切到 `CODEKSEI_*`
+- `CODEKSEI_USER_NAME` 是 agent 聊天时怎么称呼你的人设字段，不参与消息路由
+- `CODEKSEI_ALLOWED_USER_IDS` 必须填写微信桥实际观测到的 sender id；最简单的做法是先跑 `npm run accounts`
 - 第一次运行任意命令时，会在状态目录生成 `weixin-instructions.md`
 - 如果你在共享模式下使用多 workspace，建议启动前就设置好 `CODEKSEI_WORKSPACE_ROOT`
 - `.env` 只应放在你的本地工作目录或状态目录里，不要提交进仓库

@@ -38,7 +38,7 @@ function runTimelineCommand(binPath, args, extraEnv = {}, options = {}) {
   return new Promise((resolve, reject) => {
     const spawnSpec = buildTimelineSpawnSpec(binPath, args);
     const child = spawn(spawnSpec.command, spawnSpec.args, {
-      stdio: ["inherit", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
       env: {
         ...process.env,
         ...extraEnv,
@@ -62,6 +62,8 @@ function runTimelineCommand(binPath, args, extraEnv = {}, options = {}) {
       process.stderr.write(text);
     });
 
+    wireTimelineStdin(child, args);
+
     child.once("error", reject);
     child.once("exit", (code, signal) => {
       if (signal) {
@@ -69,7 +71,8 @@ function runTimelineCommand(binPath, args, extraEnv = {}, options = {}) {
         return;
       }
       if (code !== 0) {
-        reject(new Error(`timeline 命令执行失败，退出码 ${code}`));
+        const detail = extractTimelineCommandFailure(stdout, stderr);
+        reject(new Error(detail || `timeline 命令执行失败，退出码 ${code}`));
         return;
       }
       if (options.subcommand === "write") {
@@ -188,4 +191,42 @@ function detectTimelineWriteFailure(stdout, stderr) {
   return "";
 }
 
-module.exports = { createTimelineIntegration };
+function extractTimelineCommandFailure(stdout, stderr) {
+  const output = `${stderr}\n${stdout}`;
+  const lines = output
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return lines.find((line) => line.includes("timeline 事件无效"))
+    || lines.find((line) => line.includes("timeline 事件不能跨天"))
+    || lines.find((line) => line.includes("timeline-write"))
+    || lines.at(-1)
+    || "";
+}
+
+function shouldForwardTimelineStdin(args = [], stdin = process.stdin) {
+  return Array.isArray(args)
+    && args.some((value) => String(value || "").trim() === "--stdin")
+    && stdin
+    && stdin.isTTY === false;
+}
+
+function wireTimelineStdin(child, args = [], stdin = process.stdin) {
+  if (!child?.stdin) {
+    return;
+  }
+  if (!shouldForwardTimelineStdin(args, stdin)) {
+    child.stdin.end();
+    return;
+  }
+  stdin.pipe(child.stdin);
+}
+
+module.exports = {
+  createTimelineIntegration,
+  detectTimelineWriteFailure,
+  extractTimelineCommandFailure,
+  normalizeTimelineArgs,
+  shouldForwardTimelineStdin,
+};

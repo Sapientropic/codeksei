@@ -55,7 +55,7 @@ README 和帮助文本默认都按新入口书写；旧名字只作为兼容层�
 ## Timeline
 
 - `npm run timeline:event -- --date YYYY-MM-DD --start HH:mm --end HH:mm --title "标题" --subcategory <id>`
-- `npm run timeline:write -- --date YYYY-MM-DD --stdin`
+- `npm run timeline:write -- --date YYYY-MM-DD --json '{"events":[...]}'`
 - `npm run timeline:read -- --date YYYY-MM-DD`
 - `npm run timeline:categories`
 - `npm run timeline:proposals -- --help`
@@ -68,6 +68,8 @@ README 和帮助文本默认都按新入口书写；旧名字只作为兼容层�
 
 - 单条明确时间块优先用 `timeline:event`
 - 已有完整 JSON、或要批量写入时再用 `timeline:write`
+- `timeline:write --stdin` 也要传完整 JSON 对象 `{"events":[...]}`，不要传裸数组
+- 不确定分类 id 时先跑 `timeline:categories`，改已有日程前先跑 `timeline:read`
 - 截图回微信统一走 `timeline:screenshot -- --send`
 
 ## Diary
