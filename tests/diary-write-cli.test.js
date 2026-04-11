@@ -1,5 +1,8 @@
+const fs = require("fs");
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const os = require("os");
+const path = require("path");
 
 const {
   buildDiaryEntryPayload,
@@ -9,6 +12,7 @@ const {
   parseArgs,
   parseTodoLine,
   resolveTodoDoneTimelineText,
+  runDiaryWriteCommand,
 } = require("../src/app/diary-write-cli");
 
 function buildSkeleton() {
@@ -108,6 +112,38 @@ test("timeline, fragment, and summary entries land in their own sections", () =>
   assert.match(content, /## 时间线事实\n\n- 17:30-17:58 把药单发出去了/);
   assert.match(content, /## 今日碎片\n\n- 今天切换点统一收口比边聊边记更稳。/);
   assert.match(content, /## 总结\n\n- 明天第一步先验证 Apple Watch 最小提醒链路。/);
+});
+
+test("runDiaryWriteCommand accepts fragment writes without requiring todo state", async () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-diary-write-"));
+  const originalArgv = process.argv;
+  process.argv = [
+    "node",
+    "./bin/codeksei.js",
+    "diary",
+    "write",
+    "--section",
+    "fragment",
+    "--date",
+    "2026-04-11",
+    "--time",
+    "19:14",
+    "--text",
+    "今天忙了一整天，晚饭前明显感觉能量很低，还有点晕。",
+  ];
+
+  try {
+    await runDiaryWriteCommand({
+      diaryDir: tempRoot,
+      timezone: "Asia/Shanghai",
+    });
+
+    const content = fs.readFileSync(path.join(tempRoot, "2026-04-11.md"), "utf8");
+    assert.match(content, /## 今日碎片\n\n- 今天忙了一整天，晚饭前明显感觉能量很低，还有点晕。/);
+  } finally {
+    process.argv = originalArgv;
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
 });
 
 test("todo done cutover writes timeline fact in the same command batch", () => {
