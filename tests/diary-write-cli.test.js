@@ -7,6 +7,8 @@ const {
   buildDiaryFileSkeleton,
   insertDiaryEntry,
   parseArgs,
+  parseTodoLine,
+  resolveTodoDoneTimelineText,
 } = require("../src/app/diary-write-cli");
 
 function buildSkeleton() {
@@ -29,6 +31,7 @@ test("todo entries update state in place without duplicate lines", () => {
   );
 
   assert.match(opened, /## Todo\n\n- \[ \] 把药单发给 Alex/);
+  assert.match(opened, /<!-- codeksei-todo:start=18:00 -->/);
 
   const done = insertDiaryEntry(
     opened,
@@ -42,6 +45,7 @@ test("todo entries update state in place without duplicate lines", () => {
   );
 
   assert.match(done, /## Todo\n\n- \[x\] 把药单发给 Alex/);
+  assert.match(done, /<!-- codeksei-todo:start=18:00 -->/);
   assert.equal((done.match(/把药单发给 Alex/g) || []).length, 1);
 });
 
@@ -98,7 +102,36 @@ test("todo done cutover writes timeline fact in the same command batch", () => {
   assert.match(content, /## 时间线事实[\s\S]*- 22:39-23:04 连续压测 Cyberboss 微信回复与 timeline 截图发送链路；这条问题今晚可以先收尾。/);
 });
 
-test("todo done cutover synthesizes a minimal timeline fact for legacy callers", () => {
+test("todo done cutover reuses the captured Todo start time when --timeline-text is omitted", () => {
+  const opened = insertDiaryEntry(
+    buildSkeleton(),
+    buildDiaryEntryPayload({
+      section: "todo",
+      timeString: "22:39",
+      body: "明天继续观察并收口 Cyberboss 微信回复重复 / 截断问题",
+      todoState: "open",
+    }),
+    "2026-04-10"
+  );
+
+  const payloads = buildDiaryWriteEntryPayloads({
+    existingContent: opened,
+    section: "todo",
+    timeString: "23:04",
+    body: "明天继续观察并收口 Cyberboss 微信回复重复 / 截断问题",
+    todoState: "done",
+  });
+
+  const content = payloads.reduce(
+    (draft, payload) => insertDiaryEntry(draft, payload, "2026-04-10"),
+    buildSkeleton()
+  );
+
+  assert.match(content, /## Todo\n\n- \[x\] 明天继续观察并收口 Cyberboss 微信回复重复 \/ 截断问题/);
+  assert.match(content, /## 时间线事实[\s\S]*- 22:39-23:04 明天继续观察并收口 Cyberboss 微信回复重复 \/ 截断问题/);
+});
+
+test("todo done cutover still synthesizes a point-in-time fact when no Todo start was captured", () => {
   const payloads = buildDiaryWriteEntryPayloads({
     section: "todo",
     timeString: "23:04",
@@ -133,6 +166,48 @@ test("parseArgs reports missing option values explicitly", () => {
     () => parseArgs(["--section", "todo", "--state", "done", "--text", "x", "--timeline-text", "--time", "22:00"]),
     /--timeline-text 需要一个值/
   );
+});
+
+test("resolveTodoDoneTimelineText reports whether it used captured Todo start time or point fallback", () => {
+  const opened = insertDiaryEntry(
+    buildSkeleton(),
+    buildDiaryEntryPayload({
+      section: "todo",
+      timeString: "17:30",
+      body: "把药单发给 Alex",
+      todoState: "open",
+    }),
+    "2026-04-10"
+  );
+
+  const fromTodo = resolveTodoDoneTimelineText({
+    existingContent: opened,
+    section: "todo",
+    timeString: "17:58",
+    body: "把药单发给 Alex",
+    todoState: "done",
+  });
+  assert.equal(fromTodo.mode, "range_from_todo");
+  assert.equal(fromTodo.text, "17:30-17:58 把药单发给 Alex");
+
+  const fallback = resolveTodoDoneTimelineText({
+    section: "todo",
+    timeString: "17:58",
+    body: "把药单发给 Alex",
+    todoState: "done",
+  });
+  assert.equal(fallback.mode, "point_in_time");
+  assert.equal(fallback.text, "17:58 把药单发给 Alex");
+});
+
+test("parseTodoLine keeps visible text separate from hidden start-time metadata", () => {
+  const parsed = parseTodoLine("- [x] 把药单发给 Alex <!-- codeksei-todo:start=17:30 -->");
+
+  assert.deepEqual(parsed, {
+    todoState: "done",
+    text: "把药单发给 Alex",
+    todoStartedAt: "17:30",
+  });
 });
 
 test("supplement remains the default section and dedupes identical body/title pairs", () => {

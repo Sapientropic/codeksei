@@ -39,3 +39,14 @@ test("reminder topic help clarifies sender id and context token requirements", (
   assert.match(help, /npm run accounts/u);
   assert.match(help, /context_token/u);
 });
+
+test("diary topic help explains captured Todo start time for later timeline accuracy", () => {
+  const help = buildTerminalTopicHelp("diary");
+
+  assert.match(help, /todo open 时也会把它记成这条 live block 的开始时间/u);
+  assert.match(help, /优先复用同一 Todo 已捕获的开始时间/u);
+  assert.match(help, /open loop .*-> todo/u);
+  assert.match(help, /事后完成块 -> timeline/u);
+  assert.match(help, /灵感碎片 -> fragment/u);
+  assert.match(help, /不要为了记一条已完成事实而先补造一个 Todo/u);
+});

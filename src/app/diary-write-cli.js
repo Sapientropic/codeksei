@@ -20,6 +20,8 @@ const TODO_STATE_MARKERS = Object.freeze({
   open: " ",
   done: "x",
 });
+const TODO_LINE_RE = /^- \[( |x|X)\] (.*)$/u;
+const TODO_START_MARKER_RE = /\s*<!--\s*codeksei-todo:start=(\d{2}:\d{2})\s*-->\s*$/u;
 
 async function runDiaryWriteCommand(config) {
   const args = process.argv.slice(4);
@@ -35,13 +37,12 @@ async function runDiaryWriteCommand(config) {
   const timeString = options.time || formatTime(now, timezone);
   const section = normalizeSection(options.section);
   const todoState = normalizeTodoState(options.state, section);
-  const usesLegacyTodoDoneFallback = shouldSynthesizeTodoDoneTimelineText({
-    section,
-    todoState,
-    timelineText: options.timelineText,
-  });
   const filePath = path.join(config.diaryDir, `${dateString}.md`);
-  const entryPayloads = buildDiaryWriteEntryPayloads({
+  fs.mkdirSync(config.diaryDir, { recursive: true });
+  ensureDiaryFile(filePath, now, timezone);
+  const current = fs.readFileSync(filePath, "utf8");
+  const timelineResolution = resolveTodoDoneTimelineText({
+    existingContent: current,
     section,
     timeString,
     title: options.title,
@@ -49,16 +50,21 @@ async function runDiaryWriteCommand(config) {
     todoState,
     timelineText: options.timelineText,
   });
-  if (usesLegacyTodoDoneFallback) {
+  if (timelineResolution.mode === "point_in_time") {
     console.warn(
-      `[${PACKAGE_NAME}] diary:write legacy todo-done call omitted --timeline-text; `
-      + "synthesized a minimal point-in-time diary fact to keep the cutover atomic."
+      `[${PACKAGE_NAME}] diary:write todo-done call omitted --timeline-text and no captured Todo start time was found; `
+      + "synthesized only a point-in-time diary fact. Prefer opening the live Todo earlier, or pass exact cutover wording via --timeline-text."
     );
   }
-
-  fs.mkdirSync(config.diaryDir, { recursive: true });
-  ensureDiaryFile(filePath, now, timezone);
-  const current = fs.readFileSync(filePath, "utf8");
+  const entryPayloads = buildDiaryWriteEntryPayloads({
+    existingContent: current,
+    section,
+    timeString,
+    title: options.title,
+    body,
+    todoState,
+    timelineText: options.timelineText,
+  });
   const next = entryPayloads.reduce(
     (draft, payload) => insertDiaryEntry(draft, payload, dateString),
     current
@@ -188,11 +194,17 @@ function buildDiaryEntryPayload({ section = DEFAULT_SECTION, timeString, title, 
 
   if (normalizedSection === "todo") {
     const normalizedState = normalizeTodoState(todoState, normalizedSection);
+    const todoStartedAt = normalizedState === "open" ? normalizeTodoClock(timeString) : "";
     return {
       section: normalizedSection,
-      entry: `- [${TODO_STATE_MARKERS[normalizedState]}] ${lineText}`,
+      entry: buildTodoLine({
+        text: lineText,
+        todoState: normalizedState,
+        todoStartedAt,
+      }),
       text: lineText,
       todoState: normalizedState,
+      todoStartedAt,
     };
   }
 
@@ -204,6 +216,7 @@ function buildDiaryEntryPayload({ section = DEFAULT_SECTION, timeString, title, 
 }
 
 function buildDiaryWriteEntryPayloads({
+  existingContent = "",
   section = DEFAULT_SECTION,
   timeString,
   title,
@@ -213,8 +226,15 @@ function buildDiaryWriteEntryPayloads({
 }) {
   const normalizedSection = normalizeSection(section);
   const normalizedTodoState = normalizeTodoState(todoState, normalizedSection);
-  const normalizedTimelineText = normalizeLineItem(timelineText)
-    || synthesizeTodoDoneTimelineText({ section, timeString, title, body, todoState });
+  const normalizedTimelineText = resolveTodoDoneTimelineText({
+    existingContent,
+    section,
+    timeString,
+    title,
+    body,
+    todoState,
+    timelineText,
+  }).text;
 
   if (normalizedTimelineText && (normalizedSection !== "todo" || normalizedTodoState !== "done")) {
     throw new Error("--timeline-text 只支持和 --section todo --state done 一起使用");
@@ -249,12 +269,55 @@ function shouldSynthesizeTodoDoneTimelineText({ section = DEFAULT_SECTION, todoS
     && !normalizeLineItem(timelineText);
 }
 
+function resolveTodoDoneTimelineText({
+  existingContent = "",
+  section = DEFAULT_SECTION,
+  timeString = "",
+  title = "",
+  body = "",
+  todoState = "open",
+  timelineText = "",
+}) {
+  const explicitTimelineText = normalizeLineItem(timelineText);
+  if (explicitTimelineText) {
+    return {
+      text: explicitTimelineText,
+      mode: "explicit",
+    };
+  }
+
+  if (!shouldSynthesizeTodoDoneTimelineText({ section, todoState })) {
+    return {
+      text: "",
+      mode: "none",
+    };
+  }
+
+  const existingTodoStartTime = findTodoStartTimeInDiaryContent(existingContent, {
+    title,
+    body,
+  });
+  const synthesized = synthesizeTodoDoneTimelineText({
+    section,
+    timeString,
+    title,
+    body,
+    todoState,
+    existingTodoStartTime,
+  });
+  return {
+    text: synthesized,
+    mode: existingTodoStartTime ? "range_from_todo" : "point_in_time",
+  };
+}
+
 function synthesizeTodoDoneTimelineText({
   section = DEFAULT_SECTION,
   timeString = "",
   title = "",
   body = "",
   todoState = "open",
+  existingTodoStartTime = "",
 }) {
   if (!shouldSynthesizeTodoDoneTimelineText({ section, todoState })) {
     return "";
@@ -265,10 +328,14 @@ function synthesizeTodoDoneTimelineText({
     return "";
   }
 
-  // Keep stale prompts from dropping the diary hard fact entirely. This
-  // compatibility bridge records only a minimal point-in-time fact; fresh
-  // callers should still pass --timeline-text with the real cutover context.
+  // Keep stale prompts from dropping the diary hard fact entirely. When the
+  // same live Todo already captured a reliable start time, reuse it here so
+  // todo-first workflow can still produce an accurate diary range at cutover.
+  const capturedStartTime = normalizeTodoClock(existingTodoStartTime);
   const normalizedTime = normalizeLineItem(timeString);
+  if (capturedStartTime && normalizedTime && capturedStartTime !== normalizedTime) {
+    return `${capturedStartTime}-${normalizedTime} ${lineText}`;
+  }
   return normalizedTime ? `${normalizedTime} ${lineText}` : lineText;
 }
 
@@ -356,6 +423,7 @@ function normalizeEntryPayload(entry) {
     title: normalizeLineItem(payload.title),
     body: normalizeBody(payload.body),
     todoState: normalizeTodoState(payload.todoState, normalizeSection(payload.section)),
+    todoStartedAt: normalizeTodoClock(payload.todoStartedAt),
   };
 }
 
@@ -430,19 +498,26 @@ function isPlaceholderLine(line, section) {
 
 function upsertTodoLine(lines, payload) {
   const nextLines = Array.isArray(lines) ? [...lines] : [];
-  const desiredLine = `- [${TODO_STATE_MARKERS[payload.todoState]}] ${payload.text}`;
   for (let index = 0; index < nextLines.length; index += 1) {
-    const match = /^- \[( |x|X)\] (.*)$/u.exec(String(nextLines[index] || ""));
-    if (!match) {
+    const parsed = parseTodoLine(nextLines[index]);
+    if (!parsed) {
       continue;
     }
-    if (normalizeLineItem(match[2]) !== payload.text) {
+    if (parsed.text !== payload.text) {
       continue;
     }
-    nextLines[index] = desiredLine;
+    nextLines[index] = buildTodoLine({
+      text: payload.text,
+      todoState: payload.todoState,
+      todoStartedAt: parsed.todoStartedAt || payload.todoStartedAt,
+    });
     return nextLines;
   }
-  nextLines.push(desiredLine);
+  nextLines.push(buildTodoLine({
+    text: payload.text,
+    todoState: payload.todoState,
+    todoStartedAt: payload.todoStartedAt,
+  }));
   return nextLines;
 }
 
@@ -538,6 +613,58 @@ function buildSectionLineText({ title, body }) {
   return normalizedTitle || normalizedBody;
 }
 
+function buildTodoLine({ text, todoState = "open", todoStartedAt = "" }) {
+  const startMarker = buildTodoStartMarker(todoStartedAt);
+  return `- [${TODO_STATE_MARKERS[todoState]}] ${text}${startMarker}`;
+}
+
+function buildTodoStartMarker(value) {
+  const normalized = normalizeTodoClock(value);
+  return normalized ? ` <!-- codeksei-todo:start=${normalized} -->` : "";
+}
+
+function parseTodoLine(line) {
+  const match = TODO_LINE_RE.exec(String(line || ""));
+  if (!match) {
+    return null;
+  }
+  const rawText = String(match[2] || "");
+  const startMarker = TODO_START_MARKER_RE.exec(rawText);
+  return {
+    todoState: String(match[1] || "").toLowerCase() === "x" ? "done" : "open",
+    text: normalizeLineItem(stripTodoMetadata(rawText)),
+    todoStartedAt: normalizeTodoClock(startMarker?.[1] || ""),
+  };
+}
+
+function stripTodoMetadata(value) {
+  return String(value || "").replace(TODO_START_MARKER_RE, "").trim();
+}
+
+function findTodoStartTimeInDiaryContent(content, { title = "", body = "" } = {}) {
+  const normalizedContent = normalizeFileEnding(content);
+  if (!normalizedContent.trim()) {
+    return "";
+  }
+  const range = findSectionRange(normalizedContent, SECTION_HEADINGS.todo);
+  if (!range) {
+    return "";
+  }
+  const targetText = buildSectionLineText({ title, body });
+  if (!targetText) {
+    return "";
+  }
+  const lines = extractSectionLines(normalizedContent.slice(range.contentStart, range.end), "todo");
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const parsed = parseTodoLine(lines[index]);
+    if (!parsed || parsed.text !== targetText) {
+      continue;
+    }
+    return parsed.todoStartedAt;
+  }
+  return "";
+}
+
 function normalizeSection(value) {
   const normalized = String(value || "").trim().toLowerCase();
   switch (normalized) {
@@ -583,6 +710,11 @@ function normalizeLineItem(value) {
   return normalizeBody(value).replace(/\s*\n+\s*/g, " ").replace(/\s{2,}/g, " ").trim();
 }
 
+function normalizeTodoClock(value) {
+  const normalized = normalizeLineItem(value);
+  return /^\d{2}:\d{2}$/u.test(normalized) ? normalized : "";
+}
+
 function formatDate(date, timezone = LEGACY_TIMELINE_TIMEZONE) {
   return formatDateInTimezone(date, timezone);
 }
@@ -604,5 +736,7 @@ module.exports = {
   normalizeSection,
   normalizeTodoState,
   parseArgs,
+  parseTodoLine,
   runDiaryWriteCommand,
+  resolveTodoDoneTimelineText,
 };

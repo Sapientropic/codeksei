@@ -82,7 +82,11 @@ README 和帮助文本默认都按新入口书写；旧名字只作为兼容层�
 
 约定：
 
+- 路由速记：`open loop / 待跟进 -> todo`；`事后完成块 -> timeline`；`灵感碎片 -> fragment`；`解释判断 -> supplement`；`收口带走 -> summary`
 - `todo + done + --timeline-text` 是原子 cutover 写法
+- `todo open` 会在条目里隐式保存这条 live block 的开始时间；如果 block 已经开始且你知道更早时间，开 todo 时就传 `--time HH:mm`
+- `todo done` 若省略 `--timeline-text`，会优先复用同一 Todo 捕获的开始时间生成 `HH:mm-HH:mm ...`；只有找不到开始时间时才退回成单点时间事实
+- 不要为了记一条已完成事实而先补造一个 Todo 再立刻 done
 - 当前日期与默认时间都跟随统一 timezone contract，不再写死 `Asia/Shanghai`
 - `summary` 主要给 nightly closeout
 - `supplement` 用于背景、判断、补充说明，不是第二条 live log
