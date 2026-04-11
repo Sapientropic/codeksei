@@ -400,6 +400,86 @@ test("weixin stream delivery sends completed assistant items before turn complet
   );
 });
 
+test("weixin stream delivery collapses to the terminal answer when nothing user-visible was sent earlier", async () => {
+  const sent = [];
+  const delivery = new StreamDelivery({
+    weixinReplyMode: "stream",
+    channelAdapter: {
+      async sendText(payload) {
+        sent.push(payload);
+      },
+    },
+    sessionStore: {
+      findBindingForThreadId() {
+        return { bindingKey: "binding-stream-collapse" };
+      },
+    },
+  });
+
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.started",
+    payload: {
+      threadId: "thread-stream-collapse",
+      turnId: "turn-stream-collapse",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-stream-collapse",
+      turnId: "turn-stream-collapse",
+      itemId: "item-1",
+      text: "不算委屈我。",
+      phase: "commentary",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-stream-collapse",
+      turnId: "turn-stream-collapse",
+      itemId: "item-2",
+      text: "约束当然有，而且很多层。",
+      phase: "commentary",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-stream-collapse",
+      turnId: "turn-stream-collapse",
+      itemId: "item-3",
+      text: "不算委屈我。\n\n约束当然有，而且很多层。OpenAI 的、Codex 的、你这边的、工作流的。",
+      phase: "final_answer",
+    },
+  });
+
+  const state = delivery.ensureRunState("thread-stream-collapse", "turn-stream-collapse");
+  state.replyTarget = {
+    userId: "user-stream-collapse",
+    contextToken: "ctx-stream-collapse",
+    provider: "weixin",
+  };
+
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.completed",
+    payload: {
+      threadId: "thread-stream-collapse",
+      turnId: "turn-stream-collapse",
+    },
+  });
+
+  assert.deepEqual(
+    sent.map((payload) => ({ text: payload.text, preserveBlock: payload.preserveBlock })),
+    [
+      {
+        text: "不算委屈我。\n\n约束当然有，而且很多层。OpenAI 的、Codex 的、你这边的、工作流的。",
+        preserveBlock: false,
+      },
+    ]
+  );
+});
+
 test("weixin stream delivery suppresses duplicate completed assistant blocks within one turn", async () => {
   const sent = [];
   const delivery = new StreamDelivery({
@@ -607,6 +687,71 @@ test("weixin stream delivery treats final_answer as terminal and waits for turn 
     payload: {
       threadId: "thread-stream-final-answer",
       turnId: "turn-stream-final-answer",
+    },
+  });
+
+  assert.deepEqual(
+    sent.map((payload) => ({ text: payload.text, preserveBlock: payload.preserveBlock })),
+    [
+      { text: "已经修好了。", preserveBlock: false },
+    ]
+  );
+});
+
+test("weixin stream delivery does not duplicate a final block when delta and completion only differ by whitespace", async () => {
+  const sent = [];
+  const delivery = new StreamDelivery({
+    weixinReplyMode: "stream",
+    channelAdapter: {
+      async sendText(payload) {
+        sent.push(payload);
+      },
+    },
+    sessionStore: {
+      findBindingForThreadId() {
+        return { bindingKey: "binding-stream-final-whitespace" };
+      },
+    },
+  });
+
+  delivery.queueReplyTargetForThread("thread-stream-final-whitespace", {
+    userId: "user-stream-final-whitespace",
+    contextToken: "ctx-stream-final-whitespace",
+    provider: "weixin",
+  });
+
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.started",
+    payload: {
+      threadId: "thread-stream-final-whitespace",
+      turnId: "turn-stream-final-whitespace",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.delta",
+    payload: {
+      threadId: "thread-stream-final-whitespace",
+      turnId: "turn-stream-final-whitespace",
+      itemId: "item-1",
+      text: "已经修好了。  ",
+      phase: "final_answer",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-stream-final-whitespace",
+      turnId: "turn-stream-final-whitespace",
+      itemId: "item-1",
+      text: "已经修好了。",
+      phase: "final_answer",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.completed",
+    payload: {
+      threadId: "thread-stream-final-whitespace",
+      turnId: "turn-stream-final-whitespace",
     },
   });
 

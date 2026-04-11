@@ -593,6 +593,14 @@ function buildStreamingReplyText(state, { completedOnly, force }) {
 
   const terminal = findStreamingTerminalReplyText(visibleItems);
   if (terminal) {
+    // `stream` means "ship completed user-visible blocks early when safe", not
+    // "stitch every unseen progress block onto the terminal answer". If no
+    // user-visible text has actually gone out yet, collapsing to the terminal
+    // block avoids the historical failure mode where several brief progress
+    // items get welded onto the final answer as one duplicated mega-bubble.
+    if (!normalizeVisibleStreamingText(state.sentText)) {
+      return terminal.text;
+    }
     rememberVisiblePart(parts, seenParts, terminal.text);
   }
   return parts.join("\n\n");
@@ -893,6 +901,12 @@ function mergeCompletedItemText(current, completed) {
   if (!streamed) {
     return finalized;
   }
+  // Upstream can resend the same final item with only whitespace / formatting
+  // differences between delta and completed snapshots. Treat those as the same
+  // semantic block so we do not concatenate two copies of the same answer.
+  if (normalizeVisibleStreamingText(streamed) === normalizeVisibleStreamingText(finalized)) {
+    return finalized;
+  }
   return appendStreamingText(streamed, finalized);
 }
 
@@ -929,6 +943,10 @@ function normalizeDeliveryDelta(delta, { streaming = false } = {}) {
 
 function buildVisibleItemDedupKey(text) {
   return trimOuterBlankLines(markdownToPlainText(normalizeLineEndings(text)));
+}
+
+function normalizeVisibleStreamingText(text) {
+  return buildVisibleItemDedupKey(text).replace(/\s+/gu, " ").trim();
 }
 
 function hasWatchdogTail(state, { completedOnly }) {
