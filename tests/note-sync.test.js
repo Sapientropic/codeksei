@@ -1,5 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 
 const {
   resolveNoteSyncTarget,
@@ -58,13 +61,30 @@ test("note sync replaces managed slot blocks inside a section", () => {
 });
 
 test("note sync can resolve tracked project notes by slug or alias", () => {
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-note-sync-"));
+  const projectRadarConfigFile = path.join(workspaceRoot, ".codex", "code-projects.json");
+  const repoRoot = path.join(workspaceRoot, "repos", "codeksei");
+  fs.mkdirSync(path.dirname(projectRadarConfigFile), { recursive: true });
+  fs.mkdirSync(repoRoot, { recursive: true });
+  fs.writeFileSync(projectRadarConfigFile, JSON.stringify({
+    projects: [
+      {
+        slug: "codeksei",
+        title: "Codeksei",
+        aliases: ["微信桥"],
+        repoRoot,
+        notePath: "项目/代码工程/Codeksei.md",
+      },
+    ],
+  }), "utf8");
+
   const config = {
-    workspaceRoot: "E:/SDY/website-content/Website",
-    projectRadarConfigFile: "E:/SDY/website-content/Website/.codex/code-projects.json",
+    workspaceRoot,
+    projectRadarConfigFile,
   };
   const target = resolveNoteSyncTarget(config, { project: "微信桥" });
   assert.equal(
     target.filePath,
-    "E:/SDY/website-content/Website/项目/代码工程/Cyberboss.md"
+    path.join(workspaceRoot, "项目", "代码工程", "Codeksei.md").replace(/\\/g, "/")
   );
 });
