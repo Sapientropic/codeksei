@@ -16,8 +16,9 @@ test("loadWechatInstructions appends local overlays after public defaults", () =
   fs.writeFileSync(operationsPath, "PUBLIC OPS {{CODEKSEI_HOME}}", "utf8");
   fs.writeFileSync(operationsOverlayPath, "LOCAL OPS {{CODEKSEI_HOME}}", "utf8");
 
+  const repoHome = "E:/workspace/codeksei";
   const content = loadWechatInstructions({
-    codekseiHome: "E:/SDY/工程问题/repos/codeksei",
+    codekseiHome: repoHome,
     weixinInstructionsFile: personaPath,
     weixinOperationsFile: operationsPath,
     weixinInstructionsOverlayFile: path.join(tempRoot, "missing-persona.local.md"),
@@ -25,7 +26,7 @@ test("loadWechatInstructions appends local overlays after public defaults", () =
   });
 
   assert.match(content, /^PUBLIC PERSONA/u);
-  assert.match(content, /PUBLIC OPS E:\/SDY\/工程问题\/repos\/codeksei/u);
-  assert.match(content, /LOCAL OPS E:\/SDY\/工程问题\/repos\/codeksei/u);
+  assert.match(content, /PUBLIC OPS E:\/workspace\/codeksei/u);
+  assert.match(content, /LOCAL OPS E:\/workspace\/codeksei/u);
   assert.ok(content.indexOf("LOCAL OPS") > content.indexOf("PUBLIC OPS"));
 });

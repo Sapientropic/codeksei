@@ -755,7 +755,7 @@ test("weixin settled delivery keeps only the latest assistant message in one tur
   assert.deepEqual(sent, ["我已经把两处旧页面都更新好了，接下来只剩最后一遍通读。"]);
 });
 
-test("watchdog settled delivery keeps all visible reply text and appends the watchdog tail", async () => {
+test("watchdog settled delivery keeps only the latest safe visible text and appends the watchdog tail", async () => {
   const sent = [];
   const delivery = new StreamDelivery({
     weixinReplyMode: "settled",
@@ -827,5 +827,64 @@ test("watchdog settled delivery keeps all visible reply text and appends the wat
     trailingText: "【系统提示】\n这一轮回复没有正常收尾。",
   });
 
-  assert.deepEqual(sent, ["第一段已经确认完仓库状态。\n\n第二段已经确认到两处页面都旧了。\n\n第三段还没收尾，但已经开始改第一处页面，第二处也准备一起改。\n\n【系统提示】\n这一轮回复没有正常收尾。"]);
+  assert.deepEqual(sent, ["第三段还没收尾，但已经开始改第一处页面，第二处也准备一起改。\n\n【系统提示】\n这一轮回复没有正常收尾。"]);
+});
+
+test("watchdog settled delivery drops long commentary blocks instead of leaking them to WeChat", async () => {
+  const sent = [];
+  const delivery = new StreamDelivery({
+    weixinReplyMode: "settled",
+    channelAdapter: {
+      async sendText(payload) {
+        sent.push(payload.text);
+      },
+    },
+    sessionStore: {
+      findBindingForThreadId() {
+        return { bindingKey: "binding-watchdog-commentary" };
+      },
+    },
+  });
+
+  delivery.queueReplyTargetForThread("thread-watchdog-commentary", {
+    userId: "user-watchdog-commentary",
+    contextToken: "ctx-watchdog-commentary",
+    provider: "weixin",
+  });
+
+  await delivery.handleRuntimeEvent({
+    type: "runtime.turn.started",
+    payload: {
+      threadId: "thread-watchdog-commentary",
+      turnId: "turn-watchdog-commentary",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-watchdog-commentary",
+      turnId: "turn-watchdog-commentary",
+      itemId: "item-1",
+      text: "我先去核一下发送链。",
+      phase: "commentary",
+    },
+  });
+  await delivery.handleRuntimeEvent({
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-watchdog-commentary",
+      turnId: "turn-watchdog-commentary",
+      itemId: "item-2",
+      text: "1. 先把 stream / settled 两条链都过一遍。\n2. 再核对 watchdog 为什么会把中间施工说明整块发到微信。\n3. 如果确认是历史回退，再补测试把这类结构化 commentary 压住。",
+      phase: "commentary",
+    },
+  });
+
+  await delivery.finalizeAbandonedTurn({
+    threadId: "thread-watchdog-commentary",
+    turnId: "turn-watchdog-commentary",
+    trailingText: "【系统提示】\n这一轮回复没有正常收尾。",
+  });
+
+  assert.deepEqual(sent, ["我先去核一下发送链。\n\n【系统提示】\n这一轮回复没有正常收尾。"]);
 });

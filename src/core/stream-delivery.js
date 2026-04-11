@@ -579,13 +579,11 @@ function buildSettledReplyText(state, { completedOnly }) {
     return findLatestVisibleReplyText(state, { completedOnly });
   }
 
-  // The watchdog message says "目前拿到的内容". When a turn never reaches its
-  // final assistant item, silently dropping earlier completed items here would
-  // contradict that promise and hide already-generated user-visible text.
-  const visible = buildAllVisibleReplyText(state, {
-    completedOnly,
-    skipItemIds: new Set(["__watchdog__"]),
-  });
+  // When the watchdog has to rescue a stalled turn, dumping every visible item
+  // back to WeChat recreates the historical failure mode where long internal
+  // commentary or task cards leak as one giant assistant bubble. Keep only the
+  // latest safe visible block, then append the watchdog tail.
+  const visible = findLatestWatchdogVisibleReplyText(state, { completedOnly });
   return [visible, tail].filter(Boolean).join("\n\n");
 }
 
@@ -613,6 +611,40 @@ function findLatestVisibleReplyText(state, { completedOnly }) {
     }
   }
   return "";
+}
+
+function findLatestWatchdogVisibleReplyText(state, { completedOnly }) {
+  const visibleItems = collectVisibleItems(state, {
+    completedOnly,
+    skipItemIds: new Set(["__watchdog__"]),
+  });
+  const candidate = findLatestWatchdogVisibleReply(visibleItems);
+  return candidate?.text || "";
+}
+
+function findLatestWatchdogVisibleReply(visibleItems) {
+  for (let index = visibleItems.length - 1; index >= 0; index -= 1) {
+    const item = visibleItems[index];
+    if (!item || item.itemId === "__watchdog__") {
+      continue;
+    }
+
+    if (item.phase === "final") {
+      return item;
+    }
+
+    if (item.phase === "commentary") {
+      if (item.completed && isBriefStreamingProgressText(item.text)) {
+        return item;
+      }
+      continue;
+    }
+
+    if (item.completed || isBriefStreamingProgressText(item.text)) {
+      return item;
+    }
+  }
+  return null;
 }
 
 function findStreamingTerminalReplyText(visibleItems) {
@@ -666,6 +698,7 @@ function collectVisibleItems(state, { completedOnly, skipItemIds = null }) {
     items.push({
       itemId,
       text,
+      completed: Boolean(item?.completed),
       phase: normalizeAssistantPhase(item?.phase),
     });
   }

@@ -243,7 +243,7 @@ const COMMAND_GROUPS = [
       },
       {
         action: "timeline.write",
-        summary: "将当前上下文写入时间轴",
+        summary: "按批量或原始 JSON 写入时间轴事件（低层入口）",
         terminal: ["timeline write"],
         terminalGroup: "timeline",
         weixin: [],
