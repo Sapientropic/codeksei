@@ -66,12 +66,15 @@ test("approval commands still resolve persisted pending approval after a restart
   });
 
   await handlers.approval({
+    provider: "weixin",
     workspaceId: "workspace-1",
     accountId: "acct-1",
     senderId: "user-1",
     contextToken: "ctx-1",
+    text: "/yes",
   }, {
     name: "yes",
+    args: "",
   });
 
   assert.deepEqual(runtimeCalls, [{

@@ -1,4 +1,34 @@
-const ROUTE_BY_COMMAND = new Map([
+import type { NormalizedIncomingMessage } from "./runtime-types";
+
+type WorkspaceRouteName = "bind" | "status" | "new" | "reread" | "switch" | "stop";
+type ControlRouteName = "approval" | "model" | "help";
+
+export interface ParsedChannelCommand {
+  args: string;
+  name: string;
+}
+
+export type ChannelCommandMessage = Pick<
+  NormalizedIncomingMessage,
+  "accountId" | "contextToken" | "provider" | "senderId" | "text" | "workspaceId"
+>;
+
+export interface WorkspaceCommandHandlerSet {
+  bind(normalized: ChannelCommandMessage, command: ParsedChannelCommand): Promise<unknown>;
+  new: (normalized: ChannelCommandMessage, command: ParsedChannelCommand) => Promise<unknown>;
+  reread(normalized: ChannelCommandMessage, command: ParsedChannelCommand): Promise<unknown>;
+  status(normalized: ChannelCommandMessage, command: ParsedChannelCommand): Promise<unknown>;
+  stop(normalized: ChannelCommandMessage, command: ParsedChannelCommand): Promise<unknown>;
+  switch(normalized: ChannelCommandMessage, command: ParsedChannelCommand): Promise<unknown>;
+}
+
+export interface ControlCommandHandlerSet {
+  approval(normalized: ChannelCommandMessage, command: ParsedChannelCommand): Promise<unknown>;
+  help(normalized: ChannelCommandMessage, command: ParsedChannelCommand): Promise<unknown>;
+  model(normalized: ChannelCommandMessage, command: ParsedChannelCommand): Promise<unknown>;
+}
+
+const ROUTE_BY_COMMAND = new Map<string, WorkspaceRouteName | Exclude<ControlRouteName, "approval">>([
   ["bind", "bind"],
   ["status", "status"],
   ["new", "new"],
@@ -10,18 +40,21 @@ const ROUTE_BY_COMMAND = new Map([
 ]);
 
 class ChannelCommandRouter {
-  controlHandlers: any;
-  workspaceHandlers: any;
+  controlHandlers: ControlCommandHandlerSet;
+  workspaceHandlers: WorkspaceCommandHandlerSet;
 
   constructor({
     workspaceHandlers,
     controlHandlers,
-  }: any) {
+  }: {
+    workspaceHandlers: WorkspaceCommandHandlerSet;
+    controlHandlers: ControlCommandHandlerSet;
+  }) {
     this.workspaceHandlers = workspaceHandlers;
     this.controlHandlers = controlHandlers;
   }
 
-  async maybeDispatchCommand(normalized: any) {
+  async maybeDispatchCommand(normalized: ChannelCommandMessage): Promise<boolean> {
     const command = parseChannelCommand(normalized?.text);
     if (!command) {
       return false;
@@ -51,7 +84,7 @@ class ChannelCommandRouter {
   }
 }
 
-function resolveRouteName(commandName: any) {
+function resolveRouteName(commandName: unknown): WorkspaceRouteName | ControlRouteName {
   const normalized = normalizeCommandName(commandName);
   if (!normalized) {
     return "help";
@@ -62,7 +95,7 @@ function resolveRouteName(commandName: any) {
   return ROUTE_BY_COMMAND.get(normalized) || "help";
 }
 
-function parseChannelCommand(text: any) {
+function parseChannelCommand(text: unknown): ParsedChannelCommand | null {
   const normalized = typeof text === "string" ? text.trim() : "";
   if (!normalized.startsWith("/")) {
     return null;
@@ -78,7 +111,7 @@ function parseChannelCommand(text: any) {
   };
 }
 
-function normalizeCommandName(value: any) {
+function normalizeCommandName(value: unknown): string {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 

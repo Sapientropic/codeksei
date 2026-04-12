@@ -76,12 +76,12 @@
     "timeline:serve": "node ./dist/src/index.js timeline serve",
     "timeline:dev": "node ./dist/src/index.js timeline dev",
     "timeline:screenshot": "node ./dist/src/index.js timeline screenshot",
-    "lint": "node ./dist/src/release/check-covered-js-entrypoints.js && node ./dist/src/release/assert-no-legacy-branding.js && node ./dist/src/release/assert-no-key-ts-commonjs.js && node ./dist/src/release/assert-no-ts-nocheck-regressions.js",
+    "lint": "node ./dist/src/release/check-covered-js-entrypoints.js && node ./dist/src/release/assert-no-js-tests.js && node ./dist/src/release/assert-no-legacy-branding.js && node ./dist/src/release/assert-no-key-ts-commonjs.js && node ./dist/src/release/assert-no-ts-nocheck-regressions.js",
     "typecheck": "tsc -p ./tsconfig.json --noEmit --pretty false",
     "typecheck:tests:ts": "tsc -p ./tsconfig.tests.json --noEmit --pretty false",
     "typecheck:strict": "npm run typecheck",
     "check": "npm run build && npm run lint && npm run typecheck && npm run typecheck:tests:ts",
-    "verify": "npm run check && node --experimental-strip-types --require ./tests/helpers/build-path-resolver.js --test tests/*.test.js tests/*.test.ts"
+    "verify": "npm run check && node --experimental-strip-types --require ./tests/helpers/build-path-resolver.ts --test tests/*.test.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

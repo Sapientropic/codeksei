@@ -21,7 +21,7 @@ interface DurableNoteRoute {
   section: string;
   style: string;
   slot: string;
-  maxItems: string;
+  maxItems: number;
   sections: string[];
 }
 
@@ -73,7 +73,7 @@ const { syncNoteFile } = noteSyncModule as {
     text: string;
     style: string;
     slot: string;
-    maxItems: string;
+    maxItems: number;
   }) => NoteSyncResult;
 };
 

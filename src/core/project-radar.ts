@@ -10,7 +10,30 @@ import {
   resolveCrossPlatformPathFromRoot,
 } from "./path-utils";
 
-function loadProjectRadarConfig(config: any = {}) {
+interface ProjectRadarConfigInput {
+  projectRadarConfigFile?: unknown;
+  workspaceRoot?: unknown;
+}
+
+interface ProjectRadarOptions {
+  changes?: unknown;
+  commits?: unknown;
+  project?: unknown;
+}
+
+interface TrackedProject {
+  aliases: string[];
+  graphReportPath: string;
+  noteAbsolutePath: string;
+  notePath: string;
+  overviewFiles: string[];
+  repoRoot: string;
+  slug: string;
+  timelineLabel: string;
+  title: string;
+}
+
+function loadProjectRadarConfig(config: ProjectRadarConfigInput = {}) {
   const workspaceRoot = resolveCrossPlatformPath(String(config.workspaceRoot || process.cwd()));
   const configFile = resolveCrossPlatformPath(String(
     config.projectRadarConfigFile || path.join(workspaceRoot, ".codex", "code-projects.json")
@@ -25,8 +48,8 @@ function loadProjectRadarConfig(config: any = {}) {
 
   const projects = Array.isArray(parsed?.projects)
     ? parsed.projects
-      .map((entry: any) => normalizeProjectEntry(entry, workspaceRoot))
-      .filter(Boolean)
+      .map((entry: unknown) => normalizeProjectEntry(entry, workspaceRoot))
+      .filter((project): project is TrackedProject => Boolean(project))
     : [];
   if (!projects.length) {
     throw new Error(`代码项目配置里没有可用 projects: ${configFile}`);
@@ -39,9 +62,9 @@ function loadProjectRadarConfig(config: any = {}) {
   };
 }
 
-function listTrackedProjects(config: any = {}) {
+function listTrackedProjects(config: ProjectRadarConfigInput = {}) {
   const radarConfig = loadProjectRadarConfig(config);
-  return radarConfig.projects.map((project: any) => ({
+  return radarConfig.projects.map((project: TrackedProject) => ({
     slug: project.slug,
     title: project.title,
     aliases: [...project.aliases],
@@ -51,44 +74,44 @@ function listTrackedProjects(config: any = {}) {
   }));
 }
 
-function collectProjectRadars(config: any = {}, options: any = {}) {
+function collectProjectRadars(config: ProjectRadarConfigInput = {}, options: ProjectRadarOptions = {}) {
   const radarConfig = loadProjectRadarConfig(config);
   const selectedProjects = selectProjects(radarConfig.projects, options.project);
   return {
     generatedAt: new Date().toISOString(),
     workspaceRoot: radarConfig.workspaceRoot,
     configFile: radarConfig.configFile,
-    projects: selectedProjects.map((project: any) => collectSingleProjectRadar(project, options)),
+    projects: selectedProjects.map((project: TrackedProject) => collectSingleProjectRadar(project, options)),
   };
 }
 
-function selectProjects(projects: any, selectedProject: any) {
+function selectProjects(projects: TrackedProject[], selectedProject: unknown): TrackedProject[] {
   const normalizedSelectedProject = normalizeText(selectedProject).toLowerCase();
   if (!normalizedSelectedProject) {
     return projects;
   }
-  const matched = projects.filter((project: any) => matchesProjectSelector(project, normalizedSelectedProject));
+  const matched = projects.filter((project) => matchesProjectSelector(project, normalizedSelectedProject));
   if (matched.length) {
     return matched;
   }
-  const available = projects.map((project: any) => project.slug).join(", ");
+  const available = projects.map((project) => project.slug).join(", ");
   throw new Error(`找不到代码项目: ${selectedProject}；当前可用 slug: ${available}`);
 }
 
-function matchesProjectSelector(project: any, selector: any) {
+function matchesProjectSelector(project: TrackedProject, selector: unknown): boolean {
   if (project.slug.toLowerCase() === selector) {
     return true;
   }
   if (project.title.toLowerCase() === selector) {
     return true;
   }
-  return project.aliases.some((alias: any) => alias.toLowerCase() === selector);
+  return project.aliases.some((alias) => alias.toLowerCase() === selector);
 }
 
-function collectSingleProjectRadar(project: any, options: any = {}) {
+function collectSingleProjectRadar(project: TrackedProject, options: ProjectRadarOptions = {}) {
   const commitLimit = clampPositiveInteger(options.commits, 5);
   const changeLimit = clampPositiveInteger(options.changes, 20);
-  const overviewFiles = project.overviewFiles.map((relativePath: any) => buildWorkspaceFileInfo(project.repoRoot, relativePath, "overview"));
+  const overviewFiles = project.overviewFiles.map((relativePath) => buildWorkspaceFileInfo(project.repoRoot, relativePath, "overview"));
   const graphReport = project.graphReportPath
     ? buildWorkspaceFileInfo(project.repoRoot, project.graphReportPath, "graph")
     : null;
@@ -98,7 +121,7 @@ function collectSingleProjectRadar(project: any, options: any = {}) {
       path: project.noteAbsolutePath,
       exists: isReadableFile(project.noteAbsolutePath),
     } : null,
-    ...overviewFiles.filter((file: any) => file.exists),
+    ...overviewFiles.filter((file) => file.exists),
     graphReport?.exists ? graphReport : null,
   ].filter(Boolean);
 
@@ -118,7 +141,7 @@ function collectSingleProjectRadar(project: any, options: any = {}) {
   };
 }
 
-function collectGitFacts(repoRoot: any, { commitLimit, changeLimit }: any) {
+function collectGitFacts(repoRoot: string, { commitLimit, changeLimit }: { changeLimit: number; commitLimit: number }) {
   const repoCheck = runGit(repoRoot, ["rev-parse", "--show-toplevel"]);
   if (!repoCheck.ok) {
     return {
@@ -172,7 +195,7 @@ function collectGitFacts(repoRoot: any, { commitLimit, changeLimit }: any) {
   };
 }
 
-function buildMissingRepoFacts(repoRoot: any) {
+function buildMissingRepoFacts(repoRoot: string) {
   return {
     ok: false,
     reason: "missing-repo",
@@ -194,7 +217,7 @@ function buildMissingRepoFacts(repoRoot: any) {
   };
 }
 
-function buildWorkspaceFileInfo(root: any, relativePath: any, kind: any) {
+function buildWorkspaceFileInfo(root: string, relativePath: unknown, kind: string) {
   const normalizedRelativePath = normalizeRelativePath(relativePath);
   const absolutePath = normalizedRelativePath
     ? resolveCrossPlatformPathFromRoot(root, ...normalizedRelativePath.split("/"))
@@ -207,8 +230,10 @@ function buildWorkspaceFileInfo(root: any, relativePath: any, kind: any) {
   };
 }
 
-function normalizeProjectEntry(entry: any, workspaceRoot: any) {
-  const project = entry && typeof entry === "object" ? entry : {};
+function normalizeProjectEntry(entry: unknown, workspaceRoot: string): TrackedProject | null {
+  const project = entry && typeof entry === "object"
+    ? entry as Record<string, unknown>
+    : {};
   const slug = normalizeText(project.slug);
   const repoRoot = normalizeText(project.repoRoot);
   const notePath = normalizeRelativePath(project.notePath);
@@ -228,19 +253,19 @@ function normalizeProjectEntry(entry: any, workspaceRoot: any) {
   };
 }
 
-function normalizeAliases(rawAliases: any) {
+function normalizeAliases(rawAliases: unknown): string[] {
   return Array.isArray(rawAliases)
-    ? rawAliases.map((alias: any) => normalizeText(alias)).filter(Boolean)
+    ? rawAliases.map((alias: unknown) => normalizeText(alias)).filter(Boolean)
     : [];
 }
 
-function normalizeRelativePathList(rawPaths: any) {
+function normalizeRelativePathList(rawPaths: unknown): string[] {
   return Array.isArray(rawPaths)
-    ? rawPaths.map((value: any) => normalizeRelativePath(value)).filter(Boolean)
+    ? rawPaths.map((value: unknown) => normalizeRelativePath(value)).filter(Boolean)
     : [];
 }
 
-function resolveBranchName(repoRoot: any) {
+function resolveBranchName(repoRoot: string): string {
   const symbolic = runGit(repoRoot, ["symbolic-ref", "--quiet", "--short", "HEAD"]);
   if (symbolic.ok && normalizeText(symbolic.stdout)) {
     return normalizeText(symbolic.stdout);
@@ -252,12 +277,12 @@ function resolveBranchName(repoRoot: any) {
   return "";
 }
 
-function resolveUpstreamName(repoRoot: any) {
+function resolveUpstreamName(repoRoot: string): string {
   const upstream = runGit(repoRoot, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"]);
   return upstream.ok ? normalizeText(upstream.stdout) : "";
 }
 
-function resolveAheadBehind(repoRoot: any, upstream: any) {
+function resolveAheadBehind(repoRoot: string, upstream: unknown): { ahead: number; behind: number } {
   if (!normalizeText(upstream)) {
     return { ahead: 0, behind: 0 };
   }
@@ -272,12 +297,12 @@ function resolveAheadBehind(repoRoot: any, upstream: any) {
   };
 }
 
-function parseStatusEntries(stdout: any) {
+function parseStatusEntries(stdout: unknown) {
   return String(stdout || "")
     .split(/\r?\n/)
-    .map((line: any) => line.trimEnd())
+    .map((line: string) => line.trimEnd())
     .filter(Boolean)
-    .map((line: any) => {
+    .map((line: string) => {
       const code = line.slice(0, 2);
       const filePath = line.slice(3).trim();
       return {
@@ -287,7 +312,7 @@ function parseStatusEntries(stdout: any) {
     });
 }
 
-function summarizeStatusEntries(entries: any) {
+function summarizeStatusEntries(entries: Array<{ code: string; path: string }> | unknown) {
   const summary = {
     staged: 0,
     unstaged: 0,
@@ -314,12 +339,12 @@ function summarizeStatusEntries(entries: any) {
   return summary;
 }
 
-function parseRecentCommits(stdout: any) {
+function parseRecentCommits(stdout: unknown) {
   return String(stdout || "")
     .split(/\r?\n/)
-    .map((line: any) => line.trim())
+    .map((line: string) => line.trim())
     .filter(Boolean)
-    .map((line: any) => {
+    .map((line: string) => {
       const [hash, committedAt, subject] = line.split("\t");
       return {
         hash: normalizeText(hash),
@@ -330,7 +355,7 @@ function parseRecentCommits(stdout: any) {
     });
 }
 
-function runGit(repoRoot: any, args: any) {
+function runGit(repoRoot: string, args: string[]) {
   const result = spawnSync("git", ["-c", "core.quotepath=false", ...args], {
     cwd: repoRoot,
     encoding: "utf8",
@@ -345,7 +370,7 @@ function runGit(repoRoot: any, args: any) {
   };
 }
 
-function clampPositiveInteger(value: any, fallback: any) {
+function clampPositiveInteger(value: unknown, fallback: number): number {
   const parsed = Number.parseInt(String(value || ""), 10);
   if (!Number.isFinite(parsed) || parsed <= 0) {
     return fallback;
@@ -353,7 +378,7 @@ function clampPositiveInteger(value: any, fallback: any) {
   return parsed;
 }
 
-function normalizeRelativePath(value: any) {
+function normalizeRelativePath(value: unknown): string {
   return normalizeText(value)
     .replace(/\\/g, "/")
     .replace(/^\/+/, "")
@@ -384,7 +409,7 @@ function normalizeCommandStderr(value: any) {
   return String(value || "").replace(/\r\n/g, "\n").trim();
 }
 
-function normalizeText(value: any) {
+function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
