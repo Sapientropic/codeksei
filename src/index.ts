@@ -138,7 +138,7 @@ async function main() {
     }
   }
 
-  const manifest = findTerminalCommandManifest(command, subcommand);
+  const manifest = resolveTerminalCommandManifest(command, subcommand);
   if (manifest) {
     await runTerminalManifestCommand(manifest, {
       argv,
@@ -152,7 +152,20 @@ async function main() {
   throw new Error(`未知命令: ${command}`);
 }
 
-module.exports = { main };
+module.exports = { main, resolveTerminalCommandManifest };
+
+function resolveTerminalCommandManifest(command: any, subcommand: any) {
+  const normalizedCommand = String(command || "").trim();
+  const normalizedSubcommand = String(subcommand || "").trim();
+  const exact = findTerminalCommandManifest(normalizedCommand, normalizedSubcommand);
+  if (exact) {
+    return exact;
+  }
+  if (normalizedSubcommand.startsWith("-")) {
+    return findTerminalCommandManifest(normalizedCommand, "");
+  }
+  return null;
+}
 
 async function runTerminalManifestCommand(manifest: any, {
   argv,
@@ -228,6 +241,14 @@ async function runTerminalManifestCommand(manifest: any, {
 
 function hasArgFlag(argv: any, flag: any) {
   return Array.isArray(argv) && argv.some((item: any) => String(item || "").trim() === flag);
+}
+
+if (require.main === module) {
+  main().catch((error: any) => {
+    const message = error instanceof Error ? error.stack || error.message : String(error);
+    console.error(`[${PACKAGE_NAME}] ${message}`);
+    process.exitCode = 1;
+  });
 }
 
 export {};
