@@ -46,6 +46,46 @@ interface DurableNoteFamily {
   sections: string[];
 }
 
+export interface ResolvedDurableNoteRoute extends DurableNoteRouteDefinition {
+  family: string;
+  filePath: string;
+  kind: string;
+  sections: string[];
+}
+
+export type DurableNoteRoutingInspection =
+  | {
+    mode: "overview";
+    workspaceRoot: string;
+    project: {
+      availableProjects: string[];
+      sections: string[];
+      kinds: string[];
+    };
+    scopes: Record<string, { label: string; filePath: string; sections: string[]; kinds: string[] }>;
+  }
+  | {
+    mode: "family";
+    family: string;
+    label: string;
+    filePath: string;
+    sections: string[];
+    kinds: string[];
+    project?: string;
+    availableProjects?: string[];
+  }
+  | {
+    mode: "route";
+    family: string;
+    label: string;
+    filePath: string;
+    sections: string[];
+    kinds: string[];
+    route: ResolvedDurableNoteRoute;
+    project?: string;
+    availableProjects?: string[];
+  };
+
 function loadDurableNoteSchemaConfig(config: DurableNoteConfig = {}): Record<string, unknown> {
   const filePath = normalizeText(config.durableNoteSchemaConfigFile);
   if (!filePath) {
@@ -77,7 +117,7 @@ function resolveDurableNoteProfile(config: DurableNoteConfig = {}) {
 function inspectDurableNoteRouting(
   config: DurableNoteConfig = {},
   options: DurableNoteInspectionOptions = {},
-) {
+): DurableNoteRoutingInspection {
   const profile = resolveDurableNoteProfile(config);
   const project = normalizeText(options.project);
   const scope = canonicalizeDurableNoteScope(options.scope);
@@ -86,7 +126,6 @@ function inspectDurableNoteRouting(
   if (project) {
     const target = resolveNoteSyncTarget(config, { project });
     return buildInspectionResult({
-      mode: kind ? "route" : "family",
       familyId: "project",
       familyLabel: "tracked-project",
       filePath: target.filePath,
@@ -106,7 +145,6 @@ function inspectDurableNoteRouting(
       throw new Error(`找不到 durable note scope: ${scope}；当前可用 scope: ${listAvailableScopes(profile).join(", ") || "none"}`);
     }
     return buildInspectionResult({
-      mode: kind ? "route" : "family",
       familyId: scope,
       familyLabel: family.label || scope,
       filePath: resolveWorkspaceNotePath(profile.workspaceRoot, family.filePath),
@@ -145,14 +183,12 @@ function inspectDurableNoteRouting(
 function resolveDurableNoteRoute(
   config: DurableNoteConfig = {},
   options: DurableNoteInspectionOptions = {},
-) {
+): ResolvedDurableNoteRoute {
   const inspection = inspectDurableNoteRouting(config, options);
-  if (inspection.mode !== "route") {
+  if (inspection.mode !== "route" || !("route" in inspection) || !inspection.route) {
     throw new Error("缺少完整 durable note 路由参数：至少传 --kind，并配合 --project 或 --scope");
   }
-  return (inspection as unknown as {
-    route: DurableNoteRouteDefinition & { family: string; filePath: string; kind: string; sections: string[] };
-  }).route;
+  return inspection.route;
 }
 
 function ensureDurableNoteSections(filePath: unknown, sections: unknown[] = []) {
@@ -195,7 +231,6 @@ function ensureDurableNoteSections(filePath: unknown, sections: unknown[] = []) 
 }
 
 function buildInspectionResult({
-  mode,
   familyId,
   familyLabel,
   filePath,
@@ -210,13 +245,12 @@ function buildInspectionResult({
   filePath: string;
   kind: string;
   kinds: Record<string, { maxItems: number; section: string; slot: string; style: string }>;
-  mode: string;
   sections: string[];
-}) {
+}): DurableNoteRoutingInspection {
   const availableKinds = Object.keys(kinds);
   if (!kind) {
     return {
-      mode,
+      mode: "family",
       family: familyId,
       label: familyLabel,
       filePath,
@@ -232,7 +266,7 @@ function buildInspectionResult({
   }
 
   return {
-    mode,
+    mode: "route",
     family: familyId,
     label: familyLabel,
     filePath,

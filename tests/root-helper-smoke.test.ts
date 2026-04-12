@@ -58,3 +58,27 @@ test("dist runtime entrypoint executes main when invoked directly", () => {
   assert.equal(result.status, 0, result.stderr || "expected help command to succeed");
   assert.match(result.stdout, /用法: codeksei <command> \[subcommand\]/u);
 });
+
+test("help entrypoints stay read-only and do not create the state dir", () => {
+  const entrypoint = path.join(__dirname, "..", "dist", "src", "index.js");
+  const stateDir = path.join(fs.mkdtempSync(path.join(require("node:os").tmpdir(), "codeksei-help-root-")), "state");
+  const env = { ...process.env, CODEKSEI_STATE_DIR: stateDir };
+
+  const rootHelp = spawnSync(process.execPath, [entrypoint, "help"], {
+    encoding: "utf8",
+    env,
+  });
+  const leafHelp = spawnSync(process.execPath, [entrypoint, "review", "weekly", "--help"], {
+    encoding: "utf8",
+    env,
+  });
+  const topicHelp = spawnSync(process.execPath, [entrypoint, "timeline", "--help"], {
+    encoding: "utf8",
+    env,
+  });
+
+  assert.equal(rootHelp.status, 0, rootHelp.stderr || "expected root help to succeed");
+  assert.equal(leafHelp.status, 0, leafHelp.stderr || "expected leaf help to succeed");
+  assert.equal(topicHelp.status, 0, topicHelp.stderr || "expected topic help to succeed");
+  assert.equal(fs.existsSync(stateDir), false);
+});

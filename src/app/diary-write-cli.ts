@@ -551,10 +551,10 @@ function findSectionRange(content: string, headingText: string): SectionRange | 
 function extractSectionLines(sectionBody: string, section: DiarySection): string[] {
   const normalizedBody = normalizeFileEnding(sectionBody);
   const lines = normalizedBody.split("\n").map((line) => line.replace(/\s+$/u, ""));
-  while (lines.length && !lines[0].trim()) {
+  while (lines.length && !(lines[0] || "").trim()) {
     lines.shift();
   }
-  while (lines.length && !lines[lines.length - 1].trim()) {
+  while (lines.length && !(lines[lines.length - 1] || "").trim()) {
     lines.pop();
   }
   return lines.filter((line) => !isPlaceholderLine(line, section));
@@ -578,7 +578,7 @@ function upsertTodoLine(lines: string[], payload: NormalizedDiaryEntryPayload): 
   const nextLines = Array.isArray(lines) ? [...lines] : [];
   const nextTodoState = normalizeTodoState(payload.todoState, "todo");
   for (let index = 0; index < nextLines.length; index += 1) {
-    const parsed = parseTodoLine(nextLines[index]);
+    const parsed = parseTodoLine(nextLines[index] || "");
     if (!parsed) {
       continue;
     }
@@ -769,7 +769,7 @@ function findTodoStartTimeInDiaryContent(
   }
   const lines = extractSectionLines(normalizedContent.slice(range.contentStart, range.end), "todo");
   for (let index = lines.length - 1; index >= 0; index -= 1) {
-    const parsed = parseTodoLine(lines[index]);
+    const parsed = parseTodoLine(lines[index] || "");
     if (!parsed || parsed.text !== targetText) {
       continue;
     }

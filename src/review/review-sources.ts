@@ -89,11 +89,16 @@ function parseTodoSection(body: string): { done: string[]; open: string[] } {
     if (!match) {
       continue;
     }
-    const text = normalizeLineItem(stripTodoMetadata(match[2]));
+    const checkboxState = match[1];
+    const rawText = match[2];
+    if (!checkboxState || rawText === undefined) {
+      continue;
+    }
+    const text = normalizeLineItem(stripTodoMetadata(rawText));
     if (!text) {
       continue;
     }
-    if (match[1].toLowerCase() === "x") {
+    if (checkboxState.toLowerCase() === "x") {
       done.push(text);
     } else {
       open.push(text);

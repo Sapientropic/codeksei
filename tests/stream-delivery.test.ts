@@ -585,5 +585,7 @@ test("persistent send failure abandons the run and reports delivery degradation"
   await sleep(20);
 
   assert.equal(degraded.length, 1);
-  assert.equal(degraded[0].threadId, "thread-fail");
+  const firstDegraded = degraded[0];
+  assert.ok(firstDegraded);
+  assert.equal(firstDegraded.threadId, "thread-fail");
 });

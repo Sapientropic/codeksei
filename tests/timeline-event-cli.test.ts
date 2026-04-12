@@ -10,7 +10,11 @@ const {
 function extractJsonPayload(args: string[]) {
   const jsonIndex = args.indexOf("--json");
   assert.notEqual(jsonIndex, -1, "expected --json in args");
-  return JSON.parse(args[jsonIndex + 1]);
+  const jsonPayload = args[jsonIndex + 1];
+  if (jsonPayload === undefined) {
+    throw new Error("expected payload after --json");
+  }
+  return JSON.parse(jsonPayload);
 }
 
 test("timeline:event builds a single-event write payload from friendly flags", () => {

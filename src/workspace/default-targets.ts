@@ -1,9 +1,5 @@
-import * as contextTokenStoreModule from "../adapters/channel/weixin/context-token-store";
+import { loadPersistedContextTokens } from "../adapters/channel/weixin/context-token-store";
 import type { SessionBinding } from "../contracts/session-state";
-
-const { loadPersistedContextTokens } = contextTokenStoreModule as unknown as {
-  loadPersistedContextTokens: (config: ConfigLike, accountId: string) => Record<string, string>;
-};
 
 interface ConfigLike extends Record<string, unknown> {
   allowedUserIds?: unknown;
@@ -61,19 +57,19 @@ export function resolvePreferredSenderId({
     ? config.allowedUserIds.map((value) => normalizeText(value)).filter(Boolean)
     : [];
   if (configuredUsers.length) {
-    return configuredUsers[0];
+    return configuredUsers[0] || "";
   }
 
   const bindingCandidates = collectBindingSenderIds({ config, accountId, sessionStore });
   if (bindingCandidates.length === 1) {
-    return bindingCandidates[0];
+    return bindingCandidates[0] || "";
   }
 
   const persistedUserIds = Object.keys(loadPersistedContextTokens(config, accountId) || {})
     .map((value) => normalizeText(value))
     .filter(Boolean);
   if (persistedUserIds.length === 1) {
-    return persistedUserIds[0];
+    return persistedUserIds[0] || "";
   }
 
   return "";
@@ -111,13 +107,13 @@ export function resolvePreferredWorkspaceRoot({
     const binding = store.getBinding(bindingKey);
     const boundWorkspaceRoots = collectWorkspaceRoots(binding);
     if (boundWorkspaceRoots.length === 1) {
-      return boundWorkspaceRoots[0];
+      return boundWorkspaceRoots[0] || "";
     }
   }
 
   const globalWorkspaceCandidates = collectBindingWorkspaceRoots({ config, accountId, sessionStore: store });
   if (globalWorkspaceCandidates.length === 1) {
-    return globalWorkspaceCandidates[0];
+    return globalWorkspaceCandidates[0] || "";
   }
 
   return normalizeText(config?.workspaceRoot);

@@ -64,9 +64,11 @@ test("weixin api-v2 sendText accepts string success codes and preserves request 
 
     assert.equal(response.ret, "0");
     assert.equal(requests.length, 1);
-    assert.match(requests[0].url, /ilink\/bot\/sendmessage$/u);
+    const firstRequest = requests[0];
+    assert.ok(firstRequest);
+    assert.match(firstRequest.url, /ilink\/bot\/sendmessage$/u);
 
-    const payload = JSON.parse(requests[0].body) as {
+    const payload = JSON.parse(firstRequest.body) as {
       msg?: {
         to_user_id?: string;
         client_id?: string;

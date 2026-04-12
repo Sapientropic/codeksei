@@ -111,7 +111,7 @@ async function waitForV2WeixinLogin({
   let pollBaseUrl = apiBaseUrl;
 
   console.log("使用微信扫描以下二维码，以完成连接：\n");
-  printQrCode((qrResponse as any).qrcode_img_content);
+  printQrCode(qrResponse.qrcode_img_content);
   console.log("\n等待连接结果...\n");
 
   const deadline = Date.now() + timeoutMs;
@@ -129,7 +129,7 @@ async function waitForV2WeixinLogin({
 
     const statusResponse = await pollQrStatus({
       apiBaseUrl: pollBaseUrl,
-      qrcode: (qrResponse as any).qrcode,
+      qrcode: qrResponse.qrcode,
       routeTag,
       clientVersion,
     });
@@ -205,7 +205,7 @@ async function refreshQrCode({
   }
   const qrResponse = await fetchQrCode({ apiBaseUrl, botType, routeTag, clientVersion });
   console.log(`${reason}(${nextRefreshCount}/${MAX_QR_REFRESH_COUNT})\n`);
-  printQrCode((qrResponse as any).qrcode_img_content);
+  printQrCode(qrResponse.qrcode_img_content);
   return {
     qrResponse,
     startedAt: Date.now(),

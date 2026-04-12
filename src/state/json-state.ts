@@ -47,7 +47,14 @@ export function readManagedJsonStateFile<T>({
   try {
     const raw = fs.readFileSync(filePath, "utf8");
     const parsed = JSON.parse(raw) as unknown;
-    return validateJsonState(parsed, { validate, schema });
+    const validationOptions: { validate?: JsonValidator; schema?: ZodType<T> } = {};
+    if (validate !== null) {
+      validationOptions.validate = validate;
+    }
+    if (schema) {
+      validationOptions.schema = schema;
+    }
+    return validateJsonState(parsed, validationOptions);
   } catch (error) {
     if (isNodeError(error) && error.code === "ENOENT") {
       return cloneJsonValue(fallback);

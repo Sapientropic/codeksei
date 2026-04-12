@@ -143,13 +143,17 @@ function resolveSelectedAccount(config: WeixinAccountConfig): WeixinAccountRecor
     throw new Error("当前没有已保存的微信账号，请先执行 `npm run login`");
   }
   if (accounts.length > 1) {
-    const accountIds = accounts.map((account: any) => account.accountId).join(", ");
+    const accountIds = accounts.map((account) => account.accountId).join(", ");
     throw new Error(`检测到多个微信账号，请设置 CODEKSEI_ACCOUNT_ID。可选值: ${accountIds}`);
   }
-  if (!accounts[0].token) {
-    throw new Error(`微信账号缺少 token: ${accounts[0].accountId}，请重新执行 login`);
+  const selectedAccount = accounts[0];
+  if (!selectedAccount) {
+    throw new Error("当前没有已保存的微信账号，请先执行 `npm run login`");
   }
-  return accounts[0];
+  if (!selectedAccount.token) {
+    throw new Error(`微信账号缺少 token: ${selectedAccount.accountId}，请重新执行 login`);
+  }
+  return selectedAccount;
 }
 
 function resolveAccountsDir(config: WeixinAccountConfig): string {

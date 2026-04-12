@@ -34,7 +34,7 @@ async function runReviewCommand(config: Record<string, unknown>, kind: ReviewKin
 }
 
 function parseReviewArgs(args: string[], kind: ReviewKind): ReviewOptions {
-  const options = parseCliArgs(args, getCommandArgsSchema("review")) as unknown as ReviewOptions;
+  const options = parseCliArgs<ReviewOptions>(args, getCommandArgsSchema("review"));
 
   if (kind === "weekly" && options.month) {
     throw new Error("review:weekly 不支持 --month");

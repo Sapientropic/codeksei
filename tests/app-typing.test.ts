@@ -117,7 +117,9 @@ test("handlePreparedMessage clears typing before sending the visible error when 
   assert.equal(result?.status, "retryable_error");
   assert.deepEqual(harness.typingCalls.map((entry: { status: number }) => entry.status), [1, 0]);
   assert.equal(harness.textCalls.length, 1);
-  assert.equal(harness.textCalls[0].text, "处理失败：runtime boom");
+  const firstTextCall = harness.textCalls[0];
+  assert.ok(firstTextCall);
+  assert.equal(firstTextCall.text, "处理失败：runtime boom");
   assert.deepEqual(harness.callOrder.slice(0, 4), [
     "typing:1",
     "sendTextTurn",

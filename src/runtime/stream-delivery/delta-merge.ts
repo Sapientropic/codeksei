@@ -213,7 +213,7 @@ export function buildComparisonMap(text: unknown, { stripPunctuation = false }: 
   rawToComparison[0] = 0;
 
   for (let index = 0; index < raw.length; index += 1) {
-    const character = raw[index];
+    const character = raw[index] || "";
     if (/\s/u.test(character)) {
       if (!comparison || lastWasSpace) {
         rawToComparison[index + 1] = comparison.length;
@@ -248,7 +248,8 @@ export function comparisonIndexToRawIndex(
     return 0;
   }
   for (let index = 0; index < map.rawToComparison.length; index += 1) {
-    if (map.rawToComparison[index] >= comparisonLength) {
+    const mappedIndex = map.rawToComparison[index];
+    if (typeof mappedIndex === "number" && mappedIndex >= comparisonLength) {
       return index;
     }
   }

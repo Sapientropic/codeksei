@@ -4,8 +4,8 @@ import * as workspaceAliasModule from "../workspace/workspace-alias";
 import {
   buildSpawnInvocation,
   ensureSharedAppServer,
-  listenUrl,
   resolveBoundThread,
+  resolveSharedProcessContext,
 } from "./shared-common";
 
 const { readPrefixedEnv } = brandingModule as {
@@ -16,6 +16,7 @@ const { resolveCodexWorkspaceRoot } = workspaceAliasModule as {
 };
 
 async function main() {
+  const sharedContext = resolveSharedProcessContext();
   const workspaceRoot = readPrefixedEnv(process.env, "WORKSPACE_ROOT") || process.cwd();
   await ensureSharedAppServer();
   const { threadId, workspaceRoot: resolvedWorkspaceRoot } = resolveBoundThread(workspaceRoot);
@@ -27,7 +28,7 @@ async function main() {
     "resume",
     threadId,
     "--remote",
-    listenUrl,
+    sharedContext.listenUrl,
     "-C",
     runtimeWorkspaceRoot,
     ...process.argv.slice(2),

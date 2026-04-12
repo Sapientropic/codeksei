@@ -1,8 +1,14 @@
 import { getCommandArgsSchema } from "../contracts/command-args";
 import { parseCliArgs } from "../core/cli-args";
 import { buildTerminalLeafHelp } from "../core/command-registry";
-import * as durableNoteSchemaModule from "../notes/durable-note-schema";
-import * as noteSyncModule from "../notes/note-sync";
+import {
+  type DurableNoteRoutingInspection,
+  type ResolvedDurableNoteRoute,
+  ensureDurableNoteSections,
+  inspectDurableNoteRouting,
+  resolveDurableNoteRoute,
+} from "../notes/durable-note-schema";
+import { syncNoteFile } from "../notes/note-sync";
 
 interface NoteAutoOptions {
   help: boolean;
@@ -12,17 +18,6 @@ interface NoteAutoOptions {
   kind: string;
   text: string;
   useStdin: boolean;
-}
-
-interface DurableNoteRoute {
-  family: string;
-  kind: string;
-  filePath: string;
-  section: string;
-  style: string;
-  slot: string;
-  maxItems: number;
-  sections: string[];
 }
 
 interface EnsureSectionsResult {
@@ -36,47 +31,6 @@ interface NoteSyncResult {
   filePath: string;
 }
 
-interface DurableNoteInspection {
-  mode: string;
-  workspaceRoot?: string;
-  project?: {
-    kinds: string[];
-    availableProjects: string[];
-  };
-  scopes?: Record<string, { filePath: string; kinds: string[]; sections: string[] }>;
-  family?: string;
-  filePath: string;
-  kinds?: string[];
-  sections?: string[];
-  route?: {
-    kind: string;
-    section: string;
-    style: string;
-    slot: string;
-    maxItems: number;
-  };
-}
-
-const {
-  ensureDurableNoteSections,
-  inspectDurableNoteRouting,
-  resolveDurableNoteRoute,
-} = durableNoteSchemaModule as {
-  ensureDurableNoteSections: (filePath: string, sections: string[]) => EnsureSectionsResult;
-  inspectDurableNoteRouting: (config: unknown, options: NoteAutoOptions) => DurableNoteInspection;
-  resolveDurableNoteRoute: (config: unknown, options: NoteAutoOptions) => DurableNoteRoute;
-};
-const { syncNoteFile } = noteSyncModule as {
-  syncNoteFile: (options: {
-    filePath: string;
-    section: string;
-    text: string;
-    style: string;
-    slot: string;
-    maxItems: number;
-  }) => NoteSyncResult;
-};
-
 async function runNoteAutoCommand(config: unknown, args: string[] = []) {
   const options = parseNoteAutoArgs(args);
   if (options.help) {
@@ -89,7 +43,7 @@ async function runNoteAutoCommand(config: unknown, args: string[] = []) {
     throw new Error("note 内容不能为空，传 --text 或通过 stdin 输入");
   }
 
-  const route = resolveDurableNoteRoute(config, options);
+  const route = resolveDurableNoteRoute(normalizeConfig(config), options);
   const schemaResult = ensureDurableNoteSections(route.filePath, route.sections);
   const result = syncNoteFile({
     filePath: route.filePath,
@@ -114,7 +68,7 @@ function runNoteMaybeCommand(config: unknown, args: string[] = []) {
     return;
   }
 
-  const inspection = inspectDurableNoteRouting(config, options);
+  const inspection = inspectDurableNoteRouting(normalizeConfig(config), options);
   if (options.json) {
     console.log(JSON.stringify(inspection, null, 2));
     return;
@@ -123,7 +77,7 @@ function runNoteMaybeCommand(config: unknown, args: string[] = []) {
 }
 
 function parseNoteAutoArgs(args: string[]): NoteAutoOptions {
-  return parseCliArgs(args, getCommandArgsSchema("noteAuto")) as unknown as NoteAutoOptions;
+  return parseCliArgs<NoteAutoOptions>(args, getCommandArgsSchema("noteAuto"));
 }
 
 async function resolveBody(options: NoteAutoOptions): Promise<string> {
@@ -149,7 +103,7 @@ function readStdin(): Promise<string> {
   });
 }
 
-function formatInspection(inspection: DurableNoteInspection): string {
+function formatInspection(inspection: DurableNoteRoutingInspection): string {
   if (inspection.mode === "overview") {
     const scopeEntries = Object.entries(inspection.scopes || {});
     const lines = [
@@ -185,6 +139,10 @@ function formatInspection(inspection: DurableNoteInspection): string {
     `slot: ${inspection.route?.slot || "-"}`,
     `maxItems: ${inspection.route?.maxItems || 0}`,
   ].join("\n");
+}
+
+function normalizeConfig(config: unknown): Record<string, unknown> {
+  return config && typeof config === "object" ? { ...config } : {};
 }
 
 export {

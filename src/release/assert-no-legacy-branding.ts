@@ -101,7 +101,8 @@ function main(): void {
 
 function capitalize(value: unknown): string {
   const text = String(value || "");
-  return text ? `${text[0].toUpperCase()}${text.slice(1)}` : "";
+  const firstCharacter = text[0] || "";
+  return firstCharacter ? `${firstCharacter.toUpperCase()}${text.slice(1)}` : "";
 }
 
 export {

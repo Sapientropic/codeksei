@@ -51,7 +51,7 @@ class SystemMessageQueueStore {
       filePath: this.filePath,
       fallback: { messages: [] },
       label: "system message queue",
-      schema: systemMessageQueueStateSchema as unknown as ZodType<{ messages?: SystemMessage[] }>,
+      schema: systemMessageQueueStateSchema as ZodType<{ messages: SystemMessage[] }>,
     });
     const normalizedState = /** @type {{ messages?: unknown[] }} */ (parsed || {});
     const messages = Array.isArray(normalizedState.messages) ? normalizedState.messages.slice() : [];
@@ -78,7 +78,7 @@ class SystemMessageQueueStore {
       filePath: this.deadLetterFilePath,
       fallback: { entries: [] },
       label: "system message dead letter",
-      schema: systemMessageDeadLetterStateSchema as unknown as ZodType<{ entries?: SystemMessageDeadLetterEntry[] }>,
+      schema: systemMessageDeadLetterStateSchema as ZodType<{ entries: SystemMessageDeadLetterEntry[] }>,
     });
     // Dead-letter payloads share the same single-ingress contract as the live
     // queue. Once schema parse succeeds here, stores should only clone/sort the

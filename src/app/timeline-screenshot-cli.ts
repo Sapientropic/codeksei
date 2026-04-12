@@ -64,7 +64,7 @@ async function runTimelineScreenshotCommand(config: RuntimeConfig, args: string[
 }
 
 function parseTimelineScreenshotArgs(args: string[]): TimelineScreenshotOptions {
-  const options = parseCliArgs(args, getCommandArgsSchema("timelineScreenshot")) as unknown as TimelineScreenshotOptions;
+  const options = parseCliArgs<TimelineScreenshotOptions>(args, getCommandArgsSchema("timelineScreenshot"));
   if (options.outputFile) {
     options.outputFile = path.resolve(options.outputFile);
   }

@@ -4,6 +4,7 @@ const path: typeof import("node:path") = require("node:path");
 const test: typeof import("node:test") = require("node:test");
 const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 const {
+  resolveSharedProcessContext,
   spawnDetachedCommand,
   stopManagedProcess,
 }: typeof import("../src/shared/shared-common") = require("../src/shared/shared-common");
@@ -150,6 +151,30 @@ test("resolveBoundThread prefers exact workspace binding and falls back to newes
     });
   } finally {
     fallback.restore();
+  }
+});
+
+test("resolveSharedProcessContext reflects env changes across calls without clearing require cache", () => {
+  const firstRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-shared-context-a-"));
+  const secondRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-shared-context-b-"));
+  const previousStateDir = process.env.CODEKSEI_STATE_DIR;
+
+  try {
+    process.env.CODEKSEI_STATE_DIR = firstRoot;
+    const first = resolveSharedProcessContext();
+
+    process.env.CODEKSEI_STATE_DIR = secondRoot;
+    const second = resolveSharedProcessContext();
+
+    assert.equal(first.stateDir.replace(/\\/g, "/"), firstRoot.replace(/\\/g, "/"));
+    assert.equal(second.stateDir.replace(/\\/g, "/"), secondRoot.replace(/\\/g, "/"));
+    assert.notEqual(first.watchdogStateFile.replace(/\\/g, "/"), second.watchdogStateFile.replace(/\\/g, "/"));
+  } finally {
+    if (previousStateDir === undefined) {
+      delete process.env.CODEKSEI_STATE_DIR;
+    } else {
+      process.env.CODEKSEI_STATE_DIR = previousStateDir;
+    }
   }
 });
 

@@ -88,8 +88,10 @@ test("ChannelCommandRouter routes approval aliases through one approval handler"
 
   assert.equal(handled, true);
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].type, "approval");
-  assert.equal(calls[0].command.name, "always");
+  const firstCall = calls[0];
+  assert.ok(firstCall);
+  assert.equal(firstCall.type, "approval");
+  assert.equal(firstCall.command.name, "always");
 });
 
 test("ChannelCommandRouter falls back unknown commands to help", async () => {
@@ -99,6 +101,8 @@ test("ChannelCommandRouter falls back unknown commands to help", async () => {
 
   assert.equal(handled, true);
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].type, "help");
-  assert.equal(calls[0].command.name, "wat");
+  const fallbackCall = calls[0];
+  assert.ok(fallbackCall);
+  assert.equal(fallbackCall.type, "help");
+  assert.equal(fallbackCall.command.name, "wat");
 });

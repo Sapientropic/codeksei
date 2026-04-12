@@ -169,7 +169,9 @@ test("v2 delivery packing preserves semantic chunk boundaries and paragraphs", (
   const packed = packV2ChunksForWeixinDelivery(chunks, 10, 200);
 
   assert.deepEqual(packed, chunks);
-  assert.ok(packed[1].includes("\n\n"));
+  const secondPackedChunk = packed[1];
+  assert.ok(secondPackedChunk);
+  assert.ok(secondPackedChunk.includes("\n\n"));
 });
 
 test("legacy delivery packing preserves semantic chunk boundaries and paragraphs", () => {
@@ -181,5 +183,7 @@ test("legacy delivery packing preserves semantic chunk boundaries and paragraphs
   const packed = packLegacyChunksForWeixinDelivery(chunks, 10, 200);
 
   assert.deepEqual(packed, chunks);
-  assert.ok(packed[1].includes("\n\n"));
+  const secondLegacyChunk = packed[1];
+  assert.ok(secondLegacyChunk);
+  assert.ok(secondLegacyChunk.includes("\n\n"));
 });

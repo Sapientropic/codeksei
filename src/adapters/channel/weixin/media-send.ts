@@ -377,7 +377,11 @@ async function sendFileFallback({
 
   let lastError: unknown = null;
   for (let index = 0; index < strategies.length; index += 1) {
-    const { label, api } = strategies[index];
+    const strategy = strategies[index];
+    if (!strategy) {
+      continue;
+    }
+    const { label, api } = strategy;
     try {
       const uploaded = await uploadMediaToWeixin({
         filePath,
@@ -404,12 +408,15 @@ async function sendFileFallback({
           },
         },
       });
-      return {
+      const result: WeixinFileSendResult = {
         kind: "file",
         fileName: path.basename(filePath),
-        fallbackFrom: fallbackFrom || undefined,
         uploadStrategy: label,
       };
+      if (fallbackFrom) {
+        result.fallbackFrom = "image";
+      }
+      return result;
     } catch (error) {
       lastError = error;
       if (!isMissingUploadParamError(error) || index >= strategies.length - 1) {

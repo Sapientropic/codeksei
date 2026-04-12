@@ -28,8 +28,18 @@ interface ThreadState {
 }
 
 function normalizePendingApprovalState(value: unknown): PendingApprovalState | null {
-  const normalized = normalizeRuntimeApprovalPayload(value) as unknown as PendingApprovalState;
-  return normalized?.requestId ? normalized : null;
+  const normalized = normalizeRuntimeApprovalPayload(value);
+  return typeof normalized.requestId === "string" && normalized.requestId
+    ? {
+      threadId: typeof normalized.threadId === "string" ? normalized.threadId : "",
+      requestId: normalized.requestId,
+      reason: typeof normalized.reason === "string" ? normalized.reason : "",
+      command: typeof normalized.command === "string" ? normalized.command : "",
+      commandTokens: Array.isArray(normalized.commandTokens) ? normalized.commandTokens : [],
+      signature: typeof normalized.signature === "string" ? normalized.signature : "",
+      promptedAt: typeof normalized.promptedAt === "string" ? normalized.promptedAt : "",
+    }
+    : null;
 }
 
 export class ThreadStateStore {

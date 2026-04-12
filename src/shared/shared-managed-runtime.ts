@@ -3,28 +3,16 @@ import * as brandingModule from "../core/branding";
 import * as sharedBridgeHeartbeatModule from "./shared-bridge-heartbeat";
 import * as codexSpawnModule from "../core/codex-spawn";
 import {
-  BRIDGE_HEARTBEAT_MAX_AGE_MS,
-  SHARED_DISABLE_PLUGINS,
-  SHARED_DISABLE_SHELL_SNAPSHOT,
-  SHARED_USE_BUNDLED_CODEX_BINARY,
-  appServerLogFile,
-  appServerPidFile,
-  bridgeHeartbeatFile,
-  bridgeLogFile,
-  bridgePidFile,
   ensureLogDir,
   isPidAlive,
-  listenUrl,
   readPidFile,
   readProcessCommandLine,
   resolveReadyAppServerPid,
-  rootDir,
+  resolveSharedProcessContext,
+  type SharedProcessContext,
   sleep,
   spawnDetachedCommand,
-  stateDir,
   stopManagedProcess,
-  supervisorLogFile,
-  supervisorPidFile,
   waitForReadyz,
   writePidFile,
 } from "./shared-process";
@@ -58,13 +46,13 @@ interface SharedBridgeHealth {
   healthy: boolean;
 }
 
-function readSharedBridgeHealth(): SharedBridgeHealth {
-  const pid = readPidFile(bridgePidFile);
+function readSharedBridgeHealth(context: SharedProcessContext = resolveSharedProcessContext()): SharedBridgeHealth {
+  const pid = readPidFile(context.bridgePidFile);
   const alive = pid ? isPidAlive(pid) : false;
-  const heartbeat = readSharedBridgeHeartbeat(bridgeHeartbeatFile);
+  const heartbeat = readSharedBridgeHeartbeat(context.bridgeHeartbeatFile);
   const classification = classifySharedBridgeHeartbeat(heartbeat, {
     expectedPid: alive ? pid : 0,
-    maxAgeMs: BRIDGE_HEARTBEAT_MAX_AGE_MS,
+    maxAgeMs: context.bridgeHeartbeatMaxAgeMs,
   });
   return {
     pid,
@@ -76,12 +64,16 @@ function readSharedBridgeHealth(): SharedBridgeHealth {
 }
 
 async function waitForSharedBridgeHealthy(
-  { attempts = 30, delayMs = 1000 }: { attempts?: unknown; delayMs?: unknown } = {},
+  {
+    context = resolveSharedProcessContext(),
+    attempts = 30,
+    delayMs = 1000,
+  }: { context?: SharedProcessContext; attempts?: unknown; delayMs?: unknown } = {},
 ): Promise<SharedBridgeHealth | null> {
   const normalizedAttempts = Number.isFinite(Number(attempts)) ? Number(attempts) : 30;
   const normalizedDelayMs = Number.isFinite(Number(delayMs)) ? Number(delayMs) : 1000;
   for (let index = 0; index < normalizedAttempts; index += 1) {
-    const health = readSharedBridgeHealth();
+    const health = readSharedBridgeHealth(context);
     if (health.healthy) {
       return health;
     }
@@ -91,40 +83,43 @@ async function waitForSharedBridgeHealthy(
 }
 
 function startSharedBridge(): number {
+  const context = resolveSharedProcessContext();
   const pid = spawnDetachedCommand(process.execPath, ["./dist/src/index.js", "start", "--checkin"], {
-    logFile: bridgeLogFile,
-    cwd: rootDir,
+    logFile: context.bridgeLogFile,
+    cwd: context.rootDir,
     env: {
-      CODEKSEI_CODEX_ENDPOINT: listenUrl,
+      CODEKSEI_CODEX_ENDPOINT: context.listenUrl,
     },
   });
-  writePidFile(bridgePidFile, pid);
+  writePidFile(context.bridgePidFile, pid);
   return pid;
 }
 
 function startSharedSupervisor({ intervalMinutes = 5 }: { intervalMinutes?: unknown } = {}): number {
+  const context = resolveSharedProcessContext();
   const normalizedIntervalMinutes = Number.isFinite(Number(intervalMinutes))
     ? Number(intervalMinutes)
     : 5;
   const args = ["./dist/src/shared/shared-supervisor.js", `--interval-minutes=${normalizedIntervalMinutes}`];
   const pid = spawnDetachedCommand(process.execPath, args, {
-    logFile: supervisorLogFile,
-    cwd: rootDir,
+    logFile: context.supervisorLogFile,
+    cwd: context.rootDir,
   });
-  writePidFile(supervisorPidFile, pid);
+  writePidFile(context.supervisorPidFile, pid);
   return pid;
 }
 
 async function ensureSharedAppServer(): Promise<{ pid: number; status: string }> {
-  ensureLogDir();
-  const readyPid = await resolveReadyAppServerPid();
+  const context = resolveSharedProcessContext();
+  ensureLogDir(context);
+  const readyPid = await resolveReadyAppServerPid(context);
   if (readyPid) {
     return { pid: readyPid, status: "already_running" };
   }
 
   const env: Record<string, string> = {
-    CODEKSEI_STATE_DIR: stateDir,
-    TIMELINE_FOR_AGENT_STATE_DIR: stateDir,
+    CODEKSEI_STATE_DIR: context.stateDir,
+    TIMELINE_FOR_AGENT_STATE_DIR: context.stateDir,
   };
   if (!process.env.TIMELINE_FOR_AGENT_CHROME_PATH) {
     env.TIMELINE_FOR_AGENT_CHROME_PATH =
@@ -139,29 +134,29 @@ async function ensureSharedAppServer(): Promise<{ pid: number; status: string }>
   // through the bundled codex.cmd shim, because later shell_command children
   // can inherit that console environment instead of spawning a fresh visible
   // one. Keep the direct codex.exe path as an explicit opt-in/out switch.
-  const detachedCommand = SHARED_USE_BUNDLED_CODEX_BINARY
+  const detachedCommand = context.sharedUseBundledCodexBinary
     ? (resolveBundledCodexBinary(command) || command)
     : command;
-  const appServerArgs = ["app-server", "--listen", listenUrl];
-  if (SHARED_DISABLE_PLUGINS) {
+  const appServerArgs = ["app-server", "--listen", context.listenUrl];
+  if (context.sharedDisablePlugins) {
     appServerArgs.push("--disable", "plugins");
   }
-  if (SHARED_DISABLE_SHELL_SNAPSHOT) {
+  if (context.sharedDisableShellSnapshot) {
     appServerArgs.push("--disable", "shell_snapshot");
   }
 
   const pid = spawnDetachedCommand(detachedCommand, appServerArgs, {
-    logFile: appServerLogFile,
+    logFile: context.appServerLogFile,
     env,
   });
-  writePidFile(appServerPidFile, pid);
+  writePidFile(context.appServerPidFile, pid);
 
-  const ready = await waitForReadyz();
+  const ready = await waitForReadyz({ context });
   if (!ready) {
-    throw new Error(`failed to start shared app-server; check ${appServerLogFile}`);
+    throw new Error(`failed to start shared app-server; check ${context.appServerLogFile}`);
   }
 
-  const adoptedPid = await resolveReadyAppServerPid();
+  const adoptedPid = await resolveReadyAppServerPid(context);
   return {
     pid: adoptedPid || pid,
     status: adoptedPid && adoptedPid !== pid ? "started_adopted" : "started",
@@ -171,14 +166,15 @@ async function ensureSharedAppServer(): Promise<{ pid: number; status: string }>
 async function ensureManagedAppServer(
   { restartUnhealthy = false }: { restartUnhealthy?: unknown } = {},
 ): Promise<{ pid: number; status: string }> {
-  const readyPid = await resolveReadyAppServerPid();
+  const context = resolveSharedProcessContext();
+  const readyPid = await resolveReadyAppServerPid(context);
   if (readyPid) {
     return { pid: readyPid, status: "already_running" };
   }
 
   let recovered = false;
-  if (Boolean(restartUnhealthy) && readPidFile(appServerPidFile)) {
-    const stopped = await stopManagedProcess(appServerPidFile, {
+  if (Boolean(restartUnhealthy) && readPidFile(context.appServerPidFile)) {
+    const stopped = await stopManagedProcess(context.appServerPidFile, {
       expectedSubstrings: ["codex", "app-server"],
       label: "shared app-server",
     });
@@ -196,12 +192,13 @@ async function ensureManagedAppServer(
 }
 
 function ensureBridgeNotRunning(): number {
-  const pidFromFile = readPidFile(bridgePidFile);
+  const context = resolveSharedProcessContext();
+  const pidFromFile = readPidFile(context.bridgePidFile);
   if (pidFromFile && isPidAlive(pidFromFile)) {
     return pidFromFile;
   }
   if (pidFromFile) {
-    fs.rmSync(bridgePidFile, { force: true });
+    fs.rmSync(context.bridgePidFile, { force: true });
   }
   return 0;
 }
@@ -209,14 +206,15 @@ function ensureBridgeNotRunning(): number {
 async function ensureManagedBridge(
   { restartUnhealthy = false }: { restartUnhealthy?: unknown } = {},
 ): Promise<{ pid: number; status: string; health: SharedBridgeHealth }> {
-  ensureLogDir();
-  const health = readSharedBridgeHealth();
+  const context = resolveSharedProcessContext();
+  ensureLogDir(context);
+  const health = readSharedBridgeHealth(context);
   if (health.healthy) {
     return { pid: health.pid, status: "already_running", health };
   }
 
   if (health.pid && health.alive) {
-    const warmed = await waitForSharedBridgeHealthy({ attempts: 5, delayMs: 1000 });
+    const warmed = await waitForSharedBridgeHealthy({ context, attempts: 5, delayMs: 1000 });
     if (warmed) {
       return { pid: warmed.pid, status: "already_running", health: warmed };
     }
@@ -224,7 +222,7 @@ async function ensureManagedBridge(
 
   let recovered = false;
   if (Boolean(restartUnhealthy) && health.pid) {
-    const stopped = await stopManagedProcess(bridgePidFile, {
+    const stopped = await stopManagedProcess(context.bridgePidFile, {
       expectedSubstrings: ["start", "checkin"],
       label: "shared codeksei bridge",
     });
@@ -233,13 +231,13 @@ async function ensureManagedBridge(
     }
     recovered = stopped.status === "terminated";
   } else if (health.pid && !health.alive) {
-    fs.rmSync(bridgePidFile, { force: true });
+    fs.rmSync(context.bridgePidFile, { force: true });
   }
 
   const pid = startSharedBridge();
-  const readyHealth = await waitForSharedBridgeHealthy();
+  const readyHealth = await waitForSharedBridgeHealthy({ context });
   if (!readyHealth) {
-    throw new Error(`failed to start shared codeksei bridge; check ${bridgeLogFile}`);
+    throw new Error(`failed to start shared codeksei bridge; check ${context.bridgeLogFile}`);
   }
   return {
     pid: readyHealth.pid || pid,
@@ -251,8 +249,9 @@ async function ensureManagedBridge(
 async function ensureManagedSupervisor(
   { intervalMinutes = 5 }: { intervalMinutes?: unknown } = {},
 ): Promise<{ pid: number; status: string }> {
-  ensureLogDir();
-  const pid = readPidFile(supervisorPidFile);
+  const context = resolveSharedProcessContext();
+  ensureLogDir(context);
+  const pid = readPidFile(context.supervisorPidFile);
   if (pid && isPidAlive(pid)) {
     const commandLine = readProcessCommandLine(pid);
     if (!String(commandLine).toLowerCase().includes("shared-supervisor.js")) {
@@ -261,13 +260,13 @@ async function ensureManagedSupervisor(
     return { pid, status: "already_running" };
   }
   if (pid) {
-    fs.rmSync(supervisorPidFile, { force: true });
+    fs.rmSync(context.supervisorPidFile, { force: true });
   }
 
   const startedPid = startSharedSupervisor({ intervalMinutes });
   await sleep(300);
   return {
-    pid: readPidFile(supervisorPidFile) || startedPid,
+    pid: readPidFile(context.supervisorPidFile) || startedPid,
     status: "started",
   };
 }

@@ -59,7 +59,7 @@ export function createShutdownController(onStop: ShutdownStopHandler) {
 
 export function getSystemMessageFailureRetryDelayMs(attemptCount: unknown): number {
   const index = Math.max(0, Math.min(SYSTEM_MESSAGE_FAILURE_RETRY_DELAYS_MS.length - 1, Number(attemptCount) - 1));
-  return SYSTEM_MESSAGE_FAILURE_RETRY_DELAYS_MS[index];
+  return SYSTEM_MESSAGE_FAILURE_RETRY_DELAYS_MS[index] || SYSTEM_MESSAGE_FAILURE_RETRY_DELAYS_MS[0] || 30_000;
 }
 
 export function buildReminderSystemTrigger(

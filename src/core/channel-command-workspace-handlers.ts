@@ -231,13 +231,26 @@ function createWorkspaceCommandHandlers({
           normalized,
           threadId,
         });
-        await runtimeAdapter.refreshThreadInstructions({
+        const refreshArgs = {
           bindingKey,
           threadId,
           workspaceRoot,
-          model: sessionStore.getCodexParamsForWorkspace(bindingKey, workspaceRoot).model,
           accessMode: config.codexAccessMode,
-        });
+        } as {
+          bindingKey: string;
+          threadId: string;
+          workspaceRoot: string;
+          model?: string;
+          accessMode?: string;
+        };
+        const model = sessionStore.getCodexParamsForWorkspace(bindingKey, workspaceRoot).model;
+        if (model) {
+          refreshArgs.model = model;
+        }
+        if (!refreshArgs.accessMode) {
+          delete refreshArgs.accessMode;
+        }
+        await runtimeAdapter.refreshThreadInstructions(refreshArgs);
       } catch (error) {
         // This notice is only a courtesy. If the chat send itself also fails,
         // we still want the next normal message to retry reread naturally.

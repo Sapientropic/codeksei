@@ -10,11 +10,11 @@ function sliceLeafCommandArgs(argv: readonly string[] = process.argv, startIndex
   return Array.isArray(argv) ? argv.slice(startIndex) : [];
 }
 
-function parseCliArgs(
+function parseCliArgs<T = ParsedCliOptions>(
   args: readonly string[],
   schema: CommandArgSchema | null,
   { passthroughKey = "" }: ParseCliArgsOptions = {},
-): ParsedCliOptions {
+): T {
   const normalizedArgs = Array.isArray(args) ? args.map((value) => String(value || "")) : [];
   const normalizedSchema = normalizeSchema(schema);
   const options: ParsedCliOptions = buildDefaultOptions(normalizedSchema);
@@ -28,7 +28,7 @@ function parseCliArgs(
   const resolvedPassthroughKey = passthroughKey || normalizedSchema.passthrough?.key || "passthrough";
 
   for (let index = 0; index < normalizedArgs.length; index += 1) {
-    const token = normalizedArgs[index].trim();
+    const token = (normalizedArgs[index] || "").trim();
     if (!token) {
       continue;
     }
@@ -42,7 +42,7 @@ function parseCliArgs(
       if (normalizedSchema.passthrough) {
         passthrough.push(token);
         if (shouldCapturePassthroughValue(token, normalizedArgs[index + 1])) {
-          passthrough.push(normalizedArgs[index + 1].trim());
+          passthrough.push((normalizedArgs[index + 1] || "").trim());
           index += 1;
         }
         continue;
@@ -73,7 +73,7 @@ function parseCliArgs(
   if (normalizedSchema.passthrough) {
     options[resolvedPassthroughKey] = passthrough;
   }
-  return options;
+  return options as T;
 }
 
 function normalizeSchema(schema: CommandArgSchema | null) {

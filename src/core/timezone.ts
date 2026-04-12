@@ -327,11 +327,11 @@ function parseLocalDateTimeParts(dateString: any, timeString: any) {
   }
 
   const parts = {
-    year: Number.parseInt(dateMatch[1], 10),
-    month: Number.parseInt(dateMatch[2], 10),
-    day: Number.parseInt(dateMatch[3], 10),
-    hour: Number.parseInt(timeMatch[1], 10),
-    minute: Number.parseInt(timeMatch[2], 10),
+    year: Number.parseInt(dateMatch[1] || "", 10),
+    month: Number.parseInt(dateMatch[2] || "", 10),
+    day: Number.parseInt(dateMatch[3] || "", 10),
+    hour: Number.parseInt(timeMatch[1] || "", 10),
+    minute: Number.parseInt(timeMatch[2] || "", 10),
     second: Number.parseInt(timeMatch[3] || "00", 10),
   };
 

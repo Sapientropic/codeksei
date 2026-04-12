@@ -1,85 +1,94 @@
 import * as fs from "node:fs";
 import * as http from "node:http";
-import * as os from "node:os";
 import * as path from "node:path";
 import { execFileSync, spawn } from "node:child_process";
-import * as brandingModule from "../core/branding";
-import * as envLoaderModule from "../core/env-loader";
+import {
+  ensureStateDirectory,
+  readPrefixedBoolEnv,
+  readPrefixedEnv,
+  resolveStateDir,
+} from "../core/branding";
+import { loadEnvStack } from "../core/env-loader";
+import { resolvePackageRoot } from "../core/path-utils";
+import { DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS } from "./shared-bridge-heartbeat";
+import { buildSpawnInvocation } from "../core/codex-spawn";
 import {
   readManagedJsonStateFile,
   writeManagedJsonStateFile,
   writeTextFileAtomically,
 } from "../state/json-state";
-import * as sharedBridgeHeartbeatModule from "./shared-bridge-heartbeat";
-import * as codexSpawnModule from "../core/codex-spawn";
-import { resolvePackageRoot } from "../core/path-utils";
 
-const {
-  ensureStateDirectory,
-  readPrefixedBoolEnv,
-  readPrefixedEnv,
-  resolveStateDir,
-} = brandingModule as {
-  ensureStateDirectory: (args: { env: NodeJS.ProcessEnv }) => void;
-  readPrefixedBoolEnv: (env: NodeJS.ProcessEnv, key: string, fallback?: boolean) => boolean;
-  readPrefixedEnv: (env: NodeJS.ProcessEnv, key: string) => string;
-  resolveStateDir: (args: { env: NodeJS.ProcessEnv }) => string;
-};
-const { loadEnvStack } = envLoaderModule as {
-  loadEnvStack: (args: { cwd: string; env: NodeJS.ProcessEnv }) => void;
-};
-const {
-  DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS,
-} = sharedBridgeHeartbeatModule as {
-  DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS: number;
-};
-const { buildSpawnInvocation } = codexSpawnModule as {
-  buildSpawnInvocation: (command: string, args: string[]) => { command: string; args: string[] };
-};
-
-const rootDir = resolvePackageRoot(__dirname);
-loadSharedEnv();
-const port = String(readPrefixedEnv(process.env, "SHARED_PORT") || "8765");
-const listenUrl = `ws://127.0.0.1:${port}`;
-const stateDir = resolveStateDir({ env: process.env });
-const logDir = path.join(stateDir, "logs");
-const appServerPidFile = path.join(logDir, "shared-app-server.pid");
-const bridgePidFile = path.join(logDir, "shared-wechat.pid");
-const supervisorPidFile = path.join(logDir, "shared-supervisor.pid");
-const appServerLogFile = path.join(logDir, "shared-app-server.log");
-const bridgeLogFile = path.join(logDir, "shared-wechat.log");
-const supervisorLogFile = path.join(logDir, "shared-supervisor.log");
-const bridgeHeartbeatFile = path.join(logDir, "shared-wechat-heartbeat.json");
-const watchdogStateFile = path.join(logDir, "shared-watchdog-state.json");
-const accountsDir = path.join(stateDir, "accounts");
-const sessionFile = readPrefixedEnv(process.env, "SESSIONS_FILE") || path.join(stateDir, "sessions.json");
-const BRIDGE_HEARTBEAT_MAX_AGE_MS = Number.parseInt(
-  String(readPrefixedEnv(process.env, "SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS") || ""),
-  10,
-) || DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS;
-const SHARED_USE_BUNDLED_CODEX_BINARY = readPrefixedBoolEnv(
-  process.env,
-  "SHARED_USE_BUNDLED_CODEX_BINARY",
-  true,
-);
-const SHARED_DISABLE_PLUGINS = readPrefixedBoolEnv(
-  process.env,
-  "SHARED_DISABLE_PLUGINS",
-  false,
-);
-const SHARED_DISABLE_SHELL_SNAPSHOT = readPrefixedBoolEnv(
-  process.env,
-  "SHARED_DISABLE_SHELL_SNAPSHOT",
-  false,
-);
-
-function loadSharedEnv() {
-  loadEnvStack({ cwd: rootDir, env: process.env });
-  ensureStateDirectory({ env: process.env });
+export interface SharedProcessContext {
+  rootDir: string;
+  port: string;
+  listenUrl: string;
+  stateDir: string;
+  logDir: string;
+  accountsDir: string;
+  sessionFile: string;
+  appServerPidFile: string;
+  bridgePidFile: string;
+  supervisorPidFile: string;
+  appServerLogFile: string;
+  bridgeLogFile: string;
+  supervisorLogFile: string;
+  bridgeHeartbeatFile: string;
+  watchdogStateFile: string;
+  bridgeHeartbeatMaxAgeMs: number;
+  sharedUseBundledCodexBinary: boolean;
+  sharedDisablePlugins: boolean;
+  sharedDisableShellSnapshot: boolean;
 }
 
-function ensureLogDir() {
-  fs.mkdirSync(logDir, { recursive: true });
+interface ResolveSharedProcessContextArgs {
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+}
+
+function loadSharedEnv({
+  cwd = resolvePackageRoot(__dirname),
+  env = process.env,
+}: ResolveSharedProcessContextArgs = {}): void {
+  loadEnvStack({ cwd, env });
+  ensureStateDirectory({ env });
+}
+
+function resolveSharedProcessContext({
+  cwd = resolvePackageRoot(__dirname),
+  env = process.env,
+}: ResolveSharedProcessContextArgs = {}): SharedProcessContext {
+  loadSharedEnv({ cwd, env });
+  const port = String(readPrefixedEnv(env, "SHARED_PORT") || "8765");
+  const stateDir = resolveStateDir({ env });
+  const logDir = path.join(stateDir, "logs");
+  return {
+    rootDir: cwd,
+    port,
+    listenUrl: `ws://127.0.0.1:${port}`,
+    stateDir,
+    logDir,
+    accountsDir: path.join(stateDir, "accounts"),
+    sessionFile: readPrefixedEnv(env, "SESSIONS_FILE") || path.join(stateDir, "sessions.json"),
+    appServerPidFile: path.join(logDir, "shared-app-server.pid"),
+    bridgePidFile: path.join(logDir, "shared-wechat.pid"),
+    supervisorPidFile: path.join(logDir, "shared-supervisor.pid"),
+    appServerLogFile: path.join(logDir, "shared-app-server.log"),
+    bridgeLogFile: path.join(logDir, "shared-wechat.log"),
+    supervisorLogFile: path.join(logDir, "shared-supervisor.log"),
+    bridgeHeartbeatFile: path.join(logDir, "shared-wechat-heartbeat.json"),
+    watchdogStateFile: path.join(logDir, "shared-watchdog-state.json"),
+    bridgeHeartbeatMaxAgeMs: Number.parseInt(
+      String(readPrefixedEnv(env, "SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS") || ""),
+      10,
+    ) || DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS,
+    sharedUseBundledCodexBinary: readPrefixedBoolEnv(env, "SHARED_USE_BUNDLED_CODEX_BINARY", true),
+    sharedDisablePlugins: readPrefixedBoolEnv(env, "SHARED_DISABLE_PLUGINS", false),
+    sharedDisableShellSnapshot: readPrefixedBoolEnv(env, "SHARED_DISABLE_SHELL_SNAPSHOT", false),
+  };
+}
+
+function ensureLogDir(context: SharedProcessContext = resolveSharedProcessContext()): void {
+  fs.mkdirSync(context.logDir, { recursive: true });
 }
 
 function isPidAlive(pid: unknown): boolean {
@@ -146,17 +155,19 @@ function findListeningPidByPort(targetPort: unknown): number {
           continue;
         }
         const parts = line.split(/\s+/);
-        if (parts.length < 5) {
+        const localAddress = parts[1];
+        const state = parts[3];
+        const pidText = parts[4];
+        if (!localAddress || !state || !pidText) {
           continue;
         }
-        const [, localAddress, , state, pidText] = parts;
         if (String(state).toUpperCase() !== "LISTENING") {
           continue;
         }
         if (!String(localAddress).endsWith(`:${normalizedPort}`)) {
           continue;
         }
-        const pid = Number.parseInt(String(pidText || ""), 10);
+        const pid = Number.parseInt(String(pidText), 10);
         return isPidAlive(pid) ? pid : 0;
       }
       return 0;
@@ -166,19 +177,20 @@ function findListeningPidByPort(targetPort: unknown): number {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     });
-    const pid = Number.parseInt(output.trim().split(/\r?\n/)[0] || "", 10);
+    const firstLine = output.trim().split(/\r?\n/)[0] || "";
+    const pid = Number.parseInt(firstLine, 10);
     return isPidAlive(pid) ? pid : 0;
   } catch {
     return 0;
   }
 }
 
-function checkReadyz(): Promise<boolean> {
+function checkReadyz(context: SharedProcessContext = resolveSharedProcessContext()): Promise<boolean> {
   return new Promise((resolve) => {
     const req = http.get(
       {
         hostname: "127.0.0.1",
-        port: Number(port),
+        port: Number(context.port),
         path: "/readyz",
         timeout: 500,
       },
@@ -195,19 +207,19 @@ function checkReadyz(): Promise<boolean> {
   });
 }
 
-async function resolveReadyAppServerPid(): Promise<number> {
-  if (!(await checkReadyz())) {
+async function resolveReadyAppServerPid(context: SharedProcessContext = resolveSharedProcessContext()): Promise<number> {
+  if (!(await checkReadyz(context))) {
     return 0;
   }
 
-  const pidFromFile = readPidFile(appServerPidFile);
+  const pidFromFile = readPidFile(context.appServerPidFile);
   // On Windows a detached shell launch can leave the pid file pointing at the
   // wrapper cmd.exe instead of the real listener. Prefer the actual listening
   // pid whenever readyz is healthy, then backfill the pid file.
-  const listenerPid = findListeningPidByPort(port);
+  const listenerPid = findListeningPidByPort(context.port);
   if (listenerPid) {
     if (listenerPid !== pidFromFile) {
-      writePidFile(appServerPidFile, listenerPid);
+      writePidFile(context.appServerPidFile, listenerPid);
     }
     return listenerPid;
   }
@@ -215,11 +227,19 @@ async function resolveReadyAppServerPid(): Promise<number> {
   return pidFromFile && isPidAlive(pidFromFile) ? pidFromFile : 0;
 }
 
-async function waitForReadyz({ attempts = 10, delayMs = 300 }: { attempts?: unknown; delayMs?: unknown } = {}): Promise<boolean> {
+async function waitForReadyz({
+  context = resolveSharedProcessContext(),
+  attempts = 10,
+  delayMs = 300,
+}: {
+  context?: SharedProcessContext;
+  attempts?: unknown;
+  delayMs?: unknown;
+} = {}): Promise<boolean> {
   const normalizedAttempts = numberOrDefault(attempts, 10);
   const normalizedDelayMs = numberOrDefault(delayMs, 300);
   for (let index = 0; index < normalizedAttempts; index += 1) {
-    if (await checkReadyz()) {
+    if (await checkReadyz(context)) {
       return true;
     }
     await sleep(normalizedDelayMs);
@@ -239,23 +259,31 @@ interface SpawnDetachedCommandDependencies {
     command: string,
     args: string[],
     options: { stdio: [string, number, number] } & Record<string, unknown>,
-  ) => { pid?: number; unref: () => void };
+  ) => { pid: number | undefined; unref: () => void };
 }
 
 const DEFAULT_SPAWN_DETACHED_DEPS: SpawnDetachedCommandDependencies = {
   buildSpawnInvocation,
   closeFd: (fd) => fs.closeSync(fd),
   openLogFile,
-  spawn: (command, args, options) => spawn(command, args, options as never),
+  spawn: (command, args, options) => {
+    const child = spawn(command, args, options as never);
+    return {
+      pid: child.pid,
+      unref: () => child.unref(),
+    };
+  },
 };
 
-function safeCloseFd(fd: number, closeFd: (fd: number) => void) {
+function safeCloseFd(fd: number, closeFd: (fd: number) => void): void {
   if (!Number.isInteger(fd) || fd < 0) {
     return;
   }
   try {
     closeFd(fd);
-  } catch {}
+  } catch {
+    // best effort
+  }
 }
 
 function spawnDetachedCommand(
@@ -263,7 +291,7 @@ function spawnDetachedCommand(
   args: string[],
   {
     logFile,
-    cwd = rootDir,
+    cwd,
     env = {},
   }: { logFile?: string; cwd?: string; env?: Record<string, string> } = {},
   {
@@ -278,13 +306,14 @@ function spawnDetachedCommand(
   }
   let stdoutFd = -1;
   let stderrFd = -1;
+  const resolvedCwd = cwd || resolveSharedProcessContext().rootDir;
 
   try {
     stdoutFd = openLogFileImpl(logFile);
     stderrFd = openLogFileImpl(logFile);
     const spawnSpec = buildSpawnInvocationImpl(command, args);
     const child = spawnImpl(spawnSpec.command, spawnSpec.args, {
-      cwd,
+      cwd: resolvedCwd,
       env: { ...process.env, ...env },
       detached: true,
       stdio: ["ignore", stdoutFd, stderrFd],
@@ -368,7 +397,9 @@ async function stopManagedProcess(
 
   try {
     process.kill(pid);
-  } catch {}
+  } catch {
+    // best effort
+  }
 
   for (let index = 0; index < 10; index += 1) {
     if (!isPidAlive(pid)) {
@@ -387,7 +418,9 @@ async function stopManagedProcess(
     } else {
       process.kill(pid, "SIGKILL");
     }
-  } catch {}
+  } catch {
+    // best effort
+  }
 
   for (let index = 0; index < 10; index += 1) {
     if (!isPidAlive(pid)) {
@@ -414,37 +447,19 @@ function numberOrDefault(value: unknown, fallback: number): number {
 }
 
 export {
-  BRIDGE_HEARTBEAT_MAX_AGE_MS,
-  SHARED_DISABLE_PLUGINS,
-  SHARED_DISABLE_SHELL_SNAPSHOT,
-  SHARED_USE_BUNDLED_CODEX_BINARY,
-  accountsDir,
-  appServerLogFile,
-  appServerPidFile,
-  bridgeHeartbeatFile,
-  bridgeLogFile,
-  bridgePidFile,
   buildSpawnInvocation,
   ensureLogDir,
   isPidAlive,
-  listenUrl,
-  logDir,
-  port,
   readJsonFile,
   readPidFile,
   readProcessCommandLine,
   removePidFileIfMatches,
   resolveReadyAppServerPid,
-  rootDir,
-  sessionFile,
+  resolveSharedProcessContext,
   sleep,
   spawnDetachedCommand,
-  stateDir,
   stopManagedProcess,
-  supervisorLogFile,
-  supervisorPidFile,
   waitForReadyz,
-  watchdogStateFile,
   writeJsonFile,
   writePidFile,
 };

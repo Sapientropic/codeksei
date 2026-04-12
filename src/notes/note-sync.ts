@@ -247,8 +247,9 @@ function upsertBullet(sectionMain: any, text: any, maxItems: number = 0) {
   }
 
   const entryLine = `- ${normalizedText}`;
-  if (bulletIndexes.length) {
-    lines.splice(bulletIndexes[0], 0, entryLine);
+  const firstBulletIndex = bulletIndexes[0];
+  if (typeof firstBulletIndex === "number") {
+    lines.splice(firstBulletIndex, 0, entryLine);
   } else {
     while (lines.length && !String(lines[lines.length - 1] || "").trim()) {
       lines.pop();
@@ -354,17 +355,18 @@ function parseHeadings(content: any) {
     const lineEnd = hasTrailingNewline ? lineBreakIndex + 1 : lineBreakIndex;
     const trimmed = line.trim();
     const fenceMatch = /^\s*(```+|~~~+)/u.exec(line);
+    const fenceMarker = fenceMatch?.[1]?.[0] || "";
 
     if (activeFenceMarker) {
-      if (fenceMatch && fenceMatch[1][0] === activeFenceMarker) {
+      if (fenceMarker === activeFenceMarker) {
         activeFenceMarker = "";
       }
       index = lineEnd;
       continue;
     }
 
-    if (fenceMatch) {
-      activeFenceMarker = fenceMatch[1][0];
+    if (fenceMarker) {
+      activeFenceMarker = fenceMarker;
       index = lineEnd;
       continue;
     }
@@ -376,9 +378,15 @@ function parseHeadings(content: any) {
 
     const headingMatch = /^(#{1,6})\s+(.+?)\s*$/u.exec(line);
     if (headingMatch) {
+      const headingHashes = headingMatch[1];
+      const title = headingMatch[2];
+      if (!headingHashes || !title) {
+        index = lineEnd;
+        continue;
+      }
       headings.push({
-        level: headingMatch[1].length,
-        title: headingMatch[2],
+        level: headingHashes.length,
+        title,
         index,
         lineEnd,
       });

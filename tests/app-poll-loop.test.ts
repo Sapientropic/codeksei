@@ -93,9 +93,13 @@ test("app poll loop keeps flush ordering around successful getUpdates cycles", a
     "flushPendingTimelineScreenshots",
   ]);
   assert.equal(heartbeatPatches.length, 2);
-  assert.equal(heartbeatPatches[0].status, "running");
-  assert.equal(heartbeatPatches[1].status, "running");
-  assert.equal(heartbeatPatches[1].lastError, "");
+  const firstHeartbeat = heartbeatPatches[0];
+  const secondHeartbeat = heartbeatPatches[1];
+  assert.ok(firstHeartbeat);
+  assert.ok(secondHeartbeat);
+  assert.equal(firstHeartbeat.status, "running");
+  assert.equal(secondHeartbeat.status, "running");
+  assert.equal(secondHeartbeat.lastError, "");
 });
 
 test("app poll loop turns session-expired transport failures into the login hint", async () => {
@@ -165,9 +169,13 @@ test("app poll loop escalates from retry delay to backoff delay after repeated f
   });
 
   assert.deepEqual(delays, [2_000, 30_000]);
-  assert.equal(heartbeatPatches[1].status, "degraded");
-  assert.equal(heartbeatPatches[1].consecutiveFailures, 1);
-  assert.equal(heartbeatPatches[3].consecutiveFailures, 2);
+  const degradedHeartbeat = heartbeatPatches[1];
+  const backoffHeartbeat = heartbeatPatches[3];
+  assert.ok(degradedHeartbeat);
+  assert.ok(backoffHeartbeat);
+  assert.equal(degradedHeartbeat.status, "degraded");
+  assert.equal(degradedHeartbeat.consecutiveFailures, 1);
+  assert.equal(backoffHeartbeat.consecutiveFailures, 2);
 });
 
 test("app poll loop error formatter keeps the user-facing login hint", () => {
