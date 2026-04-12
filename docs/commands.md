@@ -7,9 +7,9 @@
 `Codeksei` 先定义稳定动作，再分别映射到终端和微信，让不同入口共享同一套行为语义。
 这页只负责对外说明；真实 active command surface 以当前共享 help / manifest 为准，不再单独发明第二套命令语义。
 
-## 命名与兼容
+## 命名
 
-对外统一用新名字，对内尽量不打断旧痕迹。
+对外统一用新名字；旧名字只保留最小迁移兼容。
 
 当前主入口：
 
@@ -17,12 +17,9 @@
 - CLI：`codeksei`
 - env 前缀：`CODEKSEI_*`
 
-兼容入口仍保留：
+- 旧别名仍接受：`cyberboss`、`CYBERBOSS_*`
 
-- CLI：`cyberboss`
-- env 前缀：`CYBERBOSS_*`
-
-README 和帮助文本默认都按新入口书写；旧名字只作为兼容层保留。
+README、帮助文本和公开示例默认都按 `codeksei` 书写。
 
 ## 终端主入口
 
@@ -176,13 +173,5 @@ Project radar 用于回答“项目现在在哪、应该从哪里重新进去”
 - 找回 tracked repo 的根目录、workspace note、稳定入口文件
 - 看当前 branch、working tree、最近 commits
 - 把 git 动作视作“最近发生了什么”的弱信号，方便判断下一步从哪里接上
-
-## 兼容细节
-
-改名不应该让已有状态、旧脚本和历史痕迹一下子失效，所以兼容层会继续保留。
-
-- 文档中的 `CODEKSEI_*` 都有 `CYBERBOSS_*` 兼容读取
-- 主 bin 是 `codeksei`，旧 `cyberboss` 仍可调用
-- 新 managed marker 前缀写成 `codeksei-*`，但旧 `cyberboss-*` marker 仍能继续被读取和更新
 
 这页只管“怎么使用这些入口”；维护与发布流程留在本地维护材料里。
