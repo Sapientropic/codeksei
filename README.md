@@ -241,14 +241,8 @@ npm run help
 
 ## 如果你是从 cyberboss 过来
 
-新安装与新文档默认都用 `Codeksei / codeksei / CODEKSEI_*`。
-
-如果你的本地已经在跑旧名字，当前兼容层还在：
-
-- `cyberboss` CLI 仍可调用
-- `CYBERBOSS_*` 仍会被读取，新前缀优先
-- 如果 `~/.codeksei` 不存在但 `~/.cyberboss` 已存在，运行时会继续复用旧状态
-- Windows 后台任务会安装为 `Codeksei Shared *`，同时清理旧 `Cyberboss Shared *`
+新安装与公开示例统一使用 `Codeksei / codeksei / CODEKSEI_*`。
+为了不打断已有本地状态，运行时仍继续接受旧的 `cyberboss` CLI、`CYBERBOSS_*` 和 `~/.cyberboss`。
 
 ## 本地数据与公开边界
 
@@ -258,7 +252,7 @@ npm run help
 ~/.codeksei
 ```
 
-如果你是从旧版本升级，且只有旧目录存在，运行时会继续兼容：
+如果你是从旧版本升级，且只有旧目录存在，运行时会继续沿用：
 
 ```text
 ~/.cyberboss
@@ -307,8 +301,8 @@ Codeksei 从那里长出来，也感谢这份开源起点。
 
 ### 现在到底该用 `codeksei` 还是 `cyberboss`？
 
-新安装和新文档统一使用 `Codeksei / codeksei / CODEKSEI_*`。
-如果你本地已经在跑 `cyberboss`，沿用当前兼容层即可，不需要为了迁移立刻重装一遍。
+公开文档和新安装统一使用 `Codeksei / codeksei / CODEKSEI_*`。
+旧的 `cyberboss` 只作为迁移兼容入口保留。
 
 ### 共享模式和 `npm run start` 有什么区别？
 

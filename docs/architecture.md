@@ -72,7 +72,7 @@
 
 ## 5. Shared Mode
 
-`scripts/shared-*`
+公开入口脚本在 `scripts/*.sh` / `scripts/*.ps1`，shared lifecycle 逻辑收口在 `src/shared/*`。
 
 这是当前默认运行方式。
 
@@ -127,21 +127,7 @@ shared mode 让照看在你换入口、换窗口、或短暂离开之后，依�
 
 如果把 Runtime / Adapters 看成骨架，这一层就是更接近“陪伴感”和“节奏感”的地方。
 
-## 8. Compatibility Strategy
+## 8. Compatibility Boundary
 
-当前改名采用“新入口为主，旧入口兼容”：
-
-- 主名称：`Codeksei`
-- 主 CLI / 包名：`codeksei`
-- 主 env 前缀：`CODEKSEI_*`
-- 主状态目录：`~/.codeksei`
-
-同时兼容：
-
-- `cyberboss`
-- `CYBERBOSS_*`
-- `~/.cyberboss`
-
-兼容层集中收口在配置读取、shared scripts、marker 读取与 CLI 入口，尽量不打断已经留下来的本地状态。
-
-对 Codeksei 来说，改名可以发生，但已经留下来的生活痕迹不该轻易断掉。
+公开表面统一按 `Codeksei / codeksei / CODEKSEI_*` 书写。
+旧的 `cyberboss` 兼容主要收口在 `src/core/branding.ts`、shared wrapper 和旧 marker 读取，用来承接已有本地状态，而不是继续扩散成公开默认入口。

@@ -233,14 +233,8 @@ More detailed references:
 
 ## If You Are Coming From `cyberboss`
 
-New setups and current docs use `Codeksei / codeksei / CODEKSEI_*`.
-
-If your local setup still runs on the old name, the compatibility layer is still there:
-
-- the `cyberboss` CLI still works
-- `CYBERBOSS_*` variables are still read, with `CODEKSEI_*` taking priority
-- if `~/.codeksei` does not exist but `~/.cyberboss` does, the runtime keeps reusing the old state
-- Windows scheduled tasks install as `Codeksei Shared *` and clean up legacy `Cyberboss Shared *` names during reinstall
+New setups and public examples use `Codeksei / codeksei / CODEKSEI_*`.
+To avoid breaking existing local state, the runtime still accepts the legacy `cyberboss` CLI, `CYBERBOSS_*`, and `~/.cyberboss`.
 
 ## Local State and Public Boundary
 
@@ -250,7 +244,7 @@ Primary state directory:
 ~/.codeksei
 ```
 
-Legacy-compatible state directory:
+Legacy state directory that is still reused when needed:
 
 ```text
 ~/.cyberboss
@@ -299,8 +293,8 @@ Use that path when you want the base CLI quickly; clone the repository when you 
 
 ### Should I use `codeksei` or `cyberboss`?
 
-New setups and current docs should use `Codeksei / codeksei / CODEKSEI_*`.
-If your machine already runs `cyberboss`, the existing compatibility layer is enough; there is no need for a rushed migration.
+Public docs and new installs should use `Codeksei / codeksei / CODEKSEI_*`.
+`cyberboss` only remains as a migration-compatible legacy entrypoint.
 
 ### How is shared mode different from `npm run start`?
 
