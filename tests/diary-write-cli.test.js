@@ -119,7 +119,7 @@ test("runDiaryWriteCommand accepts fragment writes without requiring todo state"
   const originalArgv = process.argv;
   process.argv = [
     "node",
-    "./bin/codeksei.js",
+    "./dist/src/index.js",
     "diary",
     "write",
     "--section",

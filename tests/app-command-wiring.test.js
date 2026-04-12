@@ -4,11 +4,15 @@ const path = require("path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const repoRoot = path.resolve(__dirname, "..");
-const appModulePath = path.resolve(repoRoot, "src/core/app.js");
+const {
+  repoRoot,
+  resolveRepoRuntimeModule,
+  resolveRepoRuntimePath,
+} = require("./helpers/runtime-paths");
+const appModulePath = resolveRepoRuntimePath("src/core/app.js");
 
 function resolveRepoModule(relativePath) {
-  return require.resolve(path.resolve(repoRoot, relativePath));
+  return resolveRepoRuntimeModule(relativePath);
 }
 
 function stubModule(relativePath, exports, originals) {

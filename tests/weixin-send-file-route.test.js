@@ -2,11 +2,15 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
 
-const repoRoot = path.resolve(__dirname, "..");
-const adapterModulePath = path.resolve(repoRoot, "src/adapters/channel/weixin/index.js");
+const {
+  repoRoot,
+  resolveRepoRuntimeModule,
+  resolveRepoRuntimePath,
+} = require("./helpers/runtime-paths");
+const adapterModulePath = resolveRepoRuntimePath("src/adapters/channel/weixin/index.js");
 
 function resolveRepoModule(relativePath) {
-  return require.resolve(path.resolve(repoRoot, relativePath));
+  return resolveRepoRuntimeModule(relativePath);
 }
 
 function stubModule(relativePath, exports, originals) {

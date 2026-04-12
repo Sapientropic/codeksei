@@ -16,7 +16,7 @@ function resolve_pid_cwd() {
 }
 
 function list_bridge_processes() {
-  ps -ax -o pid=,ppid=,command= | awk '/node \.\/bin\/(codeksei|cyberboss)\.js start --checkin/ { print }'
+  ps -ax -o pid=,ppid=,command= | awk '/node \.\/dist\/src\/index\.js start --checkin/ { print }'
 }
 
 function find_bridge_child_pid() {
@@ -102,7 +102,7 @@ trap shutdown_bridge EXIT INT TERM
 cd "${ROOT_DIR}"
 export CODEKSEI_CODEX_ENDPOINT="ws://127.0.0.1:${PORT}"
 export CYBERBOSS_CODEX_ENDPOINT="ws://127.0.0.1:${PORT}"
-node ./bin/codeksei.js start --checkin &
+node ./dist/src/index.js start --checkin &
 BRIDGE_PID="$!"
 echo "${BRIDGE_PID}" > "${PID_FILE}"
 wait "${BRIDGE_PID}"

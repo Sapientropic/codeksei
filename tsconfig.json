@@ -1,44 +1,23 @@
 {
   "compilerOptions": {
-    "allowJs": true,
-    "checkJs": true,
-    "noEmit": true,
+    "noEmit": false,
     "module": "commonjs",
     "moduleResolution": "node",
     "target": "ES2023",
     "lib": ["ES2023"],
     "types": ["node"],
     "skipLibCheck": true,
-    "strict": false,
-    "noImplicitAny": false
+    "rootDir": ".",
+    "outDir": "dist",
+    "strict": true,
+    "noImplicitAny": true
   },
   "include": [
-    "bin/*.js",
-    "src/contracts/*.js",
-    "src/contracts/**/*.js",
-    "src/core/approval-command-policy.js",
-    "src/core/app-runtime-factory.js",
-    "src/core/app-runtime-helpers.js",
-    "src/core/branding.js",
-    "src/core/codex-spawn.js",
-    "src/core/command-registry.js",
-    "src/core/config-loader.js",
-    "src/core/instructions-template.js",
-    "src/core/json-state.js",
-    "src/core/path-utils.js",
-    "src/core/person-reference.js",
-    "src/adapters/runtime/codex/events.js",
-    "src/adapters/runtime/codex/message-utils.js",
-    "src/adapters/runtime/codex/model-catalog.js",
-    "src/adapters/runtime/codex/protocol-leak-monitor.js",
-    "src/adapters/runtime/codex/rpc-client.js",
-    "src/adapters/runtime/codex/session-store.js",
-    "src/core/runtime-watchdog-lifecycle.js",
-    "src/core/stream-delivery.js",
-    "src/core/stream-delivery/*.js",
-    "src/core/thread-state-store.js",
-    "src/core/system-message-queue-store.js",
-    "src/core/timeline-screenshot-queue-store.js",
-    "src/core/cli-args.js"
+    "src/**/*"
+  ],
+  "exclude": [
+    "dist",
+    "tests",
+    "node_modules"
   ]
 }

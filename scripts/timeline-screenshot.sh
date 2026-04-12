@@ -12,4 +12,4 @@ for arg in "$@"; do
 done
 
 cd "$ROOT"
-exec node ./bin/codeksei.js timeline screenshot "${ARGS[@]}"
+exec node ./dist/src/index.js timeline screenshot "${ARGS[@]}"

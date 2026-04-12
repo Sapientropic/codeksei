@@ -45,11 +45,11 @@ $errorLogFile = if ($Mode -eq "Supervisor") {
 
 $node = (Get-Command node -ErrorAction Stop).Source
 $scriptPath = if ($Mode -eq "Start") {
-  Join-Path $repoRoot "scripts\shared-start.js"
+  Join-Path $repoRoot "dist\src\shared\shared-start.js"
 } elseif ($Mode -eq "Supervisor") {
-  Join-Path $repoRoot "scripts\shared-supervisor.js"
+  Join-Path $repoRoot "dist\src\shared\shared-supervisor.js"
 } else {
-  Join-Path $repoRoot "scripts\shared-watchdog.js"
+  Join-Path $repoRoot "dist\src\shared\shared-watchdog.js"
 }
 
 $nodeArgs = @($scriptPath)
