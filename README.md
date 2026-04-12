@@ -153,7 +153,7 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - `CODEKSEI_WEIXIN_REPLY_MODE=settled` 仍表示“等整轮收口后再发”：只发送最新的可见最终回复
 - `CODEKSEI_USER_NAME` 决定对话里怎么称呼你，不参与消息路由
 - `CODEKSEI_ALLOWED_USER_IDS` 必须填写微信桥实际观测到的 sender id；最简单的做法是先跑 `npm run accounts`
-- 第一次运行任意命令时，会在状态目录生成 `weixin-instructions.md`
+- 微信 persona / continuity instructions 默认来自仓库里的 `templates/weixin-instructions.md`，如需本地覆盖可在状态目录放 `weixin-instructions.local.md`
 - 如果你在共享模式下使用多 workspace，建议启动前就设置好 `CODEKSEI_WORKSPACE_ROOT`
 - `CODEKSEI_TIMEZONE` 可选；若显式设置，它会统一驱动 reminder / diary / review / timeline 的本地时间解释
 - 如果不设 `CODEKSEI_TIMEZONE`，Codeksei 会优先沿用 timeline state 里已声明的非 legacy timezone；否则回退到系统时区
@@ -269,7 +269,8 @@ npm run help
 - `accounts/`
 - `sessions.json`
 - `sync-buffers/`
-- `weixin-instructions.md`
+- `weixin-instructions.local.md`
+- `weixin-operations.local.md`
 - `workspace-bootstrap.json`
 - `reminder-queue.json`
 - `system-message-queue.json`
@@ -282,6 +283,8 @@ npm run help
 连续性关键的状态文件目前包括 `sessions.json`、`reminder-queue.json`、`system-message-queue.json`、`timeline-screenshot-queue.json`。这几类文件现在会走原子写；如果 JSON 可读但关键 schema 已坏、或者文件本身损坏，运行时会把原文件隔离成 `*.corrupt-<timestamp>.json` 再回到空默认状态继续启动。
 
 如果你单独设置了 `CODEKSEI_DIARY_DIR` 或 `CODEKSEI_TIMELINE_STATE_DIR`，真正的数据会写到你指定的位置，状态目录只保留运行态文件。
+
+默认 persona / operations 模板继续跟仓库一起发布在 `templates/`；状态目录里的 `*.local.md` 只负责你本机的 overlay，不再充当唯一真相源。
 
 这个仓库和 npm 包默认只放代码、脚本、模板与文档，不应包含你的账号、会话、日志、个人 `.env` 或本地业务数据。
 

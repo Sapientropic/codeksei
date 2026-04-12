@@ -1,24 +1,31 @@
 const { spawn } = require("child_process");
-const os = require("os");
 const WebSocket = require("ws");
 const { PRIMARY_RPC_CLIENT_INFO } = require("../../../core/branding");
 const { readPrefixedEnv } = require("../../../core/branding");
+const { buildSpawnInvocation } = require("../../../core/codex-spawn");
 
-const IS_WINDOWS = os.platform() === "win32";
 const DEFAULT_CODEX_COMMAND = "codex";
-const WINDOWS_EXECUTABLE_SUFFIX_RE = /\.(cmd|exe|bat)$/i;
 const CODEX_CLIENT_INFO = PRIMARY_RPC_CLIENT_INFO;
+const TRANSPORT_STDERR_MAX_CHARS = 4000;
 
 class CodexRpcClient {
-  constructor({ endpoint = "", env = process.env, codexCommand = "", extraWritableRoots = [] }) {
+  constructor({
+    endpoint = "",
+    env = process.env,
+    codexCommand = "",
+    extraWritableRoots = [],
+    spawnImpl = spawn,
+  }) {
     this.endpoint = endpoint;
     this.env = env;
     this.codexCommand = codexCommand || resolveDefaultCodexCommand(env);
     this.extraWritableRoots = normalizeWritableRoots(extraWritableRoots);
+    this.spawnImpl = spawnImpl;
     this.mode = endpoint ? "websocket" : "spawn";
     this.socket = null;
     this.child = null;
     this.stdoutBuffer = "";
+    this.stderrBuffer = "";
     this.pending = new Map();
     this.isReady = false;
     this.messageListeners = new Set();
@@ -36,37 +43,24 @@ class CodexRpcClient {
   }
 
   async connectSpawn() {
-    const commandCandidates = buildCodexCommandCandidates(this.codexCommand);
+    const spawnSpec = buildSpawnInvocation(this.codexCommand, ["app-server"]);
     let child = null;
-    let lastError = null;
-
-    for (const command of commandCandidates) {
-      try {
-        const spawnSpec = buildSpawnSpec(command);
-        child = spawn(spawnSpec.command, spawnSpec.args, {
-          env: { ...this.env },
-          stdio: ["pipe", "pipe", "pipe"],
-          shell: false,
-          windowsHide: true,
-        });
-        break;
-      } catch (error) {
-        lastError = error;
-        if (error?.code !== "ENOENT" && error?.code !== "EINVAL") {
-          throw error;
-        }
-      }
+    try {
+      child = this.spawnImpl(spawnSpec.command, spawnSpec.args, {
+        env: { ...this.env },
+        stdio: ["pipe", "pipe", "pipe"],
+        shell: false,
+        windowsHide: true,
+      });
+    } catch (error) {
+      throw createSpawnFailureError(spawnSpec, error);
     }
 
-    if (!child) {
-      const attempted = commandCandidates.join(", ");
-      const detail = lastError?.message ? `: ${lastError.message}` : "";
-      throw new Error(`Unable to spawn Codex app-server. Tried ${attempted}${detail}.`);
-    }
-
+    this.stdoutBuffer = "";
+    this.stderrBuffer = "";
     this.child = child;
-    child.on("error", () => {
-      this.isReady = false;
+    child.on("error", (error) => {
+      this.handleTransportClosed(buildSpawnRuntimeErrorMessage(error, this.stderrBuffer), { child });
     });
     child.stdout.on("data", (chunk) => {
       this.stdoutBuffer += chunk.toString("utf8");
@@ -79,9 +73,27 @@ class CodexRpcClient {
         }
       }
     });
-    child.on("close", () => {
-      this.isReady = false;
+    child.stderr.on("data", (chunk) => {
+      this.stderrBuffer = appendTransportOutput(this.stderrBuffer, chunk.toString("utf8"));
     });
+    if (child.stdin && typeof child.stdin.on === "function") {
+      child.stdin.on("error", (error) => {
+        this.handleTransportClosed(buildSpawnRuntimeErrorMessage(error, this.stderrBuffer), { child });
+      });
+    }
+    child.on("close", (code, signal) => {
+      this.handleTransportClosed(buildSpawnCloseMessage({
+        code,
+        signal,
+        stderrBuffer: this.stderrBuffer,
+      }), { child });
+    });
+
+    try {
+      await waitForSpawnReady(child);
+    } catch (error) {
+      throw createSpawnFailureError(spawnSpec, error);
+    }
   }
 
   async connectWebSocket() {
@@ -106,11 +118,13 @@ class CodexRpcClient {
       });
       socket.on("error", (error) => {
         if (!settled) {
-          this.socket = null;
+          if (this.socket === socket) {
+            this.socket = null;
+          }
           reject(error);
           return;
         }
-        this.handleTransportClosed("Codex websocket errored");
+        this.handleTransportClosed("Codex websocket errored", { socket });
       });
       socket.on("message", (chunk) => {
         const message = typeof chunk === "string" ? chunk : chunk.toString("utf8");
@@ -120,11 +134,13 @@ class CodexRpcClient {
       });
       socket.on("close", () => {
         if (!settled) {
-          this.socket = null;
+          if (this.socket === socket) {
+            this.socket = null;
+          }
           reject(new Error("Codex websocket closed before connection completed"));
           return;
         }
-        this.handleTransportClosed("Codex websocket closed");
+        this.handleTransportClosed("Codex websocket closed", { socket });
       });
     });
   }
@@ -208,23 +224,27 @@ class CodexRpcClient {
 
   async close() {
     this.rejectPending(new Error("Codex RPC client closed"));
-    if (this.socket) {
-      try {
-        this.socket.close();
-      } catch {
-        // best effort
-      }
-      this.socket = null;
-    }
-    if (this.child) {
-      try {
-        this.child.kill();
-      } catch {
-        // best effort
-      }
-      this.child = null;
-    }
+    const socket = this.socket;
+    const child = this.child;
+    this.socket = null;
+    this.child = null;
+    this.stdoutBuffer = "";
+    this.stderrBuffer = "";
     this.isReady = false;
+    if (socket) {
+      try {
+        socket.close();
+      } catch {
+        // best effort
+      }
+    }
+    if (child) {
+      try {
+        child.kill();
+      } catch {
+        // best effort
+      }
+    }
   }
 
   async sendRequest(method, params) {
@@ -256,16 +276,34 @@ class CodexRpcClient {
       this.socket.send(payload);
       return;
     }
-    if (!this.child || !this.child.stdin.writable) {
+    const child = this.child;
+    if (!child || !child.stdin || !child.stdin.writable) {
+      this.handleTransportClosed(buildSpawnStdinClosedMessage(this.stderrBuffer), { child });
       throw new Error("Codex process stdin is not writable");
     }
-    this.child.stdin.write(`${payload}\n`);
+    try {
+      child.stdin.write(`${payload}\n`);
+    } catch (error) {
+      this.handleTransportClosed(buildSpawnRuntimeErrorMessage(error, this.stderrBuffer), { child });
+      throw error;
+    }
   }
 
-  handleTransportClosed(message) {
+  handleTransportClosed(message, { socket = null, child = null } = {}) {
+    if (socket && this.socket !== socket) {
+      return;
+    }
+    if (child && this.child !== child) {
+      return;
+    }
+    if (!socket && !child && !this.socket && !this.child) {
+      return;
+    }
     this.socket = null;
     this.child = null;
     this.isReady = false;
+    this.stdoutBuffer = "";
+    this.stderrBuffer = "";
     this.rejectPending(new Error(message));
   }
 
@@ -303,37 +341,6 @@ class CodexRpcClient {
 
 function resolveDefaultCodexCommand(env = process.env) {
   return normalizeNonEmptyString(readPrefixedEnv(env, "CODEX_COMMAND")) || DEFAULT_CODEX_COMMAND;
-}
-
-function buildCodexCommandCandidates(configuredCommand) {
-  const explicit = normalizeNonEmptyString(configuredCommand);
-  if (explicit) {
-    if (!IS_WINDOWS) {
-      return [explicit];
-    }
-    const candidates = [explicit];
-    if (!WINDOWS_EXECUTABLE_SUFFIX_RE.test(explicit)) {
-      candidates.push(`${explicit}.cmd`, `${explicit}.exe`, `${explicit}.bat`);
-    }
-    return [...new Set(candidates)];
-  }
-  if (IS_WINDOWS) {
-    return [DEFAULT_CODEX_COMMAND, `${DEFAULT_CODEX_COMMAND}.cmd`, `${DEFAULT_CODEX_COMMAND}.exe`, `${DEFAULT_CODEX_COMMAND}.bat`];
-  }
-  return [DEFAULT_CODEX_COMMAND];
-}
-
-function buildSpawnSpec(command) {
-  if (IS_WINDOWS) {
-    return {
-      command: "cmd.exe",
-      args: ["/c", command, "app-server"],
-    };
-  }
-  return {
-    command,
-    args: ["app-server"],
-  };
 }
 
 function normalizeNonEmptyString(value) {
@@ -426,6 +433,86 @@ function normalizeWritableRoots(values) {
     roots.push(normalized);
   }
   return roots;
+}
+
+function waitForSpawnReady(child) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => {
+      if (typeof child.off === "function") {
+        child.off("spawn", handleSpawn);
+        child.off("error", handleError);
+      } else {
+        child.removeListener("spawn", handleSpawn);
+        child.removeListener("error", handleError);
+      }
+    };
+    const handleSpawn = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      resolve();
+    };
+    const handleError = (error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      reject(error);
+    };
+    child.once("spawn", handleSpawn);
+    child.once("error", handleError);
+  });
+}
+
+function createSpawnFailureError(spawnSpec, error) {
+  const attempted = [spawnSpec.command, ...(spawnSpec.args || [])].filter(Boolean).join(" ");
+  const detail = error?.message ? `: ${error.message}` : "";
+  return new Error(`Unable to spawn Codex app-server via ${attempted}${detail}.`);
+}
+
+function buildSpawnRuntimeErrorMessage(error, stderrBuffer) {
+  const detail = error?.message ? `: ${error.message}` : "";
+  return appendTransportDiagnostic(`Codex process transport errored${detail}`, stderrBuffer);
+}
+
+function buildSpawnCloseMessage({ code, signal, stderrBuffer }) {
+  const codeLabel = code == null ? "unknown" : String(code);
+  const signalLabel = signal ? ` signal=${signal}` : "";
+  return appendTransportDiagnostic(`Codex process closed (code=${codeLabel}${signalLabel})`, stderrBuffer);
+}
+
+function buildSpawnStdinClosedMessage(stderrBuffer) {
+  return appendTransportDiagnostic("Codex process stdin is not writable", stderrBuffer);
+}
+
+function appendTransportDiagnostic(message, stderrBuffer) {
+  const summary = summarizeTransportStderr(stderrBuffer);
+  return summary ? `${message}; stderr tail: ${summary}` : message;
+}
+
+function summarizeTransportStderr(stderrBuffer) {
+  const tail = String(stderrBuffer || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(-3)
+    .join(" | ");
+  if (!tail) {
+    return "";
+  }
+  return tail.length > 240 ? `${tail.slice(0, 237)}...` : tail;
+}
+
+function appendTransportOutput(buffer, chunk) {
+  const next = `${buffer}${chunk}`;
+  if (next.length <= TRANSPORT_STDERR_MAX_CHARS) {
+    return next;
+  }
+  return next.slice(-TRANSPORT_STDERR_MAX_CHARS);
 }
 
 module.exports = { CodexRpcClient };

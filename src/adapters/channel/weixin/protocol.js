@@ -53,6 +53,7 @@ function getStableWechatUin() {
 }
 
 function buildJsonHeaders({ body, token = "", routeTag = "", clientVersion = DEFAULT_PROTOCOL_CLIENT_VERSION }) {
+  /** @type {Record<string, string>} */
   const headers = {
     "Content-Type": "application/json",
     AuthorizationType: "ilink_bot_token",

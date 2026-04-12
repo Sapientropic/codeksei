@@ -472,7 +472,7 @@ function startOfIsoWeek(date) {
 function isoWeekNumber(date) {
   const thursday = addDays(startOfIsoWeek(date), 3);
   const firstThursday = addDays(startOfIsoWeek(createUtcDate(thursday.getUTCFullYear(), 1, 4)), 3);
-  return Math.round((thursday - firstThursday) / 604800000) + 1;
+  return Math.round((thursday.getTime() - firstThursday.getTime()) / 604800000) + 1;
 }
 
 function formatUtcDate(date) {

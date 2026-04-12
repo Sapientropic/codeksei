@@ -147,7 +147,7 @@ Notes:
 - Legacy `CYBERBOSS_*` variables still work, but new setups should use `CODEKSEI_*`
 - `CODEKSEI_USER_NAME` is a display/persona field for chat, not a routing id
 - `CODEKSEI_ALLOWED_USER_IDS` must use the exact sender ids observed by the bridge; the easiest way to find them is `npm run accounts`
-- The first successful run will generate `weixin-instructions.md` in the state directory
+- WeChat persona / continuity instructions now default to the repo template at `templates/weixin-instructions.md`; use `weixin-instructions.local.md` in the state directory only when you need a local overlay
 - If you use multiple workspaces in shared mode, set `CODEKSEI_WORKSPACE_ROOT` before starting
 - `CODEKSEI_TIMEZONE` is optional; when set, it becomes the single local-time contract for reminder / diary / review / timeline flows
 - If `CODEKSEI_TIMEZONE` is unset, Codeksei first reuses any non-legacy timezone already declared by the timeline state; otherwise it falls back to the system timezone
@@ -261,7 +261,8 @@ Typical runtime contents:
 - `accounts/`
 - `sessions.json`
 - `sync-buffers/`
-- `weixin-instructions.md`
+- `weixin-instructions.local.md`
+- `weixin-operations.local.md`
 - `workspace-bootstrap.json`
 - `reminder-queue.json`
 - `system-message-queue.json`
@@ -274,6 +275,8 @@ Typical runtime contents:
 The continuity-critical state files currently covered are `sessions.json`, `reminder-queue.json`, `system-message-queue.json`, and `timeline-screenshot-queue.json`. Those files now use atomic writes, and if JSON parsing or the critical top-level schema is invalid, the original file is moved aside as `*.corrupt-<timestamp>.json` before startup falls back to an empty default state.
 
 If you set `CODEKSEI_DIARY_DIR` or `CODEKSEI_TIMELINE_STATE_DIR`, business data is stored there and the state directory keeps runtime files only.
+
+The default persona / operations templates still ship from the repository under `templates/`; `*.local.md` files in the state directory are overlays for your own machine, not the only source of truth.
 
 The repository and npm package are meant to contain code, scripts, templates, and docs only. Your accounts, sessions, logs, personal `.env`, and local business data should stay outside version control.
 

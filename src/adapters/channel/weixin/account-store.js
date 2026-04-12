@@ -45,17 +45,17 @@ function saveWeixinAccount(config, rawAccountId, update) {
   ensureAccountsDir(config);
   const accountId = normalizeAccountId(rawAccountId);
   const filePath = resolveAccountPath(config, accountId);
-  const existing = loadWeixinAccount(config, accountId) || {};
+  const existing = loadWeixinAccount(config, accountId);
   const hasRouteTag = Object.prototype.hasOwnProperty.call(update || {}, "routeTag");
   const next = {
     accountId,
-    rawAccountId: String(rawAccountId || "").trim() || existing.rawAccountId || "",
-    token: typeof update.token === "string" && update.token.trim() ? update.token.trim() : existing.token || "",
-    baseUrl: typeof update.baseUrl === "string" && update.baseUrl.trim() ? update.baseUrl.trim() : existing.baseUrl || config.weixinBaseUrl,
-    userId: typeof update.userId === "string" ? update.userId.trim() : existing.userId || "",
+    rawAccountId: String(rawAccountId || "").trim() || existing?.rawAccountId || "",
+    token: typeof update.token === "string" && update.token.trim() ? update.token.trim() : existing?.token || "",
+    baseUrl: typeof update.baseUrl === "string" && update.baseUrl.trim() ? update.baseUrl.trim() : existing?.baseUrl || config.weixinBaseUrl,
+    userId: typeof update.userId === "string" ? update.userId.trim() : existing?.userId || "",
     routeTag: hasRouteTag
       ? normalizeRouteTag(update.routeTag)
-      : normalizeRouteTag(existing.routeTag || config.weixinRouteTag),
+      : normalizeRouteTag(existing?.routeTag || config.weixinRouteTag),
     savedAt: new Date().toISOString(),
   };
   writeManagedJsonStateFile(filePath, next, { mode: 0o600 });

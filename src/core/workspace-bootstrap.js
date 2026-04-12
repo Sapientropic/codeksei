@@ -54,7 +54,7 @@ function buildWorkspaceContinuityInstructions(workspaceRoot, config = {}) {
   const recentFiles = collectRecentFiles(normalizedWorkspaceRoot, profile.recentFiles);
   const conditionalFiles = collectExistingFiles(normalizedWorkspaceRoot, profile.conditionalFiles);
 
-  const primarySequence = primaryFiles.concat(recentFiles);
+  const primarySequence = [...primaryFiles, ...recentFiles];
   if (!primarySequence.length && !conditionalFiles.length) {
     return "";
   }
@@ -228,6 +228,7 @@ function collectRecentFiles(workspaceRoot, specs) {
       files.push({
         absolutePath: normalizeDisplayPath(path.join(directoryPath, entryName)),
         role: spec.role,
+        when: "",
       });
     }
   }

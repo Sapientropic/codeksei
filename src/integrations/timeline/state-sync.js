@@ -66,7 +66,10 @@ function shouldSyncTimezone({ currentTimezone, desiredTimezone, config = {} }) {
   // from the old hard-coded default so we do not silently rewrite an already
   // customized timeline timezone just because this machine has a different OS
   // setting today.
-  if (config.timezoneExplicit) {
+  const timezoneExplicit = Boolean(
+    config && typeof config === "object" && "timezoneExplicit" in config && config.timezoneExplicit
+  );
+  if (timezoneExplicit) {
     return true;
   }
 
