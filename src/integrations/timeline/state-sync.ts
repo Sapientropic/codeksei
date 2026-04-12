@@ -1,12 +1,13 @@
-const fs = require("fs");
-const { writeForeignJsonDocument } = require("../../state/json-state");
+import * as fs from "node:fs";
 
-const {
+import { writeForeignJsonDocument } from "../../state/json-state";
+
+import {
   LEGACY_TIMELINE_TIMEZONE,
   formatDateInTimezone,
   loadTimelineStateSnapshot,
   normalizeTimezone,
-} = require("../../core/timezone");
+} from "../../core/timezone";
 
 function ensureTimelineStateTimezone(config: any = {}) {
   const desiredTimezone = normalizeTimezone(config.timezone);
@@ -228,8 +229,6 @@ function normalizeText(value: any) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-module.exports = {
+export {
   ensureTimelineStateTimezone,
 };
-
-export {};

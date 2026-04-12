@@ -1,9 +1,9 @@
 // @ts-check
 
-const {
+import {
   LEGACY_TIMELINE_TIMEZONE,
   getCurrentDateStringInTimezone,
-} = require("../core/timezone");
+} from "../core/timezone";
 
 function buildReviewDraft(profile: any, window: any, diaryEntries: any, nightlyEntries: any[] = []) {
   if (profile.kind === "nightly") {
@@ -498,10 +498,8 @@ function normalizeText(value: any) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-module.exports = {
+export {
   buildReviewDraft,
   mergeReviewDraft,
   resolveReviewWindow,
 };
-
-export {};

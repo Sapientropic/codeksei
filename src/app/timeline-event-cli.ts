@@ -1,11 +1,33 @@
-const crypto = require("crypto");
-const { getCommandArgsSchema } = require("../contracts/command-args");
-const { parseCliArgs } = require("../core/cli-args");
-const { buildTerminalLeafHelp } = require("../core/command-registry");
-const {
+import * as crypto from "node:crypto";
+
+import { getCommandArgsSchema } from "../contracts/command-args";
+import { buildTerminalLeafHelp } from "../core/command-registry";
+import {
   LEGACY_TIMELINE_TIMEZONE,
   coerceLocalDateTimeToIso,
-} = require("../core/timezone");
+} from "../core/timezone";
+import * as cliArgsModule from "../core/cli-args";
+
+interface TimelineEventOptions extends Record<string, unknown> {
+  help?: boolean;
+  useStdin?: boolean;
+  finalize?: boolean;
+  date?: unknown;
+  start?: unknown;
+  end?: unknown;
+  title?: unknown;
+  note?: unknown;
+  categoryId?: unknown;
+  subcategoryId?: unknown;
+  eventNodeId?: unknown;
+  mode?: unknown;
+  eventId?: unknown;
+  tags?: unknown[];
+}
+
+const { parseCliArgs } = cliArgsModule as {
+  parseCliArgs(args: string[], schema: unknown): TimelineEventOptions;
+};
 
 async function runTimelineEventCommand(timelineIntegration: any, configOrArgs: any = {}, argsMaybe: any[] = []) {
   const config = Array.isArray(configOrArgs) ? {} : (configOrArgs || {});
@@ -21,7 +43,7 @@ async function runTimelineEventCommand(timelineIntegration: any, configOrArgs: a
   await timelineIntegration.runSubcommand("write", writeArgs);
 }
 
-function parseTimelineEventArgs(args: any) {
+function parseTimelineEventArgs(args: string[]): TimelineEventOptions {
   return parseCliArgs(args, getCommandArgsSchema("timelineEvent"));
 }
 
@@ -155,7 +177,7 @@ function normalizeText(value: any) {
   return String(value || "").replace(/\r\n/g, "\n").trim();
 }
 
-module.exports = {
+export {
   runTimelineEventCommand,
   parseTimelineEventArgs,
   buildTimelineEventWriteArgs,
@@ -165,5 +187,3 @@ module.exports = {
 function normalizeTimezoneConfigValue(value: any) {
   return typeof value === "string" ? value.trim() : "";
 }
-
-export {};

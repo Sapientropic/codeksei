@@ -1,11 +1,11 @@
-const { CodexRpcClient } = require("../adapters/runtime/codex/rpc-client");
-const { mapCodexMessageToRuntimeEvent } = require("../adapters/runtime/codex/events");
-const {
+import { mapCodexMessageToRuntimeEvent } from "../adapters/runtime/codex/events";
+import { CodexRpcClient } from "../adapters/runtime/codex/rpc-client";
+import {
   extractThreadId,
   extractThreadIdFromParams,
-} = require("../adapters/runtime/codex/message-utils");
-const { RUNTIME_EVENT_TYPES } = require("../contracts/runtime-events");
-const { resolveCodexWorkspaceRoot } = require("../workspace/workspace-alias");
+} from "../adapters/runtime/codex/message-utils";
+import { RUNTIME_EVENT_TYPES } from "../contracts/runtime-events";
+import { resolveCodexWorkspaceRoot } from "../workspace/workspace-alias";
 
 const DEFAULT_TIMEOUT_MS = 120_000;
 
@@ -78,7 +78,9 @@ async function runCodexSemanticReview(config: any = {}, input: any = {}) {
     await client.connect();
     await client.initialize();
     const response = await client.startThread({ cwd: workspaceRoot });
-    const threadId = extractThreadId(response);
+    const threadId = extractThreadId(
+      response as Parameters<typeof extractThreadId>[0]
+    );
     if (!threadId) {
       throw new Error("semantic review did not return a thread id");
     }
@@ -247,7 +249,9 @@ function waitForSemanticTurnCompletion(client: any, threadId: any, timeoutMs: an
       // Keep semantic review on the same normalized runtime event contract as
       // the main chat/runtime path. Otherwise upstream RPC drift gets fixed in
       // one place and silently reintroduced here.
-      const runtimeEvent = mapCodexMessageToRuntimeEvent(message);
+      const runtimeEvent = mapCodexMessageToRuntimeEvent(
+        message as Parameters<typeof mapCodexMessageToRuntimeEvent>[0]
+      );
       const messageThreadId = normalizeText(runtimeEvent?.payload?.threadId)
         || extractThreadIdFromParams(params);
       if (messageThreadId && messageThreadId !== threadId) {
@@ -521,11 +525,11 @@ function formatErrorMessage(error: any) {
   return error instanceof Error ? error.message : String(error || "unknown error");
 }
 
-module.exports = {
-  maybeGenerateSemanticReview,
-  __testing: {
-    waitForSemanticTurnCompletion,
-  },
+const __testing = {
+  waitForSemanticTurnCompletion,
 };
 
-export {};
+export {
+  maybeGenerateSemanticReview,
+  __testing,
+};

@@ -1,5 +1,12 @@
-const os = require("os");
-const path = require("path");
+import * as os from "node:os";
+import * as path from "node:path";
+import {
+  resolveCrossPlatformPathFromRoot,
+  resolvePackageRoot,
+} from "./path-utils";
+import { resolveTimezoneConfig } from "./timezone";
+import * as brandingModule from "./branding";
+
 const {
   readPrefixedBoolEnv,
   readPrefixedEnv,
@@ -7,12 +14,14 @@ const {
   readPrefixedListEnv,
   resolveAppHome,
   resolveStateDir,
-} = require("./branding");
-const {
-  resolveCrossPlatformPathFromRoot,
-  resolvePackageRoot,
-} = require("./path-utils");
-const { resolveTimezoneConfig } = require("./timezone");
+} = brandingModule as {
+  readPrefixedBoolEnv(env: NodeJS.ProcessEnv, suffix: string): boolean;
+  readPrefixedEnv(env: NodeJS.ProcessEnv, suffix: string): string;
+  readPrefixedIntEnv(env: NodeJS.ProcessEnv, suffix: string): number;
+  readPrefixedListEnv(env: NodeJS.ProcessEnv, suffix: string): string[];
+  resolveAppHome(args: { env: NodeJS.ProcessEnv; fallbackRoot?: string }): string;
+  resolveStateDir(args?: { env?: NodeJS.ProcessEnv }): string;
+};
 
 function readConfig() {
   const packageRoot = resolvePackageRoot(__dirname);
@@ -93,6 +102,4 @@ function normalizeWeixinReplyMode(value: any) {
   return String(value || "").trim().toLowerCase() === "settled" ? "settled" : "stream";
 }
 
-module.exports = { readConfig };
-
-export {};
+export { readConfig };

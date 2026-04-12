@@ -1,17 +1,18 @@
-const fs = require("fs");
-const path = require("path");
-const { PACKAGE_NAME } = require("../core/branding");
-const { getCommandArgsSchema } = require("../contracts/command-args");
-const { parseCliArgs } = require("../core/cli-args");
-const { writeForeignTextDocument } = require("../state/json-state");
-const {
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+import { getCommandArgsSchema } from "../contracts/command-args";
+import {
   LEGACY_TIMELINE_TIMEZONE,
   formatDateInTimezone,
   formatDateTimeInTimezone,
   formatTimeInTimezone,
-} = require("../core/timezone");
+} from "../core/timezone";
+import { writeForeignTextDocument } from "../state/json-state";
+import * as brandingModule from "../core/branding";
+import * as cliArgsModule from "../core/cli-args";
 
-const DEFAULT_SECTION = "supplement";
+const DEFAULT_SECTION = "supplement" as const;
 const SECTION_HEADINGS = Object.freeze({
   todo: "Todo",
   timeline: "时间线事实",
@@ -26,7 +27,92 @@ const TODO_STATE_MARKERS = Object.freeze({
 const TODO_LINE_RE = /^- \[( |x|X)\] (.*)$/u;
 const TODO_START_MARKER_RE = /\s*<!--\s*codeksei-todo:start=(\d{2}:\d{2})\s*-->\s*$/u;
 
-async function runDiaryWriteCommand(config: any, args: any[] = []) {
+type DiarySection = keyof typeof SECTION_HEADINGS;
+type TodoState = keyof typeof TODO_STATE_MARKERS;
+type DiaryEntryTodoState = TodoState | "";
+type TodoTimelineResolutionMode = "explicit" | "none" | "range_from_todo" | "point_in_time";
+
+interface DiaryWriteConfig extends Record<string, unknown> {
+  diaryDir?: string;
+  timezone?: unknown;
+}
+
+interface DiaryWriteOptions extends Record<string, unknown> {
+  text?: unknown;
+  title?: unknown;
+  date?: string;
+  time?: string;
+  section?: unknown;
+  state?: unknown;
+  timelineText?: unknown;
+  useStdin?: boolean;
+}
+
+interface BuildDiaryEntryArgs {
+  timeString: string;
+  title?: string;
+  body: string;
+}
+
+interface BuildDiaryEntryPayloadArgs {
+  section?: unknown;
+  timeString: string;
+  title?: unknown;
+  body?: unknown;
+  todoState?: unknown;
+}
+
+interface BuildDiaryWriteEntryPayloadsArgs extends BuildDiaryEntryPayloadArgs {
+  existingContent?: string;
+  timelineText?: unknown;
+}
+
+interface NormalizeEntryPayloadInput {
+  section?: unknown;
+  entry?: unknown;
+  text?: unknown;
+  title?: unknown;
+  body?: unknown;
+  todoState?: unknown;
+  todoStartedAt?: unknown;
+}
+
+interface NormalizedDiaryEntryPayload {
+  section: DiarySection;
+  entry: string;
+  text: string;
+  title: string;
+  body: string;
+  todoState: DiaryEntryTodoState;
+  todoStartedAt: string;
+}
+
+interface SectionRange {
+  sectionStart: number;
+  contentStart: number;
+  end: number;
+}
+
+interface TodoLineParseResult {
+  todoState: TodoState;
+  text: string;
+  todoStartedAt: string;
+}
+
+interface TodoTimelineResolution {
+  text: string;
+  mode: TodoTimelineResolutionMode;
+}
+
+const { PACKAGE_NAME } = brandingModule as {
+  PACKAGE_NAME: string;
+};
+
+const { parseCliArgs } = cliArgsModule as {
+  parseCliArgs(args: string[], schema: unknown): DiaryWriteOptions;
+};
+
+async function runDiaryWriteCommand(config: DiaryWriteConfig, args: string[] = []) {
   const options = parseArgs(args);
   const body = await resolveBody(options);
   if (!body) {
@@ -35,11 +121,15 @@ async function runDiaryWriteCommand(config: any, args: any[] = []) {
 
   const now = new Date();
   const timezone = config?.timezone || LEGACY_TIMELINE_TIMEZONE;
+  const diaryDir = normalizeLineItem(config.diaryDir);
+  if (!diaryDir) {
+    throw new Error("缺少有效 diaryDir，无法写入日记");
+  }
   const dateString = options.date || formatDate(now, timezone);
   const timeString = options.time || formatTime(now, timezone);
   const section = normalizeSection(options.section);
-  const filePath = path.join(config.diaryDir, `${dateString}.md`);
-  fs.mkdirSync(config.diaryDir, { recursive: true });
+  const filePath = path.join(diaryDir, `${dateString}.md`);
+  fs.mkdirSync(diaryDir, { recursive: true });
   ensureDiaryFile(filePath, now, timezone);
   const current = fs.readFileSync(filePath, "utf8");
   const timelineResolution = resolveTodoDoneTimelineText({
@@ -74,18 +164,18 @@ async function runDiaryWriteCommand(config: any, args: any[] = []) {
     timelineText: options.timelineText,
   });
   const next = entryPayloads.reduce(
-    (draft: any, payload: any) => insertDiaryEntry(draft, payload, dateString),
+    (draft, payload) => insertDiaryEntry(draft, payload, dateString),
     current
   );
   writeForeignTextDocument(filePath, next, { encoding: "utf8" });
   console.log(`diary written: ${filePath}`);
 }
 
-function parseArgs(args: any) {
-  return parseCliArgs(args, getCommandArgsSchema("diaryWrite"));
+function parseArgs(args: string[]): DiaryWriteOptions {
+  return parseCliArgs(args, getCommandArgsSchema("diaryWrite")) as DiaryWriteOptions;
 }
 
-function readOptionValue(args: any, index: any, optionName: any) {
+function readOptionValue(args: string[], index: number, optionName: string): string {
   const next = args[index + 1];
   if (typeof next !== "string" || next.startsWith("--")) {
     throw new Error(`${optionName} 需要一个值`);
@@ -93,7 +183,7 @@ function readOptionValue(args: any, index: any, optionName: any) {
   return String(next);
 }
 
-async function resolveBody(options: any) {
+async function resolveBody(options: DiaryWriteOptions): Promise<string> {
   const inlineText = normalizeBody(options.text);
   if (inlineText) {
     return inlineText;
@@ -104,11 +194,11 @@ async function resolveBody(options: any) {
   return normalizeBody(await readStdin());
 }
 
-function readStdin() {
-  return new Promise((resolve: any, reject: any) => {
+function readStdin(): Promise<string> {
+  return new Promise((resolve, reject) => {
     let buffer = "";
     process.stdin.setEncoding("utf8");
-    process.stdin.on("data", (chunk: any) => {
+    process.stdin.on("data", (chunk: string) => {
       buffer += chunk;
     });
     process.stdin.on("end", () => resolve(buffer));
@@ -116,12 +206,18 @@ function readStdin() {
   });
 }
 
-function buildDiaryEntry({ timeString, title, body }: any) {
+function buildDiaryEntry({ timeString, title, body }: BuildDiaryEntryArgs): string {
   const heading = title ? `### ${timeString} ${title.trim()}` : `### ${timeString}`;
   return `${heading}\n\n${body}`;
 }
 
-function buildDiaryEntryPayload({ section = DEFAULT_SECTION, timeString, title = "", body = "", todoState = "open" }: any) {
+function buildDiaryEntryPayload({
+  section = DEFAULT_SECTION,
+  timeString,
+  title = "",
+  body = "",
+  todoState = "open",
+}: BuildDiaryEntryPayloadArgs): NormalizedDiaryEntryPayload {
   const normalizedSection = normalizeSection(section);
   const normalizedTitle = normalizeLineItem(title);
   const normalizedBody = normalizeBody(body);
@@ -137,8 +233,11 @@ function buildDiaryEntryPayload({ section = DEFAULT_SECTION, timeString, title =
         title: normalizedTitle,
         body: normalizedBody,
       }),
+      text: "",
       title: normalizedTitle,
       body: normalizedBody,
+      todoState: "",
+      todoStartedAt: "",
     };
   }
 
@@ -158,6 +257,8 @@ function buildDiaryEntryPayload({ section = DEFAULT_SECTION, timeString, title =
         todoStartedAt,
       }),
       text: lineText,
+      title: "",
+      body: normalizedBody,
       todoState: normalizedState,
       todoStartedAt,
     };
@@ -167,6 +268,10 @@ function buildDiaryEntryPayload({ section = DEFAULT_SECTION, timeString, title =
     section: normalizedSection,
     entry: `- ${lineText}`,
     text: lineText,
+    title: "",
+    body: normalizedBody,
+    todoState: "",
+    todoStartedAt: "",
   };
 }
 
@@ -178,7 +283,7 @@ function buildDiaryWriteEntryPayloads({
   body,
   todoState = "",
   timelineText = "",
-}: any) {
+}: BuildDiaryWriteEntryPayloadsArgs): NormalizedDiaryEntryPayload[] {
   const normalizedSection = normalizeSection(section);
   const normalizedTodoState = normalizeTodoState(todoState, normalizedSection);
   const normalizedTimelineText = resolveTodoDoneTimelineText({
@@ -216,7 +321,15 @@ function buildDiaryWriteEntryPayloads({
   return entries;
 }
 
-function shouldSynthesizeTodoDoneTimelineText({ section = DEFAULT_SECTION, todoState = "open", timelineText = "" }: any) {
+function shouldSynthesizeTodoDoneTimelineText({
+  section = DEFAULT_SECTION,
+  todoState = "open",
+  timelineText = "",
+}: {
+  section?: unknown;
+  todoState?: unknown;
+  timelineText?: unknown;
+}): boolean {
   const normalizedSection = normalizeSection(section);
   const normalizedTodoState = normalizeTodoState(todoState, normalizedSection);
   return normalizedSection === "todo"
@@ -232,7 +345,7 @@ function resolveTodoDoneTimelineText({
   body = "",
   todoState = "open",
   timelineText = "",
-}: any) {
+}: BuildDiaryWriteEntryPayloadsArgs): TodoTimelineResolution {
   const explicitTimelineText = normalizeLineItem(timelineText);
   if (explicitTimelineText) {
     return {
@@ -273,7 +386,14 @@ function synthesizeTodoDoneTimelineText({
   body = "",
   todoState = "open",
   existingTodoStartTime = "",
-}: any) {
+}: {
+  section?: unknown;
+  timeString?: unknown;
+  title?: unknown;
+  body?: unknown;
+  todoState?: unknown;
+  existingTodoStartTime?: unknown;
+}): string {
   if (!shouldSynthesizeTodoDoneTimelineText({ section, todoState })) {
     return "";
   }
@@ -294,7 +414,7 @@ function synthesizeTodoDoneTimelineText({
   return normalizedTime ? `${normalizedTime} ${lineText}` : lineText;
 }
 
-function ensureDiaryFile(filePath: any, now: any, timezone: any = LEGACY_TIMELINE_TIMEZONE) {
+function ensureDiaryFile(filePath: string, now: Date, timezone: unknown = LEGACY_TIMELINE_TIMEZONE): void {
   if (fs.existsSync(filePath) && fs.statSync(filePath).size > 0) {
     return;
   }
@@ -303,7 +423,7 @@ function ensureDiaryFile(filePath: any, now: any, timezone: any = LEGACY_TIMELIN
   writeForeignTextDocument(filePath, buildDiaryFileSkeleton({ createdAt, updated }), { encoding: "utf8" });
 }
 
-function buildDiaryFileSkeleton({ createdAt, updated }: any) {
+function buildDiaryFileSkeleton({ createdAt, updated }: { createdAt: string; updated: string }): string {
   return [
     "---",
     `created: ${createdAt}`,
@@ -325,7 +445,7 @@ function buildDiaryFileSkeleton({ createdAt, updated }: any) {
   ].join("\n");
 }
 
-function insertDiaryEntry(content: any, entry: any, updatedDate: any) {
+function insertDiaryEntry(content: string, entry: string | NormalizeEntryPayloadInput, updatedDate: string): string {
   const normalizedContent = normalizeFileEnding(content);
   const withUpdatedFrontmatter = updateFrontmatterValue(normalizedContent, "updated", updatedDate);
   const payload = normalizeEntryPayload(entry);
@@ -335,7 +455,7 @@ function insertDiaryEntry(content: any, entry: any, updatedDate: any) {
   return insertBulletSectionEntry(withUpdatedFrontmatter, payload);
 }
 
-function findInsertionPoint(content: any) {
+function findInsertionPoint(content: string): number {
   const supplementSection = locateSectionStart(content, "补充记录");
   if (supplementSection >= 0) {
     const nextHeading = locateNextLevelTwoHeading(content, supplementSection + 1);
@@ -348,29 +468,32 @@ function findInsertionPoint(content: any) {
   return content.length;
 }
 
-function locateSectionStart(content: any, headingText: any) {
+function locateSectionStart(content: string, headingText: string): number {
   const pattern = new RegExp(`^##\\s+${escapeRegExp(headingText)}\\s*$`, "m");
   const match = pattern.exec(content);
   return match ? match.index : -1;
 }
 
-function locateNextLevelTwoHeading(content: any, fromIndex: any) {
+function locateNextLevelTwoHeading(content: string, fromIndex: number): number {
   const pattern = /^##\s+/gm;
   pattern.lastIndex = fromIndex;
   const match = pattern.exec(content);
   return match ? match.index : -1;
 }
 
-function normalizeEntryPayload(entry: any) {
+function normalizeEntryPayload(entry: string | NormalizeEntryPayloadInput): NormalizedDiaryEntryPayload {
   if (typeof entry === "string") {
     return {
       section: DEFAULT_SECTION,
       entry: entry.trim(),
+      text: "",
       title: "",
       body: "",
+      todoState: "",
+      todoStartedAt: "",
     };
   }
-  const payload = entry && typeof entry === "object" ? entry : {};
+  const payload: NormalizeEntryPayloadInput = entry && typeof entry === "object" ? entry : {};
   return {
     section: normalizeSection(payload.section),
     entry: String(payload.entry || "").trim(),
@@ -382,7 +505,7 @@ function normalizeEntryPayload(entry: any) {
   };
 }
 
-function insertSupplementEntry(content: any, payload: any) {
+function insertSupplementEntry(content: string, payload: NormalizedDiaryEntryPayload): string {
   const range = findSectionRange(content, SECTION_HEADINGS.supplement);
   if (!range || !payload.entry) {
     return content;
@@ -396,7 +519,7 @@ function insertSupplementEntry(content: any, payload: any) {
   return replaceSectionBody(content, range, nextBody);
 }
 
-function insertBulletSectionEntry(content: any, payload: any) {
+function insertBulletSectionEntry(content: string, payload: NormalizedDiaryEntryPayload): string {
   const headingText = SECTION_HEADINGS[payload.section as keyof typeof SECTION_HEADINGS];
   const range = findSectionRange(content, headingText);
   if (!range || !payload.entry) {
@@ -410,7 +533,7 @@ function insertBulletSectionEntry(content: any, payload: any) {
   return replaceSectionBody(content, range, nextLines.join("\n"));
 }
 
-function findSectionRange(content: any, headingText: any) {
+function findSectionRange(content: string, headingText: string): SectionRange | null {
   const sectionStart = locateSectionStart(content, headingText);
   if (sectionStart < 0) {
     return null;
@@ -425,19 +548,19 @@ function findSectionRange(content: any, headingText: any) {
   };
 }
 
-function extractSectionLines(sectionBody: any, section: any) {
+function extractSectionLines(sectionBody: string, section: DiarySection): string[] {
   const normalizedBody = normalizeFileEnding(sectionBody);
-  const lines = normalizedBody.split("\n").map((line: any) => line.replace(/\s+$/u, ""));
+  const lines = normalizedBody.split("\n").map((line) => line.replace(/\s+$/u, ""));
   while (lines.length && !lines[0].trim()) {
     lines.shift();
   }
   while (lines.length && !lines[lines.length - 1].trim()) {
     lines.pop();
   }
-  return lines.filter((line: any) => !isPlaceholderLine(line, section));
+  return lines.filter((line) => !isPlaceholderLine(line, section));
 }
 
-function isPlaceholderLine(line: any, section: any) {
+function isPlaceholderLine(line: string, section: DiarySection): boolean {
   const trimmed = String(line || "").trim();
   if (!trimmed) {
     return true;
@@ -451,8 +574,9 @@ function isPlaceholderLine(line: any, section: any) {
   return trimmed === "-" || trimmed === "*";
 }
 
-function upsertTodoLine(lines: any, payload: any) {
+function upsertTodoLine(lines: string[], payload: NormalizedDiaryEntryPayload): string[] {
   const nextLines = Array.isArray(lines) ? [...lines] : [];
+  const nextTodoState = normalizeTodoState(payload.todoState, "todo");
   for (let index = 0; index < nextLines.length; index += 1) {
     const parsed = parseTodoLine(nextLines[index]);
     if (!parsed) {
@@ -463,20 +587,23 @@ function upsertTodoLine(lines: any, payload: any) {
     }
     nextLines[index] = buildTodoLine({
       text: payload.text,
-      todoState: payload.todoState,
+      todoState: nextTodoState,
       todoStartedAt: resolveTodoStartedAtForUpsert(parsed, payload),
     });
     return nextLines;
   }
   nextLines.push(buildTodoLine({
     text: payload.text,
-    todoState: payload.todoState,
+    todoState: nextTodoState,
     todoStartedAt: payload.todoStartedAt,
   }));
   return nextLines;
 }
 
-function resolveTodoStartedAtForUpsert(parsed: any, payload: any) {
+function resolveTodoStartedAtForUpsert(
+  parsed: TodoLineParseResult | null | undefined,
+  payload: Partial<Pick<NormalizedDiaryEntryPayload, "todoStartedAt" | "todoState">>,
+): string {
   const existingState = parsed?.todoState || "open";
   const existingStartedAt = normalizeTodoClock(parsed?.todoStartedAt);
   const payloadStartedAt = normalizeTodoClock(payload?.todoStartedAt);
@@ -496,7 +623,7 @@ function resolveTodoStartedAtForUpsert(parsed: any, payload: any) {
   return existingStartedAt || payloadStartedAt;
 }
 
-function upsertBulletLine(lines: any, payload: any) {
+function upsertBulletLine(lines: string[], payload: NormalizedDiaryEntryPayload): string[] {
   const nextLines = Array.isArray(lines) ? [...lines] : [];
   for (const line of nextLines) {
     const match = /^- (.*)$/u.exec(String(line || ""));
@@ -511,7 +638,7 @@ function upsertBulletLine(lines: any, payload: any) {
   return nextLines;
 }
 
-function replaceSectionBody(content: any, range: any, newBody: any) {
+function replaceSectionBody(content: string, range: SectionRange, newBody: string): string {
   const before = content.slice(0, range.contentStart).replace(/\s*$/u, "");
   const after = content.slice(range.end).replace(/^\s*/u, "");
   const parts = [before];
@@ -524,25 +651,25 @@ function replaceSectionBody(content: any, range: any, newBody: any) {
   return `${parts.filter(Boolean).join("\n\n").trimEnd()}\n`;
 }
 
-function hasSupplementDuplicate(sectionBody: any, payload: any) {
+function hasSupplementDuplicate(sectionBody: string, payload: NormalizedDiaryEntryPayload): boolean {
   const targetBody = normalizeBody(payload.body);
   if (!targetBody) {
     return false;
   }
   const targetTitle = normalizeLineItem(payload.title);
-  return parseSupplementBlocks(sectionBody).some((block: any) =>
+  return parseSupplementBlocks(sectionBody).some((block) =>
     block.title === targetTitle && block.body === targetBody
   );
 }
 
-function parseSupplementBlocks(sectionBody: any) {
+function parseSupplementBlocks(sectionBody: string): Array<{ title: string; body: string }> {
   const normalizedBody = normalizeFileEnding(sectionBody).trim();
   if (!normalizedBody) {
     return [];
   }
   return normalizedBody
     .split(/\n(?=###\s)/u)
-    .map((block: any) => {
+    .map((block) => {
       const lines = block.split("\n");
       const heading = String(lines.shift() || "").trim();
       const match = /^###\s+\d{2}:\d{2}(?:\s+(.*))?$/u.exec(heading);
@@ -551,10 +678,10 @@ function parseSupplementBlocks(sectionBody: any) {
         body: normalizeBody(lines.join("\n")),
       };
     })
-    .filter((block: any) => block.body);
+    .filter((block) => block.body);
 }
 
-function updateFrontmatterValue(content: any, key: any, value: any) {
+function updateFrontmatterValue(content: string, key: string, value: string): string {
   if (!content.startsWith("---\n")) {
     return content;
   }
@@ -571,15 +698,15 @@ function updateFrontmatterValue(content: any, key: any, value: any) {
   return `---\n${nextFrontmatter}\n---\n${body.replace(/^\n*/u, "")}`;
 }
 
-function normalizeFileEnding(content: any) {
+function normalizeFileEnding(content: unknown): string {
   return String(content || "").replace(/\r\n/g, "\n");
 }
 
-function escapeRegExp(value: any) {
+function escapeRegExp(value: unknown): string {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function buildSectionLineText({ title, body }: any) {
+function buildSectionLineText({ title, body }: { title?: unknown; body?: unknown }): string {
   const normalizedTitle = normalizeLineItem(title);
   const normalizedBody = normalizeLineItem(body);
   if (normalizedTitle && normalizedBody) {
@@ -588,17 +715,25 @@ function buildSectionLineText({ title, body }: any) {
   return normalizedTitle || normalizedBody;
 }
 
-function buildTodoLine({ text, todoState = "open", todoStartedAt = "" }: any) {
+function buildTodoLine({
+  text,
+  todoState = "open",
+  todoStartedAt = "",
+}: {
+  text: string;
+  todoState?: TodoState;
+  todoStartedAt?: unknown;
+}): string {
   const startMarker = buildTodoStartMarker(todoStartedAt);
   return `- [${TODO_STATE_MARKERS[todoState as keyof typeof TODO_STATE_MARKERS]}] ${text}${startMarker}`;
 }
 
-function buildTodoStartMarker(value: any) {
+function buildTodoStartMarker(value: unknown): string {
   const normalized = normalizeTodoClock(value);
   return normalized ? ` <!-- codeksei-todo:start=${normalized} -->` : "";
 }
 
-function parseTodoLine(line: any) {
+function parseTodoLine(line: string): TodoLineParseResult | null {
   const match = TODO_LINE_RE.exec(String(line || ""));
   if (!match) {
     return null;
@@ -612,11 +747,14 @@ function parseTodoLine(line: any) {
   };
 }
 
-function stripTodoMetadata(value: any) {
+function stripTodoMetadata(value: unknown): string {
   return String(value || "").replace(TODO_START_MARKER_RE, "").trim();
 }
 
-function findTodoStartTimeInDiaryContent(content: any, { title = "", body = "" }: any = {}) {
+function findTodoStartTimeInDiaryContent(
+  content: string,
+  { title = "", body = "" }: { title?: unknown; body?: unknown } = {},
+): string {
   const normalizedContent = normalizeFileEnding(content);
   if (!normalizedContent.trim()) {
     return "";
@@ -640,7 +778,7 @@ function findTodoStartTimeInDiaryContent(content: any, { title = "", body = "" }
   return "";
 }
 
-function normalizeSection(value: any) {
+function normalizeSection(value: unknown): DiarySection {
   const normalized = String(value || "").trim().toLowerCase();
   switch (normalized) {
     case "":
@@ -659,7 +797,7 @@ function normalizeSection(value: any) {
   }
 }
 
-function normalizeTodoState(value: any, section: any = DEFAULT_SECTION) {
+function normalizeTodoState(value: unknown, section: unknown = DEFAULT_SECTION): TodoState {
   const normalizedSection = normalizeSection(section);
   const normalizedValue = String(value || "").trim().toLowerCase();
   if (normalizedSection !== "todo") {
@@ -677,32 +815,32 @@ function normalizeTodoState(value: any, section: any = DEFAULT_SECTION) {
   throw new Error(`不支持的 Todo state: ${value}`);
 }
 
-function normalizeBody(value: any) {
+function normalizeBody(value: unknown): string {
   return String(value || "").replace(/\r\n/g, "\n").trim();
 }
 
-function normalizeLineItem(value: any) {
+function normalizeLineItem(value: unknown): string {
   return normalizeBody(value).replace(/\s*\n+\s*/g, " ").replace(/\s{2,}/g, " ").trim();
 }
 
-function normalizeTodoClock(value: any) {
+function normalizeTodoClock(value: unknown): string {
   const normalized = normalizeLineItem(value);
   return /^\d{2}:\d{2}$/u.test(normalized) ? normalized : "";
 }
 
-function formatDate(date: any, timezone: any = LEGACY_TIMELINE_TIMEZONE) {
+function formatDate(date: unknown, timezone: unknown = LEGACY_TIMELINE_TIMEZONE): string {
   return formatDateInTimezone(date, timezone);
 }
 
-function formatTime(date: any, timezone: any = LEGACY_TIMELINE_TIMEZONE) {
+function formatTime(date: unknown, timezone: unknown = LEGACY_TIMELINE_TIMEZONE): string {
   return formatTimeInTimezone(date, timezone);
 }
 
-function formatDateTime(date: any, timezone: any = LEGACY_TIMELINE_TIMEZONE) {
+function formatDateTime(date: unknown, timezone: unknown = LEGACY_TIMELINE_TIMEZONE): string {
   return formatDateTimeInTimezone(date, timezone);
 }
 
-module.exports = {
+export {
   buildDiaryEntry,
   buildDiaryEntryPayload,
   buildDiaryWriteEntryPayloads,
@@ -715,5 +853,3 @@ module.exports = {
   runDiaryWriteCommand,
   resolveTodoDoneTimelineText,
 };
-
-export {};

@@ -42,6 +42,38 @@ test("ReminderQueueStore normalizes persisted reminders through the shared queue
   assert.equal(store.peekNextDueAtMs(), 1712908800000);
 });
 
+test("ReminderQueueStore accepts schema-repaired legacy reminders on load without quarantine", () => {
+  const { filePath } = createStore();
+  fs.writeFileSync(filePath, JSON.stringify({
+    retained: true,
+    reminders: [
+      {
+        id: "legacy-reminder",
+        accountId: "acct-1",
+        senderId: "user-1",
+        contextToken: "ctx-1",
+        text: "起身喝水",
+        dueAtMs: "1712908800000",
+        createdAt: "2026-04-12T00:00:00.000Z",
+      },
+    ],
+  }, null, 2), "utf8");
+
+  const reloaded = new ReminderQueueStore({ filePath });
+
+  assert.equal(reloaded.peekNextDueAtMs(), 1712908800000);
+  assert.equal(fs.existsSync(filePath), true);
+  assert.deepEqual(reloaded.listDue(1712908800000), [{
+    id: "legacy-reminder",
+    accountId: "acct-1",
+    senderId: "user-1",
+    contextToken: "ctx-1",
+    text: "起身喝水",
+    dueAtMs: 1712908800000,
+    createdAt: "2026-04-12T00:00:00.000Z",
+  }]);
+});
+
 test("ReminderQueueStore quarantines schema-invalid managed state on load", () => {
   const { filePath } = createStore();
   fs.writeFileSync(filePath, JSON.stringify({

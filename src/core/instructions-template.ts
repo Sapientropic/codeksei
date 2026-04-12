@@ -1,8 +1,8 @@
-const {
+import {
   resolveConfiguredPersonName,
   resolvePromptPersonEn,
   resolvePromptPersonZh,
-} = require("./person-reference");
+} from "./person-reference";
 
 function resolveUserPronoun(gender: any) {
   const normalized = String(gender || "").trim().toLowerCase();
@@ -33,9 +33,7 @@ function renderInstructionTemplate(template: any, config: any = {}) {
     .replaceAll("她", pronoun);
 }
 
-module.exports = {
+export {
   renderInstructionTemplate,
   resolveUserPronoun,
 };
-
-export {};

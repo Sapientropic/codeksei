@@ -78,7 +78,10 @@ class SystemMessageQueueStore {
       label: "system message dead letter",
       schema: systemMessageDeadLetterStateSchema,
     });
-    const normalizedState = /** @type {{ entries?: unknown[] }} */ (parsed || {});
+    // Dead-letter payloads share the same single-ingress contract as the live
+    // queue. Once schema parse succeeds here, stores should only clone/sort the
+    // canonical entries instead of re-running per-entry repair.
+    const normalizedState = /** @type {{ entries?: import("../contracts/queue-items").SystemMessageDeadLetterEntry[] }} */ (parsed || {});
     const entries = Array.isArray(normalizedState.entries) ? normalizedState.entries.slice() : [];
     return {
       entries: entries.sort(compareSystemMessageDeadLetters),

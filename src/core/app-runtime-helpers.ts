@@ -1,19 +1,13 @@
 // @ts-check
 
-const {
+import {
   LEGACY_TIMELINE_TIMEZONE,
   formatDateTimeInTimezone,
-}: {
-  LEGACY_TIMELINE_TIMEZONE: string;
-  formatDateTimeInTimezone(date: Date, timezone?: unknown): string;
-} = require("./timezone");
-const {
+} from "./timezone";
+import {
   resolveConfiguredPersonName,
   resolvePromptPersonEn,
-}: {
-  resolveConfiguredPersonName(config?: Record<string, unknown>): string;
-  resolvePromptPersonEn(config?: Record<string, unknown>): string;
-} = require("./person-reference");
+} from "./person-reference";
 
 const SYSTEM_MESSAGE_FAILURE_RETRY_DELAYS_MS = [30_000, 2 * 60_000, 5 * 60_000];
 

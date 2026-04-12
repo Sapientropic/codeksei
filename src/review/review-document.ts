@@ -1,11 +1,15 @@
 // @ts-check
 
-const { PRIMARY_REVIEW_MARKER_PREFIX } = require("../core/branding");
-const {
+import {
   LEGACY_TIMELINE_TIMEZONE,
   formatDateInTimezone,
   formatDateTimeInTimezone,
-} = require("../core/timezone");
+} from "../core/timezone";
+import * as brandingModule from "../core/branding";
+
+const { PRIMARY_REVIEW_MARKER_PREFIX } = brandingModule as {
+  PRIMARY_REVIEW_MARKER_PREFIX: string;
+};
 
 const REVIEW_MARKER_PREFIX = PRIMARY_REVIEW_MARKER_PREFIX;
 
@@ -243,11 +247,9 @@ function escapeRegExp(value: any) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-module.exports = {
+export {
   buildReviewFileSkeleton,
   buildReviewSections,
   parseManagedBulletList,
   syncReviewContent,
 };
-
-export {};

@@ -36,6 +36,18 @@ const systemMessageIngressSchema = z.object({
   createdAt: z.unknown().optional(),
 }).passthrough();
 
+const systemMessageDeadLetterStateIngressSchema = z.object({
+  entries: z.array(z.unknown()),
+}).passthrough();
+
+const timelineScreenshotQueueStateIngressSchema = z.object({
+  jobs: z.array(z.unknown()),
+}).passthrough();
+
+const reminderQueueStateIngressSchema = z.object({
+  reminders: z.array(z.unknown()),
+}).passthrough();
+
 export const systemMessageSchema = systemMessageIngressSchema.transform((value, ctx) => {
   const normalized = normalizeSystemMessageRecord(value);
   if (!normalized) {
@@ -164,18 +176,10 @@ export function validateSystemMessageQueueState(state: unknown): true | string {
 }
 
 export function validateSystemMessageDeadLetterState(state: unknown): true | string {
-  if (!isPlainObject(state)) {
-    return "system message dead letter top-level state must be an object";
-  }
-  if (!Array.isArray(state.entries)) {
-    return "system message dead letter entries must be an array";
-  }
-  for (let index = 0; index < state.entries.length; index += 1) {
-    if (!normalizeSystemMessageDeadLetterEntry(state.entries[index])) {
-      return `system message dead letter entries[${index}] is invalid`;
-    }
-  }
-  return true;
+  const parsed = systemMessageDeadLetterStateSchema.safeParse(state);
+  return parsed.success
+    ? true
+    : (parsed.error.issues[0]?.message || "system message dead letter is invalid");
 }
 
 export function normalizeTimelineScreenshotJob(job: unknown): TimelineScreenshotJob | null {
@@ -207,18 +211,10 @@ export function normalizeTimelineScreenshotJob(job: unknown): TimelineScreenshot
 }
 
 export function validateTimelineScreenshotQueueState(state: unknown): true | string {
-  if (!isPlainObject(state)) {
-    return "timeline screenshot queue top-level state must be an object";
-  }
-  if (!Array.isArray(state.jobs)) {
-    return "timeline screenshot queue jobs must be an array";
-  }
-  for (let index = 0; index < state.jobs.length; index += 1) {
-    if (!normalizeTimelineScreenshotJob(state.jobs[index])) {
-      return `timeline screenshot queue jobs[${index}] is invalid`;
-    }
-  }
-  return true;
+  const parsed = timelineScreenshotQueueStateSchema.safeParse(state);
+  return parsed.success
+    ? true
+    : (parsed.error.issues[0]?.message || "timeline screenshot queue is invalid");
 }
 
 export function normalizeReminderQueueEntry(reminder: unknown): ReminderQueueEntry | null {
@@ -250,60 +246,70 @@ export function normalizeReminderQueueEntry(reminder: unknown): ReminderQueueEnt
 }
 
 export function validateReminderQueueState(state: unknown): true | string {
-  if (!isPlainObject(state)) {
-    return "reminder queue top-level state must be an object";
-  }
-  if (!Array.isArray(state.reminders)) {
-    return "reminder queue reminders must be an array";
-  }
-  for (let index = 0; index < state.reminders.length; index += 1) {
-    if (!normalizeReminderQueueEntry(state.reminders[index])) {
-      return `reminder queue reminders[${index}] is invalid`;
-    }
-  }
-  return true;
+  const parsed = reminderQueueStateSchema.safeParse(state);
+  return parsed.success
+    ? true
+    : (parsed.error.issues[0]?.message || "reminder queue is invalid");
 }
 
 export const systemMessageQueueStateSchema = z.object({
   messages: z.array(systemMessageSchema),
 }).passthrough();
 
-export const systemMessageDeadLetterStateSchema = z.unknown().transform((value: any, ctx: any) => {
-  const validation = validateSystemMessageDeadLetterState(value);
-  if (validation !== true) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: validation });
-    return z.NEVER;
+export const systemMessageDeadLetterStateSchema = systemMessageDeadLetterStateIngressSchema.transform((value, ctx) => {
+  const entries: SystemMessageDeadLetterEntry[] = [];
+  for (let index = 0; index < value.entries.length; index += 1) {
+    const normalized = normalizeSystemMessageDeadLetterEntry(value.entries[index]);
+    if (!normalized) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `system message dead letter entries[${index}] is invalid`,
+      });
+      return z.NEVER;
+    }
+    entries.push(normalized);
   }
-  const source = value as { entries: unknown[] } & PlainObject;
   return {
-    ...source,
-    entries: source.entries.map((entry: any) => normalizeSystemMessageDeadLetterEntry(entry)!),
+    ...value,
+    entries,
   };
 });
 
-export const timelineScreenshotQueueStateSchema = z.unknown().transform((value: any, ctx: any) => {
-  const validation = validateTimelineScreenshotQueueState(value);
-  if (validation !== true) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: validation });
-    return z.NEVER;
+export const timelineScreenshotQueueStateSchema = timelineScreenshotQueueStateIngressSchema.transform((value, ctx) => {
+  const jobs: TimelineScreenshotJob[] = [];
+  for (let index = 0; index < value.jobs.length; index += 1) {
+    const normalized = normalizeTimelineScreenshotJob(value.jobs[index]);
+    if (!normalized) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `timeline screenshot queue jobs[${index}] is invalid`,
+      });
+      return z.NEVER;
+    }
+    jobs.push(normalized);
   }
-  const source = value as { jobs: unknown[] } & PlainObject;
   return {
-    ...source,
-    jobs: source.jobs.map((job: any) => normalizeTimelineScreenshotJob(job)!),
+    ...value,
+    jobs,
   };
 });
 
-export const reminderQueueStateSchema = z.unknown().transform((value: any, ctx: any) => {
-  const validation = validateReminderQueueState(value);
-  if (validation !== true) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: validation });
-    return z.NEVER;
+export const reminderQueueStateSchema = reminderQueueStateIngressSchema.transform((value, ctx) => {
+  const reminders: ReminderQueueEntry[] = [];
+  for (let index = 0; index < value.reminders.length; index += 1) {
+    const normalized = normalizeReminderQueueEntry(value.reminders[index]);
+    if (!normalized) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `reminder queue reminders[${index}] is invalid`,
+      });
+      return z.NEVER;
+    }
+    reminders.push(normalized);
   }
-  const source = value as { reminders: unknown[] } & PlainObject;
   return {
-    ...source,
-    reminders: source.reminders.map((reminder: any) => normalizeReminderQueueEntry(reminder)!),
+    ...value,
+    reminders,
   };
 });
 

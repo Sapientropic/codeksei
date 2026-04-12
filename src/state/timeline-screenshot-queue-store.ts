@@ -33,13 +33,10 @@ class TimelineScreenshotQueueStore {
       label: "timeline screenshot queue",
       schema: timelineScreenshotQueueStateSchema,
     });
-    const normalizedState = /** @type {{ jobs?: unknown[] }} */ (parsed || {});
-    const jobs = Array.isArray(normalizedState.jobs) ? normalizedState.jobs : [];
+    const normalizedState = /** @type {{ jobs?: import("../contracts/queue-items").TimelineScreenshotJob[] }} */ (parsed || {});
+    const jobs = Array.isArray(normalizedState.jobs) ? normalizedState.jobs.slice() : [];
     this.state = {
-      jobs: jobs
-        .map(normalizeTimelineScreenshotJob)
-        .filter(Boolean)
-        .sort(compareTimelineScreenshotJobs),
+      jobs: jobs.sort(compareTimelineScreenshotJobs),
     };
   }
 

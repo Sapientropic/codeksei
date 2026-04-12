@@ -1,15 +1,31 @@
-const crypto = require("crypto");
+import * as crypto from "node:crypto";
 
-const { resolveSelectedAccount } = require("../adapters/channel/weixin/account-store");
-const { SessionStore } = require("../adapters/runtime/codex/session-store");
-const { PACKAGE_NAME, readPrefixedEnv } = require("../core/branding");
-const { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } = require("../workspace/default-targets");
-const { resolvePromptPersonEn } = require("../core/person-reference");
-const { SystemMessageQueueStore } = require("../state/system-message-queue-store");
+import { SessionStore } from "../adapters/runtime/codex/session-store";
+import { resolvePromptPersonEn } from "../core/person-reference";
+import { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } from "../workspace/default-targets";
+import * as accountStoreModule from "../adapters/channel/weixin/account-store";
+import * as brandingModule from "../core/branding";
+import * as systemMessageQueueStoreModule from "../state/system-message-queue-store";
 
 const DEFAULT_MIN_INTERVAL_MS = 3 * 60_000;
 const DEFAULT_MAX_INTERVAL_MS = 60 * 60_000;
 const INTERNAL_CHECKIN_TRIGGER_TEMPLATE = "Take a quiet look at whether now is a good moment to reach out to %PERSON%. You may stay silent, send one short WeChat message, update diary/timeline, or take another useful backstage action. If no user-visible message should be sent, output exactly SILENT. If you do send a message, output only the message text.";
+
+const { resolveSelectedAccount } = accountStoreModule as {
+  resolveSelectedAccount(config: Record<string, unknown>): { accountId: string };
+};
+
+const { PACKAGE_NAME, readPrefixedEnv } = brandingModule as {
+  PACKAGE_NAME: string;
+  readPrefixedEnv(env: NodeJS.ProcessEnv, suffix: string): string;
+};
+
+const { SystemMessageQueueStore } = systemMessageQueueStoreModule as {
+  SystemMessageQueueStore: new (args: { filePath: string; deadLetterFilePath?: string }) => {
+    hasPendingForAccount(accountId: string): boolean;
+    enqueue(message: Record<string, unknown>): { id: string };
+  };
+};
 
 async function runSystemCheckinPoller(config: any) {
   const account = resolveSelectedAccount(config);
@@ -98,6 +114,4 @@ function buildCheckinTrigger(config: any) {
   return INTERNAL_CHECKIN_TRIGGER_TEMPLATE.replace("%PERSON%", person);
 }
 
-module.exports = { runSystemCheckinPoller };
-
-export {};
+export { runSystemCheckinPoller };

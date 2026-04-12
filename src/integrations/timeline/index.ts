@@ -1,8 +1,13 @@
-const path = require("path");
-const { spawn } = require("child_process");
-const { readPrefixedEnv } = require("../../core/branding");
-const { resolveTimelineStateFiles } = require("../../core/timezone");
-const { ensureTimelineStateTimezone } = require("./state-sync");
+import { spawn } from "node:child_process";
+import * as path from "node:path";
+
+import { resolveTimelineStateFiles } from "../../core/timezone";
+import { ensureTimelineStateTimezone } from "./state-sync";
+import * as brandingModule from "../../core/branding";
+
+const { readPrefixedEnv } = brandingModule as {
+  readPrefixedEnv(env: NodeJS.ProcessEnv, suffix: string): string;
+};
 
 function createTimelineIntegration(config: any) {
   const binPath = resolveTimelineBinPath();
@@ -238,12 +243,10 @@ function wireTimelineStdin(child: any, args: any[] = [], stdin: any = process.st
   stdin.pipe(child.stdin);
 }
 
-module.exports = {
+export {
   createTimelineIntegration,
   detectTimelineWriteFailure,
   extractTimelineCommandFailure,
   normalizeTimelineArgs,
   shouldForwardTimelineStdin,
 };
-
-export {};
