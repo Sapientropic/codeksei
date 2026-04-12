@@ -1,8 +1,19 @@
+import * as jsonStateModule from "../state/json-state";
+
 const {
   isPlainObject,
   readManagedJsonStateFile,
   writeManagedJsonStateFile,
-} = require("../state/json-state");
+} = jsonStateModule as {
+  isPlainObject: (value: unknown) => boolean;
+  readManagedJsonStateFile: (args: {
+    filePath: string;
+    fallback: null;
+    label: string;
+    validate: (value: unknown) => true | string;
+  }) => unknown;
+  writeManagedJsonStateFile: (filePath: string, payload: unknown) => void;
+};
 
 const DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS = 120_000;
 
@@ -181,11 +192,9 @@ function validateHeartbeatRecord(value: any) {
   return true;
 }
 
-module.exports = {
+export {
   DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS,
   classifySharedBridgeHeartbeat,
   readSharedBridgeHeartbeat,
   writeSharedBridgeHeartbeat,
 };
-
-export {};

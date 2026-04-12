@@ -3,6 +3,13 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { SessionStore } from "../adapters/runtime/codex/session-store";
 import type {
+  AppRuntimeConfig,
+  ChannelAdapterLike,
+  RuntimeAdapterLike,
+  StreamDeliveryLike,
+  TimelineIntegrationLike,
+} from "./app-service-contract";
+import type {
   AttachmentFailure,
   HandlePreparedMessageOptions,
   NormalizedIncomingMessage,
@@ -15,49 +22,12 @@ import type {
   UserTypingOptions,
 } from "./runtime-types";
 
-interface RuntimeTurnConfig extends Record<string, unknown> {
-  stateDir: string;
-  weixinCdnBaseUrl?: string;
-  codexAccessMode?: string;
-}
-
 interface PersistedAttachmentResult {
   saved: unknown[];
   failed: AttachmentFailure[];
 }
 
-interface ChannelAdapterLike {
-  getKnownContextTokens(): Record<string, string>;
-  sendFile(payload: { userId: string; filePath: string; contextToken: string }): Promise<unknown>;
-  sendText(payload: {
-    userId: string;
-    text: string;
-    contextToken: string;
-    preserveBlock?: boolean;
-  }): Promise<unknown>;
-  sendTyping(payload: { userId: string; status: number; contextToken: string }): Promise<unknown>;
-}
-
-interface TimelineIntegrationLike {
-  runSubcommand(command: string, args: string[]): Promise<unknown>;
-}
-
-interface StreamDeliveryLike {
-  setReplyTarget(bindingKey: string, target: ReplyTarget): void;
-  queueReplyTargetForThread(threadId: string, target: ReplyTarget): void;
-}
-
-interface RuntimeAdapterLike {
-  getSessionStore(): SessionStore;
-  sendTextTurn(args: {
-    bindingKey: string;
-    workspaceRoot: string;
-    text: string;
-    model?: string;
-    accessMode?: string;
-    metadata?: Record<string, unknown>;
-  }): Promise<RuntimeTurnSendState>;
-}
+type RuntimeTurnConfig = AppRuntimeConfig;
 
 type FormatErrorMessage = (error: unknown) => string;
 type MaybeDispatchCommand = (normalized: NormalizedIncomingMessage) => Promise<boolean>;

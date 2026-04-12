@@ -1,43 +1,81 @@
-// @ts-check
+import * as commandSurfaceModule from "../contracts/command-surface";
+import * as commandArgsModule from "../contracts/command-args";
+import {
+  buildTerminalActionExample,
+  buildTerminalEntryUsage,
+} from "./terminal-command-usage";
+
+interface CommandActionLike {
+  action: string;
+  argsSchemaKey: string;
+  command: string;
+  entrypointType: string;
+  help: { leafKey: string; topic: string };
+  scriptName: string;
+  status: string;
+  subcommand: string;
+  summary: string;
+  terminal: string[];
+  weixin: string[];
+}
 
 const {
   findCommandAction,
   listCommandActions,
   listCommandGroups: listCommandGroupsFromSurface,
-} = require("../contracts/command-surface");
-const { listCommandArgFlagsForHelp } = require("../contracts/command-args");
+} = commandSurfaceModule as {
+  findCommandAction: (actionId: string) => CommandActionLike | null;
+  listCommandActions: () => CommandActionLike[];
+  listCommandGroups: () => Array<{ id: string; label: string; actions: CommandActionLike[] }>;
+};
+const { listCommandArgFlagsForHelp } = commandArgsModule as {
+  listCommandArgFlagsForHelp: (schemaKey: string) => Array<{
+    description: string;
+    keys?: string[];
+    name: string;
+    placeholder?: string;
+    required?: boolean;
+  }>;
+};
 
-function listCommandGroups() {
+export function listCommandGroups() {
   return listCommandGroupsFromSurface();
 }
 
-function buildTerminalHelpText() {
+export function buildTerminalHelpText() {
   const lines = [
-    "用法: npm run <script>",
+    "用法: codeksei <command> [subcommand]",
     "",
-    "当前终端命令：",
+    "公共 CLI：",
   ];
 
-  for (const group of listCommandGroups()) {
-    const activeActions = group.actions.filter((action: any) => action.status === "active" && action.terminal.length);
-    if (!activeActions.length) {
-      continue;
-    }
-    lines.push(`- ${group.label}`);
-    for (const action of activeActions) {
-      lines.push(`  ${formatTerminalExamples(action)}  ${action.summary}`);
-    }
+  appendTerminalActionGroups(lines, {
+    audience: "public",
+    filter: (action) => action.entrypointType === "cli",
+  });
+
+  const hasRepoScripts = listCommandGroups().some((group) => group.actions.some(
+    (action) => action.status === "active" && action.terminal.length && action.entrypointType === "script",
+  ));
+  if (hasRepoScripts) {
+    lines.push("");
+    lines.push("仓库脚本 / shared 模式：");
+    appendTerminalActionGroups(lines, {
+      audience: "repo",
+      filter: (action) => action.entrypointType === "script",
+    });
+    lines.push("  这些入口需要在 clone 下来的仓库工作树里运行。");
   }
 
   lines.push("");
-  lines.push("微信命令映射与后续能力动作请看 README / docs。");
+  lines.push("微信命令映射与更多场景说明请看 README / docs。");
   return lines.join("\n");
 }
 
-function buildWeixinHelpText() {
+export function buildWeixinHelpText() {
   const lines = ["当前可用命令："];
   for (const group of listCommandGroups()) {
-    const activeActions = group.actions.filter((action: any) => action.status === "active" && action.weixin.length);
+    const activeActions = group.actions.filter((action) => action.status === "active" && action.weixin.length);
     if (!activeActions.length) {
       continue;
     }
@@ -50,7 +88,7 @@ function buildWeixinHelpText() {
   return lines.join("\n");
 }
 
-function buildTerminalTopicHelp(topic: any, context: any = {}) {
+export function buildTerminalTopicHelp(topic: unknown, context: Record<string, unknown> = {}) {
   const normalizedTopic = normalizeTopic(topic);
   if (!normalizedTopic) {
     return "";
@@ -62,7 +100,7 @@ function buildTerminalTopicHelp(topic: any, context: any = {}) {
         `用法: ${buildExample("reminder.create", true)}`,
         "",
         "补充：",
-        "  先用 npm run accounts 看可用 sender id；不要填昵称或自己猜的微信号",
+        `  先用 ${buildTerminalEntryUsage("app.accounts", "public")} 看可用 sender id；不要填昵称或自己猜的微信号`,
         "  当前选中的 sender id 必须已经有可用的 context_token；否则命令会直接失败",
         "  不带 offset 的本地时间按当前 runtime timezone 解释；显式偏移时间戳按原值保留",
       ].join("\n");
@@ -82,18 +120,18 @@ function buildTerminalTopicHelp(topic: any, context: any = {}) {
       ].join("\n");
     case "system":
       return [
-        `用法: ${buildExample("system.send", true)} / npm run system:checkin`,
+        `用法: ${buildExample("system.send", true)} / ${buildTerminalEntryUsage("system.checkin_poller", "public")}`,
       ].join("\n");
     case "timeline":
       return [
-        `用法: ${buildExample("timeline.event", true)} / npm run timeline:write -- <args> / npm run timeline:read -- <args> / npm run timeline:categories / npm run timeline:proposals -- <args> / npm run timeline:build / npm run timeline:serve / npm run timeline:dev / npm run timeline:screenshot -- --send`,
+        `用法: ${buildExample("timeline.event", true)} / ${buildTerminalEntryUsage("timeline.write", "public")} <args> / ${buildTerminalEntryUsage("timeline.read", "public")} <args> / ${buildTerminalEntryUsage("timeline.categories", "public")} / ${buildTerminalEntryUsage("timeline.proposals", "public")} <args> / ${buildTerminalEntryUsage("timeline.build", "public")} / ${buildTerminalEntryUsage("timeline.serve", "public")} / ${buildTerminalEntryUsage("timeline.dev", "public")} / ${buildTerminalActionExample("timeline.screenshot", { audience: "public", includeArgs: true })}`,
         "",
         "补充：",
         `  单条事件优先用 ${buildExample("timeline.event")}，避免手写 JSON`,
         "  如果必须用 timeline:write --stdin，传完整 JSON 对象 {\"events\":[...]}，不要传裸数组",
-        "  timeline 查分类先用 npm run timeline:categories；改已有日程前先用 npm run timeline:read -- --date YYYY-MM-DD",
+        `  timeline 查分类先用 ${buildTerminalEntryUsage("timeline.categories", "public")}；改已有日程前先用 ${buildTerminalEntryUsage("timeline.read", "public")} --date YYYY-MM-DD`,
         "  不带 offset 的本地时间按当前 timezone 解释；如果 timeline state 已声明非 legacy timezone，会优先沿用它",
-        "  timeline 截图稳定入口是 npm run timeline:screenshot -- --send，它会把任务交给当前微信桥执行",
+        `  timeline 截图稳定入口是 ${buildTerminalActionExample("timeline.screenshot", { audience: "public", includeArgs: true })}，它会把任务交给当前微信桥执行`,
       ].join("\n");
     case "project":
       return [
@@ -133,8 +171,8 @@ function buildTerminalTopicHelp(topic: any, context: any = {}) {
   }
 }
 
-function buildTerminalLeafHelp(actionId: any, context: any = {}) {
-  const action = findCommandAction(actionId);
+export function buildTerminalLeafHelp(actionId: unknown, context: Record<string, unknown> = {}) {
+  const action = findCommandAction(String(actionId || ""));
   if (!action) {
     return "";
   }
@@ -164,10 +202,10 @@ function buildTerminalLeafHelp(actionId: any, context: any = {}) {
         renderFlagBlock(action.argsSchemaKey),
         "",
         "示例：",
-        "  npm run note:auto -- --project <slug> --kind recent --text \"补了 note:auto / note:maybe 路由层\"",
-        "  npm run note:auto -- --project <slug> --kind status --text \"当前已接上 durable note schema，下一步观察真实线程里的使用手感。\"",
-        "  npm run note:auto -- --scope companion --kind preference --text \"默认先接住、记住和接上，不把承接做成工具菜单。\"",
-        "  npm run note:auto -- --scope inspiration --kind idea --text \"做一个只在切换点发力的 transition mode，让主动提醒更像接线而不是催债。\"",
+        "  codeksei note auto --project <slug> --kind recent --text \"补了 note:auto / note:maybe 路由层\"",
+        "  codeksei note auto --project <slug> --kind status --text \"当前已接上 durable note schema，下一步观察真实线程里的使用手感。\"",
+        "  codeksei note auto --scope companion --kind preference --text \"默认先接住、记住和接上，不把承接做成工具菜单。\"",
+        "  codeksei note auto --scope inspiration --kind idea --text \"做一个只在切换点发力的 transition mode，让主动提醒更像接线而不是催债。\"",
       ].join("\n");
     case "note.maybe":
       return [
@@ -181,10 +219,10 @@ function buildTerminalLeafHelp(actionId: any, context: any = {}) {
         renderFlagBlock(action.argsSchemaKey),
         "",
         "示例：",
-        "  npm run note:maybe",
-        "  npm run note:maybe -- --project <slug>",
-        "  npm run note:maybe -- --scope companion --kind preference",
-        "  npm run note:maybe -- --scope inspiration --json",
+        "  codeksei note maybe",
+        "  codeksei note maybe --project <slug>",
+        "  codeksei note maybe --scope companion --kind preference",
+        "  codeksei note maybe --scope inspiration --json",
       ].join("\n");
     case "note.sync":
       return [
@@ -198,25 +236,27 @@ function buildTerminalLeafHelp(actionId: any, context: any = {}) {
         renderFlagBlock(action.argsSchemaKey),
         "",
         "示例：",
-        "  npm run note:sync -- --project <slug> --section \"最近动作\" --text \"把微信 prompt 收口为更温柔的 chief-of-staff 风格\" --max-items 6",
-        "  npm run note:sync -- --project <slug> --section \"当前状态\" --slot current-status --style paragraph --text \"当前 shared bridge 正常运行，默认入口稳定。\"",
-        "  npm run note:sync -- --path \"/absolute/path/to/note.md\" --section \"当前定位\" --text \"默认先接住，再定向，再推进。\"",
+        "  codeksei note sync --project <slug> --section \"最近动作\" --text \"把微信 prompt 收口为更温柔的 chief-of-staff 风格\" --max-items 6",
+        "  codeksei note sync --project <slug> --section \"当前状态\" --slot current-status --style paragraph --text \"当前 shared bridge 正常运行，默认入口稳定。\"",
+        "  codeksei note sync --path \"/absolute/path/to/note.md\" --section \"当前定位\" --text \"默认先接住，再定向，再推进。\"",
       ].join("\n");
-    case "project.radar":
+    case "project.radar": {
+      const config = isRecord(context.config) ? context.config : {};
       return [
         `用法: ${buildExample(action.action, true)}`,
         "",
         "说明：",
         "  默认从当前 workspace 的 .codex/code-projects.json 读取已跟踪代码项目。",
-        `  当前配置文件: ${context.config?.projectRadarConfigFile || "(auto)"}`,
+        `  当前配置文件: ${String(config.projectRadarConfigFile || "(auto)")}`,
         "",
         renderFlagBlock(action.argsSchemaKey),
         "",
         "示例：",
-        "  npm run project:radar -- --list",
-        "  npm run project:radar -- --project <slug> --json",
-        "  npm run project:radar -- --project engineering-issues --commits 8 --changes 30",
+        "  codeksei project radar --list",
+        "  codeksei project radar --project <slug> --json",
+        "  codeksei project radar --project engineering-issues --commits 8 --changes 30",
       ].join("\n");
+    }
     case "review.nightly":
     case "review.weekly":
     case "review.monthly":
@@ -226,7 +266,7 @@ function buildTerminalLeafHelp(actionId: any, context: any = {}) {
         `用法: ${buildExample(action.action, true)}`,
         "",
         "示例：",
-        "  npm run system:send -- --text \"提醒她今天早点睡\" --workspace \"$(pwd)\"",
+        "  codeksei system send --text \"提醒她今天早点睡\" --workspace \"$(pwd)\"",
         "",
         renderFlagBlock(action.argsSchemaKey),
       ].join("\n");
@@ -244,10 +284,10 @@ function buildTerminalLeafHelp(actionId: any, context: any = {}) {
         renderFlagBlock(action.argsSchemaKey),
         "",
         "示例：",
-        "  npm run timeline:event -- --date 2026-04-10 --start 09:30 --end 10:15 --title \"看 Codeksei 提交历史\" --subcategory work.dev --category work --note \"为了补日记和时间线先核对最近改动。\"",
+        "  codeksei timeline event --date 2026-04-10 --start 09:30 --end 10:15 --title \"看 Codeksei 提交历史\" --subcategory work.dev --category work --note \"为了补日记和时间线先核对最近改动。\"",
         "  @'",
         "补充背景和为什么要记录这段。",
-        "'@ | npm run timeline:event -- --date 2026-04-10 --start 10:20 --end 10:45 --title \"整理营养师笔记结构\" --subcategory study.reading --stdin",
+        "'@ | codeksei timeline event --date 2026-04-10 --start 10:20 --end 10:45 --title \"整理营养师笔记结构\" --subcategory study.reading --stdin",
       ].join("\n");
     }
     case "timeline.screenshot":
@@ -261,15 +301,15 @@ function buildTerminalLeafHelp(actionId: any, context: any = {}) {
         renderFlagBlock(action.argsSchemaKey),
         "",
         "示例：",
-        "  npm run timeline:screenshot -- --send --selector timeline",
+        "  codeksei timeline screenshot --send --selector timeline",
       ].join("\n");
     default:
       return buildGenericLeafHelp(action);
   }
 }
 
-function buildReviewLeafHelp(actionId: any, context: any = {}) {
-  const action = findCommandAction(actionId);
+function buildReviewLeafHelp(actionId: unknown, context: Record<string, unknown> = {}) {
+  const action = findCommandAction(String(actionId || ""));
   const resolvedTimezone = normalizeText(context.timezone) || "Asia/Shanghai";
   if (!action) {
     return "";
@@ -277,41 +317,41 @@ function buildReviewLeafHelp(actionId: any, context: any = {}) {
 
   const variant = {
     "review.nightly": {
-      usage: "npm run review:nightly -- [--date YYYY-MM-DD] [--stdout] [--deterministic] [--model <id>]",
+      usage: buildTerminalActionExample("review.nightly", { audience: "public", includeArgs: true }),
       description: [
         "  从当前 diary 真相源生成一份 Codeksei 睡前收口。",
         `  默认按 ${resolvedTimezone} 的当前日期推断今天，并给周/月复盘提供更轻的日级原料。`,
         "  默认走 hybrid：脚本保骨架，Codex 负责结构化语义提炼；失败时自动回退。",
       ],
       examples: [
-        "  npm run review:nightly",
-        "  npm run review:nightly -- --date 2026-04-10",
+        "  codeksei review nightly",
+        "  codeksei review nightly --date 2026-04-10",
       ],
     },
     "review.weekly": {
-      usage: "npm run review:weekly -- [--week YYYY-Www] [--date YYYY-MM-DD] [--stdout] [--deterministic] [--model <id>]",
+      usage: buildTerminalActionExample("review.weekly", { audience: "public", includeArgs: true }),
       description: [
         "  从当前 diary 真相源生成一份 Codeksei 生活助理周复盘。",
         `  默认按 ${resolvedTimezone} 的当前日期推断本周（周一到周日）。`,
         "  默认走 hybrid：脚本保骨架，Codex 负责结构化语义提炼；失败时自动回退。",
       ],
       examples: [
-        "  npm run review:weekly",
-        "  npm run review:weekly -- --week 2026-W15",
-        "  npm run review:weekly -- --date 2026-04-11",
+        "  codeksei review weekly",
+        "  codeksei review weekly --week 2026-W15",
+        "  codeksei review weekly --date 2026-04-11",
       ],
     },
     "review.monthly": {
-      usage: "npm run review:monthly -- [--month YYYY-MM] [--date YYYY-MM-DD] [--stdout] [--deterministic] [--model <id>]",
+      usage: buildTerminalActionExample("review.monthly", { audience: "public", includeArgs: true }),
       description: [
         "  从当前 diary 真相源生成一份 Codeksei 生活助理月复盘。",
         `  默认按 ${resolvedTimezone} 的当前日期推断本月。`,
         "  默认走 hybrid：脚本保骨架，Codex 负责结构化语义提炼；失败时自动回退。",
       ],
       examples: [
-        "  npm run review:monthly",
-        "  npm run review:monthly -- --month 2026-04",
-        "  npm run review:monthly -- --date 2026-04-11",
+        "  codeksei review monthly",
+        "  codeksei review monthly --month 2026-04",
+        "  codeksei review monthly --date 2026-04-11",
       ],
     },
   }[action.action as keyof {
@@ -333,7 +373,7 @@ function buildReviewLeafHelp(actionId: any, context: any = {}) {
   ].join("\n");
 }
 
-function buildGenericLeafHelp(action: any) {
+function buildGenericLeafHelp(action: CommandActionLike) {
   const lines = [
     `用法: ${buildExample(action.action, true)}`,
   ];
@@ -345,8 +385,8 @@ function buildGenericLeafHelp(action: any) {
   return lines.join("\n");
 }
 
-function renderFlagBlock(schemaKey: any) {
-  const flags = listCommandArgFlagsForHelp(schemaKey).filter((flag: any) => flag.name !== "help");
+function renderFlagBlock(schemaKey: unknown) {
+  const flags = listCommandArgFlagsForHelp(String(schemaKey || "")).filter((flag) => flag.name !== "help");
   if (!flags.length) {
     return "";
   }
@@ -366,60 +406,61 @@ function renderFlagBlock(schemaKey: any) {
   return lines.join("\n");
 }
 
-function isPlannedTerminalTopic(topic: any) {
+export function isPlannedTerminalTopic(topic: unknown) {
   const normalizedTopic = normalizeTopic(topic);
   return listCommandActions().some(
-    (action: any) => action.help.topic === normalizedTopic && action.terminal.length
+    (action) => action.help.topic === normalizedTopic && action.terminal.length
   );
 }
 
-function buildExample(actionId: any, includeUsage: boolean = false) {
-  const action = findCommandAction(actionId);
-  if (!action?.scriptName) {
-    return "npm run <script>";
-  }
-  const examples = {
-    "channel.send_file": "npm run channel:send-file -- --path /绝对路径",
-    "note.auto": "npm run note:auto -- (--project <slug> | --scope <name>) --kind <kind> [--text \"内容\" | --stdin]",
-    "note.maybe": "npm run note:maybe -- [--project <slug> | --scope <name>] [--kind <kind>] [--json]",
-    "note.sync": "npm run note:sync -- (--project <slug> | --path <path>) --section <标题> [--text \"内容\" | --stdin] [--style bullet|paragraph] [--slot <id>] [--max-items N]",
-    "project.radar": "npm run project:radar -- [--list] [--project <slug>] [--json] [--commits 5] [--changes 20]",
-    "review.nightly": "npm run review:nightly -- [--date YYYY-MM-DD] [--stdout] [--deterministic] [--model <id>]",
-    "review.weekly": "npm run review:weekly -- [--week YYYY-Www] [--date YYYY-MM-DD] [--stdout] [--deterministic] [--model <id>]",
-    "review.monthly": "npm run review:monthly -- [--month YYYY-MM] [--date YYYY-MM-DD] [--stdout] [--deterministic] [--model <id>]",
-    "system.send": "npm run system:send -- --text \"<message>\" [--user <wechat_user_id>] [--workspace /绝对路径]",
-    "timeline.event": "npm run timeline:event -- --date YYYY-MM-DD --start HH:mm --end HH:mm --title \"标题\" (--event-node <id> | --subcategory <id>) [其他参数]",
-    "timeline.screenshot": "npm run timeline:screenshot -- --send [--user <wechatUserId>] [--output /绝对路径] [其他 timeline screenshot 参数]",
-  };
-  const actionKey = action.action as keyof typeof examples;
-  if (includeUsage && examples[actionKey]) {
-    return examples[actionKey];
-  }
-  return `npm run ${action.scriptName}`;
+function buildExample(actionId: unknown, includeUsage: boolean = false) {
+  return buildTerminalActionExample(String(actionId || ""), {
+    audience: "public",
+    includeArgs: includeUsage,
+  });
 }
 
-function formatTerminalExamples(action: any) {
-  if (!action?.scriptName) {
-    return "";
-  }
-  return `npm run ${action.scriptName}`;
+function formatTerminalExamples(action: CommandActionLike) {
+  return action.entrypointType === "cli"
+    ? buildTerminalEntryUsage(action, "public")
+    : buildTerminalEntryUsage(action, "repo");
 }
 
-function normalizeTopic(value: any) {
+function appendTerminalActionGroups(
+  lines: string[],
+  {
+    audience,
+    filter,
+  }: {
+    audience: "public" | "repo";
+    filter: (action: CommandActionLike) => boolean;
+  },
+): void {
+  for (const group of listCommandGroups()) {
+    const activeActions = group.actions.filter(
+      (action) => action.status === "active" && action.terminal.length && filter(action),
+    );
+    if (!activeActions.length) {
+      continue;
+    }
+    lines.push(`- ${group.label}`);
+    for (const action of activeActions) {
+      const command = audience === "public"
+        ? buildTerminalEntryUsage(action, "public")
+        : buildTerminalEntryUsage(action, "repo");
+      lines.push(`  ${command}  ${action.summary}`);
+    }
+  }
+}
+
+function normalizeTopic(value: unknown) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
-function normalizeText(value: any) {
+function normalizeText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-module.exports = {
-  buildTerminalHelpText,
-  buildTerminalLeafHelp,
-  buildTerminalTopicHelp,
-  buildWeixinHelpText,
-  isPlannedTerminalTopic,
-  listCommandGroups,
-};
-
-export {};
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}

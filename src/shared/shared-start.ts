@@ -1,10 +1,14 @@
-const {
-  listenUrl,
+import * as brandingModule from "../core/branding";
+import {
   ensureManagedAppServer,
   ensureManagedBridge,
   ensureManagedSupervisor,
-} = require("./shared-common");
-const { readPrefixedEnv } = require("../core/branding");
+  listenUrl,
+} from "./shared-common";
+
+const { readPrefixedEnv } = brandingModule as {
+  readPrefixedEnv: (env: NodeJS.ProcessEnv, key: string) => string;
+};
 
 function parseIntervalMinutes() {
   for (const rawArg of process.argv.slice(2)) {
@@ -35,10 +39,6 @@ async function main() {
   console.log(`shared supervisor ${supervisor.status} pid=${supervisor.pid}`);
 }
 
-module.exports = {
-  main,
-};
-
 if (require.main === module) {
   main().catch((error: any) => {
     console.error(error.message || String(error));
@@ -46,4 +46,4 @@ if (require.main === module) {
   });
 }
 
-export {};
+export { main };

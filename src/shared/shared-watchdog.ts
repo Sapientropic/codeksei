@@ -1,11 +1,57 @@
-const fs = require("fs");
-const path = require("path");
+import * as brandingModule from "../core/branding";
+import * as envLoaderModule from "../core/env-loader";
+import * as pathUtilsModule from "../core/path-utils";
+import { createWeixinChannelAdapter } from "../adapters/channel/weixin";
+import * as accountStoreModule from "../adapters/channel/weixin/account-store";
+import * as contextTokenStoreModule from "../adapters/channel/weixin/context-token-store";
+import { SessionStore } from "../adapters/runtime/codex/session-store";
+import * as configModule from "../core/config";
+import * as defaultTargetsModule from "../workspace/default-targets";
+import {
+  appServerLogFile,
+  appServerPidFile,
+  bridgeLogFile,
+  bridgePidFile,
+  ensureLogDir,
+  ensureManagedAppServer,
+  ensureManagedBridge,
+  readJsonFile,
+  readPidFile,
+  readSharedBridgeHealth,
+  resolveReadyAppServerPid,
+  watchdogStateFile,
+  writeJsonFile,
+} from "./shared-common";
+
 const {
   ensureCodekseiHomeEnv,
   ensureStateDirectory,
-} = require("../core/branding");
-const { loadEnvStack } = require("../core/env-loader");
-const { resolvePackageRoot } = require("../core/path-utils");
+} = brandingModule as {
+  ensureCodekseiHomeEnv: (args: { fallbackRoot: string }) => void;
+  ensureStateDirectory: () => void;
+};
+const { loadEnvStack } = envLoaderModule as {
+  loadEnvStack: () => void;
+};
+const { resolvePackageRoot } = pathUtilsModule as {
+  resolvePackageRoot: (baseDir: string) => string;
+};
+const { resolveSelectedAccount } = accountStoreModule as {
+  resolveSelectedAccount: (config: Record<string, unknown>) => { accountId: string };
+};
+const { loadPersistedContextTokens } = contextTokenStoreModule as {
+  loadPersistedContextTokens: (config: Record<string, unknown>, accountId: string) => Record<string, string>;
+};
+const { readConfig } = configModule as {
+  readConfig: () => Record<string, unknown>;
+};
+const {
+  resolvePreferredSenderId,
+  resolvePreferredWorkspaceRoot,
+} = defaultTargetsModule as unknown as {
+  resolvePreferredSenderId: (args: Record<string, unknown>) => string;
+  resolvePreferredWorkspaceRoot: (args: Record<string, unknown>) => string;
+};
 
 const ALERT_COOLDOWN_MS = 10 * 60_000;
 
@@ -25,32 +71,10 @@ function ensureRuntimeEnv() {
 loadEnv();
 ensureRuntimeEnv();
 
-const { createWeixinChannelAdapter } = require("../adapters/channel/weixin");
-const { resolveSelectedAccount } = require("../adapters/channel/weixin/account-store");
-const { loadPersistedContextTokens } = require("../adapters/channel/weixin/context-token-store");
-const { SessionStore } = require("../adapters/runtime/codex/session-store");
-const { readConfig } = require("../core/config");
-const { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } = require("../workspace/default-targets");
-const {
-  appServerLogFile,
-  appServerPidFile,
-  bridgeLogFile,
-  bridgePidFile,
-  ensureLogDir,
-  ensureManagedAppServer,
-  ensureManagedBridge,
-  readJsonFile,
-  readPidFile,
-  readSharedBridgeHealth,
-  resolveReadyAppServerPid,
-  watchdogStateFile,
-  writeJsonFile,
-} = require("./shared-common");
-
 async function runWatchdogOnce({ shouldPrintSummary = true }: any = {}) {
   const config = readConfig();
   ensureLogDir();
-  const previousState = readJsonFile(watchdogStateFile) || {};
+  const previousState = (readJsonFile(watchdogStateFile) || {}) as Record<string, unknown>;
   const before = await collectHealth();
   const actions = [];
   let result = "healthy";
@@ -269,11 +293,6 @@ function normalizeText(value: any) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-module.exports = {
-  main,
-  runWatchdogOnce,
-};
-
 if (require.main === module) {
   main().catch((error: any) => {
     console.error(formatErrorMessage(error));
@@ -281,4 +300,7 @@ if (require.main === module) {
   });
 }
 
-export {};
+export {
+  main,
+  runWatchdogOnce,
+};

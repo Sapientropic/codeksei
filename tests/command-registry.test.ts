@@ -2,9 +2,21 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const {
+  buildTerminalHelpText,
+  buildTerminalLeafHelp,
   buildTerminalTopicHelp,
   listCommandGroups,
 } = require("../src/core/command-registry");
+
+test("terminal help prefers codeksei CLI syntax and keeps repo scripts in a separate section", () => {
+  const help = buildTerminalHelpText();
+
+  assert.match(help, /用法: codeksei <command> \[subcommand\]/u);
+  assert.match(help, /codeksei review weekly/u);
+  assert.match(help, /仓库脚本 \/ shared 模式/u);
+  assert.match(help, /npm run shared:start/u);
+  assert.doesNotMatch(help, /用法: npm run/u);
+});
 
 test("timeline write help labels the command as a low-level batch/json entry", () => {
   const action = listCommandGroups()
@@ -20,8 +32,8 @@ test("timeline write help labels the command as a low-level batch/json entry", (
 test("timeline topic help still prefers timeline:event for single events", () => {
   const help = buildTerminalTopicHelp("timeline");
 
-  assert.match(help, /单条事件优先用 npm run timeline:event/u);
-  assert.match(help, /timeline 查分类先用 npm run timeline:categories/u);
+  assert.match(help, /单条事件优先用 codeksei timeline event/u);
+  assert.match(help, /timeline 查分类先用 codeksei timeline categories/u);
   assert.match(help, /完整 JSON 对象/u);
   assert.match(help, /当前 timezone/u);
 });
@@ -36,8 +48,15 @@ test("reminder topic help clarifies sender id and context token requirements", (
   const help = buildTerminalTopicHelp("reminder");
 
   assert.match(help, /sender id/u);
-  assert.match(help, /npm run accounts/u);
+  assert.match(help, /codeksei accounts/u);
   assert.match(help, /context_token/u);
+});
+
+test("review leaf help uses codeksei syntax", () => {
+  const help = buildTerminalLeafHelp("review.weekly");
+
+  assert.match(help, /codeksei review weekly/u);
+  assert.doesNotMatch(help, /npm run review:weekly/u);
 });
 
 test("diary topic help explains captured Todo start time for later timeline accuracy", () => {

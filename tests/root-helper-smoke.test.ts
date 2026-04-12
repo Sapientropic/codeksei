@@ -56,5 +56,5 @@ test("dist runtime entrypoint executes main when invoked directly", () => {
   });
 
   assert.equal(result.status, 0, result.stderr || "expected help command to succeed");
-  assert.match(result.stdout, /用法: npm run/u);
+  assert.match(result.stdout, /用法: codeksei <command> \[subcommand\]/u);
 });
