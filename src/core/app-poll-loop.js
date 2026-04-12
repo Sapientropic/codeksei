@@ -117,6 +117,7 @@ function assertWeixinUpdateResponse(response) {
   const ret = normalizeErrorCode(response?.ret);
   const errcode = normalizeErrorCode(response?.errcode);
   if ((ret !== 0 && ret !== null) || (errcode !== 0 && errcode !== null)) {
+    /** @type {Error & { ret?: number | null, errcode?: number | null }} */
     const error = new Error(
       `weixin getUpdates ret=${ret ?? ""} errcode=${errcode ?? ""} errmsg=${normalizeText(response?.errmsg) || ""}`
     );

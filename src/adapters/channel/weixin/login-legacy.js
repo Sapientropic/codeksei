@@ -17,7 +17,7 @@ async function fetchQrCode(apiBaseUrl, botType) {
     const body = await response.text().catch(() => "(unreadable)");
     throw new Error(`二维码获取失败: ${response.status} ${response.statusText} ${redactSensitiveText(body)}`);
   }
-  return response.json();
+  return /** @type {Promise<any>} */ (response.json());
 }
 
 async function pollQrStatus(apiBaseUrl, qrcode) {

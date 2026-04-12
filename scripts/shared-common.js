@@ -24,6 +24,10 @@ const {
   classifySharedBridgeHeartbeat,
   readSharedBridgeHeartbeat,
 } = require("../src/core/shared-bridge-heartbeat");
+const {
+  buildSpawnInvocation,
+  resolveBundledCodexBinary,
+} = require("../src/core/codex-spawn");
 
 const rootDir = path.resolve(__dirname, "..");
 loadSharedEnv();
@@ -41,8 +45,6 @@ const bridgeHeartbeatFile = path.join(logDir, "shared-wechat-heartbeat.json");
 const watchdogStateFile = path.join(logDir, "shared-watchdog-state.json");
 const accountsDir = path.join(stateDir, "accounts");
 const sessionFile = readPrefixedEnv(process.env, "SESSIONS_FILE") || path.join(stateDir, "sessions.json");
-const WINDOWS_CMD_SUFFIX_RE = /\.(cmd|bat)$/i;
-const WINDOWS_EXE_SUFFIX_RE = /\.(exe|com)$/i;
 const BRIDGE_HEARTBEAT_MAX_AGE_MS = Number.parseInt(
   String(readPrefixedEnv(process.env, "SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS") || ""),
   10
@@ -217,136 +219,6 @@ async function waitForReadyz({ attempts = 10, delayMs = 300 } = {}) {
 
 function openLogFile(filePath) {
   return fs.openSync(filePath, "a");
-}
-
-function resolveSpawnCommand(command) {
-  const normalized = normalizeText(command);
-  if (!normalized || process.platform !== "win32") {
-    return normalized || command;
-  }
-  if (path.isAbsolute(normalized) && fs.existsSync(normalized)) {
-    return normalized;
-  }
-  try {
-    const output = execFileSync("where.exe", [normalized], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-      windowsHide: true,
-    });
-    const candidates = output
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean);
-    const preferred = candidates.find(isPreferredWindowsCmdShim)
-      || candidates.find((candidate) => WINDOWS_EXE_SUFFIX_RE.test(candidate) && !isWindowsAppsPath(candidate))
-      || candidates.find((candidate) => WINDOWS_CMD_SUFFIX_RE.test(candidate))
-      || candidates.find((candidate) => WINDOWS_EXE_SUFFIX_RE.test(candidate))
-      || candidates[0];
-    return preferred || normalized;
-  } catch {
-    return normalized;
-  }
-}
-
-function isPreferredWindowsCmdShim(candidate) {
-  const normalized = String(candidate || "").trim().toLowerCase();
-  return WINDOWS_CMD_SUFFIX_RE.test(normalized) && normalized.includes("\\appdata\\roaming\\npm\\");
-}
-
-function isWindowsAppsPath(candidate) {
-  return String(candidate || "").trim().toLowerCase().includes("\\windowsapps\\");
-}
-
-function resolveCodexTargetTriple() {
-  if (process.platform !== "win32") {
-    return "";
-  }
-  if (process.arch === "x64") {
-    return "x86_64-pc-windows-msvc";
-  }
-  if (process.arch === "arm64") {
-    return "aarch64-pc-windows-msvc";
-  }
-  return "";
-}
-
-function resolveCodexPlatformPackageName() {
-  if (process.platform !== "win32") {
-    return "";
-  }
-  if (process.arch === "x64") {
-    return "codex-win32-x64";
-  }
-  if (process.arch === "arm64") {
-    return "codex-win32-arm64";
-  }
-  return "";
-}
-
-function resolveBundledCodexBinary(command) {
-  if (process.platform !== "win32") {
-    return "";
-  }
-  const resolvedCommand = resolveSpawnCommand(command);
-  const normalizedResolved = normalizeText(resolvedCommand).toLowerCase();
-  if (
-    !normalizedResolved
-    || (!normalizedResolved.endsWith("\\codex.cmd")
-      && !normalizedResolved.endsWith("\\codex")
-      && normalizedResolved !== "codex")
-  ) {
-    return "";
-  }
-
-  const npmRoot = normalizedResolved.includes("\\appdata\\roaming\\npm\\")
-    ? path.dirname(resolvedCommand)
-    : "";
-  const targetTriple = resolveCodexTargetTriple();
-  const platformPackage = resolveCodexPlatformPackageName();
-  if (!npmRoot || !targetTriple || !platformPackage) {
-    return "";
-  }
-
-  const candidate = path.join(
-    npmRoot,
-    "node_modules",
-    "@openai",
-    "codex",
-    "node_modules",
-    "@openai",
-    platformPackage,
-    "vendor",
-    targetTriple,
-    "codex",
-    "codex.exe"
-  );
-  return fs.existsSync(candidate) ? candidate : "";
-}
-
-function quoteWindowsCmdArg(value) {
-  const text = String(value ?? "");
-  if (!text.length) {
-    return "\"\"";
-  }
-  if (!/[\s"]/u.test(text)) {
-    return text;
-  }
-  const escaped = text.replace(/(\\*)"/g, "$1$1\\\"");
-  return `"${escaped.replace(/(\\+)$/g, "$1$1")}"`;
-}
-
-function buildSpawnInvocation(command, args = []) {
-  const resolvedCommand = resolveSpawnCommand(command);
-  if (process.platform === "win32" && WINDOWS_CMD_SUFFIX_RE.test(resolvedCommand)) {
-    return {
-      command: "cmd.exe",
-      args: ["/d", "/s", "/c", [resolvedCommand, ...args].map(quoteWindowsCmdArg).join(" ")],
-    };
-  }
-  return {
-    command: resolvedCommand,
-    args,
-  };
 }
 
 function spawnDetachedCommand(command, args, { logFile, cwd = rootDir, env = {} } = {}) {

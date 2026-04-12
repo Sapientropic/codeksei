@@ -121,7 +121,7 @@ function buildDiaryEntry({ timeString, title, body }) {
   return `${heading}\n\n${body}`;
 }
 
-function buildDiaryEntryPayload({ section = DEFAULT_SECTION, timeString, title, body, todoState = "open" }) {
+function buildDiaryEntryPayload({ section = DEFAULT_SECTION, timeString, title = "", body = "", todoState = "open" }) {
   const normalizedSection = normalizeSection(section);
   const normalizedTitle = normalizeLineItem(title);
   const normalizedBody = normalizeBody(body);
