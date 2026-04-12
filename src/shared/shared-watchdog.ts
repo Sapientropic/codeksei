@@ -1,17 +1,13 @@
-import * as brandingModule from "../core/branding";
-import * as envLoaderModule from "../core/env-loader";
-import * as pathUtilsModule from "../core/path-utils";
 import { createWeixinChannelAdapter } from "../adapters/channel/weixin";
-import * as accountStoreModule from "../adapters/channel/weixin/account-store";
-import * as contextTokenStoreModule from "../adapters/channel/weixin/context-token-store";
+import { resolveSelectedAccount } from "../adapters/channel/weixin/account-store";
+import { loadPersistedContextTokens } from "../adapters/channel/weixin/context-token-store";
 import { SessionStore } from "../adapters/runtime/codex/session-store";
-import * as configModule from "../core/config";
-import * as defaultTargetsModule from "../workspace/default-targets";
+import { ensureCodekseiHomeEnv } from "../core/branding";
+import { readConfig } from "../core/config";
+import { loadEnvStack } from "../core/env-loader";
+import { resolvePackageRoot } from "../core/path-utils";
+import { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } from "../workspace/default-targets";
 import {
-  appServerLogFile,
-  appServerPidFile,
-  bridgeLogFile,
-  bridgePidFile,
   ensureLogDir,
   ensureManagedAppServer,
   ensureManagedBridge,
@@ -19,63 +15,25 @@ import {
   readPidFile,
   readSharedBridgeHealth,
   resolveReadyAppServerPid,
-  watchdogStateFile,
+  resolveSharedProcessContext,
+  type SharedProcessContext,
   writeJsonFile,
 } from "./shared-common";
 
-const {
-  ensureCodekseiHomeEnv,
-  ensureStateDirectory,
-} = brandingModule as {
-  ensureCodekseiHomeEnv: (args: { fallbackRoot: string }) => void;
-  ensureStateDirectory: () => void;
-};
-const { loadEnvStack } = envLoaderModule as {
-  loadEnvStack: () => void;
-};
-const { resolvePackageRoot } = pathUtilsModule as {
-  resolvePackageRoot: (baseDir: string) => string;
-};
-const { resolveSelectedAccount } = accountStoreModule as unknown as {
-  resolveSelectedAccount: (config: Record<string, unknown>) => { accountId: string };
-};
-const { loadPersistedContextTokens } = contextTokenStoreModule as unknown as {
-  loadPersistedContextTokens: (config: Record<string, unknown>, accountId: string) => Record<string, string>;
-};
-const { readConfig } = configModule as {
-  readConfig: () => Record<string, unknown>;
-};
-const {
-  resolvePreferredSenderId,
-  resolvePreferredWorkspaceRoot,
-} = defaultTargetsModule as unknown as {
-  resolvePreferredSenderId: (args: Record<string, unknown>) => string;
-  resolvePreferredWorkspaceRoot: (args: Record<string, unknown>) => string;
-};
-
 const ALERT_COOLDOWN_MS = 10 * 60_000;
 
-function ensureDefaultStateDirectory() {
-  ensureStateDirectory();
-}
-
-function loadEnv() {
+function loadWatchdogConfig(): Record<string, unknown> {
   loadEnvStack();
-  ensureDefaultStateDirectory();
-}
-
-function ensureRuntimeEnv() {
   ensureCodekseiHomeEnv({ fallbackRoot: resolvePackageRoot(__dirname) });
+  return readConfig();
 }
-
-loadEnv();
-ensureRuntimeEnv();
 
 async function runWatchdogOnce({ shouldPrintSummary = true }: any = {}) {
-  const config = readConfig();
-  ensureLogDir();
-  const previousState = (readJsonFile(watchdogStateFile) || {}) as Record<string, unknown>;
-  const before = await collectHealth();
+  const sharedContext = resolveSharedProcessContext();
+  const config = loadWatchdogConfig();
+  ensureLogDir(sharedContext);
+  const previousState = (readJsonFile(sharedContext.watchdogStateFile) || {}) as Record<string, unknown>;
+  const before = await collectHealth(sharedContext);
   const actions = [];
   let result = "healthy";
   let errorMessage = "";
@@ -95,7 +53,7 @@ async function runWatchdogOnce({ shouldPrintSummary = true }: any = {}) {
     errorMessage = formatErrorMessage(error);
   }
 
-  const after = await collectHealth();
+  const after = await collectHealth(sharedContext);
   if (result !== "failed") {
     result = actions.length ? "recovered" : "healthy";
   }
@@ -112,7 +70,7 @@ async function runWatchdogOnce({ shouldPrintSummary = true }: any = {}) {
     lastNotification: previousState.lastNotification || null,
   };
 
-  const alert = buildAlert({ result, actions, errorMessage, after, config });
+  const alert = buildAlert({ result, actions, errorMessage, after, config, sharedContext });
   if (alert && shouldSendAlert(previousState, alert.signature)) {
     const notification = await sendVisibleAlert(config, alert.text);
     nextState.lastAlertAt = new Date().toISOString();
@@ -127,7 +85,7 @@ async function runWatchdogOnce({ shouldPrintSummary = true }: any = {}) {
     };
   }
 
-  writeJsonFile(watchdogStateFile, nextState);
+  writeJsonFile(sharedContext.watchdogStateFile, nextState);
   if (shouldPrintSummary) {
     printSummary(nextState);
   }
@@ -142,14 +100,14 @@ async function main() {
   }
 }
 
-async function collectHealth() {
-  const appServerReadyPid = await resolveReadyAppServerPid();
-  const bridge = readSharedBridgeHealth();
+async function collectHealth(sharedContext: SharedProcessContext) {
+  const appServerReadyPid = await resolveReadyAppServerPid(sharedContext);
+  const bridge = readSharedBridgeHealth(sharedContext);
   return {
     appServer: {
       ready: Boolean(appServerReadyPid),
       readyPid: appServerReadyPid,
-      pidFromFile: readPidFile(appServerPidFile),
+      pidFromFile: readPidFile(sharedContext.appServerPidFile),
     },
     bridge: {
       pid: bridge.pid,
@@ -163,7 +121,7 @@ async function collectHealth() {
   };
 }
 
-function buildAlert({ result, actions, errorMessage, after, config }: any) {
+function buildAlert({ result, actions, errorMessage, after, config, sharedContext }: any) {
   if (result === "recovered") {
     return {
       kind: "recovered",
@@ -195,7 +153,7 @@ function buildAlert({ result, actions, errorMessage, after, config }: any) {
         after.bridge.lastError ? `bridge error: ${after.bridge.lastError}` : "",
         errorMessage ? `watchdog error: ${errorMessage}` : "",
         `workspace: ${normalizeText(config.workspaceRoot) || "(unknown)"}`,
-        `日志: ${appServerLogFile} | ${bridgeLogFile}`,
+        `日志: ${sharedContext.appServerLogFile} | ${sharedContext.bridgeLogFile}`,
       ].filter(Boolean).join("\n"),
     };
   }

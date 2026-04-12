@@ -370,18 +370,34 @@ export class RuntimeTurnLifecycle {
         // stream, watchdog, or stopTypingForThread() settles it. Only the local
         // failure path should clear typing here.
         clearOnSuccess: false,
-      }, async () => this.runtimeAdapter.sendTextTurn({
-        bindingKey,
-        workspaceRoot,
-        text: prepared.text,
-        model: this.runtimeAdapter.getSessionStore().getCodexParamsForWorkspace(bindingKey, workspaceRoot).model,
-        accessMode: this.normalizeText(this.config.codexAccessMode),
-        metadata: {
-          workspaceId: prepared.workspaceId,
-          accountId: prepared.accountId,
-          senderId: prepared.senderId,
-        },
-      }));
+      }, async () => {
+        const sendArgs: {
+          bindingKey: string;
+          workspaceRoot: string;
+          text: string;
+          model?: string;
+          accessMode?: string;
+          metadata?: Record<string, unknown>;
+        } = {
+          bindingKey,
+          workspaceRoot,
+          text: prepared.text,
+          metadata: {
+            workspaceId: prepared.workspaceId,
+            accountId: prepared.accountId,
+            senderId: prepared.senderId,
+          },
+        };
+        const model = this.runtimeAdapter.getSessionStore().getCodexParamsForWorkspace(bindingKey, workspaceRoot).model;
+        if (model) {
+          sendArgs.model = model;
+        }
+        const accessMode = this.normalizeText(this.config.codexAccessMode);
+        if (accessMode) {
+          sendArgs.accessMode = accessMode;
+        }
+        return this.runtimeAdapter.sendTextTurn(sendArgs);
+      });
 
       this.streamDelivery.queueReplyTargetForThread(turn.threadId, {
         userId: prepared.senderId,

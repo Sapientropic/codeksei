@@ -165,7 +165,7 @@ function createControlCommandHarness({
       return pendingApproval ? { pendingApproval } : null;
     },
     resolveApproval(threadId: string, status?: string) {
-      resolveApprovalCalls.push({ threadId, status });
+      resolveApprovalCalls.push(status ? { threadId, status } : { threadId });
     },
   };
 

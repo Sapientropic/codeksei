@@ -23,7 +23,7 @@ test("image upload falls back to generic file delivery when image upload_param i
     async text() {
       return "";
     },
-  }) as unknown as Response) as typeof fetch;
+  }) as Response) as typeof fetch;
 
   try {
     const result = await sendWeixinMediaFile({
@@ -83,7 +83,7 @@ test("media upload falls back to alternate media api when primary stack still ha
     async text() {
       return "";
     },
-  }) as unknown as Response) as typeof fetch;
+  }) as Response) as typeof fetch;
 
   try {
     const result = await sendWeixinMediaFile({

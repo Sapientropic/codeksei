@@ -82,7 +82,9 @@ test("approval commands still resolve persisted pending approval after a restart
     decision: "accept",
   }]);
   assert.equal(sessionStore.getPendingApprovalForThread("thread-current"), null);
-  assert.match(textCalls[textCalls.length - 1].text, /已允许本次请求/u);
+  const lastTextCall = textCalls[textCalls.length - 1];
+  assert.ok(lastTextCall);
+  assert.match(lastTextCall.text, /已允许本次请求/u);
 });
 
 test("restoreBoundThreadSubscriptions rehydrates persisted approval into thread runtime state", async () => {
@@ -90,6 +92,82 @@ test("restoreBoundThreadSubscriptions rehydrates persisted approval into thread 
   const threadStateStore = new ThreadStateStore();
   const resumedThreads: string[] = [];
   const streamTargets: Array<{ bindingKey: string; target: unknown }> = [];
+  const channelAdapter: ChannelAdapterLike = {
+    describe() {
+      return { id: "test-weixin" };
+    },
+    getKnownContextTokens() {
+      return {};
+    },
+    async getUpdates() {
+      return { ret: 0, msgs: [] };
+    },
+    loadSyncBuffer() {
+      return "";
+    },
+    async login() {
+      return {};
+    },
+    normalizeIncomingMessage(message: unknown) {
+      return message;
+    },
+    printAccounts() {},
+    resolveAccount() {
+      return { accountId: "acct-1", baseUrl: "http://localhost" };
+    },
+    async sendFile() {
+      return {};
+    },
+    sendText() {
+      return Promise.resolve();
+    },
+    sendTyping() {
+      return Promise.resolve();
+    },
+  };
+  const runtimeAdapter: RuntimeAdapterLike = {
+    async cancelTurn() {
+      return {};
+    },
+    async close() {},
+    describe() {
+      return { id: "test-runtime" };
+    },
+    getSessionStore() {
+      return sessionStore;
+    },
+    async initialize() {
+      return {
+        endpoint: "ws://runtime",
+        models: [],
+      };
+    },
+    onEvent() {
+      return () => {};
+    },
+    async refreshThreadInstructions() {
+      return {};
+    },
+    async respondApproval() {
+      return {};
+    },
+    async resumeThread({ threadId }: { threadId: string }) {
+      resumedThreads.push(threadId);
+    },
+    async sendTextTurn() {
+      throw new Error("sendTextTurn should not be called in this test");
+    },
+  };
+  const streamDelivery: StreamDeliveryLike = {
+    async finalizeAbandonedTurn() {
+      return {};
+    },
+    async handleRuntimeEvent() {},
+    queueReplyTargetForThread() {},
+    setReplyTarget(bindingKeyValue: string, target: unknown) {
+      streamTargets.push({ bindingKey: bindingKeyValue, target });
+    },
+  };
   const lifecycle = new RuntimeWatchdogLifecycle({
     buildApprovalPromptSignature() {
       return "";
@@ -97,14 +175,7 @@ test("restoreBoundThreadSubscriptions rehydrates persisted approval into thread 
     buildApprovalPromptText() {
       return "";
     },
-    channelAdapter: {
-      sendText() {
-        return Promise.resolve();
-      },
-      sendTyping() {
-        return Promise.resolve();
-      },
-    } as unknown as ChannelAdapterLike,
+    channelAdapter,
     matchesBuiltInCommandPrefix() {
       return false;
     },
@@ -127,19 +198,8 @@ test("restoreBoundThreadSubscriptions rehydrates persisted approval into thread 
       }
       return null;
     },
-    runtimeAdapter: {
-      getSessionStore() {
-        return sessionStore;
-      },
-      async resumeThread({ threadId }: { threadId: string }) {
-        resumedThreads.push(threadId);
-      },
-    } as unknown as RuntimeAdapterLike,
-    streamDelivery: {
-      setReplyTarget(bindingKeyValue: string, target: unknown) {
-        streamTargets.push({ bindingKey: bindingKeyValue, target });
-      },
-    } as unknown as StreamDeliveryLike,
+    runtimeAdapter,
+    streamDelivery,
     streamSettlementTimeoutMs: 1000,
     threadStateStore,
     firstRuntimeEventFailureTimeoutMs: 1000,

@@ -73,8 +73,11 @@ test("timeline state sync migrates legacy Asia/Shanghai buckets into current tim
 
   const state = readTimelineState(dirPath);
   assert.equal(state.timezone, "America/Los_Angeles");
-  assert.ok(state.facts["2026-04-09"]);
-  assert.equal(state.facts["2026-04-09"].events[0].id, "evt-1");
+  const syncedDay = state.facts["2026-04-09"];
+  assert.ok(syncedDay);
+  const syncedEvent = syncedDay.events[0];
+  assert.ok(syncedEvent);
+  assert.equal(syncedEvent.id, "evt-1");
 });
 
 test("timeline state sync does not rewrite a custom timezone just because the machine differs", () => {
@@ -105,8 +108,11 @@ test("timeline state sync does not rewrite a custom timezone just because the ma
 
   const state = readTimelineState(dirPath);
   assert.equal(state.timezone, "America/New_York");
-  assert.ok(state.facts["2026-04-10"]);
-  assert.equal(state.facts["2026-04-10"].events[0].id, "evt-1");
+  const preservedDay = state.facts["2026-04-10"];
+  assert.ok(preservedDay);
+  const preservedEvent = preservedDay.events[0];
+  assert.ok(preservedEvent);
+  assert.equal(preservedEvent.id, "evt-1");
 });
 
 test("timeline state sync bootstraps timezone metadata for an empty state dir", () => {

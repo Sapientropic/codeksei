@@ -68,7 +68,7 @@ async function runNoteSyncCommand(config: unknown, args: string[] = []) {
 }
 
 function parseNoteSyncArgs(args: string[]): NoteSyncOptions {
-  return parseCliArgs(args, getCommandArgsSchema("noteSync")) as unknown as NoteSyncOptions;
+  return parseCliArgs<NoteSyncOptions>(args, getCommandArgsSchema("noteSync"));
 }
 
 async function resolveBody(options: NoteSyncOptions): Promise<string> {

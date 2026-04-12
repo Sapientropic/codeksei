@@ -93,9 +93,11 @@ export function buildAllVisibleReplyText(
 export function findLatestVisibleReplyText(state: RunState, { completedOnly }: { completedOnly: boolean }): string {
   const visibleItems = collectVisibleItems(state, { completedOnly });
   for (let index = visibleItems.length - 1; index >= 0; index -= 1) {
-    if (visibleItems[index].itemId !== "__watchdog__") {
-      return visibleItems[index].text;
+    const item = visibleItems[index];
+    if (!item || item.itemId === "__watchdog__") {
+      continue;
     }
+    return item.text;
   }
   return "";
 }
@@ -155,6 +157,9 @@ export function findStreamingTerminalReplyText(visibleItems: VisibleRunStateItem
   }
   for (let index = visibleItems.length - 1; index >= 0; index -= 1) {
     const item = visibleItems[index];
+    if (!item) {
+      continue;
+    }
     if (item.itemId === "__watchdog__") {
       continue;
     }
@@ -327,7 +332,7 @@ export function prepareStreamingDelivery(
   return {
     state,
     safeText: deltaParts.join(""),
-    relation: deliveredItems.length === 1
+    relation: deliveredItems.length === 1 && deliveredItems[0]
       ? deliveredItems[0].relation
       : (deliveredItems.length > 1 ? "batch" : "keep"),
     deliveredItems,

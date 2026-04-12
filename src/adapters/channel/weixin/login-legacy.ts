@@ -81,7 +81,7 @@ async function waitForLegacyWeixinLogin({
   let refreshCount = 1;
 
   console.log("使用微信扫描以下二维码，以完成连接：\n");
-  printQrCode((qrResponse as any).qrcode_img_content);
+  printQrCode(qrResponse.qrcode_img_content);
   console.log("\n等待连接结果...\n");
 
   const deadline = Date.now() + timeoutMs;
@@ -95,10 +95,10 @@ async function waitForLegacyWeixinLogin({
         throw new Error("二维码多次过期，请重新执行 login");
       }
       console.log(`二维码已过期，正在刷新...(${refreshCount}/${MAX_QR_REFRESH_COUNT})\n`);
-      printQrCode((qrResponse as any).qrcode_img_content);
+      printQrCode(qrResponse.qrcode_img_content);
     }
 
-    const statusResponse = await pollQrStatus(apiBaseUrl, (qrResponse as any).qrcode);
+    const statusResponse = await pollQrStatus(apiBaseUrl, qrResponse.qrcode);
     switch (statusResponse.status) {
       case "wait":
         process.stdout.write(".");
@@ -118,7 +118,7 @@ async function waitForLegacyWeixinLogin({
           throw new Error("二维码多次过期，请重新执行 login");
         }
         console.log(`二维码已过期，正在刷新...(${refreshCount}/${MAX_QR_REFRESH_COUNT})\n`);
-        printQrCode((qrResponse as any).qrcode_img_content);
+        printQrCode(qrResponse.qrcode_img_content);
         break;
       case "confirmed":
         if (!statusResponse.bot_token || !statusResponse.ilink_bot_id) {

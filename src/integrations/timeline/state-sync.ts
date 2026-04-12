@@ -81,7 +81,7 @@ function regroupFactsByTimezone(facts: any, timezone: any) {
   const buckets = new Map();
 
   for (const [originalDate, rawDay] of Object.entries(facts || {})) {
-    const day = rawDay && typeof rawDay === "object" ? (rawDay as any) : {};
+    const day = isRecord(rawDay) ? rawDay : {};
     const events = Array.isArray(day.events) ? day.events : [];
     if (!events.length) {
       mergeDayBucket(buckets, originalDate, day, []);
@@ -227,6 +227,10 @@ function writeJsonFile(filePath: any, value: any) {
 
 function normalizeText(value: any) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 export {

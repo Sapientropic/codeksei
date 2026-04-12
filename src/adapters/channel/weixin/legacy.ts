@@ -233,13 +233,16 @@ function createLegacyWeixinChannelAdapter(config: LegacyWeixinConfig) {
         WEIXIN_MAX_DELIVERY_MESSAGES,
         MAX_WEIXIN_CHUNK
       );
-      const traceContext = buildWeixinTraceContext(trace, {
-        enabled: config.weixinDeliveryTrace,
+      const traceDefaults: TraceContext = {
         origin: "adapter.sendText",
         variant: "legacy",
         preserveBlock,
         chunkTotal: sendChunks.length,
-      });
+      };
+      if (typeof config.weixinDeliveryTrace === "boolean") {
+        traceDefaults.enabled = config.weixinDeliveryTrace;
+      }
+      const traceContext = buildWeixinTraceContext(trace, traceDefaults);
       for (let index = 0; index < sendChunks.length; index += 1) {
         const compactChunk = normalizePlainTextForWeixin(sendChunks[index]) || "已完成。";
         const clientId = crypto.randomUUID();
@@ -442,16 +445,16 @@ function collectStreamingBoundaries(text: string): number[] {
   }
 
   for (let index = 0; index < text.length; index += 1) {
-    const char = text[index];
+    const char = text[index] || "";
     if (!/[。！？!?]/.test(char)) {
       continue;
     }
 
     let end = index + 1;
-    while (end < text.length && /["'”’）)\]」』】]/.test(text[end])) {
+    while (end < text.length && /["'”’）)\]」』】]/.test(text[end] || "")) {
       end += 1;
     }
-    while (end < text.length && /[\t \n]/.test(text[end])) {
+    while (end < text.length && /[\t \n]/.test(text[end] || "")) {
       end += 1;
     }
     boundaries.add(end);
@@ -491,7 +494,11 @@ async function sendTextChunkWithRetry<T>(
       if (!retryable) {
         throw error;
       }
-      await sleep(retryDelays[attempt]);
+      const retryDelay = retryDelays[attempt];
+      if (retryDelay === undefined) {
+        throw error;
+      }
+      await sleep(retryDelay);
     }
   }
   throw lastError || new Error("sendText chunk failed");

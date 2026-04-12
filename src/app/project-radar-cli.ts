@@ -109,7 +109,7 @@ async function runProjectRadarCommand(config: unknown, args: string[] = []) {
 }
 
 function parseProjectRadarArgs(args: string[]): ProjectRadarOptions {
-  return parseCliArgs(args, getCommandArgsSchema("projectRadar")) as unknown as ProjectRadarOptions;
+  return parseCliArgs<ProjectRadarOptions>(args, getCommandArgsSchema("projectRadar"));
 }
 
 function printProjectList(radarConfig: ProjectRadarConfig, trackedProjects: TrackedProject[]): void {

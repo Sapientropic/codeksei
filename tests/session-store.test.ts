@@ -85,3 +85,35 @@ test("SessionStore round-trips pending approvals with deep normalized state", ()
     promptedAt: "2026-04-12T00:00:00.000Z",
   });
 });
+
+test("SessionStore keeps both bindings when two instances write the same file in sequence", () => {
+  const { filePath } = createTempSessionFile();
+  const storeA = new SessionStore({ filePath });
+  const storeB = new SessionStore({ filePath });
+
+  storeA.setThreadIdForWorkspace("binding-a", "E:/repo/a", "thread-a");
+  storeB.setThreadIdForWorkspace("binding-b", "E:/repo/b", "thread-b");
+
+  const reloaded = new SessionStore({ filePath });
+  assert.deepEqual(
+    reloaded.listBindings().map((entry) => entry.bindingKey).sort((left, right) => left.localeCompare(right)),
+    ["binding-a", "binding-b"]
+  );
+  assert.equal(reloaded.getThreadIdForWorkspace("binding-a", "E:/repo/a"), "thread-a");
+  assert.equal(reloaded.getThreadIdForWorkspace("binding-b", "E:/repo/b"), "thread-b");
+});
+
+test("SessionStore read APIs refresh persisted state written by another instance", () => {
+  const { filePath } = createTempSessionFile();
+  const reader = new SessionStore({ filePath });
+  const writer = new SessionStore({ filePath });
+
+  writer.setThreadIdForWorkspace("binding-a", "E:/repo/current", "thread-current");
+
+  assert.equal(reader.getThreadIdForWorkspace("binding-a", "E:/repo/current"), "thread-current");
+  assert.deepEqual(reader.listWorkspaceRoots("binding-a"), ["E:/repo/current"]);
+  assert.deepEqual(reader.findBindingForThreadId("thread-current"), {
+    bindingKey: "binding-a",
+    workspaceRoot: "E:/repo/current",
+  });
+});

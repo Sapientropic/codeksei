@@ -9,6 +9,8 @@
     "skipLibCheck": true,
     "strict": true,
     "noImplicitAny": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
     "moduleDetection": "force"
   },
   "include": [

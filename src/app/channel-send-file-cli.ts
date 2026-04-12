@@ -38,7 +38,7 @@ async function runChannelSendFileCommand(app: ChannelSendFileApp, args: string[]
 }
 
 function parseArgs(args: string[]): ChannelSendFileOptions {
-  return parseCliArgs(args, getCommandArgsSchema("channelSendFile")) as unknown as ChannelSendFileOptions;
+  return parseCliArgs<ChannelSendFileOptions>(args, getCommandArgsSchema("channelSendFile"));
 }
 
 export { runChannelSendFileCommand };

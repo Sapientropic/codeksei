@@ -1,18 +1,15 @@
 import * as brandingModule from "../core/branding";
-import * as sharedWatchdogModule from "./shared-watchdog";
+import { runWatchdogOnce } from "./shared-watchdog";
 import {
   ensureLogDir,
   isPidAlive,
   readPidFile,
   readProcessCommandLine,
   removePidFileIfMatches,
-  supervisorPidFile,
+  resolveSharedProcessContext,
   writePidFile,
 } from "./shared-common";
 
-const { runWatchdogOnce } = sharedWatchdogModule as {
-  runWatchdogOnce: (options?: { shouldPrintSummary?: boolean }) => Promise<Record<string, unknown>>;
-};
 const { readPrefixedEnv } = brandingModule as {
   readPrefixedEnv: (env: NodeJS.ProcessEnv, key: string) => string;
 };
@@ -72,7 +69,8 @@ function isRecord(value: unknown): value is Record<string, any> {
 }
 
 function ensureSingleInstance() {
-  const existingPid = readPidFile(supervisorPidFile);
+  const sharedContext = resolveSharedProcessContext();
+  const existingPid = readPidFile(sharedContext.supervisorPidFile);
   if (!existingPid || existingPid === process.pid || !isPidAlive(existingPid)) {
     return 0;
   }
@@ -85,6 +83,7 @@ function ensureSingleInstance() {
 }
 
 function installSignalHandlers() {
+  const sharedContext = resolveSharedProcessContext();
   const shutdown = (signal: any) => {
     if (shuttingDown) {
       return;
@@ -98,12 +97,13 @@ function installSignalHandlers() {
   }
 
   process.on("exit", () => {
-    removePidFileIfMatches(supervisorPidFile, process.pid);
+    removePidFileIfMatches(sharedContext.supervisorPidFile, process.pid);
   });
 }
 
 async function main() {
-  ensureLogDir();
+  const sharedContext = resolveSharedProcessContext();
+  ensureLogDir(sharedContext);
   const existingPid = ensureSingleInstance();
   if (existingPid) {
     logLine(`already_running pid=${existingPid}`);
@@ -112,7 +112,7 @@ async function main() {
 
   const intervalMinutes = parseIntervalMinutes(process.argv.slice(2));
   const intervalMs = intervalMinutes * 60_000;
-  writePidFile(supervisorPidFile, process.pid);
+  writePidFile(sharedContext.supervisorPidFile, process.pid);
   installSignalHandlers();
 
   // Keep one long-lived background process per desktop session so healthy
@@ -130,12 +130,12 @@ async function main() {
           ? ` actions=${state.actions.join(" | ")}`
           : "";
         const error = state.error ? ` error=${state.error}` : "";
-        const after = isRecord(state.after) ? state.after : {};
-        const appServerState = isRecord(after.appServer) ? after.appServer : {};
-        const bridgeState = isRecord(after.bridge) ? after.bridge : {};
+        const after = isRecord(state.after) ? state.after : null;
+        const appServerState = after && isRecord(after.appServer) ? after.appServer : null;
+        const bridgeState = after && isRecord(after.bridge) ? after.bridge : null;
         logLine(
-          `result=${state.result} readyz=${appServerState.ready ? "ok" : "down"} `
-          + `bridge=${String(bridgeState.heartbeatStatus || "missing")}${actions}${error}`
+          `result=${state.result} readyz=${appServerState?.ready ? "ok" : "down"} `
+          + `bridge=${String(bridgeState?.heartbeatStatus || "missing")}${actions}${error}`
         );
         lastLoggedSignature = signature;
       }
@@ -148,7 +148,7 @@ async function main() {
     }
   }
 
-  removePidFileIfMatches(supervisorPidFile, process.pid);
+  removePidFileIfMatches(sharedContext.supervisorPidFile, process.pid);
   logLine(`stopped pid=${process.pid}`);
 }
 

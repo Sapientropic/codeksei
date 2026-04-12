@@ -16,9 +16,9 @@ import * as noteSyncCliModule from "./app/note-sync-cli";
 import * as projectRadarCliModule from "./app/project-radar-cli";
 import * as reviewCliModule from "./app/review-cli";
 import * as timelineEventCliModule from "./app/timeline-event-cli";
-import * as timelineScreenshotCliModule from "./app/timeline-screenshot-cli";
+import { runTimelineScreenshotCommand } from "./app/timeline-screenshot-cli";
 import * as systemCheckinPollerModule from "./app/system-checkin-poller";
-import * as systemSendCliModule from "./app/system-send-cli";
+import { runSystemSendCommand } from "./app/system-send-cli";
 import * as commandSurfaceModule from "./contracts/command-surface";
 import * as cliArgsModule from "./core/cli-args";
 import * as commandRegistryModule from "./core/command-registry";
@@ -76,14 +76,8 @@ const { runTimelineEventCommand } = timelineEventCliModule as {
     args: string[],
   ) => Promise<void>;
 };
-const { runTimelineScreenshotCommand } = timelineScreenshotCliModule as unknown as {
-  runTimelineScreenshotCommand: (config: RuntimeConfig, args: string[]) => Promise<void>;
-};
 const { runSystemCheckinPoller } = systemCheckinPollerModule as {
   runSystemCheckinPoller: (config: RuntimeConfig) => Promise<void>;
-};
-const { runSystemSendCommand } = systemSendCliModule as unknown as {
-  runSystemSendCommand: (config: RuntimeConfig, args: string[]) => Promise<void>;
 };
 const { findTerminalCommandManifest } = commandSurfaceModule as {
   findTerminalCommandManifest: (command: string, subcommand: string) => TerminalCommandManifest | null;
@@ -93,10 +87,12 @@ const { sliceLeafCommandArgs } = cliArgsModule as {
 };
 const {
   buildTerminalHelpText,
+  buildTerminalLeafHelp,
   buildTerminalTopicHelp,
   isPlannedTerminalTopic,
 } = commandRegistryModule as {
   buildTerminalHelpText: () => string;
+  buildTerminalLeafHelp: (actionId: unknown, context?: Record<string, unknown>) => string;
   buildTerminalTopicHelp: (topic: string) => string;
   isPlannedTerminalTopic: (command: string) => boolean;
 };
@@ -113,6 +109,9 @@ const { resolveConfiguredPersonName } = personReferenceModule as {
 interface RuntimeConfig extends Record<string, unknown> {
   sessionsFile: string;
   stateDir: string;
+  systemMessageQueueFile: string;
+  systemMessageDeadLetterFile: string;
+  timelineScreenshotQueueFile: string;
   workspaceId: string;
   workspaceRoot: string;
   startWithCheckin?: boolean;
@@ -124,11 +123,21 @@ interface TimelineIntegrationLike {
 }
 
 interface TerminalCommandManifest {
+  action: string;
   command: string;
   subcommand?: string;
   runner: string;
+  helpTopic?: string;
   kind?: string;
   timelineSubcommand?: string;
+}
+
+interface ParsedCommandIntent {
+  argv: string[];
+  command: string;
+  subcommand: string;
+  manifest: TerminalCommandManifest | null;
+  helpFlag: boolean;
 }
 
 function ensureDefaultStateDirectory(): void {
@@ -200,52 +209,83 @@ function installRuntimeErrorHooks(): void {
 }
 
 export async function main(): Promise<void> {
-  loadEnv();
-  ensureRuntimeEnv();
-  installRuntimeErrorHooks();
   const argv = process.argv.slice(2);
-  const leafArgs = sliceLeafCommandArgs(process.argv, 4);
-  const baseConfig = readConfig();
+  const intent = parseCommandIntent(argv);
+  if (runReadonlyHelpPath(intent)) {
+    return;
+  }
+
+  installRuntimeErrorHooks();
+  const runtimeContext = loadRuntimeContext(argv);
+  if (intent.manifest) {
+    await runTerminalManifestCommand(intent.manifest, runtimeContext);
+    return;
+  }
+
+  throw new Error(`未知命令: ${intent.command}`);
+}
+
+function parseCommandIntent(argv: string[]): ParsedCommandIntent {
   const command = argv[0] || "help";
   const subcommand = argv[1] || "";
+  return {
+    argv,
+    command,
+    subcommand,
+    manifest: resolveTerminalCommandManifest(command, subcommand),
+    helpFlag: hasArgFlag(argv, "--help") || hasArgFlag(argv, "-h"),
+  };
+}
+
+function runReadonlyHelpPath({ command, subcommand, manifest, helpFlag }: ParsedCommandIntent): boolean {
+  if (command === "help" || command === "--help" || command === "-h") {
+    const topicHelp = subcommand ? buildTerminalTopicHelp(subcommand) : "";
+    console.log(topicHelp || buildTerminalHelpText());
+    return true;
+  }
+
+  if (manifest && helpFlag) {
+    const leafHelp = buildTerminalLeafHelp(manifest.action);
+    const topicHelp = buildTerminalTopicHelp(manifest.helpTopic || manifest.command);
+    console.log(leafHelp || topicHelp || buildTerminalHelpText());
+    return true;
+  }
+
+  if (isPlannedTerminalTopic(command) && (helpFlag || subcommand === "help" || !subcommand)) {
+    console.log(buildTerminalTopicHelp(command));
+    return true;
+  }
+
+  return false;
+}
+
+function loadRuntimeContext(argv: string[]): {
+  argv: string[];
+  config: RuntimeConfig;
+  getApp: () => CodekseiApp;
+  leafArgs: string[];
+} {
+  loadEnv();
+  ensureRuntimeEnv();
+  const leafArgs = sliceLeafCommandArgs(process.argv, 4);
+  const baseConfig = readConfig();
   const config: RuntimeConfig = {
     ...baseConfig,
     startWithCheckin: Boolean(baseConfig.startWithCheckin || hasArgFlag(argv, "--checkin")),
   };
   ensureBootstrapFiles(config);
   let app: CodekseiApp | null = null;
-  const getApp = (): CodekseiApp => {
-    if (!app) {
-      app = new CodekseiApp(config);
-    }
-    return app;
+  return {
+    argv,
+    config,
+    leafArgs,
+    getApp: () => {
+      if (!app) {
+        app = new CodekseiApp(config);
+      }
+      return app;
+    },
   };
-
-  if (command === "help" || command === "--help" || command === "-h") {
-    const topicHelp = subcommand ? buildTerminalTopicHelp(subcommand) : "";
-    console.log(topicHelp || buildTerminalHelpText());
-    return;
-  }
-
-  if (isPlannedTerminalTopic(command)) {
-    if (subcommand === "help" || !subcommand) {
-      console.log(buildTerminalTopicHelp(command));
-      return;
-    }
-  }
-
-  const manifest = resolveTerminalCommandManifest(command, subcommand);
-  if (manifest) {
-    await runTerminalManifestCommand(manifest, {
-      argv,
-      config,
-      getApp,
-      leafArgs,
-    });
-    return;
-  }
-
-  throw new Error(`未知命令: ${command}`);
 }
 
 export function resolveTerminalCommandManifest(command: unknown, subcommand: unknown): TerminalCommandManifest | null {

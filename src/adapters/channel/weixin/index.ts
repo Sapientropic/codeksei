@@ -128,7 +128,7 @@ export function createWeixinChannelAdapter(config: WeixinConfig): WeixinChannelA
       // upload_param") only appeared after we forced media onto the v2 headers.
       // Keep this split explicit so future "cleanup" work does not silently route
       // screenshots/files back onto the broken stack.
-      return sendWeixinMediaFile({
+      const sendArgs = {
         filePath,
         to: userId,
         contextToken: resolvedToken,
@@ -136,9 +136,10 @@ export function createWeixinChannelAdapter(config: WeixinConfig): WeixinChannelA
         token: account.token,
         cdnBaseUrl: normalizeWeixinConfigText(config.weixinCdnBaseUrl),
         apiVariant: "legacy",
-        routeTag: account.routeTag,
         clientVersion: normalizeWeixinConfigText(config.weixinProtocolClientVersion),
-      });
+      };
+      const routeTag = normalizeWeixinConfigText(account.routeTag);
+      return sendWeixinMediaFile(routeTag ? { ...sendArgs, routeTag } : sendArgs);
     },
   };
 }

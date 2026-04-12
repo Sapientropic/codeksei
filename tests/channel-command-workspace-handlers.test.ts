@@ -76,11 +76,15 @@ test("bind canonicalizes the workspace path before persisting it", async () => {
   });
 
   assert.equal(harness.setWorkspaceCalls.length, 1);
+  const firstWorkspaceCall = harness.setWorkspaceCalls[0];
+  assert.ok(firstWorkspaceCall);
   assert.equal(
-    harness.setWorkspaceCalls[0].workspaceRoot,
+    firstWorkspaceCall.workspaceRoot,
     normalizeWorkspacePath(fs.realpathSync(workspaceRoot))
   );
-  assert.match(harness.textCalls[0].text, /^已绑定项目。/);
+  const bindTextCall = harness.textCalls[0];
+  assert.ok(bindTextCall);
+  assert.match(bindTextCall.text, /^已绑定项目。/);
 });
 
 test("status reports thread, model, and usage summary", async () => {
@@ -96,11 +100,13 @@ test("status reports thread, model, and usage summary", async () => {
 
   await harness.handlers.status(buildNormalizedCommandMessage("/status"));
 
-  assert.match(harness.textCalls[0].text, /workspace: E:\/repo\/current/);
-  assert.match(harness.textCalls[0].text, /thread: thread-current/);
-  assert.match(harness.textCalls[0].text, /status: running/);
-  assert.match(harness.textCalls[0].text, /model: gpt-5/);
-  assert.match(harness.textCalls[0].text, /usage:/);
+  const statusTextCall = harness.textCalls[0];
+  assert.ok(statusTextCall);
+  assert.match(statusTextCall.text, /workspace: E:\/repo\/current/);
+  assert.match(statusTextCall.text, /thread: thread-current/);
+  assert.match(statusTextCall.text, /status: running/);
+  assert.match(statusTextCall.text, /model: gpt-5/);
+  assert.match(statusTextCall.text, /usage:/);
 });
 
 test("new clears the current workspace thread binding", async () => {
@@ -120,10 +126,14 @@ test("reread reuses the current thread and schedules the runtime watchdog", asyn
   await harness.handlers.reread(buildNormalizedCommandMessage("/reread"));
 
   assert.equal(harness.queueReplyCalls.length, 1);
-  assert.equal(harness.queueReplyCalls[0].threadId, "thread-current");
+  const firstQueueReply = harness.queueReplyCalls[0];
+  assert.ok(firstQueueReply);
+  assert.equal(firstQueueReply.threadId, "thread-current");
   assert.equal(harness.watchdogCalls.length, 1);
   assert.equal(harness.refreshCalls.length, 1);
-  assert.equal(harness.refreshCalls[0].threadId, "thread-current");
+  const firstRefreshCall = harness.refreshCalls[0];
+  assert.ok(firstRefreshCall);
+  assert.equal(firstRefreshCall.threadId, "thread-current");
 });
 
 test("switch follows the known target thread workspace", async () => {
@@ -147,7 +157,9 @@ test("switch follows the known target thread workspace", async () => {
     workspaceRoot: "E:/repo/other",
     threadId: "thread-old",
   }]);
-  assert.match(harness.textCalls[0].text, /已跟随这条 thread 的已知 workspace。/);
+  const switchTextCall = harness.textCalls[0];
+  assert.ok(switchTextCall);
+  assert.match(switchTextCall.text, /已跟随这条 thread 的已知 workspace。/);
 });
 
 test("stop only cancels a running turn", async () => {
@@ -156,7 +168,9 @@ test("stop only cancels a running turn", async () => {
   });
   await idleHarness.handlers.stop(buildNormalizedCommandMessage("/stop"));
   assert.deepEqual(idleHarness.cancelCalls, []);
-  assert.match(idleHarness.textCalls[0].text, /当前没有正在运行的线程。/);
+  const idleStopText = idleHarness.textCalls[0];
+  assert.ok(idleStopText);
+  assert.match(idleStopText.text, /当前没有正在运行的线程。/);
 
   const runningHarness = createWorkspaceCommandHarness({
     currentThreadState: { status: "running", turnId: "turn-1" },

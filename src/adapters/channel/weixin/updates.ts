@@ -112,14 +112,15 @@ export function createWeixinUpdateState(config: WeixinConfig) {
     timeoutMs = LONG_POLL_TIMEOUT_MS,
   }: GetUpdatesArgs = {}): Promise<GetUpdatesResponse> {
     const account = ensureAccount();
-    const response = await getUpdatesV2({
+    const getUpdatesArgs = {
       baseUrl: account.baseUrl,
       token: account.token,
       getUpdatesBuf: syncBuffer,
       timeoutMs,
-      routeTag: account.routeTag,
       clientVersion: normalizeText(config.weixinProtocolClientVersion),
-    }) as GetUpdatesResponse;
+    };
+    const routeTag = normalizeText(account.routeTag);
+    const response = await getUpdatesV2(routeTag ? { ...getUpdatesArgs, routeTag } : getUpdatesArgs) as GetUpdatesResponse;
     if (typeof response?.get_updates_buf === "string" && response.get_updates_buf.trim()) {
       saveSyncBuffer(config, account.accountId, response.get_updates_buf.trim());
     }

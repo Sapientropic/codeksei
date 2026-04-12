@@ -85,7 +85,8 @@ class ReminderQueueStore {
   peekNextDueAtMs() {
     this.load();
     const first = this.state.reminders[0];
-    return Number.isFinite(first?.dueAtMs) ? first.dueAtMs : 0;
+    const dueAtMs = first?.dueAtMs;
+    return Number.isFinite(dueAtMs) ? dueAtMs : 0;
   }
 }
 

@@ -122,7 +122,7 @@ async function runSystemSendCommand(config: RuntimeConfig, args: string[] = []) 
 }
 
 function parseSystemSendArgs(args: string[]): SystemSendOptions {
-  return parseCliArgs(args, getCommandArgsSchema("systemSend")) as unknown as SystemSendOptions;
+  return parseCliArgs<SystemSendOptions>(args, getCommandArgsSchema("systemSend"));
 }
 
 export { runSystemSendCommand };

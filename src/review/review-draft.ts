@@ -249,8 +249,13 @@ function resolveWeeklyWindow(options: { week?: unknown; date?: unknown; timezone
     if (!match) {
       throw new Error(`--week 格式应为 YYYY-Www: ${options.week}`);
     }
-    const year = Number.parseInt(match[1], 10);
-    const week = Number.parseInt(match[2], 10);
+    const yearText = match[1];
+    const weekText = match[2];
+    if (!yearText || !weekText) {
+      throw new Error(`--week 格式应为 YYYY-Www: ${options.week}`);
+    }
+    const year = Number.parseInt(yearText, 10);
+    const week = Number.parseInt(weekText, 10);
     const weekOneStart = startOfIsoWeek(createUtcDate(year, 1, 4));
     const start = addDays(weekOneStart, (week - 1) * 7);
     const end = addDays(start, 6);
@@ -284,8 +289,13 @@ function resolveMonthlyWindow(options: { month?: unknown; date?: unknown; timezo
     if (!match) {
       throw new Error(`--month 格式应为 YYYY-MM: ${options.month}`);
     }
-    year = Number.parseInt(match[1], 10);
-    month = Number.parseInt(match[2], 10);
+    const yearText = match[1];
+    const monthText = match[2];
+    if (!yearText || !monthText) {
+      throw new Error(`--month 格式应为 YYYY-MM: ${options.month}`);
+    }
+    year = Number.parseInt(yearText, 10);
+    month = Number.parseInt(monthText, 10);
   } else {
     const timezone = normalizeText(options.timezone) || LEGACY_TIMELINE_TIMEZONE;
     const baseDate = normalizeText(options.date)
@@ -494,10 +504,16 @@ function parseDateString(value: string): Date {
   if (!match) {
     throw new Error(`日期格式应为 YYYY-MM-DD: ${value}`);
   }
+  const yearText = match[1];
+  const monthText = match[2];
+  const dayText = match[3];
+  if (!yearText || !monthText || !dayText) {
+    throw new Error(`日期格式应为 YYYY-MM-DD: ${value}`);
+  }
   return createUtcDate(
-    Number.parseInt(match[1], 10),
-    Number.parseInt(match[2], 10),
-    Number.parseInt(match[3], 10),
+    Number.parseInt(yearText, 10),
+    Number.parseInt(monthText, 10),
+    Number.parseInt(dayText, 10),
   );
 }
 

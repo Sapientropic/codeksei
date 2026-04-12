@@ -3,7 +3,7 @@ import {
   ensureManagedAppServer,
   ensureManagedBridge,
   ensureManagedSupervisor,
-  listenUrl,
+  resolveSharedProcessContext,
 } from "./shared-common";
 
 const { readPrefixedEnv } = brandingModule as {
@@ -28,9 +28,10 @@ function parseIntervalMinutes() {
 }
 
 async function main() {
+  const sharedContext = resolveSharedProcessContext();
   const appServer = await ensureManagedAppServer({ restartUnhealthy: true });
   const appServerPidLabel = appServer.pid ? ` pid=${appServer.pid}` : "";
-  console.log(`shared app-server ${appServer.status}${appServerPidLabel} listen=${listenUrl}`);
+  console.log(`shared app-server ${appServer.status}${appServerPidLabel} listen=${sharedContext.listenUrl}`);
 
   const bridge = await ensureManagedBridge({ restartUnhealthy: true });
   console.log(`shared codeksei ${bridge.status} pid=${bridge.pid}`);

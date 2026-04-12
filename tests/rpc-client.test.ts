@@ -20,25 +20,29 @@ interface FakeChild extends NodeEventEmitter {
 }
 
 function createFakeWritable(): FakeWritable {
-  const writable = new EventEmitter() as unknown as FakeWritable;
-  writable.writable = true;
-  writable.writes = [];
-  writable.write = (chunk: unknown) => {
-    writable.writes.push(String(chunk));
-    return true;
-  };
+  const writable = Object.assign(new EventEmitter(), {
+    writable: true,
+    writes: [] as string[],
+    write(chunk: unknown) {
+      writable.writes.push(String(chunk));
+      return true;
+    },
+  }) as FakeWritable;
   return writable;
 }
 
 function createFakeChild({ autoSpawn = true }: { autoSpawn?: boolean } = {}): FakeChild {
-  const child = new EventEmitter() as unknown as FakeChild;
-  child.stdout = new EventEmitter();
-  child.stderr = new EventEmitter();
-  child.stdin = createFakeWritable();
-  child.kill = () => {
-    child.stdin.writable = false;
-  };
-  child.emitSpawn = () => queueMicrotask(() => child.emit("spawn"));
+  const child = Object.assign(new EventEmitter(), {
+    stdout: new EventEmitter(),
+    stderr: new EventEmitter(),
+    stdin: createFakeWritable(),
+    kill() {
+      child.stdin.writable = false;
+    },
+    emitSpawn() {
+      queueMicrotask(() => child.emit("spawn"));
+    },
+  }) as FakeChild;
   if (autoSpawn) {
     child.emitSpawn();
   }

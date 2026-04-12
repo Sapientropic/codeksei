@@ -119,7 +119,7 @@ function parseDelay(rawValue: any) {
   let totalMs = 0;
   let index = 0;
   while (index < normalized.length) {
-    while (index < normalized.length && /\s/.test(normalized[index])) {
+    while (index < normalized.length && /\s/.test(normalized[index] || "")) {
       index += 1;
     }
     if (index >= normalized.length) {
@@ -131,8 +131,9 @@ function parseDelay(rawValue: any) {
       return 0;
     }
 
-    const amount = Number.parseInt(match[1], 10);
-    const unitMs = DELAY_UNIT_MS[match[2] as keyof typeof DELAY_UNIT_MS] || 0;
+    const amount = Number.parseInt(match[1] || "", 10);
+    const unit = match[2];
+    const unitMs = unit ? DELAY_UNIT_MS[unit as keyof typeof DELAY_UNIT_MS] || 0 : 0;
     if (!Number.isFinite(amount) || amount <= 0 || !unitMs) {
       return 0;
     }

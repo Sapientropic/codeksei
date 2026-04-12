@@ -288,11 +288,16 @@ function buildTargetFileName({
       return sourceName;
     }
 
-    const inferredExt = inferExtension({
-      contentType,
-      plaintext,
-      kind: attachment.kind,
-    });
+    const inferredExt = inferExtension(attachment.kind
+      ? {
+        contentType,
+        plaintext,
+        kind: attachment.kind,
+      }
+      : {
+        contentType,
+        plaintext,
+      });
     return `${sourceName}${inferredExt}`;
   }
 
@@ -301,11 +306,16 @@ function buildTargetFileName({
     messageId || Date.now(),
     String((Number(attachment.index) || 0) + 1),
   ].join("-"));
-  const inferredExt = inferExtension({
-    contentType,
-    plaintext,
-    kind: attachment.kind,
-  });
+  const inferredExt = inferExtension(attachment.kind
+    ? {
+      contentType,
+      plaintext,
+      kind: attachment.kind,
+    }
+    : {
+      contentType,
+      plaintext,
+    });
   return `${baseName || "attachment"}${inferredExt}`;
 }
 
@@ -434,7 +444,11 @@ function normalizeText(value: unknown): string {
 }
 
 function normalizeContentType(value: unknown): string {
-  return typeof value === "string" ? value.split(";")[0].trim().toLowerCase() : "";
+  if (typeof value !== "string") {
+    return "";
+  }
+  const [firstPart = ""] = value.split(";");
+  return firstPart.trim().toLowerCase();
 }
 
 export {

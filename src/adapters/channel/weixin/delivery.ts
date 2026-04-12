@@ -3,6 +3,7 @@ import {
   getConfigV2,
   sendTextV2,
   sendTypingV2,
+  type GetConfigV2Args,
   type GetConfigV2Response,
   type SendTextV2Args,
   type SendTypingV2Args,
@@ -119,10 +120,9 @@ export function createWeixinDeliveryFacade({
       .then(() => {
         const compactChunk = normalizePlainTextForWeixin(chunk) || "已完成。";
         const clientId = `cb-${crypto.randomUUID()}`;
-        return sendV2TextChunk({
+        const chunkArgs: SendV2TextChunkArgs = {
           baseUrl: account.baseUrl,
           token: account.token,
-          routeTag: account.routeTag,
           clientVersion: normalizeText(config.weixinProtocolClientVersion),
           toUserId: userId,
           text: compactChunk,
@@ -135,7 +135,12 @@ export function createWeixinDeliveryFacade({
             textHash: hashTraceText(compactChunk),
             clientId,
           },
-        }).then(() => undefined);
+        };
+        const routeTag = normalizeText(account.routeTag);
+        if (routeTag) {
+          chunkArgs.routeTag = routeTag;
+        }
+        return sendV2TextChunk(chunkArgs).then(() => undefined);
       })
       .then(() => {
         if (index < sendChunks.length - 1) {
@@ -155,29 +160,36 @@ export function createWeixinDeliveryFacade({
     if (!resolvedToken) {
       return;
     }
-    const configResponse = await getConfigV2({
+    const configArgs: GetConfigV2Args = {
       baseUrl: account.baseUrl,
       token: account.token,
-      routeTag: account.routeTag,
       clientVersion: normalizeText(config.weixinProtocolClientVersion),
       ilinkUserId: userId,
       contextToken: resolvedToken,
-    }).catch((): GetConfigV2Response | null => null);
+    };
+    const routeTag = normalizeText(account.routeTag);
+    if (routeTag) {
+      configArgs.routeTag = routeTag;
+    }
+    const configResponse = await getConfigV2(configArgs).catch((): GetConfigV2Response | null => null);
     const typingTicket = normalizeText(isRecord(configResponse) ? configResponse.typing_ticket : "");
     if (!typingTicket) {
       return;
     }
-    await sendTypingV2({
+    const typingArgs: SendTypingV2Args = {
       baseUrl: account.baseUrl,
       token: account.token,
-      routeTag: account.routeTag,
       clientVersion: normalizeText(config.weixinProtocolClientVersion),
       body: {
         ilink_user_id: userId,
         typing_ticket: typingTicket,
         status,
       },
-    });
+    };
+    if (routeTag) {
+      typingArgs.routeTag = routeTag;
+    }
+    await sendTypingV2(typingArgs);
   }
 
   return {
@@ -349,16 +361,16 @@ function collectStreamingBoundaries(text: string): number[] {
   }
 
   for (let index = 0; index < text.length; index += 1) {
-    const char = text[index];
+    const char = text[index] || "";
     if (!/[。！？!?]/.test(char)) {
       continue;
     }
 
     let end = index + 1;
-    while (end < text.length && /["'”’）)\]」』】]/.test(text[end])) {
+    while (end < text.length && /["'”’）)\]」』】]/.test(text[end] || "")) {
       end += 1;
     }
-    while (end < text.length && /[\t \n]/.test(text[end])) {
+    while (end < text.length && /[\t \n]/.test(text[end] || "")) {
       end += 1;
     }
     boundaries.add(end);
@@ -398,7 +410,11 @@ async function sendTextChunkWithRetry<T>(
       if (!retryable) {
         throw error;
       }
-      await sleep(retryDelays[attempt]);
+      const retryDelay = retryDelays[attempt];
+      if (retryDelay === undefined) {
+        throw error;
+      }
+      await sleep(retryDelay);
     }
   }
   throw lastError || new Error("sendText chunk failed");

@@ -292,8 +292,8 @@ function resolveAheadBehind(repoRoot: string, upstream: unknown): { ahead: numbe
   }
   const [behindText, aheadText] = normalizeText(counts.stdout).split(/\s+/);
   return {
-    ahead: Number.parseInt(aheadText, 10) || 0,
-    behind: Number.parseInt(behindText, 10) || 0,
+    ahead: Number.parseInt(aheadText || "", 10) || 0,
+    behind: Number.parseInt(behindText || "", 10) || 0,
   };
 }
 

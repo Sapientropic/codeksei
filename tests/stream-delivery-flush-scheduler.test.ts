@@ -141,7 +141,9 @@ test("flush scheduler only keeps idle timers for commentary-style streaming upda
   await sleep(20);
 
   assert.equal(flushCalls.length, 1);
-  assert.equal(flushCalls[0].trigger?.source, "scheduled_stream_flush");
+  const firstFlushCall = flushCalls[0];
+  assert.ok(firstFlushCall);
+  assert.equal(firstFlushCall.trigger?.source, "scheduled_stream_flush");
   assert.equal(state.scheduledFlushTimer, null);
 });
 
@@ -211,7 +213,9 @@ test("flush scheduler triggers immediate boundary flush without leaving an idle 
   await nextTick();
 
   assert.equal(flushCalls.length, 1);
-  assert.equal(flushCalls[0].trigger?.source, "runtime.reply.delta");
+  const boundaryFlushCall = flushCalls[0];
+  assert.ok(boundaryFlushCall);
+  assert.equal(boundaryFlushCall.trigger?.source, "runtime.reply.delta");
   assert.equal(state.scheduledFlushTimer, null);
 });
 
@@ -256,7 +260,9 @@ test("flush scheduler clears an existing idle timer before a force flush", async
   await sleep(30);
 
   assert.equal(flushCalls.length, 1);
-  assert.equal(flushCalls[0].force, true);
+  const forcedFlushCall = flushCalls[0];
+  assert.ok(forcedFlushCall);
+  assert.equal(forcedFlushCall.force, true);
   assert.equal(state.scheduledFlushTimer, null);
 });
 

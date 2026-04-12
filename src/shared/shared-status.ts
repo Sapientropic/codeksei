@@ -1,26 +1,23 @@
 import * as http from "node:http";
 import {
-  appServerPidFile,
-  bridgePidFile,
   isPidAlive,
-  listenUrl,
   readJsonFile,
   readPidFile,
   readSharedBridgeHealth,
   resolveReadyAppServerPid,
-  supervisorPidFile,
-  watchdogStateFile,
+  resolveSharedProcessContext,
 } from "./shared-common";
 
 async function main() {
+  const sharedContext = resolveSharedProcessContext();
   const ready = await checkReadyz();
-  const readyAppServerPid = ready ? await resolveReadyAppServerPid() : 0;
-  const bridgeHealth = readSharedBridgeHealth();
-  const watchdogState = (readJsonFile(watchdogStateFile) || {}) as Record<string, unknown>;
-  console.log(`listen=${listenUrl}`);
-  printPidState("shared_supervisor_pid", supervisorPidFile);
-  printPidState("shared_app_server_pid", appServerPidFile, readyAppServerPid);
-  printPidState("shared_codeksei_pid", bridgePidFile);
+  const readyAppServerPid = ready ? await resolveReadyAppServerPid(sharedContext) : 0;
+  const bridgeHealth = readSharedBridgeHealth(sharedContext);
+  const watchdogState = (readJsonFile(sharedContext.watchdogStateFile) || {}) as Record<string, unknown>;
+  console.log(`listen=${sharedContext.listenUrl}`);
+  printPidState("shared_supervisor_pid", sharedContext.supervisorPidFile);
+  printPidState("shared_app_server_pid", sharedContext.appServerPidFile, readyAppServerPid);
+  printPidState("shared_codeksei_pid", sharedContext.bridgePidFile);
   console.log(`shared_bridge_heartbeat=${bridgeHealth.classification.status}`);
   console.log(`shared_bridge_heartbeat_at=${bridgeHealth.classification.updatedAt || "missing"}`);
   console.log(`shared_watchdog_last_run=${normalizeText(watchdogState.lastRunAt) || "missing"}`);
@@ -42,11 +39,12 @@ function printPidState(label: any, filePath: any, fallbackPid: number = 0) {
 }
 
 function checkReadyz() {
+  const sharedContext = resolveSharedProcessContext();
   return new Promise((resolve: any) => {
     const req = http.get(
       {
         hostname: "127.0.0.1",
-        port: new URL(listenUrl).port,
+        port: new URL(sharedContext.listenUrl).port,
         path: "/readyz",
         timeout: 600,
       },

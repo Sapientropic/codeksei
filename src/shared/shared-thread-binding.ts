@@ -1,32 +1,34 @@
 import * as fs from "node:fs";
-import * as accountStoreModule from "../adapters/channel/weixin/account-store";
+import { resolveSelectedAccount } from "../adapters/channel/weixin/account-store";
 import { SessionStore } from "../adapters/runtime/codex/session-store";
 import {
   normalizeDisplayPath,
   resolveCrossPlatformPath,
 } from "../core/path-utils";
-import { accountsDir, sessionFile } from "./shared-process";
-
-const { resolveSelectedAccount } = accountStoreModule as unknown as {
-  resolveSelectedAccount: (config: Record<string, unknown>) => { accountId?: string };
-};
+import {
+  resolveSharedProcessContext,
+  type SharedProcessContext,
+} from "./shared-process";
 
 interface BoundThreadResult {
   threadId: string;
   workspaceRoot: string;
 }
 
-function resolveSelectedAccountId(): string {
+function resolveSelectedAccountId(context: SharedProcessContext): string {
   return normalizeText(resolveSelectedAccount({
-    accountsDir,
+    accountsDir: context.accountsDir,
     accountId: process.env.CODEKSEI_ACCOUNT_ID || "",
   }).accountId);
 }
 
-function resolveBoundThread(workspaceRoot: unknown): BoundThreadResult {
+function resolveBoundThread(
+  workspaceRoot: unknown,
+  { context = resolveSharedProcessContext() }: { context?: SharedProcessContext } = {},
+): BoundThreadResult {
   const normalizedWorkspaceRoot = normalizeWorkspaceLookupRoot(workspaceRoot || process.cwd());
-  const sessionStore = new SessionStore({ filePath: sessionFile });
-  const currentAccountId = resolveSelectedAccountId();
+  const sessionStore = new SessionStore({ filePath: context.sessionFile });
+  const currentAccountId = resolveSelectedAccountId(context);
   const bindings = sessionStore
     .listBindings()
     .filter((binding) => !currentAccountId || normalizeText(binding?.accountId) === currentAccountId)

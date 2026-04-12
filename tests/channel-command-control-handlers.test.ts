@@ -37,7 +37,9 @@ test("approval handler only remembers prefixes for always", async () => {
     decision: "accept",
   }]);
   assert.equal(alwaysHarness.rememberPrefixCalls.length, 1);
-  assert.match(alwaysHarness.textCalls[0].text, /自动放行/);
+  const alwaysTextCall = alwaysHarness.textCalls[0];
+  assert.ok(alwaysTextCall);
+  assert.match(alwaysTextCall.text, /自动放行/);
 
   const yesHarness = createControlCommandHarness();
   await yesHarness.handlers.approval(buildNormalizedCommandMessage("/yes"), {
@@ -66,8 +68,10 @@ test("model handler lists current and available models when no query is given", 
     args: "",
   });
 
-  assert.match(harness.textCalls[0].text, /当前模型: gpt-5/);
-  assert.match(harness.textCalls[0].text, /可用模型: gpt-5、gpt-5-mini/);
+  const currentModelText = harness.textCalls[0];
+  assert.ok(currentModelText);
+  assert.match(currentModelText.text, /当前模型: gpt-5/);
+  assert.match(currentModelText.text, /可用模型: gpt-5、gpt-5-mini/);
 });
 
 test("model handler switches to a matched model", async () => {
@@ -83,7 +87,9 @@ test("model handler switches to a matched model", async () => {
     workspaceRoot: "E:/repo/current",
     params: { model: "gpt-5-mini" },
   }]);
-  assert.match(harness.textCalls[0].text, /已切换模型。/);
+  const switchedModelText = harness.textCalls[0];
+  assert.ok(switchedModelText);
+  assert.match(switchedModelText.text, /已切换模型。/);
 });
 
 test("model handler reports when a model cannot be found", async () => {
@@ -94,7 +100,9 @@ test("model handler reports when a model cannot be found", async () => {
     args: "nope",
   });
 
-  assert.match(harness.textCalls[0].text, /未找到模型：nope/);
+  const missingModelText = harness.textCalls[0];
+  assert.ok(missingModelText);
+  assert.match(missingModelText.text, /未找到模型：nope/);
 });
 
 test("help handler uses the shared weixin help text", async () => {
@@ -102,5 +110,7 @@ test("help handler uses the shared weixin help text", async () => {
 
   await harness.handlers.help(buildNormalizedCommandMessage("/help"));
 
-  assert.equal(harness.textCalls[0].text, buildWeixinHelpText());
+  const helpTextCall = harness.textCalls[0];
+  assert.ok(helpTextCall);
+  assert.equal(helpTextCall.text, buildWeixinHelpText());
 });
