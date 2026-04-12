@@ -3,9 +3,9 @@ const crypto = require("crypto");
 const { resolveSelectedAccount } = require("../adapters/channel/weixin/account-store");
 const { SessionStore } = require("../adapters/runtime/codex/session-store");
 const { PACKAGE_NAME, readPrefixedEnv } = require("../core/branding");
-const { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } = require("../core/default-targets");
+const { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } = require("../workspace/default-targets");
 const { resolvePromptPersonEn } = require("../core/person-reference");
-const { SystemMessageQueueStore } = require("../core/system-message-queue-store");
+const { SystemMessageQueueStore } = require("../state/system-message-queue-store");
 
 const DEFAULT_MIN_INTERVAL_MS = 3 * 60_000;
 const DEFAULT_MAX_INTERVAL_MS = 60 * 60_000;

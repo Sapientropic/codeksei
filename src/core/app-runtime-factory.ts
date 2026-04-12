@@ -18,7 +18,7 @@ function createAppServices({
   handleReplyDeliveryFailure,
 }: any) {
   const { createWeixinChannelAdapter } = require("../adapters/channel/weixin");
-  const { ReminderQueueStore } = require("../adapters/channel/weixin/reminder-queue-store");
+  const { ReminderQueueStore } = require("../state/reminder-queue-store");
   const { createCodexRuntimeAdapter } = require("../adapters/runtime/codex");
   const { createTimelineIntegration } = require("../integrations/timeline");
   const { ChannelCommandRouter } = require("./channel-command-router");
@@ -26,8 +26,8 @@ function createAppServices({
   const { createWorkspaceCommandHandlers } = require("./channel-command-workspace-handlers");
   const { StreamDelivery } = require("./stream-delivery");
   const { ThreadStateStore } = require("./thread-state-store");
-  const { SystemMessageQueueStore } = require("./system-message-queue-store");
-  const { TimelineScreenshotQueueStore } = require("./timeline-screenshot-queue-store");
+  const { SystemMessageQueueStore } = require("../state/system-message-queue-store");
+  const { TimelineScreenshotQueueStore } = require("../state/timeline-screenshot-queue-store");
   const { BackstageTaskLifecycle } = require("./backstage-task-lifecycle");
   const { RuntimeTurnLifecycle } = require("./runtime-turn-lifecycle");
   const { RuntimeWatchdogLifecycle } = require("./runtime-watchdog-lifecycle");

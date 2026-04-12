@@ -2,7 +2,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { normalizeWorkspaceAliasManifest } = require("../contracts/config-files");
-const { loadJsonConfig } = require("./config-loader");
+const { loadJsonConfig } = require("../core/config-loader");
 
 const DEFAULT_ALIAS_MANIFEST = path.join(os.homedir(), ".codex", "windows-ascii-alias", "aliases.json");
 

@@ -12,7 +12,7 @@ import {
   ensureParentDirectory,
   readManagedJsonStateFile,
   writeManagedJsonStateFile,
-} from "../../../core/json-state";
+} from "../../../state/json-state";
 import * as modelCatalogModule from "./model-catalog";
 
 const { normalizeModelCatalog } = modelCatalogModule as {

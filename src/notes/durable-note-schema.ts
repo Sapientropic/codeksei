@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { normalizeDurableNoteSchemaConfig } = require("../contracts/config-files");
 const { loadJsonConfig } = require("../core/config-loader");
-const { writeForeignTextDocument } = require("../core/json-state");
+const { writeForeignTextDocument } = require("../state/json-state");
 
 const { listTrackedProjects } = require("../core/project-radar");
 const { appendSection, findSectionRange, resolveNoteSyncTarget } = require("./note-sync");

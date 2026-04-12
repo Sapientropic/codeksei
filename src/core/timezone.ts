@@ -1,6 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const { readForeignJsonDocument } = require("./json-state");
+const { readForeignJsonDocument } = require("../state/json-state");
 
 const LEGACY_TIMELINE_TIMEZONE = "Asia/Shanghai";
 const DEFAULT_FALLBACK_TIMEZONE = "UTC";

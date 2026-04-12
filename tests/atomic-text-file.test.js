@@ -4,7 +4,7 @@ const path = require("path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { writeTextFileAtomically } = require("../src/core/json-state");
+const { writeTextFileAtomically } = require("../src/state/json-state");
 
 test("writeTextFileAtomically replaces text without leaving tmp files behind", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-atomic-text-"));

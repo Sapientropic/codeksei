@@ -2,11 +2,11 @@ const crypto = require("crypto");
 
 const { resolveSelectedAccount } = require("../adapters/channel/weixin/account-store");
 const { loadPersistedContextTokens } = require("../adapters/channel/weixin/context-token-store");
-const { ReminderQueueStore } = require("../adapters/channel/weixin/reminder-queue-store");
+const { ReminderQueueStore } = require("../state/reminder-queue-store");
 const { SessionStore } = require("../adapters/runtime/codex/session-store");
 const { getCommandArgsSchema } = require("../contracts/command-args");
 const { parseCliArgs } = require("../core/cli-args");
-const { resolvePreferredSenderId } = require("../core/default-targets");
+const { resolvePreferredSenderId } = require("../workspace/default-targets");
 const {
   LEGACY_TIMELINE_TIMEZONE,
   coerceLocalDateTimeToIso,

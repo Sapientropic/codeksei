@@ -5,7 +5,7 @@ const {
   isPlainObject,
   readManagedJsonStateFile,
   writeManagedJsonStateFile,
-} = require("../../../core/json-state");
+} = require("../../../state/json-state");
 
 function normalizeAccountId(raw: any) {
   return String(raw || "")

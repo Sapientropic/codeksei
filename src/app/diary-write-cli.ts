@@ -3,7 +3,7 @@ const path = require("path");
 const { PACKAGE_NAME } = require("../core/branding");
 const { getCommandArgsSchema } = require("../contracts/command-args");
 const { parseCliArgs } = require("../core/cli-args");
-const { writeForeignTextDocument } = require("../core/json-state");
+const { writeForeignTextDocument } = require("../state/json-state");
 const {
   LEGACY_TIMELINE_TIMEZONE,
   formatDateInTimezone,

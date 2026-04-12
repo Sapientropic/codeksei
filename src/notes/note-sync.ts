@@ -1,6 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const { writeForeignTextDocument } = require("../core/json-state");
+const { writeForeignTextDocument } = require("../state/json-state");
 const { PRIMARY_NOTE_SYNC_MARKER_PREFIX } = require("../core/branding");
 const {
   normalizeDisplayPath,

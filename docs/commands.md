@@ -172,4 +172,14 @@ Project radar 用于回答“项目现在在哪、应该从哪里重新进去”
 - 看当前 branch、working tree、最近 commits
 - 把 git 动作视作“最近发生了什么”的弱信号，方便判断下一步从哪里接上
 
+## Maintainer Smoke
+
+这组不是日常用户入口，而是 shared / adapter lifecycle 收口后的维护者最小 smoke checklist。
+
+- `npm run shared:start`
+- `npm run shared:status`
+- `npm run shared:open`
+- 模拟一次 runtime child close / reconnect
+- 验证 approval continuity after restart
+
 这页只管“怎么使用这些入口”；维护与发布流程留在本地维护材料里。

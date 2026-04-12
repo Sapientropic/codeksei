@@ -6,8 +6,8 @@ const { SessionStore } = require("../adapters/runtime/codex/session-store");
 const { getCommandArgsSchema } = require("../contracts/command-args");
 const { parseCliArgs } = require("../core/cli-args");
 const { buildTerminalLeafHelp } = require("../core/command-registry");
-const { resolvePreferredSenderId } = require("../core/default-targets");
-const { TimelineScreenshotQueueStore } = require("../core/timeline-screenshot-queue-store");
+const { resolvePreferredSenderId } = require("../workspace/default-targets");
+const { TimelineScreenshotQueueStore } = require("../state/timeline-screenshot-queue-store");
 
 async function runTimelineScreenshotCommand(config: any, args: any[] = []) {
   const options = parseTimelineScreenshotArgs(args);

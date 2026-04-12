@@ -14,14 +14,14 @@ const {
   readManagedJsonStateFile,
   writeTextFileAtomically,
   writeManagedJsonStateFile,
-} = require("../core/json-state");
+} = require("../state/json-state");
 const { loadWeixinAccount } = require("../adapters/channel/weixin/account-store");
 const { SessionStore } = require("../adapters/runtime/codex/session-store");
 const {
   DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS,
   classifySharedBridgeHeartbeat,
   readSharedBridgeHeartbeat,
-} = require("../core/shared-bridge-heartbeat");
+} = require("./shared-bridge-heartbeat");
 const {
   buildSpawnInvocation,
   resolveBundledCodexBinary,

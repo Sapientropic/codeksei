@@ -4,7 +4,7 @@ const path = require("path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { SystemMessageQueueStore } = require("../src/core/system-message-queue-store");
+const { SystemMessageQueueStore } = require("../src/state/system-message-queue-store");
 
 function createStore() {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-system-queue-"));

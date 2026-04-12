@@ -2,7 +2,7 @@ const {
   isPlainObject,
   readManagedJsonStateFile,
   writeManagedJsonStateFile,
-} = require("./json-state");
+} = require("../state/json-state");
 
 const DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS = 120_000;
 

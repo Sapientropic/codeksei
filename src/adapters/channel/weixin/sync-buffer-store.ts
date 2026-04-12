@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { normalizeAccountId } = require("./account-store");
-const { writeManagedTextStateFile } = require("../../../core/json-state");
+const { writeManagedTextStateFile } = require("../../../state/json-state");
 
 function ensureSyncBufferDir(config: any) {
   fs.mkdirSync(config.syncBufferDir, { recursive: true });
