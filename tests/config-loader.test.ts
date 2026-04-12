@@ -72,3 +72,27 @@ test("config loader re-reads cached json after the file changes", async () => {
   });
   assert.deepEqual(Object.keys(second.workspaces), ["E:/repo-2"]);
 });
+
+test("config loader does not treat arbitrary thrown objects as Node ENOENT errors", () => {
+  const originalStatSync = fs.statSync;
+
+  fs.statSync = (() => {
+    throw { message: "plain object boom" };
+  }) as typeof fs.statSync;
+
+  try {
+    assert.throws(
+      () => loadJsonConfig({
+        filePath: "E:/repo/missing.json",
+        label: "review schema",
+        normalize: normalizeReviewSchemaConfig,
+        fallback: {},
+        missing: "fallback",
+        invalid: "throw",
+      }),
+      /review schema not found: E:\/repo\/missing\.json/u
+    );
+  } finally {
+    fs.statSync = originalStatSync;
+  }
+});

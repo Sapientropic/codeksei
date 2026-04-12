@@ -136,5 +136,24 @@ function formatErrorMessage(error: unknown): string {
 }
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return Boolean(error) && typeof error === "object";
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  return hasNodeErrorFields(error);
+}
+
+function hasNodeErrorFields(value: unknown): boolean {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as {
+    code?: unknown;
+    errno?: unknown;
+    syscall?: unknown;
+    path?: unknown;
+  };
+  return typeof candidate.code === "string"
+    || typeof candidate.errno === "number"
+    || typeof candidate.syscall === "string"
+    || typeof candidate.path === "string";
 }

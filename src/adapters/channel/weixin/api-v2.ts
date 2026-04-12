@@ -1,6 +1,18 @@
-const crypto = require("crypto");
-const { buildJsonHeaders } = require("./protocol");
-const { PRIMARY_CHANNEL_VERSION } = require("../../../core/branding");
+import * as crypto from "node:crypto";
+import * as protocolModule from "./protocol";
+import * as brandingModule from "../../../core/branding";
+
+const { buildJsonHeaders } = protocolModule as {
+  buildJsonHeaders: (args: {
+    body: string;
+    token?: string;
+    routeTag?: string;
+    clientVersion?: string;
+  }) => Record<string, string>;
+};
+const { PRIMARY_CHANNEL_VERSION } = brandingModule as {
+  PRIMARY_CHANNEL_VERSION: string;
+};
 
 const DEFAULT_LONG_POLL_TIMEOUT_MS = 35_000;
 const DEFAULT_API_TIMEOUT_MS = 15_000;
@@ -8,11 +20,101 @@ const DEFAULT_CONFIG_TIMEOUT_MS = 10_000;
 const MAX_RESPONSE_BODY_BYTES = 64 << 20;
 const CHANNEL_VERSION = PRIMARY_CHANNEL_VERSION;
 
-function buildBaseInfo() {
+interface WeixinBaseInfo {
+  channel_version: string;
+}
+
+export interface WeixinApiResponse extends Record<string, unknown> {
+  ret?: unknown;
+  errcode?: unknown;
+  errmsg?: unknown;
+}
+
+export interface GetUpdatesV2Args extends Record<string, unknown> {
+  baseUrl: string;
+  token: string;
+  getUpdatesBuf?: string;
+  timeoutMs?: number;
+  routeTag?: string;
+  clientVersion?: string;
+}
+
+export interface GetUpdatesV2Response extends WeixinApiResponse {
+  msgs: unknown[];
+  get_updates_buf: string;
+}
+
+export interface SendMessageV2Args extends Record<string, unknown> {
+  baseUrl: string;
+  token: string;
+  body: Record<string, unknown>;
+  routeTag?: string;
+  clientVersion?: string;
+  timeoutMs?: number;
+}
+
+export interface SendTextV2Args extends Record<string, unknown> {
+  baseUrl: string;
+  token: string;
+  toUserId: string;
+  text: string;
+  contextToken: string;
+  clientId?: string;
+  routeTag?: string;
+  clientVersion?: string;
+}
+
+export interface GetConfigV2Args extends Record<string, unknown> {
+  baseUrl: string;
+  token: string;
+  ilinkUserId: string;
+  contextToken: string;
+  routeTag?: string;
+  clientVersion?: string;
+  timeoutMs?: number;
+}
+
+export interface GetConfigV2Response extends WeixinApiResponse {
+  typing_ticket?: unknown;
+}
+
+export interface SendTypingV2Args extends Record<string, unknown> {
+  baseUrl: string;
+  token: string;
+  body: Record<string, unknown>;
+  routeTag?: string;
+  clientVersion?: string;
+  timeoutMs?: number;
+}
+
+export interface GetUploadUrlV2Args extends Record<string, unknown> {
+  baseUrl: string;
+  token: string;
+  routeTag?: string;
+  clientVersion?: string;
+  timeoutMs?: number;
+}
+
+export interface GetUploadUrlV2Response extends WeixinApiResponse {
+  upload_param?: unknown;
+}
+
+interface ApiPostArgs {
+  baseUrl: string;
+  endpoint: string;
+  token: string;
+  body: string;
+  timeoutMs?: number;
+  label: string;
+  routeTag?: string;
+  clientVersion?: string;
+}
+
+function buildBaseInfo(): WeixinBaseInfo {
   return { channel_version: CHANNEL_VERSION };
 }
 
-function ensureTrailingSlash(url: any) {
+function ensureTrailingSlash(url: string): string {
   return url.endsWith("/") ? url : `${url}/`;
 }
 
@@ -25,7 +127,7 @@ async function apiPost({
   label,
   routeTag = "",
   clientVersion = "",
-}: any) {
+}: ApiPostArgs): Promise<string> {
   const url = new URL(endpoint, ensureTrailingSlash(baseUrl)).toString();
   const controller = new AbortController();
   const timeout = timeoutMs > 0 ? timeoutMs : DEFAULT_API_TIMEOUT_MS;
@@ -51,24 +153,24 @@ async function apiPost({
   }
 }
 
-function parseJson(raw: any, label: any) {
+function parseJson<T extends Record<string, unknown>>(raw: string, label: string): T {
   try {
-    return JSON.parse(raw);
+    return JSON.parse(raw) as T;
   } catch (error) {
     throw new Error(`${label} returned invalid JSON: ${truncateForLog(raw, 256)}`);
   }
 }
 
-function assertApiSuccess(parsed: any, label: any) {
-  const ret = parsed?.ret;
-  const errcode = parsed?.errcode;
-  if ((ret !== undefined && ret !== 0) || (errcode !== undefined && errcode !== 0)) {
+function assertApiSuccess<T extends WeixinApiResponse>(parsed: T, label: string): T {
+  const ret = normalizeErrorCode(parsed?.ret);
+  const errcode = normalizeErrorCode(parsed?.errcode);
+  if ((hasErrorCode(parsed?.ret) && ret !== 0) || (hasErrorCode(parsed?.errcode) && errcode !== 0)) {
     throw new Error(`${label} ret=${ret ?? ""} errcode=${errcode ?? ""} errmsg=${parsed?.errmsg ?? ""}`);
   }
   return parsed;
 }
 
-function truncateForLog(value: any, max: any) {
+function truncateForLog(value: unknown, max: number): string {
   const text = typeof value === "string" ? value : String(value || "");
   return text.length <= max ? text : `${text.slice(0, max)}…`;
 }
@@ -80,7 +182,7 @@ async function getUpdatesV2({
   timeoutMs = DEFAULT_LONG_POLL_TIMEOUT_MS,
   routeTag = "",
   clientVersion = "",
-}: any) {
+}: GetUpdatesV2Args): Promise<GetUpdatesV2Response> {
   const payload = JSON.stringify({
     get_updates_buf: getUpdatesBuf,
     base_info: buildBaseInfo(),
@@ -96,12 +198,12 @@ async function getUpdatesV2({
       routeTag,
       clientVersion,
     });
-    return parseJson(raw, "getUpdates");
+    return parseJson<GetUpdatesV2Response>(raw, "getUpdates");
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       return { ret: 0, msgs: [], get_updates_buf: getUpdatesBuf };
     }
-    if (String((error as any)?.message || "").includes("aborted")) {
+    if (formatErrorMessage(error).includes("aborted")) {
       return { ret: 0, msgs: [], get_updates_buf: getUpdatesBuf };
     }
     throw error;
@@ -117,11 +219,11 @@ async function sendTextV2({
   clientId,
   routeTag = "",
   clientVersion = "",
-}: any) {
+}: SendTextV2Args): Promise<WeixinApiResponse> {
   if (!String(contextToken || "").trim()) {
     throw new Error("weixin-v2 sendText requires contextToken");
   }
-  const itemList = [];
+  const itemList: Array<Record<string, unknown>> = [];
   if (String(text || "").trim()) {
     itemList.push({
       type: 1,
@@ -157,7 +259,7 @@ async function sendMessageV2({
   routeTag = "",
   clientVersion = "",
   timeoutMs = DEFAULT_API_TIMEOUT_MS,
-}: any) {
+}: SendMessageV2Args): Promise<WeixinApiResponse> {
   const raw = await apiPost({
     baseUrl,
     endpoint: "ilink/bot/sendmessage",
@@ -171,7 +273,7 @@ async function sendMessageV2({
     routeTag,
     clientVersion,
   });
-  return assertApiSuccess(parseJson(raw, "sendMessage"), "sendMessage");
+  return assertApiSuccess(parseJson<WeixinApiResponse>(raw, "sendMessage"), "sendMessage");
 }
 
 async function getConfigV2({
@@ -182,7 +284,7 @@ async function getConfigV2({
   routeTag = "",
   clientVersion = "",
   timeoutMs = DEFAULT_CONFIG_TIMEOUT_MS,
-}: any) {
+}: GetConfigV2Args): Promise<GetConfigV2Response> {
   const raw = await apiPost({
     baseUrl,
     endpoint: "ilink/bot/getconfig",
@@ -197,7 +299,7 @@ async function getConfigV2({
     routeTag,
     clientVersion,
   });
-  return assertApiSuccess(parseJson(raw, "getConfig"), "getConfig");
+  return assertApiSuccess(parseJson<GetConfigV2Response>(raw, "getConfig"), "getConfig");
 }
 
 async function sendTypingV2({
@@ -207,7 +309,7 @@ async function sendTypingV2({
   routeTag = "",
   clientVersion = "",
   timeoutMs = DEFAULT_CONFIG_TIMEOUT_MS,
-}: any) {
+}: SendTypingV2Args): Promise<WeixinApiResponse> {
   const raw = await apiPost({
     baseUrl,
     endpoint: "ilink/bot/sendtyping",
@@ -221,7 +323,7 @@ async function sendTypingV2({
     routeTag,
     clientVersion,
   });
-  return assertApiSuccess(parseJson(raw, "sendTyping"), "sendTyping");
+  return assertApiSuccess(parseJson<WeixinApiResponse>(raw, "sendTyping"), "sendTyping");
 }
 
 async function getUploadUrlV2({
@@ -231,7 +333,7 @@ async function getUploadUrlV2({
   clientVersion = "",
   timeoutMs = DEFAULT_API_TIMEOUT_MS,
   ...payload
-}: any) {
+}: GetUploadUrlV2Args): Promise<GetUploadUrlV2Response> {
   const raw = await apiPost({
     baseUrl,
     endpoint: "ilink/bot/getuploadurl",
@@ -245,10 +347,36 @@ async function getUploadUrlV2({
     routeTag,
     clientVersion,
   });
-  return assertApiSuccess(parseJson(raw, "getUploadUrl"), "getUploadUrl");
+  return assertApiSuccess(parseJson<GetUploadUrlV2Response>(raw, "getUploadUrl"), "getUploadUrl");
 }
 
-module.exports = {
+function hasErrorCode(value: unknown): boolean {
+  return value !== undefined && value !== null && value !== "";
+}
+
+function normalizeErrorCode(value: unknown): number | null {
+  if (!hasErrorCode(value)) {
+    return null;
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function formatErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (isRecord(error) && typeof error.message === "string") {
+    return error.message;
+  }
+  return String(error || "unknown error");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
+
+export {
   getConfigV2,
   getUpdatesV2,
   getUploadUrlV2,
@@ -256,5 +384,3 @@ module.exports = {
   sendTypingV2,
   sendTextV2,
 };
-
-export {};

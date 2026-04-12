@@ -1,7 +1,7 @@
 import type { NormalizedIncomingMessage, UnknownRecord } from "../../../core/runtime-types";
 import * as accountStoreModule from "./account-store";
 import * as contextTokenStoreModule from "./context-token-store";
-import * as apiV2Module from "./api-v2";
+import { getUpdatesV2 } from "./api-v2";
 import * as messageUtilsV2Module from "./message-utils-v2";
 import * as syncBufferStoreModule from "./sync-buffer-store";
 
@@ -17,9 +17,6 @@ const { loadPersistedContextTokens, persistContextToken } = contextTokenStoreMod
     userId: string,
     contextToken: string,
   ) => Record<string, string>;
-};
-const { getUpdatesV2 } = apiV2Module as {
-  getUpdatesV2: (args: Record<string, unknown>) => Promise<UnknownRecord>;
 };
 const { createInboundFilter } = messageUtilsV2Module as {
   createInboundFilter: () => {

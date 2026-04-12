@@ -174,6 +174,9 @@ function createTestAppHarness({
     getKnownContextTokens() {
       return { "user-1": "ctx-1" };
     },
+    async getUpdates() {
+      return { ret: 0, msgs: [] };
+    },
     loadSyncBuffer() {
       return "";
     },

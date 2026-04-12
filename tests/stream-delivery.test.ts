@@ -45,6 +45,9 @@ function createDelivery({
     getKnownContextTokens() {
       return {};
     },
+    async getUpdates() {
+      return { ret: 0, msgs: [] };
+    },
     loadSyncBuffer() {
       return "";
     },
@@ -499,6 +502,9 @@ test("persistent send failure abandons the run and reports delivery degradation"
       },
       getKnownContextTokens() {
         return {};
+      },
+      async getUpdates() {
+        return { ret: 0, msgs: [] };
       },
       loadSyncBuffer() {
         return "";

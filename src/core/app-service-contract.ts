@@ -84,6 +84,15 @@ export interface SessionStoreLike {
 export interface ChannelAdapterLike {
   describe(): { id?: string } & Record<string, unknown>;
   getKnownContextTokens(): Record<string, string>;
+  getUpdates(args?: {
+    syncBuffer?: string;
+    timeoutMs?: number;
+  }): Promise<UnknownRecord & {
+    ret?: unknown;
+    errcode?: unknown;
+    errmsg?: unknown;
+    msgs?: unknown[];
+  }>;
   loadSyncBuffer(): string;
   login(): Promise<unknown>;
   normalizeIncomingMessage(message: unknown): unknown;

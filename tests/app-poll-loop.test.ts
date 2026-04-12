@@ -1,11 +1,11 @@
-const test = require("node:test");
-const assert = require("node:assert/strict");
+const test: typeof import("node:test") = require("node:test");
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 
 const {
   formatErrorMessage,
   resolveLongPollTimeoutMs,
   runAppPollLoop,
-} = require("../src/core/app-poll-loop");
+}: typeof import("../src/core/app-poll-loop") = require("../src/core/app-poll-loop");
 
 test("app poll loop timeout collapses to min timeout for busy queues and reminder windows", () => {
   assert.equal(resolveLongPollTimeoutMs({
@@ -37,8 +37,8 @@ test("app poll loop timeout collapses to min timeout for busy queues and reminde
 });
 
 test("app poll loop keeps flush ordering around successful getUpdates cycles", async () => {
-  const callOrder = [];
-  const heartbeatPatches = [];
+  const callOrder: string[] = [];
+  const heartbeatPatches: Array<Record<string, unknown>> = [];
   const shutdown = { stopped: false };
 
   await runAppPollLoop({
@@ -48,7 +48,7 @@ test("app poll loop keeps flush ordering around successful getUpdates cycles", a
     channelAdapter: {
       loadSyncBuffer() {
         callOrder.push("loadSyncBuffer");
-        return { cursor: "sync-1" };
+        return "sync-1";
       },
       async getUpdates() {
         callOrder.push("getUpdates");
@@ -106,10 +106,10 @@ test("app poll loop turns session-expired transport failures into the login hint
       shutdown: { stopped: false },
       channelAdapter: {
         loadSyncBuffer() {
-          return {};
+          return "";
         },
         async getUpdates() {
-          const error = new Error("session expired");
+          const error = new Error("session expired") as Error & { errcode?: number };
           error.errcode = -14;
           throw error;
         },
@@ -129,8 +129,8 @@ test("app poll loop turns session-expired transport failures into the login hint
 });
 
 test("app poll loop escalates from retry delay to backoff delay after repeated failures", async () => {
-  const delays = [];
-  const heartbeatPatches = [];
+  const delays: number[] = [];
+  const heartbeatPatches: Array<Record<string, unknown>> = [];
   const shutdown = { stopped: false };
 
   await runAppPollLoop({
@@ -139,7 +139,7 @@ test("app poll loop escalates from retry delay to backoff delay after repeated f
     shutdown,
     channelAdapter: {
       loadSyncBuffer() {
-        return {};
+        return "";
       },
       async getUpdates() {
         throw new Error("temporary boom");
@@ -171,7 +171,7 @@ test("app poll loop escalates from retry delay to backoff delay after repeated f
 });
 
 test("app poll loop error formatter keeps the user-facing login hint", () => {
-  const error = new Error("session expired");
+  const error = new Error("session expired") as Error & { errcode?: number };
   error.errcode = -14;
   assert.equal(formatErrorMessage(error), "微信会话已失效，请重新执行 `npm run login`");
 });
