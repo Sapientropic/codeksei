@@ -4,42 +4,42 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 const rootDir = path.resolve(__dirname, "..", "..", "..");
-const sourceRoot = path.join(rootDir, "src");
+const testsRoot = path.join(rootDir, "tests");
 const inventoryPath = path.join(rootDir, "src", "release", "style-type-exception-inventory.json");
-const COMMONJS_PATTERN = /\brequire\s*\(|\bmodule\.exports\b|\bexports\./u;
+const TS_NOCHECK_PATTERN = /^\s*\/\/\s*@ts-nocheck\b/mu;
 
 interface StyleTypeExceptionInventory {
   commonJsSourceAllowlist?: unknown;
   tsNoCheckAllowlist?: unknown;
 }
 
-interface AssertNoKeyTsCommonJsArgs {
+interface AssertNoTsNoCheckRegressionsArgs {
   cwd?: string;
   inventoryFilePath?: string;
 }
 
-export function assertNoKeyTsCommonJs({
+export function assertNoTsNoCheckRegressions({
   cwd = rootDir,
   inventoryFilePath = inventoryPath,
-}: AssertNoKeyTsCommonJsArgs = {}): void {
+}: AssertNoTsNoCheckRegressionsArgs = {}): void {
   const inventory = readStyleTypeExceptionInventory(inventoryFilePath);
-  const allowlist = new Set(readStringList(inventory.commonJsSourceAllowlist));
-  const violations = collectTsFilesWithCommonJs(path.join(cwd, "src"), cwd);
+  const allowlist = new Set(readStringList(inventory.tsNoCheckAllowlist));
+  const violations = collectTsNoCheckFiles(path.join(cwd, "tests"), cwd);
   const unexpected = violations.filter((relativePath) => !allowlist.has(relativePath));
   const staleAllowlist = [...allowlist].filter((relativePath) => !violations.includes(relativePath));
 
   if (unexpected.length || staleAllowlist.length) {
-    const lines = ["repo TypeScript import/export guard failed"];
+    const lines = ["repo TypeScript test guard failed"];
     if (unexpected.length) {
       lines.push("");
-      lines.push("Unexpected CommonJS-style source files:");
+      lines.push("Unexpected @ts-nocheck files:");
       for (const relativePath of unexpected) {
         lines.push(`- ${relativePath}`);
       }
     }
     if (staleAllowlist.length) {
       lines.push("");
-      lines.push("Stale allowlist entries (remove them from the inventory):");
+      lines.push("Stale @ts-nocheck allowlist entries (remove them from the inventory):");
       for (const relativePath of staleAllowlist) {
         lines.push(`- ${relativePath}`);
       }
@@ -48,11 +48,11 @@ export function assertNoKeyTsCommonJs({
   }
 }
 
-function collectTsFilesWithCommonJs(directory: string, cwd: string): string[] {
+function collectTsNoCheckFiles(directory: string, cwd: string): string[] {
   const violations: string[] = [];
   for (const absolutePath of walkTsFiles(directory)) {
     const source = fs.readFileSync(absolutePath, "utf8");
-    if (!COMMONJS_PATTERN.test(source)) {
+    if (!TS_NOCHECK_PATTERN.test(source)) {
       continue;
     }
     violations.push(toRelativePosix(cwd, absolutePath));
@@ -93,10 +93,10 @@ function toRelativePosix(cwd: string, absolutePath: string): string {
 }
 
 export function main(): void {
-  assertNoKeyTsCommonJs();
+  assertNoTsNoCheckRegressions();
   const inventory = readStyleTypeExceptionInventory(inventoryPath);
-  const allowCount = readStringList(inventory.commonJsSourceAllowlist).length;
-  console.log(`[codeksei] repo TS import/export guard passed (allowlisted CommonJS files: ${allowCount})`);
+  const allowCount = readStringList(inventory.tsNoCheckAllowlist).length;
+  console.log(`[codeksei] repo @ts-nocheck guard passed (allowlisted tests: ${allowCount})`);
 }
 
 if (require.main === module) {

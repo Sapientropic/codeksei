@@ -1,10 +1,16 @@
-// @ts-check
-
-const {
+import {
   RUNTIME_EVENT_TYPES,
   createRuntimeEvent,
   normalizeRuntimeText,
-} = require("../../../contracts/runtime-events");
+  type RuntimeEvent,
+} from "../../../contracts/runtime-events";
+import type { UnknownRecord } from "../../../core/runtime-types";
+import * as approvalCommandPolicyModule from "../../../core/approval-command-policy";
+import * as messageUtilsModule from "./message-utils";
+
+const { splitCommandLine } = approvalCommandPolicyModule as {
+  splitCommandLine: (value: string) => string[];
+};
 const {
   extractAssistantDeltaFragment,
   extractAssistantPhase,
@@ -12,16 +18,30 @@ const {
   extractFailureText,
   extractThreadIdFromParams,
   extractTurnIdFromParams,
-} = require("./message-utils");
-const { splitCommandLine } = require("../../../core/approval-command-policy");
+} = messageUtilsModule as {
+  extractAssistantDeltaFragment: (params: UnknownRecord) => { text: string; fragmentKind: string };
+  extractAssistantPhase: (params: UnknownRecord) => string;
+  extractCompletedAssistantText: (params: UnknownRecord) => string;
+  extractFailureText: (params: UnknownRecord) => string;
+  extractThreadIdFromParams: (params: UnknownRecord) => string;
+  extractTurnIdFromParams: (params: UnknownRecord) => string;
+};
 
-function mapCodexMessageToRuntimeEvent(message: any) {
+interface CodexRpcMessage extends UnknownRecord {
+  method?: unknown;
+  params?: UnknownRecord;
+  payload?: UnknownRecord;
+  type?: unknown;
+  id?: unknown;
+}
+
+export function mapCodexMessageToRuntimeEvent(message: CodexRpcMessage | null | undefined): RuntimeEvent<UnknownRecord> | null {
   if (message?.type === "event_msg" && message?.payload?.type === "token_count") {
     return createRuntimeEvent(RUNTIME_EVENT_TYPES.USAGE_UPDATED, message.payload);
   }
 
   const method = normalizeRuntimeText(message?.method);
-  const params = message?.params || {};
+  const params = asRecord(message?.params);
   const threadId = extractThreadIdFromParams(params);
   const turnId = extractTurnIdFromParams(params);
 
@@ -54,26 +74,28 @@ function mapCodexMessageToRuntimeEvent(message: any) {
   if (method === "item/agentMessage/delta") {
     const fragment = extractAssistantDeltaFragment(params);
     const phase = extractAssistantPhase(params);
+    const item = asRecord(params.item);
     if (!fragment.text) {
       return null;
     }
     return createRuntimeEvent(RUNTIME_EVENT_TYPES.REPLY_DELTA, {
       threadId,
       turnId,
-      itemId: normalizeRuntimeText(params?.itemId || params?.item?.id),
+      itemId: normalizeRuntimeText(params.itemId || item.id),
       text: fragment.text,
       fragmentKind: fragment.fragmentKind,
       phase,
     });
   }
 
-  if (method === "item/completed" && normalizeRuntimeText(params?.item?.type).toLowerCase() === "agentmessage") {
+  if (method === "item/completed" && normalizeRuntimeText(asRecord(params.item).type).toLowerCase() === "agentmessage") {
     const text = extractCompletedAssistantText(params);
     const phase = extractAssistantPhase(params);
+    const item = asRecord(params.item);
     return createRuntimeEvent(RUNTIME_EVENT_TYPES.REPLY_COMPLETED, {
       threadId,
       turnId,
-      itemId: normalizeRuntimeText(params?.item?.id),
+      itemId: normalizeRuntimeText(item.id),
       text,
       phase,
     });
@@ -92,11 +114,11 @@ function mapCodexMessageToRuntimeEvent(message: any) {
   return null;
 }
 
-function isApprovalRequestMethod(method: any) {
+function isApprovalRequestMethod(method: unknown): boolean {
   return typeof method === "string" && method.endsWith("requestApproval");
 }
 
-function extractApprovalDisplayCommand(params: any) {
+function extractApprovalDisplayCommand(params: UnknownRecord): string {
   const commandTokens = extractApprovalCommandTokens(params);
   const direct = params?.command;
   if (typeof direct === "string" && direct.trim()) {
@@ -111,17 +133,17 @@ function extractApprovalDisplayCommand(params: any) {
   return buildApprovalCommandPreview(commandTokens);
 }
 
-function extractApprovalCommandTokens(params: any) {
+function extractApprovalCommandTokens(params: UnknownRecord): string[] {
   return normalizeCommandTokens(extractTokens(params));
 }
 
-function extractTokens(value: any): string[] {
+function extractTokens(value: unknown): string[] {
   if (!value) {
     return [];
   }
   if (Array.isArray(value)) {
-    return value.every((entry: any) => typeof entry === "string")
-      ? value.map((entry: any) => entry.trim()).filter(Boolean)
+    return value.every((entry) => typeof entry === "string")
+      ? value.map((entry) => entry.trim()).filter(Boolean)
       : [];
   }
   if (typeof value === "string") {
@@ -131,14 +153,15 @@ function extractTokens(value: any): string[] {
     return [];
   }
 
+  const record = asRecord(value);
   for (const key of ["proposedExecpolicyAmendment", "argv", "args", "command", "cmd", "exec", "shellCommand", "script"]) {
-    const tokens = extractTokens(value[key]);
+    const tokens = extractTokens(record[key]);
     if (tokens.length) {
       return tokens;
     }
   }
 
-  for (const [key, nested] of Object.entries(value)) {
+  for (const [key, nested] of Object.entries(record)) {
     const normalizedKey = key.toLowerCase();
     if (normalizedKey.includes("execpolicy") || normalizedKey.includes("exec_policy")) {
       const tokens = extractTokens(nested);
@@ -151,20 +174,22 @@ function extractTokens(value: any): string[] {
   return [];
 }
 
-function buildApprovalCommandPreview(tokens: any) {
+function buildApprovalCommandPreview(tokens: unknown): string {
   const normalized = normalizeCommandTokens(tokens);
   if (!normalized.length) {
     return "";
   }
-  return normalized.map((token: any) => (token.includes(" ") ? JSON.stringify(token) : token)).join(" ");
+  return normalized.map((token) => (token.includes(" ") ? JSON.stringify(token) : token)).join(" ");
 }
 
-function normalizeCommandTokens(tokens: any) {
+function normalizeCommandTokens(tokens: unknown): string[] {
   return Array.isArray(tokens)
-    ? tokens.map((part: any) => normalizeRuntimeText(part)).filter(Boolean)
+    ? tokens.map((part) => normalizeRuntimeText(part)).filter(Boolean)
     : [];
 }
 
-module.exports = { mapCodexMessageToRuntimeEvent };
-
-export {};
+function asRecord(value: unknown): UnknownRecord {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as UnknownRecord
+    : {};
+}

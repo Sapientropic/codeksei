@@ -1,17 +1,43 @@
 #!/usr/bin/env node
 
-const fs = require("fs");
-const path = require("path");
-const { execFileSync } = require("child_process");
+import { execFileSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 const rootDir = path.resolve(__dirname, "..", "..", "..");
 
-function collectPublishedJsFiles({ packageJson = null, cwd = rootDir }: any = {}) {
-  const manifest = packageJson || JSON.parse(fs.readFileSync(path.join(cwd, "package.json"), "utf8"));
+interface PackageJsonLike {
+  files?: unknown;
+  bin?: Record<string, unknown>;
+}
+
+interface CollectPublishedJsFilesArgs {
+  packageJson?: PackageJsonLike | null;
+  cwd?: string;
+}
+
+interface RunNodeSyntaxChecksArgs {
+  cwd?: string;
+  execFileSyncImpl?: typeof execFileSync;
+  nodePath?: string;
+}
+
+interface AssertPublishedWrappersArgs {
+  cwd?: string;
+}
+
+export function collectPublishedJsFiles({
+  packageJson = null,
+  cwd = rootDir,
+}: CollectPublishedJsFilesArgs = {}): string[] {
+  const manifest = packageJson || readPackageJson(cwd);
   const roots = Array.isArray(manifest.files) ? manifest.files : [];
-  const discovered = new Set();
+  const discovered = new Set<string>();
 
   for (const entry of roots) {
+    if (typeof entry !== "string" || !entry.trim()) {
+      continue;
+    }
     const absoluteEntry = path.resolve(cwd, entry);
     if (!fs.existsSync(absoluteEntry)) {
       continue;
@@ -29,7 +55,7 @@ function collectPublishedJsFiles({ packageJson = null, cwd = rootDir }: any = {}
   return [...discovered].sort();
 }
 
-function walkJsFiles(directory: any, cwd: any, discovered: any) {
+function walkJsFiles(directory: string, cwd: string, discovered: Set<string>): void {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     const absoluteEntry = path.join(directory, entry.name);
     if (entry.isDirectory()) {
@@ -42,11 +68,14 @@ function walkJsFiles(directory: any, cwd: any, discovered: any) {
   }
 }
 
-function runNodeSyntaxChecks(files: any, {
-  cwd = rootDir,
-  execFileSyncImpl = execFileSync,
-  nodePath = process.execPath,
-}: any = {}) {
+export function runNodeSyntaxChecks(
+  files: string[],
+  {
+    cwd = rootDir,
+    execFileSyncImpl = execFileSync,
+    nodePath = process.execPath,
+  }: RunNodeSyntaxChecksArgs = {},
+): void {
   for (const relativeFile of files) {
     execFileSyncImpl(nodePath, ["--check", path.resolve(cwd, relativeFile)], {
       cwd,
@@ -55,8 +84,11 @@ function runNodeSyntaxChecks(files: any, {
   }
 }
 
-function assertPublishedWrappersDoNotRequireSource(files: any, { cwd = rootDir }: any = {}) {
-  const wrappers = files.filter((relativeFile: any) => /^(bin|scripts)\//u.test(relativeFile));
+export function assertPublishedWrappersDoNotRequireSource(
+  files: string[],
+  { cwd = rootDir }: AssertPublishedWrappersArgs = {},
+): void {
+  const wrappers = files.filter((relativeFile) => /^(bin|scripts)\//u.test(relativeFile));
   for (const relativeFile of wrappers) {
     const source = fs.readFileSync(path.resolve(cwd, relativeFile), "utf8");
     if (/\.\.\/src\//u.test(source)) {
@@ -65,8 +97,11 @@ function assertPublishedWrappersDoNotRequireSource(files: any, { cwd = rootDir }
   }
 }
 
-function assertBinTargetsUseDist({ packageJson = null, cwd = rootDir }: any = {}) {
-  const manifest = packageJson || JSON.parse(fs.readFileSync(path.join(cwd, "package.json"), "utf8"));
+export function assertBinTargetsUseDist({
+  packageJson = null,
+  cwd = rootDir,
+}: CollectPublishedJsFilesArgs = {}): void {
+  const manifest = packageJson || readPackageJson(cwd);
   for (const [binName, target] of Object.entries(manifest.bin || {})) {
     const normalizedTarget = toRelativePosix(cwd, path.resolve(cwd, String(target || "")));
     if (!normalizedTarget.startsWith("dist/")) {
@@ -75,11 +110,15 @@ function assertBinTargetsUseDist({ packageJson = null, cwd = rootDir }: any = {}
   }
 }
 
-function toRelativePosix(cwd: any, absolutePath: any) {
+function readPackageJson(cwd: string): PackageJsonLike {
+  return JSON.parse(fs.readFileSync(path.join(cwd, "package.json"), "utf8")) as PackageJsonLike;
+}
+
+function toRelativePosix(cwd: string, absolutePath: string): string {
   return path.relative(cwd, absolutePath).split(path.sep).join("/");
 }
 
-function main() {
+export function main(): void {
   const files = collectPublishedJsFiles();
   if (!files.length) {
     throw new Error("No published JS files found under package.json files entries.");
@@ -93,13 +132,3 @@ function main() {
 if (require.main === module) {
   main();
 }
-
-module.exports = {
-  assertPublishedWrappersDoNotRequireSource,
-  assertBinTargetsUseDist,
-  collectPublishedJsFiles,
-  main,
-  runNodeSyntaxChecks,
-};
-
-export {};

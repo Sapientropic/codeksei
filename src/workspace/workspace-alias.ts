@@ -1,12 +1,39 @@
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
-const { normalizeWorkspaceAliasManifest } = require("../contracts/config-files");
-const { loadJsonConfig } = require("../core/config-loader");
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { normalizeWorkspaceAliasManifest } from "../contracts/config-files";
+import { loadJsonConfig } from "../core/config-loader";
 
 const DEFAULT_ALIAS_MANIFEST = path.join(os.homedir(), ".codex", "windows-ascii-alias", "aliases.json");
 
-function resolveCodexWorkspaceRoot(workspaceRoot: any, options: any = {}) {
+interface ResolveAliasOptions {
+  manifestPath?: string;
+}
+
+interface AliasManifestEntry {
+  slug?: unknown;
+  target_path?: unknown;
+  alias_path?: unknown;
+}
+
+interface AliasManifest {
+  mappings?: AliasManifestEntry[];
+}
+
+interface AliasMapping {
+  slug: string;
+  targetPath: string;
+  aliasPath: string;
+}
+
+interface ResolvedAliasMapping {
+  slug: string;
+  kind: "target" | "alias";
+  fromRoot: string;
+  toRoot: string;
+}
+
+export function resolveCodexWorkspaceRoot(workspaceRoot: unknown, options: ResolveAliasOptions = {}): string {
   const normalized = normalizeWorkspaceRoot(workspaceRoot);
   if (!normalized) {
     return "";
@@ -30,21 +57,25 @@ function resolveCodexWorkspaceRoot(workspaceRoot: any, options: any = {}) {
   return isReadableDirectory(converted) ? converted : normalized;
 }
 
-function resolveAliasMappingForPath(workspaceRoot: any, options: any = {}) {
+export function resolveAliasMappingForPath(
+  workspaceRoot: unknown,
+  options: ResolveAliasOptions = {},
+): ResolvedAliasMapping | null {
   const normalized = normalizeWorkspaceRoot(workspaceRoot);
   if (!normalized) {
     return null;
   }
 
   const mappings = loadAliasMappings(options);
-  let bestMatch = null;
+  let bestMatch: ResolvedAliasMapping | null = null;
   let bestLength = -1;
 
   for (const mapping of mappings) {
-    for (const candidate of [
+    const candidates: Array<{ kind: "target" | "alias"; root: string; toRoot: string }> = [
       { kind: "target", root: mapping.targetPath, toRoot: mapping.aliasPath },
       { kind: "alias", root: mapping.aliasPath, toRoot: mapping.aliasPath },
-    ]) {
+    ];
+    for (const candidate of candidates) {
       if (!isPathWithinRoot(normalized, candidate.root)) {
         continue;
       }
@@ -64,29 +95,29 @@ function resolveAliasMappingForPath(workspaceRoot: any, options: any = {}) {
   return bestMatch;
 }
 
-function loadAliasMappings(options: any = {}) {
+export function loadAliasMappings(options: ResolveAliasOptions = {}): AliasMapping[] {
   const manifestPath = typeof options.manifestPath === "string" && options.manifestPath.trim()
     ? options.manifestPath.trim()
     : DEFAULT_ALIAS_MANIFEST;
-  const manifest = loadJsonConfig({
+  const manifest = loadJsonConfig<AliasManifest>({
     filePath: manifestPath,
     label: "workspace alias manifest",
-    normalize: normalizeWorkspaceAliasManifest,
+    normalize: normalizeWorkspaceAliasManifest as (value: unknown) => AliasManifest,
     fallback: { mappings: [] },
     missing: "fallback",
     invalid: "fallback",
   });
   const mappings = Array.isArray(manifest?.mappings) ? manifest.mappings : [];
   return mappings
-    .map((mapping: any) => ({
+    .map((mapping) => ({
       slug: normalizeText(mapping?.slug),
       targetPath: normalizeWorkspaceRoot(mapping?.target_path),
       aliasPath: normalizeWorkspaceRoot(mapping?.alias_path),
     }))
-    .filter((mapping: any) => mapping.slug && mapping.targetPath && mapping.aliasPath);
+    .filter((mapping) => Boolean(mapping.slug && mapping.targetPath && mapping.aliasPath));
 }
 
-function convertRootedPath(pathValue: any, fromRoot: any, toRoot: any) {
+export function convertRootedPath(pathValue: unknown, fromRoot: unknown, toRoot: unknown): string {
   const normalizedPath = normalizeWorkspaceRoot(pathValue);
   const normalizedFromRoot = normalizeWorkspaceRoot(fromRoot);
   const normalizedToRoot = normalizeWorkspaceRoot(toRoot);
@@ -102,7 +133,7 @@ function convertRootedPath(pathValue: any, fromRoot: any, toRoot: any) {
   return `${normalizedToRoot}${normalizedPath.slice(normalizedFromRoot.length)}`;
 }
 
-function isPathWithinRoot(pathValue: any, rootValue: any) {
+function isPathWithinRoot(pathValue: unknown, rootValue: unknown): boolean {
   const normalizedPath = normalizeWorkspaceRoot(pathValue);
   const normalizedRoot = normalizeWorkspaceRoot(rootValue);
   if (!normalizedPath || !normalizedRoot) {
@@ -121,7 +152,7 @@ function isPathWithinRoot(pathValue: any, rootValue: any) {
   return nextChar === "/" || nextChar === "\\";
 }
 
-function isReadableDirectory(pathValue: any) {
+function isReadableDirectory(pathValue: unknown): boolean {
   const normalized = normalizeWorkspaceRoot(pathValue);
   if (!normalized) {
     return false;
@@ -133,7 +164,7 @@ function isReadableDirectory(pathValue: any) {
   }
 }
 
-function normalizeWorkspaceRoot(value: any) {
+export function normalizeWorkspaceRoot(value: unknown): string {
   const normalized = normalizeText(value).replace(/\\/g, "/");
   if (!normalized) {
     return "";
@@ -144,7 +175,7 @@ function normalizeWorkspaceRoot(value: any) {
   return normalized;
 }
 
-function isAscii(value: any) {
+function isAscii(value: unknown): boolean {
   for (const char of String(value || "")) {
     if (char.charCodeAt(0) > 127) {
       return false;
@@ -153,17 +184,10 @@ function isAscii(value: any) {
   return true;
 }
 
-function normalizeText(value: any) {
+function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-module.exports = {
+export {
   DEFAULT_ALIAS_MANIFEST,
-  convertRootedPath,
-  loadAliasMappings,
-  normalizeWorkspaceRoot,
-  resolveAliasMappingForPath,
-  resolveCodexWorkspaceRoot,
 };
-
-export {};

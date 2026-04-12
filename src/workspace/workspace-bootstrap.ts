@@ -1,38 +1,99 @@
-const fs = require("fs");
-const path = require("path");
-const { normalizeWorkspaceBootstrapConfig } = require("../contracts/config-files");
-const { loadJsonConfig } = require("../core/config-loader");
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { normalizeWorkspaceBootstrapConfig } from "../contracts/config-files";
+import { loadJsonConfig } from "../core/config-loader";
 
-const DEFAULT_BOOTSTRAP_PROFILE = Object.freeze({
+interface FileCandidateInput extends Record<string, unknown> {
+  path?: unknown;
+  relativePath?: unknown;
+  role?: unknown;
+  when?: unknown;
+}
+
+interface RecentFileSpecInput extends Record<string, unknown> {
+  directory?: unknown;
+  pattern?: unknown;
+  role?: unknown;
+  maxCount?: unknown;
+}
+
+interface WorkspaceBootstrapProfileInput extends Record<string, unknown> {
+  primaryFiles?: unknown;
+  conditionalFiles?: unknown;
+  recentFiles?: unknown;
+}
+
+interface WorkspaceBootstrapConfig extends Record<string, unknown> {
+  defaults?: WorkspaceBootstrapProfileInput;
+  default?: WorkspaceBootstrapProfileInput;
+  workspaces?: Record<string, WorkspaceBootstrapProfileInput>;
+}
+
+interface WorkspaceBootstrapOptions extends Record<string, unknown> {
+  workspaceBootstrapConfigFile?: unknown;
+}
+
+interface FileCandidate {
+  relativePath: string;
+  role: string;
+  when: string;
+}
+
+interface RecentFileSpec {
+  directory: string;
+  pattern: RegExp;
+  role: string;
+  maxCount: number;
+}
+
+interface WorkspaceBootstrapProfile {
+  primaryFiles: FileCandidate[];
+  conditionalFiles: FileCandidate[];
+  recentFiles: RecentFileSpec[];
+}
+
+interface CollectedFile {
+  absolutePath: string;
+  role: string;
+  when: string;
+}
+
+const DEFAULT_BOOTSTRAP_PROFILE: WorkspaceBootstrapProfile = Object.freeze({
   primaryFiles: [
     {
-      path: "AGENTS.md",
+      relativePath: "AGENTS.md",
       role: "workspace routing and boundary contract",
+      when: "",
     },
     {
-      path: "AGENTS.local.md",
+      relativePath: "AGENTS.local.md",
       role: "private operator overlay for this workspace",
+      when: "",
     },
     {
-      path: "README.md",
+      relativePath: "README.md",
       role: "workspace overview and operating instructions",
+      when: "",
     },
     {
-      path: "Home.md",
+      relativePath: "Home.md",
       role: "workspace home and current control page",
+      when: "",
     },
     {
-      path: ".codex/AGENT_GUIDE.md",
+      relativePath: ".codex/AGENT_GUIDE.md",
       role: "agent write/update rules for this workspace",
+      when: "",
     },
     {
-      path: ".codex/AGENT_GUIDE.local.md",
+      relativePath: ".codex/AGENT_GUIDE.local.md",
       role: "private agent write/update overlay for this workspace",
+      when: "",
     },
   ],
   conditionalFiles: [
     {
-      path: ".codex/timeline/README.md",
+      relativePath: ".codex/timeline/README.md",
       role: "timeline write/read contract for this workspace",
       when: "timeline read/write/build/screenshot work, or cutover/closeout bookkeeping that may append timeline facts/events",
     },
@@ -40,7 +101,10 @@ const DEFAULT_BOOTSTRAP_PROFILE = Object.freeze({
   recentFiles: [],
 });
 
-function buildWorkspaceContinuityInstructions(workspaceRoot: any, config: any = {}) {
+export function buildWorkspaceContinuityInstructions(
+  workspaceRoot: unknown,
+  config: WorkspaceBootstrapOptions = {},
+): string {
   const normalizedWorkspaceRoot = normalizeWorkspaceRoot(workspaceRoot);
   if (!normalizedWorkspaceRoot) {
     return "";
@@ -66,7 +130,7 @@ function buildWorkspaceContinuityInstructions(workspaceRoot: any, config: any = 
 
   if (primarySequence.length) {
     lines.push(
-      "Before your first substantive reply in this workspace, recover context from these files in order:"
+      "Before your first substantive reply in this workspace, recover context from these files in order:",
     );
     for (const [index, file] of primarySequence.entries()) {
       lines.push(`${index + 1}. ${file.absolutePath} - ${file.role}`);
@@ -90,7 +154,10 @@ function buildWorkspaceContinuityInstructions(workspaceRoot: any, config: any = 
   return lines.join("\n").trim();
 }
 
-function resolveWorkspaceBootstrapProfile(workspaceRoot: any, config: any = {}) {
+function resolveWorkspaceBootstrapProfile(
+  workspaceRoot: string,
+  config: WorkspaceBootstrapOptions = {},
+): WorkspaceBootstrapProfile {
   const externalConfig = loadWorkspaceBootstrapConfig(config);
   const externalDefaults = externalConfig.defaults || externalConfig.default || {};
   const baseProfile = mergeProfiles(DEFAULT_BOOTSTRAP_PROFILE, externalDefaults);
@@ -98,22 +165,25 @@ function resolveWorkspaceBootstrapProfile(workspaceRoot: any, config: any = {}) 
   return mergeProfiles(baseProfile, workspaceOverrides || {});
 }
 
-function loadWorkspaceBootstrapConfig(config: any = {}) {
+function loadWorkspaceBootstrapConfig(config: WorkspaceBootstrapOptions = {}): WorkspaceBootstrapConfig {
   const filePath = normalizeText(config.workspaceBootstrapConfigFile);
   if (!filePath) {
     return {};
   }
-  return loadJsonConfig({
+  return loadJsonConfig<WorkspaceBootstrapConfig>({
     filePath,
     label: "workspace bootstrap",
-    normalize: normalizeWorkspaceBootstrapConfig,
+    normalize: normalizeWorkspaceBootstrapConfig as (value: unknown) => WorkspaceBootstrapConfig,
     fallback: {},
     missing: "fallback",
     invalid: "fallback",
   });
 }
 
-function selectWorkspaceOverrides(workspaces: any, workspaceRoot: any) {
+function selectWorkspaceOverrides(
+  workspaces: Record<string, WorkspaceBootstrapProfileInput> | undefined,
+  workspaceRoot: string,
+): WorkspaceBootstrapProfileInput | null {
   if (!workspaces || typeof workspaces !== "object") {
     return null;
   }
@@ -126,8 +196,11 @@ function selectWorkspaceOverrides(workspaces: any, workspaceRoot: any) {
   return null;
 }
 
-function mergeProfiles(baseProfile: any, overrideProfile: any) {
-  const override = overrideProfile && typeof overrideProfile === "object" ? overrideProfile : {};
+function mergeProfiles(
+  baseProfile: WorkspaceBootstrapProfile,
+  overrideProfile: WorkspaceBootstrapProfileInput,
+): WorkspaceBootstrapProfile {
+  const override = isRecord(overrideProfile) ? overrideProfile : {};
   return {
     primaryFiles: hasOwn(override, "primaryFiles")
       ? normalizeFileCandidates(override.primaryFiles)
@@ -141,15 +214,15 @@ function mergeProfiles(baseProfile: any, overrideProfile: any) {
   };
 }
 
-function normalizeFileCandidates(rawCandidates: any) {
+function normalizeFileCandidates(rawCandidates: unknown): FileCandidate[] {
   const candidates = Array.isArray(rawCandidates) ? rawCandidates : [];
   return candidates
-    .map((candidate: any) => normalizeFileCandidate(candidate))
-    .filter(Boolean);
+    .map((candidate) => normalizeFileCandidate(candidate))
+    .filter((candidate): candidate is FileCandidate => Boolean(candidate));
 }
 
-function normalizeFileCandidate(rawCandidate: any) {
-  const candidate = rawCandidate && typeof rawCandidate === "object" ? rawCandidate : {};
+function normalizeFileCandidate(rawCandidate: unknown): FileCandidate | null {
+  const candidate = isRecord(rawCandidate) ? rawCandidate : {};
   const relativePath = normalizeRelativePath(candidate.path || candidate.relativePath);
   if (!relativePath) {
     return null;
@@ -161,27 +234,27 @@ function normalizeFileCandidate(rawCandidate: any) {
   };
 }
 
-function normalizeRecentFileSpecs(rawSpecs: any) {
+function normalizeRecentFileSpecs(rawSpecs: unknown): RecentFileSpec[] {
   const specs = Array.isArray(rawSpecs) ? rawSpecs : [];
   return specs
-    .map((spec: any) => normalizeRecentFileSpec(spec))
-    .filter(Boolean);
+    .map((spec) => normalizeRecentFileSpec(spec))
+    .filter((spec): spec is RecentFileSpec => Boolean(spec));
 }
 
-function normalizeRecentFileSpec(rawSpec: any) {
-  const spec = rawSpec && typeof rawSpec === "object" ? rawSpec : {};
+function normalizeRecentFileSpec(rawSpec: unknown): RecentFileSpec | null {
+  const spec = isRecord(rawSpec) ? rawSpec : {};
   const directory = normalizeRelativePath(spec.directory);
   const patternText = normalizeText(spec.pattern);
   if (!directory || !patternText) {
     return null;
   }
-  let pattern = null;
+  let pattern: RegExp;
   try {
     pattern = new RegExp(patternText);
   } catch {
     return null;
   }
-  const maxCount = Math.max(1, Number.parseInt(spec.maxCount, 10) || 1);
+  const maxCount = Math.max(1, Number.parseInt(String(spec.maxCount ?? ""), 10) || 1);
   return {
     directory,
     pattern,
@@ -190,11 +263,10 @@ function normalizeRecentFileSpec(rawSpec: any) {
   };
 }
 
-function collectExistingFiles(workspaceRoot: any, candidates: any) {
-  const normalizedCandidates = Array.isArray(candidates) ? candidates : [];
-  const files = [];
-  for (const candidate of normalizedCandidates) {
-    const relativePath = normalizeRelativePath(candidate?.relativePath);
+function collectExistingFiles(workspaceRoot: string, candidates: FileCandidate[]): CollectedFile[] {
+  const files: CollectedFile[] = [];
+  for (const candidate of candidates) {
+    const relativePath = normalizeRelativePath(candidate.relativePath);
     if (!relativePath) {
       continue;
     }
@@ -204,25 +276,24 @@ function collectExistingFiles(workspaceRoot: any, candidates: any) {
     }
     files.push({
       absolutePath: normalizeDisplayPath(absolutePath),
-      role: normalizeText(candidate?.role) || "workspace entry file",
-      when: normalizeText(candidate?.when),
+      role: normalizeText(candidate.role) || "workspace entry file",
+      when: normalizeText(candidate.when),
     });
   }
   return files;
 }
 
-function collectRecentFiles(workspaceRoot: any, specs: any) {
-  const normalizedSpecs = Array.isArray(specs) ? specs : [];
-  const files = [];
-  for (const spec of normalizedSpecs) {
+function collectRecentFiles(workspaceRoot: string, specs: RecentFileSpec[]): CollectedFile[] {
+  const files: CollectedFile[] = [];
+  for (const spec of specs) {
     const directoryPath = path.join(workspaceRoot, ...String(spec.directory || "").split("/"));
     if (!isReadableDirectory(directoryPath)) {
       continue;
     }
     const entries = fs.readdirSync(directoryPath, { withFileTypes: true })
-      .filter((entry: any) => entry.isFile() && spec.pattern.test(entry.name))
-      .map((entry: any) => entry.name)
-      .sort((left: any, right: any) => right.localeCompare(left))
+      .filter((entry) => entry.isFile() && spec.pattern.test(entry.name))
+      .map((entry) => entry.name)
+      .sort((left, right) => right.localeCompare(left))
       .slice(0, spec.maxCount);
     for (const entryName of entries) {
       files.push({
@@ -235,10 +306,10 @@ function collectRecentFiles(workspaceRoot: any, specs: any) {
   return files;
 }
 
-function groupConditionalFiles(files: any) {
-  const groups = [];
-  const byWhen = new Map();
-  for (const file of Array.isArray(files) ? files : []) {
+function groupConditionalFiles(files: CollectedFile[]): Array<{ when: string; files: CollectedFile[] }> {
+  const groups: Array<{ when: string; files: CollectedFile[] }> = [];
+  const byWhen = new Map<string, CollectedFile[]>();
+  for (const file of files) {
     const when = normalizeText(file.when);
     if (!when) {
       continue;
@@ -247,15 +318,15 @@ function groupConditionalFiles(files: any) {
       byWhen.set(when, []);
       groups.push({
         when,
-        files: byWhen.get(when),
+        files: byWhen.get(when)!,
       });
     }
-    byWhen.get(when).push(file);
+    byWhen.get(when)!.push(file);
   }
   return groups;
 }
 
-function isReadableFile(filePath: any) {
+function isReadableFile(filePath: string): boolean {
   try {
     return fs.statSync(filePath).isFile();
   } catch {
@@ -263,7 +334,7 @@ function isReadableFile(filePath: any) {
   }
 }
 
-function isReadableDirectory(directoryPath: any) {
+function isReadableDirectory(directoryPath: string): boolean {
   try {
     return fs.statSync(directoryPath).isDirectory();
   } catch {
@@ -271,7 +342,7 @@ function isReadableDirectory(directoryPath: any) {
   }
 }
 
-function normalizeWorkspaceRoot(workspaceRoot: any) {
+function normalizeWorkspaceRoot(workspaceRoot: unknown): string {
   const normalized = normalizeText(workspaceRoot);
   if (!normalized) {
     return "";
@@ -279,10 +350,10 @@ function normalizeWorkspaceRoot(workspaceRoot: any) {
   return normalizeDisplayPath(normalized);
 }
 
-function normalizeRelativePath(value: any) {
+function normalizeRelativePath(value: unknown): string {
   if (Array.isArray(value)) {
     return value
-      .map((segment: any) => normalizeText(segment))
+      .map((segment) => normalizeText(segment))
       .filter(Boolean)
       .join("/");
   }
@@ -292,20 +363,18 @@ function normalizeRelativePath(value: any) {
     .replace(/\/+$/, "");
 }
 
-function normalizeDisplayPath(targetPath: any) {
+function normalizeDisplayPath(targetPath: unknown): string {
   return normalizeText(targetPath).replace(/\\/g, "/");
 }
 
-function normalizeText(value: any) {
+function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function hasOwn(value: any, key: any) {
+function hasOwn(value: unknown, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(value || {}, key);
 }
 
-module.exports = {
-  buildWorkspaceContinuityInstructions,
-};
-
-export {};
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}

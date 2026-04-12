@@ -1,11 +1,9 @@
-// @ts-nocheck
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
-const test = require("node:test");
-const assert = require("node:assert/strict");
-
-const { SessionStore } = require("../src/adapters/runtime/codex/session-store");
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
+const fs: typeof import("node:fs") = require("node:fs");
+const os: typeof import("node:os") = require("node:os");
+const path: typeof import("node:path") = require("node:path");
+const test: typeof import("node:test") = require("node:test");
+const { SessionStore }: typeof import("../src/adapters/runtime/codex/session-store") = require("../src/adapters/runtime/codex/session-store");
 
 function createTempSessionFile() {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-session-store-"));
@@ -60,12 +58,16 @@ test("SessionStore round-trips pending approvals with deep normalized state", ()
   });
 
   const reloaded = new SessionStore({ filePath });
+  const binding = reloaded.getBinding(bindingKey);
+  if (!binding) {
+    throw new Error("expected persisted binding");
+  }
   assert.deepEqual(reloaded.getBinding(bindingKey), {
     workspaceId: "workspace-1",
     accountId: "acct-1",
     senderId: "user-1",
     activeWorkspaceRoot: "E:/repo/current",
-    updatedAt: reloaded.getBinding(bindingKey).updatedAt,
+    updatedAt: binding.updatedAt,
     threadIdByWorkspaceRoot: {
       "E:/repo/current": "thread-current",
     },
