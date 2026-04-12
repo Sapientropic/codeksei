@@ -11,6 +11,7 @@ const {
   resolveRepoRuntimePath,
 } = require("./helpers/runtime-paths");
 const appModulePath = resolveRepoRuntimePath("src/core/app.js");
+const appRuntimeFactoryModulePath = resolveRepoRuntimePath("src/core/app-runtime-factory.js");
 
 function resolveRepoModule(relativePath) {
   return resolveRepoRuntimeModule(relativePath);
@@ -190,6 +191,8 @@ function createAppHarness({
     async runSystemCheckinPoller() {},
   }, originals);
 
+  originals.set(appRuntimeFactoryModulePath, require.cache[appRuntimeFactoryModulePath]);
+  delete require.cache[appRuntimeFactoryModulePath];
   originals.set(appModulePath, require.cache[appModulePath]);
   delete require.cache[appModulePath];
   const { CodekseiApp } = require(appModulePath);

@@ -1,10 +1,9 @@
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
-
-const { resolveCodexWorkspaceRoot } = require("../src/workspace/workspace-alias");
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
+const fs: typeof import("node:fs") = require("node:fs");
+const os: typeof import("node:os") = require("node:os");
+const path: typeof import("node:path") = require("node:path");
+const test: typeof import("node:test") = require("node:test");
+const { resolveCodexWorkspaceRoot }: typeof import("../src/workspace/workspace-alias") = require("../src/workspace/workspace-alias");
 
 test("resolveCodexWorkspaceRoot falls back to the real workspace when alias path is stale", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-alias-"));
@@ -24,7 +23,7 @@ test("resolveCodexWorkspaceRoot falls back to the real workspace when alias path
 
   assert.equal(
     resolveCodexWorkspaceRoot(targetPath, { manifestPath }),
-    targetPath.replace(/\\/g, "/")
+    targetPath.replace(/\\/g, "/"),
   );
 });
 
@@ -48,6 +47,6 @@ test("resolveCodexWorkspaceRoot keeps using an alias when the alias directory ex
 
   assert.equal(
     resolveCodexWorkspaceRoot(targetPath, { manifestPath }),
-    aliasPath.replace(/\\/g, "/")
+    aliasPath.replace(/\\/g, "/"),
   );
 });

@@ -1,25 +1,106 @@
-const { spawn } = require("child_process");
-const WebSocket = require("ws");
-const { PRIMARY_RPC_CLIENT_INFO } = require("../../../core/branding");
-const { readPrefixedEnv } = require("../../../core/branding");
-const { buildSpawnInvocation } = require("../../../core/codex-spawn");
+import { spawn } from "node:child_process";
+import WebSocket = require("ws");
+import type { RawData } from "ws";
+import * as brandingModule from "../../../core/branding";
+import * as codexSpawnModule from "../../../core/codex-spawn";
+
+const { PRIMARY_RPC_CLIENT_INFO, readPrefixedEnv } = brandingModule as {
+  PRIMARY_RPC_CLIENT_INFO: Record<string, unknown>;
+  readPrefixedEnv: (env: NodeJS.ProcessEnv, key: string) => string;
+};
+const { buildSpawnInvocation } = codexSpawnModule as {
+  buildSpawnInvocation: (command: string, args: string[]) => { command: string; args: string[] };
+};
 
 const DEFAULT_CODEX_COMMAND = "codex";
 const CODEX_CLIENT_INFO = PRIMARY_RPC_CLIENT_INFO;
 const TRANSPORT_STDERR_MAX_CHARS = 4000;
 
-class CodexRpcClient {
-  child: any;
-  codexCommand: any;
-  endpoint: any;
-  env: any;
-  extraWritableRoots: any;
+type TransportMode = "websocket" | "spawn";
+type MessageListener = (message: unknown) => void;
+interface SpawnChildLike {
+  stdin: {
+    writable: boolean;
+    write(chunk: string): void;
+    on?(event: "error", listener: (error: Error) => void): unknown;
+  } | null;
+  stdout: {
+    on(event: "data", listener: (chunk: Buffer | string) => void): unknown;
+  };
+  stderr: {
+    on(event: "data", listener: (chunk: Buffer | string) => void): unknown;
+  };
+  on(event: "error", listener: (error: Error) => void): unknown;
+  on(event: "close", listener: (code: number | null, signal: NodeJS.Signals | null) => void): unknown;
+  once(event: "spawn", listener: () => void): unknown;
+  once(event: "error", listener: (error: Error) => void): unknown;
+  off?(event: "spawn", listener: () => void): unknown;
+  off?(event: "error", listener: (error: Error) => void): unknown;
+  removeListener(event: "spawn", listener: () => void): unknown;
+  removeListener(event: "error", listener: (error: Error) => void): unknown;
+  kill(): void;
+}
+
+type SpawnLike = (command: string, args: string[], options: Record<string, unknown>) => SpawnChildLike;
+
+interface PendingEntry {
+  resolve: (value: unknown) => void;
+  reject: (error: Error) => void;
+}
+
+interface CodexRpcClientOptions {
+  endpoint?: string;
+  env?: NodeJS.ProcessEnv;
+  codexCommand?: string;
+  extraWritableRoots?: unknown[];
+  spawnImpl?: SpawnLike;
+}
+
+interface CloseTransportArgs {
+  socket?: WebSocket | null;
+  child?: SpawnChildLike | null;
+}
+
+interface StartThreadArgs {
+  cwd?: string;
+}
+
+interface ResumeThreadArgs {
+  threadId?: string;
+}
+
+interface ListThreadsArgs {
+  cursor?: string | null;
+  limit?: number;
+  sortKey?: string;
+}
+
+interface CancelTurnArgs {
+  threadId?: string;
+  turnId?: string;
+}
+
+interface SendUserMessageArgs {
+  threadId?: string | null;
+  text?: string | null;
+  model?: string | null;
+  effort?: string | null;
+  accessMode?: string | null;
+  workspaceRoot?: string | null;
+}
+
+export class CodexRpcClient {
+  child: SpawnChildLike | null;
+  codexCommand: string;
+  endpoint: string;
+  env: NodeJS.ProcessEnv;
+  extraWritableRoots: string[];
   isReady: boolean;
-  messageListeners: Set<any>;
-  mode: any;
-  pending: Map<any, any>;
-  socket: any;
-  spawnImpl: any;
+  messageListeners: Set<MessageListener>;
+  mode: TransportMode;
+  pending: Map<string, PendingEntry>;
+  socket: WebSocket | null;
+  spawnImpl: SpawnLike;
   stderrBuffer: string;
   stdoutBuffer: string;
 
@@ -29,7 +110,7 @@ class CodexRpcClient {
     codexCommand = "",
     extraWritableRoots = [],
     spawnImpl = spawn,
-  }: any) {
+  }: CodexRpcClientOptions = {}) {
     this.endpoint = endpoint;
     this.env = env;
     this.codexCommand = codexCommand || resolveDefaultCodexCommand(env);
@@ -45,7 +126,7 @@ class CodexRpcClient {
     this.messageListeners = new Set();
   }
 
-  async connect() {
+  async connect(): Promise<void> {
     if (this.isConnected()) {
       return;
     }
@@ -56,9 +137,9 @@ class CodexRpcClient {
     await this.connectSpawn();
   }
 
-  async connectSpawn() {
+  async connectSpawn(): Promise<void> {
     const spawnSpec = buildSpawnInvocation(this.codexCommand, ["app-server"]);
-    let child = null;
+    let child: SpawnChildLike | null = null;
     try {
       child = this.spawnImpl(spawnSpec.command, spawnSpec.args, {
         env: { ...this.env },
@@ -73,10 +154,10 @@ class CodexRpcClient {
     this.stdoutBuffer = "";
     this.stderrBuffer = "";
     this.child = child;
-    child.on("error", (error: any) => {
+    child.on("error", (error) => {
       this.handleTransportClosed(buildSpawnRuntimeErrorMessage(error, this.stderrBuffer), { child });
     });
-    child.stdout.on("data", (chunk: any) => {
+    child.stdout.on("data", (chunk) => {
       this.stdoutBuffer += chunk.toString("utf8");
       const lines = this.stdoutBuffer.split("\n");
       this.stdoutBuffer = lines.pop() || "";
@@ -87,15 +168,15 @@ class CodexRpcClient {
         }
       }
     });
-    child.stderr.on("data", (chunk: any) => {
+    child.stderr.on("data", (chunk) => {
       this.stderrBuffer = appendTransportOutput(this.stderrBuffer, chunk.toString("utf8"));
     });
     if (child.stdin && typeof child.stdin.on === "function") {
-      child.stdin.on("error", (error: any) => {
+      child.stdin.on("error", (error) => {
         this.handleTransportClosed(buildSpawnRuntimeErrorMessage(error, this.stderrBuffer), { child });
       });
     }
-    child.on("close", (code: any, signal: any) => {
+    child.on("close", (code, signal) => {
       this.handleTransportClosed(buildSpawnCloseMessage({
         code,
         signal,
@@ -110,7 +191,7 @@ class CodexRpcClient {
     }
   }
 
-  async connectWebSocket() {
+  async connectWebSocket(): Promise<void> {
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       return;
     }
@@ -122,7 +203,7 @@ class CodexRpcClient {
       }
       this.socket = null;
     }
-    await new Promise((resolve: any, reject: any) => {
+    await new Promise<void>((resolve, reject) => {
       let settled = false;
       const socket = new WebSocket(this.endpoint);
       this.socket = socket;
@@ -130,7 +211,7 @@ class CodexRpcClient {
         settled = true;
         resolve();
       });
-      socket.on("error", (error: any) => {
+      socket.on("error", (error) => {
         if (!settled) {
           if (this.socket === socket) {
             this.socket = null;
@@ -140,7 +221,7 @@ class CodexRpcClient {
         }
         this.handleTransportClosed("Codex websocket errored", { socket });
       });
-      socket.on("message", (chunk: any) => {
+      socket.on("message", (chunk: RawData) => {
         const message = typeof chunk === "string" ? chunk : chunk.toString("utf8");
         if (message.trim()) {
           this.handleIncoming(message);
@@ -159,19 +240,19 @@ class CodexRpcClient {
     });
   }
 
-  isConnected() {
+  isConnected(): boolean {
     if (this.mode === "websocket") {
       return Boolean(this.socket && this.socket.readyState === WebSocket.OPEN);
     }
     return Boolean(this.child && this.child.stdin && this.child.stdin.writable);
   }
 
-  onMessage(listener: any) {
+  onMessage(listener: MessageListener): () => boolean {
     this.messageListeners.add(listener);
     return () => this.messageListeners.delete(listener);
   }
 
-  async initialize() {
+  async initialize(): Promise<void> {
     if (this.isReady) {
       return;
     }
@@ -185,7 +266,14 @@ class CodexRpcClient {
     this.isReady = true;
   }
 
-  async sendUserMessage({ threadId, text, model = null, effort = null, accessMode = null, workspaceRoot = "" }: any) {
+  async sendUserMessage({
+    threadId = null,
+    text = null,
+    model = null,
+    effort = null,
+    accessMode = null,
+    workspaceRoot = "",
+  }: SendUserMessageArgs): Promise<unknown> {
     const input = buildTurnInputPayload(text);
     return threadId
       ? this.sendRequest("turn/start", buildTurnStartParams({
@@ -200,11 +288,11 @@ class CodexRpcClient {
       : this.sendRequest("thread/start", { input });
   }
 
-  async startThread({ cwd }: any) {
+  async startThread({ cwd }: StartThreadArgs): Promise<unknown> {
     return this.sendRequest("thread/start", buildStartThreadParams(cwd));
   }
 
-  async resumeThread({ threadId }: any) {
+  async resumeThread({ threadId }: ResumeThreadArgs): Promise<unknown> {
     const normalizedThreadId = normalizeNonEmptyString(threadId);
     if (!normalizedThreadId) {
       throw new Error("thread/resume requires a non-empty threadId");
@@ -212,7 +300,11 @@ class CodexRpcClient {
     return this.sendRequest("thread/resume", { threadId: normalizedThreadId });
   }
 
-  async listThreads({ cursor = null, limit = 100, sortKey = "updated_at" }: any = {}) {
+  async listThreads({
+    cursor = null,
+    limit = 100,
+    sortKey = "updated_at",
+  }: ListThreadsArgs = {}): Promise<unknown> {
     return this.sendRequest("thread/list", buildListThreadsParams({
       cursor,
       limit,
@@ -220,11 +312,11 @@ class CodexRpcClient {
     }));
   }
 
-  async listModels() {
+  async listModels(): Promise<unknown> {
     return this.sendRequest("model/list", {});
   }
 
-  async cancelTurn({ threadId, turnId }: any) {
+  async cancelTurn({ threadId, turnId }: CancelTurnArgs): Promise<unknown> {
     const normalizedThreadId = normalizeNonEmptyString(threadId);
     const normalizedTurnId = normalizeNonEmptyString(turnId);
     if (!normalizedThreadId || !normalizedTurnId) {
@@ -236,7 +328,7 @@ class CodexRpcClient {
     });
   }
 
-  async close() {
+  async close(): Promise<void> {
     this.rejectPending(new Error("Codex RPC client closed"));
     const socket = this.socket;
     const child = this.child;
@@ -261,28 +353,28 @@ class CodexRpcClient {
     }
   }
 
-  async sendRequest(method: any, params: any) {
+  async sendRequest(method: string, params: unknown): Promise<unknown> {
     const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const payload = JSON.stringify({ id, method, params });
-    const responsePromise = new Promise((resolve: any, reject: any) => {
+    const responsePromise = new Promise<unknown>((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
     });
     this.sendRaw(payload);
     return responsePromise;
   }
 
-  async sendNotification(method: any, params: any) {
+  async sendNotification(method: string, params: unknown): Promise<void> {
     this.sendRaw(JSON.stringify({ method, params }));
   }
 
-  async sendResponse(id: any, result: any) {
+  async sendResponse(id: unknown, result: unknown): Promise<void> {
     if (id == null || id === "") {
       throw new Error("Codex RPC response requires a non-empty id");
     }
     this.sendRaw(JSON.stringify({ id, result }));
   }
 
-  sendRaw(payload: any) {
+  sendRaw(payload: string): void {
     if (this.mode === "websocket") {
       if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
         throw new Error("Codex websocket is not connected");
@@ -303,7 +395,7 @@ class CodexRpcClient {
     }
   }
 
-  handleTransportClosed(message: any, { socket = null, child = null }: any = {}) {
+  handleTransportClosed(message: string, { socket = null, child = null }: CloseTransportArgs = {}): void {
     if (socket && this.socket !== socket) {
       return;
     }
@@ -321,29 +413,34 @@ class CodexRpcClient {
     this.rejectPending(new Error(message));
   }
 
-  rejectPending(error: any) {
+  rejectPending(error: Error): void {
     for (const { reject } of this.pending.values()) {
       reject(error);
     }
     this.pending.clear();
   }
 
-  handleIncoming(rawMessage: any) {
-    let parsed = null;
+  handleIncoming(rawMessage: string): void {
+    let parsed: unknown = null;
     try {
       parsed = JSON.parse(rawMessage);
     } catch {
       return;
     }
 
-    if (parsed && parsed.id != null && this.pending.has(String(parsed.id))) {
-      const { resolve, reject } = this.pending.get(String(parsed.id));
-      this.pending.delete(String(parsed.id));
-      if (parsed.error) {
-        reject(new Error(parsed.error.message || "Codex RPC request failed"));
+    const envelope = asRecord(parsed);
+    if (envelope.id != null && this.pending.has(String(envelope.id))) {
+      const pending = this.pending.get(String(envelope.id));
+      this.pending.delete(String(envelope.id));
+      if (!pending) {
         return;
       }
-      resolve(parsed);
+      const errorPayload = asRecord(envelope.error);
+      if (Object.keys(errorPayload).length) {
+        pending.reject(new Error(String(errorPayload.message || "Codex RPC request failed")));
+        return;
+      }
+      pending.resolve(parsed);
       return;
     }
 
@@ -353,21 +450,29 @@ class CodexRpcClient {
   }
 }
 
-function resolveDefaultCodexCommand(env: any = process.env) {
+function resolveDefaultCodexCommand(env: NodeJS.ProcessEnv = process.env): string {
   return normalizeNonEmptyString(readPrefixedEnv(env, "CODEX_COMMAND")) || DEFAULT_CODEX_COMMAND;
 }
 
-function normalizeNonEmptyString(value: any) {
+function normalizeNonEmptyString(value: unknown): string {
   return typeof value === "string" && value.trim() ? value.trim() : "";
 }
 
-function buildStartThreadParams(cwd: any) {
+function buildStartThreadParams(cwd: unknown): Record<string, string> {
   const normalizedCwd = normalizeNonEmptyString(cwd);
   return normalizedCwd ? { cwd: normalizedCwd } : {};
 }
 
-function buildListThreadsParams({ cursor, limit, sortKey }: any) {
-  const params: any = { limit, sortKey };
+function buildListThreadsParams({
+  cursor,
+  limit,
+  sortKey,
+}: {
+  cursor?: string | null;
+  limit: number;
+  sortKey: string;
+}): { limit: number; sortKey: string; cursor?: string | null } {
+  const params: { limit: number; sortKey: string; cursor?: string | null } = { limit, sortKey };
   const normalizedCursor = normalizeNonEmptyString(cursor);
   if (normalizedCursor) {
     params.cursor = normalizedCursor;
@@ -377,13 +482,29 @@ function buildListThreadsParams({ cursor, limit, sortKey }: any) {
   return params;
 }
 
-function buildTurnInputPayload(text: any) {
+function buildTurnInputPayload(text: unknown): Array<{ type: "text"; text: string }> {
   const normalizedText = normalizeNonEmptyString(text);
   return normalizedText ? [{ type: "text", text: normalizedText }] : [];
 }
 
-function buildTurnStartParams({ threadId, input, model, effort, accessMode, workspaceRoot, extraWritableRoots = [] }: any) {
-  const params: any = { threadId, input };
+function buildTurnStartParams({
+  threadId,
+  input,
+  model,
+  effort,
+  accessMode,
+  workspaceRoot,
+  extraWritableRoots = [],
+}: {
+  threadId?: unknown;
+  input: Array<{ type: "text"; text: string }>;
+  model?: unknown;
+  effort?: unknown;
+  accessMode?: unknown;
+  workspaceRoot?: unknown;
+  extraWritableRoots?: string[];
+}): Record<string, unknown> {
+  const params: Record<string, unknown> = { threadId, input };
   const normalizedWorkspaceRoot = normalizeNonEmptyString(workspaceRoot);
   const normalizedModel = normalizeNonEmptyString(model);
   const normalizedEffort = normalizeNonEmptyString(effort);
@@ -406,7 +527,7 @@ function buildTurnStartParams({ threadId, input, model, effort, accessMode, work
   return params;
 }
 
-function normalizeAccessMode(value: any) {
+function normalizeAccessMode(value: unknown): "current" | "full-access" | "" {
   const normalized = normalizeNonEmptyString(value).toLowerCase();
   if (normalized === "default") {
     return "current";
@@ -414,7 +535,16 @@ function normalizeAccessMode(value: any) {
   return normalized === "full-access" ? normalized : "";
 }
 
-function buildExecutionPolicies(accessMode: any, workspaceRoot: any, extraWritableRoots: any[] = []) {
+function buildExecutionPolicies(
+  accessMode: "current" | "full-access" | "",
+  workspaceRoot: unknown,
+  extraWritableRoots: string[] = [],
+): {
+  approvalPolicy: "never" | "on-request";
+  sandboxPolicy:
+    | { type: "dangerFullAccess" }
+    | { type: "workspaceWrite"; writableRoots?: string[]; networkAccess: true };
+} {
   if (accessMode === "full-access") {
     return {
       approvalPolicy: "never",
@@ -427,17 +557,17 @@ function buildExecutionPolicies(accessMode: any, workspaceRoot: any, extraWritab
     ...extraWritableRoots,
   ]);
   const sandboxPolicy = writableRoots.length
-    ? { type: "workspaceWrite", writableRoots, networkAccess: true }
-    : { type: "workspaceWrite", networkAccess: true };
+    ? { type: "workspaceWrite" as const, writableRoots, networkAccess: true as const }
+    : { type: "workspaceWrite" as const, networkAccess: true as const };
   return {
     approvalPolicy: "on-request",
     sandboxPolicy,
   };
 }
 
-function normalizeWritableRoots(values: any) {
-  const roots = [];
-  const seen = new Set();
+function normalizeWritableRoots(values: unknown[]): string[] {
+  const roots: string[] = [];
+  const seen = new Set<string>();
   for (const value of values) {
     const normalized = normalizeNonEmptyString(value);
     if (!normalized || seen.has(normalized)) {
@@ -449,8 +579,8 @@ function normalizeWritableRoots(values: any) {
   return roots;
 }
 
-function waitForSpawnReady(child: any) {
-  return new Promise((resolve: any, reject: any) => {
+function waitForSpawnReady(child: SpawnChildLike): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
     let settled = false;
     const cleanup = () => {
       if (typeof child.off === "function") {
@@ -469,7 +599,7 @@ function waitForSpawnReady(child: any) {
       cleanup();
       resolve();
     };
-    const handleError = (error: any) => {
+    const handleError = (error: Error) => {
       if (settled) {
         return;
       }
@@ -482,36 +612,47 @@ function waitForSpawnReady(child: any) {
   });
 }
 
-function createSpawnFailureError(spawnSpec: any, error: any) {
+function createSpawnFailureError(
+  spawnSpec: { command: string; args?: string[] },
+  error: unknown,
+): Error {
   const attempted = [spawnSpec.command, ...(spawnSpec.args || [])].filter(Boolean).join(" ");
-  const detail = error?.message ? `: ${error.message}` : "";
+  const detail = error instanceof Error && error.message ? `: ${error.message}` : "";
   return new Error(`Unable to spawn Codex app-server via ${attempted}${detail}.`);
 }
 
-function buildSpawnRuntimeErrorMessage(error: any, stderrBuffer: any) {
-  const detail = error?.message ? `: ${error.message}` : "";
+function buildSpawnRuntimeErrorMessage(error: unknown, stderrBuffer: string): string {
+  const detail = error instanceof Error && error.message ? `: ${error.message}` : "";
   return appendTransportDiagnostic(`Codex process transport errored${detail}`, stderrBuffer);
 }
 
-function buildSpawnCloseMessage({ code, signal, stderrBuffer }: any) {
+function buildSpawnCloseMessage({
+  code,
+  signal,
+  stderrBuffer,
+}: {
+  code: number | null;
+  signal: NodeJS.Signals | null;
+  stderrBuffer: string;
+}): string {
   const codeLabel = code == null ? "unknown" : String(code);
   const signalLabel = signal ? ` signal=${signal}` : "";
   return appendTransportDiagnostic(`Codex process closed (code=${codeLabel}${signalLabel})`, stderrBuffer);
 }
 
-function buildSpawnStdinClosedMessage(stderrBuffer: any) {
+function buildSpawnStdinClosedMessage(stderrBuffer: string): string {
   return appendTransportDiagnostic("Codex process stdin is not writable", stderrBuffer);
 }
 
-function appendTransportDiagnostic(message: any, stderrBuffer: any) {
+function appendTransportDiagnostic(message: string, stderrBuffer: string): string {
   const summary = summarizeTransportStderr(stderrBuffer);
   return summary ? `${message}; stderr tail: ${summary}` : message;
 }
 
-function summarizeTransportStderr(stderrBuffer: any) {
+function summarizeTransportStderr(stderrBuffer: string): string {
   const tail = String(stderrBuffer || "")
     .split(/\r?\n/)
-    .map((line: any) => line.trim())
+    .map((line) => line.trim())
     .filter(Boolean)
     .slice(-3)
     .join(" | ");
@@ -521,7 +662,7 @@ function summarizeTransportStderr(stderrBuffer: any) {
   return tail.length > 240 ? `${tail.slice(0, 237)}...` : tail;
 }
 
-function appendTransportOutput(buffer: any, chunk: any) {
+function appendTransportOutput(buffer: string, chunk: string): string {
   const next = `${buffer}${chunk}`;
   if (next.length <= TRANSPORT_STDERR_MAX_CHARS) {
     return next;
@@ -529,6 +670,8 @@ function appendTransportOutput(buffer: any, chunk: any) {
   return next.slice(-TRANSPORT_STDERR_MAX_CHARS);
 }
 
-module.exports = { CodexRpcClient };
-
-export {};
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}

@@ -76,7 +76,7 @@
     "timeline:serve": "node ./dist/src/index.js timeline serve",
     "timeline:dev": "node ./dist/src/index.js timeline dev",
     "timeline:screenshot": "node ./dist/src/index.js timeline screenshot",
-    "lint": "node ./dist/src/release/check-covered-js-entrypoints.js && node ./dist/src/release/assert-no-legacy-branding.js && node ./dist/src/release/assert-no-key-ts-commonjs.js",
+    "lint": "node ./dist/src/release/check-covered-js-entrypoints.js && node ./dist/src/release/assert-no-legacy-branding.js && node ./dist/src/release/assert-no-key-ts-commonjs.js && node ./dist/src/release/assert-no-ts-nocheck-regressions.js",
     "typecheck": "tsc -p ./tsconfig.json --noEmit --pretty false",
     "typecheck:tests": "tsc -p ./tsconfig.tests.json --noEmit --pretty false",
     "typecheck:strict": "npm run typecheck",

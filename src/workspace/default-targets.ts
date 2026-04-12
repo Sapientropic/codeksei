@@ -1,18 +1,64 @@
-const { loadPersistedContextTokens } = require("../adapters/channel/weixin/context-token-store");
+import * as contextTokenStoreModule from "../adapters/channel/weixin/context-token-store";
+import type { SessionBinding } from "../contracts/session-state";
 
-function resolvePreferredSenderId({
+const { loadPersistedContextTokens } = contextTokenStoreModule as {
+  loadPersistedContextTokens: (config: ConfigLike, accountId: string) => Record<string, string>;
+};
+
+interface ConfigLike extends Record<string, unknown> {
+  allowedUserIds?: unknown;
+  workspaceId?: unknown;
+  workspaceRoot?: unknown;
+}
+
+interface BindingKeyArgs {
+  workspaceId: string;
+  accountId: string;
+  senderId: string;
+}
+
+type SessionBindingLike = Partial<SessionBinding> & Record<string, unknown>;
+
+interface SenderResolutionSessionStoreLike {
+  state?: {
+    bindings?: Record<string, SessionBindingLike>;
+  };
+  getBinding(bindingKey: string): SessionBindingLike | null;
+}
+
+interface WorkspaceResolutionSessionStoreLike extends SenderResolutionSessionStoreLike {
+  buildBindingKey(args: BindingKeyArgs): string;
+  getActiveWorkspaceRoot(bindingKey: string): string;
+}
+
+interface ResolvePreferredSenderIdArgs {
+  config: ConfigLike;
+  accountId: string;
+  explicitUser?: string;
+  sessionStore?: SenderResolutionSessionStoreLike | null;
+}
+
+interface ResolvePreferredWorkspaceRootArgs {
+  config: ConfigLike;
+  accountId: string;
+  senderId?: string;
+  explicitWorkspace?: string;
+  sessionStore?: WorkspaceResolutionSessionStoreLike | null;
+}
+
+export function resolvePreferredSenderId({
   config,
   accountId,
   explicitUser = "",
   sessionStore = null,
-}: any) {
+}: ResolvePreferredSenderIdArgs): string {
   const normalizedExplicitUser = normalizeText(explicitUser);
   if (normalizedExplicitUser) {
     return normalizedExplicitUser;
   }
 
   const configuredUsers = Array.isArray(config?.allowedUserIds)
-    ? config.allowedUserIds.map((value: any) => normalizeText(value)).filter(Boolean)
+    ? config.allowedUserIds.map((value) => normalizeText(value)).filter(Boolean)
     : [];
   if (configuredUsers.length) {
     return configuredUsers[0];
@@ -24,7 +70,7 @@ function resolvePreferredSenderId({
   }
 
   const persistedUserIds = Object.keys(loadPersistedContextTokens(config, accountId) || {})
-    .map((value: any) => normalizeText(value))
+    .map((value) => normalizeText(value))
     .filter(Boolean);
   if (persistedUserIds.length === 1) {
     return persistedUserIds[0];
@@ -33,13 +79,13 @@ function resolvePreferredSenderId({
   return "";
 }
 
-function resolvePreferredWorkspaceRoot({
+export function resolvePreferredWorkspaceRoot({
   config,
   accountId,
   senderId = "",
   explicitWorkspace = "",
   sessionStore = null,
-}: any) {
+}: ResolvePreferredWorkspaceRootArgs): string {
   const normalizedExplicitWorkspace = normalizeText(explicitWorkspace);
   if (normalizedExplicitWorkspace) {
     return normalizedExplicitWorkspace;
@@ -53,7 +99,7 @@ function resolvePreferredWorkspaceRoot({
 
   if (store && normalizedSenderId && normalizedAccountId) {
     const bindingKey = store.buildBindingKey({
-      workspaceId: config.workspaceId,
+      workspaceId: normalizeText(config.workspaceId),
       accountId: normalizedAccountId,
       senderId: normalizedSenderId,
     });
@@ -77,7 +123,15 @@ function resolvePreferredWorkspaceRoot({
   return normalizeText(config?.workspaceRoot);
 }
 
-function collectBindingSenderIds({ config, accountId, sessionStore }: any) {
+function collectBindingSenderIds({
+  config,
+  accountId,
+  sessionStore,
+}: {
+  config: ConfigLike;
+  accountId: string;
+  sessionStore?: SenderResolutionSessionStoreLike | null;
+}): string[] {
   const store = sessionStore && typeof sessionStore.getBinding === "function"
     ? sessionStore
     : null;
@@ -89,9 +143,8 @@ function collectBindingSenderIds({ config, accountId, sessionStore }: any) {
     return [];
   }
 
-  /** @type {Set<string>} */
-  const senderIds = new Set();
-  for (const binding of Object.values((store.state?.bindings || {}) as Record<string, any>)) {
+  const senderIds = new Set<string>();
+  for (const binding of Object.values(store.state?.bindings || {})) {
     const bindingAccountId = normalizeText(binding?.accountId);
     const bindingWorkspaceId = normalizeText(binding?.workspaceId);
     const senderId = normalizeText(binding?.senderId);
@@ -103,10 +156,18 @@ function collectBindingSenderIds({ config, accountId, sessionStore }: any) {
     }
     senderIds.add(senderId);
   }
-  return Array.from(senderIds).sort((left: any, right: any) => left.localeCompare(right));
+  return Array.from(senderIds).sort((left, right) => left.localeCompare(right));
 }
 
-function collectBindingWorkspaceRoots({ config, accountId, sessionStore }: any) {
+function collectBindingWorkspaceRoots({
+  config,
+  accountId,
+  sessionStore,
+}: {
+  config: ConfigLike;
+  accountId: string;
+  sessionStore?: SenderResolutionSessionStoreLike | null;
+}): string[] {
   const store = sessionStore && typeof sessionStore.getBinding === "function"
     ? sessionStore
     : null;
@@ -114,10 +175,9 @@ function collectBindingWorkspaceRoots({ config, accountId, sessionStore }: any) 
     return [];
   }
   const normalizedAccountId = normalizeText(accountId);
-  /** @type {Set<string>} */
-  const workspaceRoots = new Set();
+  const workspaceRoots = new Set<string>();
 
-  for (const binding of Object.values((store.state?.bindings || {}) as Record<string, any>)) {
+  for (const binding of Object.values(store.state?.bindings || {})) {
     const bindingAccountId = normalizeText(binding?.accountId);
     const bindingWorkspaceId = normalizeText(binding?.workspaceId);
     if (bindingAccountId !== normalizedAccountId) {
@@ -131,11 +191,11 @@ function collectBindingWorkspaceRoots({ config, accountId, sessionStore }: any) 
     }
   }
 
-  return Array.from(workspaceRoots).sort((left: any, right: any) => left.localeCompare(right));
+  return Array.from(workspaceRoots).sort((left, right) => left.localeCompare(right));
 }
 
-function collectWorkspaceRoots(binding: any) {
-  const workspaceRoots = new Set();
+function collectWorkspaceRoots(binding: SessionBindingLike | null | undefined): string[] {
+  const workspaceRoots = new Set<string>();
   const activeWorkspaceRoot = normalizeText(binding?.activeWorkspaceRoot);
   if (activeWorkspaceRoot) {
     workspaceRoots.add(activeWorkspaceRoot);
@@ -152,16 +212,9 @@ function collectWorkspaceRoots(binding: any) {
       workspaceRoots.add(normalizedWorkspaceRoot);
     }
   }
-  return Array.from(workspaceRoots).sort((left: any, right: any) => left.localeCompare(right));
+  return Array.from(workspaceRoots).sort((left, right) => left.localeCompare(right));
 }
 
-function normalizeText(value: any) {
+function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
-
-module.exports = {
-  resolvePreferredSenderId,
-  resolvePreferredWorkspaceRoot,
-};
-
-export {};

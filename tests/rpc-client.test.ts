@@ -1,23 +1,37 @@
-// @ts-nocheck
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const { EventEmitter } = require("node:events");
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
+const { EventEmitter }: typeof import("node:events") = require("node:events");
+const test: typeof import("node:test") = require("node:test");
+const { CodexRpcClient }: typeof import("../src/adapters/runtime/codex/rpc-client") = require("../src/adapters/runtime/codex/rpc-client");
 
-const { CodexRpcClient } = require("../src/adapters/runtime/codex/rpc-client");
+type NodeEventEmitter = import("node:events").EventEmitter;
 
-function createFakeWritable() {
-  const writable = new EventEmitter();
+interface FakeWritable extends NodeEventEmitter {
+  writable: boolean;
+  writes: string[];
+  write(chunk: unknown): boolean;
+}
+
+interface FakeChild extends NodeEventEmitter {
+  stdout: NodeEventEmitter;
+  stderr: NodeEventEmitter;
+  stdin: FakeWritable;
+  kill(): void;
+  emitSpawn(): void;
+}
+
+function createFakeWritable(): FakeWritable {
+  const writable = new EventEmitter() as unknown as FakeWritable;
   writable.writable = true;
   writable.writes = [];
-  writable.write = (chunk) => {
-    writable.writes.push(chunk);
+  writable.write = (chunk: unknown) => {
+    writable.writes.push(String(chunk));
     return true;
   };
   return writable;
 }
 
-function createFakeChild({ autoSpawn = true } = {}) {
-  const child = new EventEmitter();
+function createFakeChild({ autoSpawn = true }: { autoSpawn?: boolean } = {}): FakeChild {
+  const child = new EventEmitter() as unknown as FakeChild;
   child.stdout = new EventEmitter();
   child.stderr = new EventEmitter();
   child.stdin = createFakeWritable();
@@ -31,8 +45,8 @@ function createFakeChild({ autoSpawn = true } = {}) {
   return child;
 }
 
-function readWrittenRequestId(child, index = 0) {
-  const payload = JSON.parse(String(child.stdin.writes[index] || "").trim());
+function readWrittenRequestId(child: FakeChild, index = 0): string {
+  const payload = JSON.parse(String(child.stdin.writes[index] || "").trim()) as { id: string };
   return payload.id;
 }
 
