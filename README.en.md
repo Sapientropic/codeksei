@@ -9,10 +9,11 @@
     <a href="https://www.npmjs.com/package/codeksei"><img alt="npm version" src="https://img.shields.io/npm/v/codeksei"></a>
     <a href="./LICENSE"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/license-AGPL--3.0--only-111111.svg"></a>
   </p>
-  <h3>It keeps time from blurring, checks in on its own, and helps days and projects come back into shape</h3>
-  <p><strong>A local-first companion that stays present and lends a hand first.</strong></p>
-  <p>What often slips away first is your sense of time, the loose thread, and the energy to begin again. Codeksei shows up when it should, and turns what already happened into timeline anchors and memory traces, so you do not have to keep restarting from fog.</p>
+  <h3>A local-first companion that helps time hold shape and brings daily life and project threads back within reach</h3>
+  <p><strong>It uses WeChat as the main entry and connects timeline, diary, reminders, reviews, and project continuity in one shared thread.</strong></p>
+  <p>Codeksei is not just a chat box that waits for prompts. It can help capture what happened, reconnect loose threads, leave reminders, and make it easier to step back into a project while keeping state and logs local by default.</p>
   <p>
+    <a href="#try-codeksei">Try It</a> ·
     <a href="#a-day-with-codeksei">A Day With Codeksei</a> ·
     <a href="#quick-start">Quick Start</a> ·
     <a href="#what-it-can-do">Capabilities</a> ·
@@ -22,9 +23,34 @@
   </p>
 </div>
 
-- **Entry**: WeChat + `codeksei`
-- **What it carries with you**: time sense, memory anchors, and the judgment of when to gently show up
-- **What you slowly get back**: days that blur less easily, and projects that are easier to step back into
+- **What it is**: a local-first companion that connects daily capture, reminders, reviews, and project continuity through WeChat + `codeksei`
+- **Who it fits**: people whose sense of time slips, whose project thread breaks easily, and who want help keeping loose ends in view
+- **How to try it**: start with `npm install -g codeksei` for the base CLI, then move into shared mode when you want the fuller experience
+
+<a id="try-codeksei"></a>
+
+## Try It First
+
+If you want the shortest path to see whether Codeksei fits your workflow, start here:
+
+```bash
+npm install -g codeksei
+codeksei help
+```
+
+If you want the fuller shape right away, with WeChat and the terminal attached to the same shared thread:
+
+```bash
+git clone https://github.com/Sapientropic/codeksei.git
+cd codeksei
+npm install
+npm run login
+npm run shared:start
+```
+
+- `Start with the base CLI`: check the command surface, confirm local setup, and feel the product boundary first
+- `Move into shared mode`: experience continuity, proactive help, reminders, and project re-entry together
+- `Send feedback after trying it`: use [GitHub Issues](https://github.com/Sapientropic/codeksei/issues) to tell us what felt most useful, what felt awkward, and where Codeksei should be more proactive or more restrained
 
 ## A Day With Codeksei
 

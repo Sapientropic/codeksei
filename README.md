@@ -9,10 +9,11 @@
     <a href="https://www.npmjs.com/package/codeksei"><img alt="npm version" src="https://img.shields.io/npm/v/codeksei"></a>
     <a href="./LICENSE"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/license-AGPL--3.0--only-111111.svg"></a>
   </p>
-  <h3>会主动分忧、替你守住时间感，也陪你把一天和项目慢慢接回正轨</h3>
-  <p><strong>一个本地优先、会持续在场，也会先替你搭把手的陪伴者助理。</strong></p>
-  <p>很多时候，先松开的会是时间感、线头和重新开口的力气。Codeksei 会在该出现时出现，也会把一天里已经发生过的东西慢慢钉成时间线和记忆锚点，让你不用老是从一团雾里重来。</p>
+  <h3>一个会主动照看时间感、帮你把日常和项目线程慢慢接回来的本地优先陪伴者助理</h3>
+  <p><strong>以 WeChat 为入口，把 timeline、diary、reminders、reviews 和 project continuity 放进同一条共享线程。</strong></p>
+  <p>它不是一个只会等你开口的聊天框。Codeksei 会在合适的时候帮你补记录、接回线索、留提醒、带你重新进入项目，也让你的状态、日志和生活痕迹尽量继续留在本地。</p>
   <p>
+    <a href="#try-codeksei">先试试看</a> ·
     <a href="#day-with-codeksei">一天会怎么相处</a> ·
     <a href="#快速开始">快速开始</a> ·
     <a href="#现在可以做什么">当前能力</a> ·
@@ -22,9 +23,34 @@
   </p>
 </div>
 
-- **入口**：WeChat + `codeksei`
-- **它会分担**：守住时间感、补记忆锚点、在该出现时主动出现
-- **你会慢慢得到**：一天不那么容易整块糊掉，项目也更容易重新接上
+- **它是什么**：以 WeChat 为入口、把日常记录、提醒、复盘和项目连续性接在一起的本地优先 companion
+- **它适合谁**：容易时间感松开、项目线程常被打断、想让人替自己照看线头的人
+- **你可以先这样试**：`npm install -g codeksei` 先体验基础 CLI；想体验完整形态，再跑共享模式
+
+<a id="try-codeksei"></a>
+
+## 先试试看
+
+如果你想先判断 Codeksei 是不是你的路子，先走最短路径：
+
+```bash
+npm install -g codeksei
+codeksei help
+```
+
+如果你想直接体验它更完整的样子，让 WeChat 和终端接到同一条共享线程：
+
+```bash
+git clone https://github.com/Sapientropic/codeksei.git
+cd codeksei
+npm install
+npm run login
+npm run shared:start
+```
+
+- `先试基础 CLI`：看命令面、确认本机环境、感受产品边界
+- `再进共享模式`：体验它真正的连续性、主动分忧、提醒和项目接续
+- `试完给反馈`：欢迎到 [GitHub Issues](https://github.com/Sapientropic/codeksei/issues) 告诉我们哪里最有用、哪里最别扭、哪里应该更主动或更克制
 
 <a id="day-with-codeksei"></a>
 
