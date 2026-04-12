@@ -19,7 +19,7 @@ function resolve_pid_cwd() {
 }
 
 function list_bridge_processes() {
-  ps -ax -o pid=,ppid=,command= | awk '/node \.\/bin\/(codeksei|cyberboss)\.js start --checkin/ { print }'
+  ps -ax -o pid=,ppid=,command= | awk '/node \.\/dist\/src\/index\.js start --checkin/ { print }'
 }
 
 function find_bridge_child_pid() {
