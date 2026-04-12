@@ -1,7 +1,7 @@
 import * as crypto from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import * as apiModule from "./api";
+import { getUploadUrl, sendMessage } from "./api";
 import { getUploadUrlV2, sendMessageV2 } from "./api-v2";
 import * as mediaMimeModule from "./media-mime";
 import type {
@@ -11,10 +11,6 @@ import type {
   WeixinMediaApi,
 } from "./media-types";
 
-const { getUploadUrl, sendMessage } = apiModule as {
-  getUploadUrl: (args: Record<string, unknown>) => Promise<Record<string, unknown>>;
-  sendMessage: (args: Record<string, unknown>) => Promise<unknown>;
-};
 const { getMimeFromFilename } = mediaMimeModule as {
   getMimeFromFilename: (filePath: string) => string;
 };

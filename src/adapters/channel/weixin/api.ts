@@ -1,7 +1,58 @@
-const fs = require("fs");
-const path = require("path");
-const { redactSensitiveText } = require("./redact");
-const { getStableWechatUin } = require("./protocol");
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as redactModule from "./redact";
+import * as protocolModule from "./protocol";
+import type { WeixinSendMessageRequest, WeixinUploadUrlRequest } from "./media-types";
+
+const { redactSensitiveText } = redactModule as {
+  redactSensitiveText: (value: string) => string;
+};
+const { getStableWechatUin } = protocolModule as {
+  getStableWechatUin: () => string;
+};
+
+interface WeixinBaseInfo {
+  channel_version: string;
+}
+
+export interface WeixinLegacyApiResponse extends Record<string, unknown> {
+  ret?: unknown;
+  errcode?: unknown;
+  errmsg?: unknown;
+}
+
+export interface GetUpdatesArgs extends Record<string, unknown> {
+  baseUrl: string;
+  token: string;
+  get_updates_buf?: string;
+  timeoutMs?: number;
+}
+
+export interface GetUpdatesResponse extends WeixinLegacyApiResponse {
+  msgs: unknown[];
+  get_updates_buf: string;
+}
+
+export interface GetConfigArgs extends Record<string, unknown> {
+  baseUrl: string;
+  token: string;
+  ilinkUserId: string;
+  contextToken: string;
+  timeoutMs?: number;
+}
+
+export interface GetConfigResponse extends WeixinLegacyApiResponse {
+  typing_ticket?: unknown;
+}
+
+interface ApiFetchArgs {
+  baseUrl: string;
+  endpoint: string;
+  body: string;
+  token: string;
+  timeoutMs: number;
+  label: string;
+}
 
 function readChannelVersion() {
   try {
@@ -18,15 +69,15 @@ const DEFAULT_LONG_POLL_TIMEOUT_MS = 35_000;
 const DEFAULT_API_TIMEOUT_MS = 15_000;
 const DEFAULT_CONFIG_TIMEOUT_MS = 10_000;
 
-function buildBaseInfo() {
+function buildBaseInfo(): WeixinBaseInfo {
   return { channel_version: CHANNEL_VERSION };
 }
 
-function ensureTrailingSlash(url: any) {
+function ensureTrailingSlash(url: string): string {
   return url.endsWith("/") ? url : `${url}/`;
 }
 
-function buildHeaders(opts: any) {
+function buildHeaders(opts: { token?: string; body: string }): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     AuthorizationType: "ilink_bot_token",
@@ -39,7 +90,7 @@ function buildHeaders(opts: any) {
   return headers;
 }
 
-async function apiFetch(params: any) {
+async function apiFetch(params: ApiFetchArgs): Promise<string> {
   const base = ensureTrailingSlash(params.baseUrl);
   const url = new URL(params.endpoint, base);
   const headers = buildHeaders({ token: params.token, body: params.body });
@@ -64,25 +115,25 @@ async function apiFetch(params: any) {
   }
 }
 
-function parseApiJson(rawText: any, label: any) {
+function parseApiJson<T extends Record<string, unknown>>(rawText: string, label: string): T {
   try {
-    return JSON.parse(rawText);
+    return JSON.parse(rawText) as T;
   } catch {
     throw new Error(`${label} returned invalid JSON: ${redactSensitiveText(rawText)}`);
   }
 }
 
-function assertApiSuccess(response: any, label: any) {
-  const ret = response?.ret;
-  const errcode = response?.errcode;
-  if ((ret !== undefined && ret !== 0) || (errcode !== undefined && errcode !== 0)) {
+function assertApiSuccess<T extends WeixinLegacyApiResponse>(response: T, label: string): T {
+  const ret = normalizeErrorCode(response?.ret);
+  const errcode = normalizeErrorCode(response?.errcode);
+  if ((hasErrorCode(response?.ret) && ret !== 0) || (hasErrorCode(response?.errcode) && errcode !== 0)) {
     const errmsg = typeof response?.errmsg === "string" ? response.errmsg.trim() : "";
     throw new Error(`${label} ret=${ret ?? ""} errcode=${errcode ?? ""} errmsg=${redactSensitiveText(errmsg)}`);
   }
   return response;
 }
 
-async function getUpdates(params: any) {
+async function getUpdates(params: GetUpdatesArgs): Promise<GetUpdatesResponse> {
   const timeout = params.timeoutMs || DEFAULT_LONG_POLL_TIMEOUT_MS;
   try {
     const rawText = await apiFetch({
@@ -96,7 +147,7 @@ async function getUpdates(params: any) {
       timeoutMs: timeout,
       label: "getUpdates",
     });
-    return parseApiJson(rawText, "getUpdates");
+    return parseApiJson<GetUpdatesResponse>(rawText, "getUpdates");
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       return { ret: 0, msgs: [], get_updates_buf: params.get_updates_buf || "" };
@@ -105,7 +156,7 @@ async function getUpdates(params: any) {
   }
 }
 
-async function sendMessage(params: any) {
+async function sendMessage(params: WeixinSendMessageRequest): Promise<WeixinLegacyApiResponse> {
   const rawText = await apiFetch({
     baseUrl: params.baseUrl,
     endpoint: "ilink/bot/sendmessage",
@@ -114,10 +165,10 @@ async function sendMessage(params: any) {
     timeoutMs: params.timeoutMs || DEFAULT_API_TIMEOUT_MS,
     label: "sendMessage",
   });
-  assertApiSuccess(parseApiJson(rawText, "sendMessage"), "sendMessage");
+  return assertApiSuccess(parseApiJson<WeixinLegacyApiResponse>(rawText, "sendMessage"), "sendMessage");
 }
 
-async function getUploadUrl(params: any) {
+async function getUploadUrl(params: WeixinUploadUrlRequest): Promise<WeixinLegacyApiResponse> {
   const rawText = await apiFetch({
     baseUrl: params.baseUrl,
     endpoint: "ilink/bot/getuploadurl",
@@ -139,10 +190,10 @@ async function getUploadUrl(params: any) {
     timeoutMs: params.timeoutMs || DEFAULT_API_TIMEOUT_MS,
     label: "getUploadUrl",
   });
-  return assertApiSuccess(parseApiJson(rawText, "getUploadUrl"), "getUploadUrl");
+  return assertApiSuccess(parseApiJson<WeixinLegacyApiResponse>(rawText, "getUploadUrl"), "getUploadUrl");
 }
 
-async function getConfig(params: any) {
+async function getConfig(params: GetConfigArgs): Promise<GetConfigResponse> {
   const rawText = await apiFetch({
     baseUrl: params.baseUrl,
     endpoint: "ilink/bot/getconfig",
@@ -155,10 +206,10 @@ async function getConfig(params: any) {
     timeoutMs: params.timeoutMs || DEFAULT_CONFIG_TIMEOUT_MS,
     label: "getConfig",
   });
-  return assertApiSuccess(parseApiJson(rawText, "getConfig"), "getConfig");
+  return assertApiSuccess(parseApiJson<GetConfigResponse>(rawText, "getConfig"), "getConfig");
 }
 
-async function sendTyping(params: any) {
+async function sendTyping(params: WeixinSendMessageRequest): Promise<WeixinLegacyApiResponse> {
   const rawText = await apiFetch({
     baseUrl: params.baseUrl,
     endpoint: "ilink/bot/sendtyping",
@@ -167,10 +218,22 @@ async function sendTyping(params: any) {
     timeoutMs: params.timeoutMs || DEFAULT_CONFIG_TIMEOUT_MS,
     label: "sendTyping",
   });
-  assertApiSuccess(parseApiJson(rawText, "sendTyping"), "sendTyping");
+  return assertApiSuccess(parseApiJson<WeixinLegacyApiResponse>(rawText, "sendTyping"), "sendTyping");
 }
 
-module.exports = {
+function hasErrorCode(value: unknown): boolean {
+  return value !== undefined && value !== null && value !== "";
+}
+
+function normalizeErrorCode(value: unknown): number | null {
+  if (!hasErrorCode(value)) {
+    return null;
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+export {
   buildBaseInfo,
   getConfig,
   getUploadUrl,
@@ -178,5 +241,3 @@ module.exports = {
   sendMessage,
   sendTyping,
 };
-
-export {};

@@ -1,9 +1,32 @@
-import type {
-  GetUploadUrlV2Args,
-  SendMessageV2Args,
-} from "./api-v2";
-
 export type WeixinMediaKind = "image" | "video" | "file";
+
+export interface WeixinUploadUrlRequest extends Record<string, unknown> {
+  baseUrl: string;
+  token: string;
+  filekey?: string;
+  media_type?: number;
+  to_user_id?: string;
+  rawsize?: number;
+  rawfilemd5?: string;
+  filesize?: number;
+  thumb_rawsize?: number;
+  thumb_rawfilemd5?: string;
+  thumb_filesize?: number;
+  no_need_thumb?: boolean;
+  aeskey?: string;
+  timeoutMs?: number;
+  routeTag?: string;
+  clientVersion?: string;
+}
+
+export interface WeixinSendMessageRequest extends Record<string, unknown> {
+  baseUrl: string;
+  token: string;
+  body: Record<string, unknown>;
+  timeoutMs?: number;
+  routeTag?: string;
+  clientVersion?: string;
+}
 
 export interface IncomingWeixinMediaRef {
   encryptQueryParam?: string;
@@ -51,8 +74,8 @@ export interface PersistIncomingWeixinAttachmentsResult {
 }
 
 export interface WeixinMediaApi {
-  getUploadUrlImpl: (args: GetUploadUrlV2Args) => Promise<Record<string, unknown>>;
-  sendMessageImpl: (args: SendMessageV2Args) => Promise<unknown>;
+  getUploadUrlImpl: (args: WeixinUploadUrlRequest) => Promise<Record<string, unknown>>;
+  sendMessageImpl: (args: WeixinSendMessageRequest) => Promise<unknown>;
 }
 
 export interface SendWeixinMediaFileArgs {

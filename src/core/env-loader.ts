@@ -1,8 +1,20 @@
-const fs = require("fs");
-const dotenv = require("dotenv");
-const { listEnvFileCandidates } = require("./branding");
+import * as fs from "node:fs";
+import * as dotenv from "dotenv";
+import * as brandingModule from "./branding";
 
-function loadEnvStack({ cwd = process.cwd(), env = process.env }: any = {}) {
+const { listEnvFileCandidates } = brandingModule as {
+  listEnvFileCandidates: (args: { cwd?: string; env?: Record<string, unknown> }) => string[];
+};
+
+type EnvMap = Record<string, string | undefined>;
+
+function loadEnvStack({
+  cwd = process.cwd(),
+  env = process.env as EnvMap,
+}: {
+  cwd?: string;
+  env?: EnvMap;
+} = {}): string[] {
   const loadedPaths = [];
   const initialCandidates = listEnvFileCandidates({ cwd, env });
   const projectEnvPath = initialCandidates[0];
@@ -10,7 +22,7 @@ function loadEnvStack({ cwd = process.cwd(), env = process.env }: any = {}) {
   if (projectEnvPath && fs.existsSync(projectEnvPath)) {
     dotenv.config({
       path: projectEnvPath,
-      processEnv: env,
+      processEnv: env as Record<string, string>,
       override: false,
     });
     loadedPaths.push(projectEnvPath);
@@ -23,7 +35,7 @@ function loadEnvStack({ cwd = process.cwd(), env = process.env }: any = {}) {
   if (stateEnvPath && stateEnvPath !== projectEnvPath && fs.existsSync(stateEnvPath)) {
     dotenv.config({
       path: stateEnvPath,
-      processEnv: env,
+      processEnv: env as Record<string, string>,
       override: false,
     });
     loadedPaths.push(stateEnvPath);
@@ -32,6 +44,4 @@ function loadEnvStack({ cwd = process.cwd(), env = process.env }: any = {}) {
   return loadedPaths;
 }
 
-module.exports = { loadEnvStack };
-
-export {};
+export { loadEnvStack };
