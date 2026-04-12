@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { writeTextFileAtomically } = require("./json-state");
 const {
   PRIMARY_NOTE_SYNC_MARKER_PREFIX,
   LEGACY_NOTE_SYNC_MARKER_PREFIX,
@@ -70,7 +71,7 @@ function syncNoteFile(options = {}) {
   const current = fs.readFileSync(filePath, "utf8");
   const result = syncNoteContent(current, options);
   if (result.changed) {
-    fs.writeFileSync(filePath, result.content, "utf8");
+    writeTextFileAtomically(filePath, result.content, { encoding: "utf8" });
   }
   return {
     ...result,

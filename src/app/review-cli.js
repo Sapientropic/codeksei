@@ -1,7 +1,9 @@
+const { getCommandArgsSchema } = require("../contracts/command-args");
+const { parseCliArgs } = require("../core/cli-args");
 const { buildReview, writeReview } = require("../core/review");
 const { LEGACY_TIMELINE_TIMEZONE } = require("../core/timezone");
 
-async function runReviewCommand(config, kind, args = process.argv.slice(4)) {
+async function runReviewCommand(config, kind, args = []) {
   const options = parseReviewArgs(args, kind);
   if (options.help) {
     printReviewHelp(kind, config?.timezone);
@@ -20,52 +22,7 @@ async function runReviewCommand(config, kind, args = process.argv.slice(4)) {
 }
 
 function parseReviewArgs(args, kind) {
-  const options = {
-    help: false,
-    stdout: false,
-    deterministic: false,
-    date: "",
-    week: "",
-    month: "",
-    model: "",
-  };
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = String(args[index] || "").trim();
-    if (!arg) {
-      continue;
-    }
-    if (arg === "--help" || arg === "-h") {
-      options.help = true;
-      continue;
-    }
-    if (arg === "--stdout") {
-      options.stdout = true;
-      continue;
-    }
-    if (arg === "--deterministic") {
-      options.deterministic = true;
-      continue;
-    }
-    if (!arg.startsWith("--")) {
-      throw new Error(`未知参数: ${arg}`);
-    }
-    const value = String(args[index + 1] || "");
-    if (!value || value.startsWith("--")) {
-      throw new Error(`参数缺少值: ${arg}`);
-    }
-    if (arg === "--date") {
-      options.date = value;
-    } else if (arg === "--week") {
-      options.week = value;
-    } else if (arg === "--month") {
-      options.month = value;
-    } else if (arg === "--model") {
-      options.model = value;
-    } else {
-      throw new Error(`未知参数: ${arg}`);
-    }
-    index += 1;
-  }
+  const options = parseCliArgs(args, getCommandArgsSchema("review"));
 
   if (kind === "weekly" && options.month) {
     throw new Error("review:weekly 不支持 --month");

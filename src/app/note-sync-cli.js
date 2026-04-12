@@ -1,9 +1,11 @@
+const { getCommandArgsSchema } = require("../contracts/command-args");
+const { parseCliArgs } = require("../core/cli-args");
 const {
   resolveNoteSyncTarget,
   syncNoteFile,
 } = require("../core/note-sync");
 
-async function runNoteSyncCommand(config, args = process.argv.slice(4)) {
+async function runNoteSyncCommand(config, args = []) {
   const options = parseNoteSyncArgs(args);
   if (options.help) {
     printNoteSyncHelp();
@@ -30,59 +32,7 @@ async function runNoteSyncCommand(config, args = process.argv.slice(4)) {
 }
 
 function parseNoteSyncArgs(args) {
-  const options = {
-    help: false,
-    project: "",
-    path: "",
-    section: "",
-    text: "",
-    style: "bullet",
-    slot: "",
-    maxItems: "",
-    useStdin: false,
-  };
-
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = String(args[index] || "").trim();
-    if (!arg) {
-      continue;
-    }
-    if (arg === "--help" || arg === "-h") {
-      options.help = true;
-      continue;
-    }
-    if (arg === "--stdin") {
-      options.useStdin = true;
-      continue;
-    }
-    if (!arg.startsWith("--")) {
-      throw new Error(`未知参数: ${arg}`);
-    }
-    const value = String(args[index + 1] || "");
-    if (!value || value.startsWith("--")) {
-      throw new Error(`参数缺少值: ${arg}`);
-    }
-    if (arg === "--project") {
-      options.project = value;
-    } else if (arg === "--path") {
-      options.path = value;
-    } else if (arg === "--section") {
-      options.section = value;
-    } else if (arg === "--text") {
-      options.text = value;
-    } else if (arg === "--style") {
-      options.style = value;
-    } else if (arg === "--slot") {
-      options.slot = value;
-    } else if (arg === "--max-items") {
-      options.maxItems = value;
-    } else {
-      throw new Error(`未知参数: ${arg}`);
-    }
-    index += 1;
-  }
-
-  return options;
+  return parseCliArgs(args, getCommandArgsSchema("noteSync"));
 }
 
 async function resolveBody(options) {

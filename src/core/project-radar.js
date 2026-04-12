@@ -1,6 +1,8 @@
 const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
+const { normalizeProjectRadarConfig } = require("../contracts/config-files");
+const { loadJsonConfig } = require("./config-loader");
 const {
   normalizeDisplayPath,
   resolveCrossPlatformPath,
@@ -12,20 +14,13 @@ function loadProjectRadarConfig(config = {}) {
   const configFile = resolveCrossPlatformPath(String(
     config.projectRadarConfigFile || path.join(workspaceRoot, ".codex", "code-projects.json")
   ));
-
-  let raw = "";
-  try {
-    raw = fs.readFileSync(configFile, "utf8");
-  } catch {
-    throw new Error(`找不到代码项目配置: ${configFile}`);
-  }
-
-  let parsed = {};
-  try {
-    parsed = JSON.parse(raw);
-  } catch (error) {
-    throw new Error(`代码项目配置不是合法 JSON: ${configFile} (${formatErrorMessage(error)})`);
-  }
+  const parsed = loadJsonConfig({
+    filePath: configFile,
+    label: "project radar config",
+    normalize: normalizeProjectRadarConfig,
+    missing: "throw",
+    invalid: "throw",
+  });
 
   const projects = Array.isArray(parsed?.projects)
     ? parsed.projects

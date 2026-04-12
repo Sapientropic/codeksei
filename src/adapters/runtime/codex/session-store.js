@@ -1,7 +1,16 @@
+// @ts-check
+
 const { normalizeModelCatalog } = require("./model-catalog");
 const {
+  createEmptySessionState,
+  listPendingApprovalEntries,
+  normalizePendingApprovalRecord,
+  normalizeSessionBinding,
+  normalizeSessionState,
+  validateSessionStoreState,
+} = require("../../../contracts/session-state");
+const {
   ensureParentDirectory,
-  isPlainObject,
   readJsonStateFile,
   writeJsonStateFile,
 } = require("../../../core/json-state");
@@ -9,7 +18,7 @@ const {
 class SessionStore {
   constructor({ filePath }) {
     this.filePath = filePath;
-    this.state = createEmptyState();
+    this.state = createEmptySessionState();
     this.ensureParentDirectory();
     this.load();
   }
@@ -21,29 +30,20 @@ class SessionStore {
   load() {
     const parsed = readJsonStateFile({
       filePath: this.filePath,
-      fallback: createEmptyState(),
+      fallback: createEmptySessionState(),
       label: "session store",
       validate: validateSessionStoreState,
     });
-    this.state = {
-      ...createEmptyState(),
-      ...parsed,
-      bindings: parsed.bindings || {},
-      approvalCommandAllowlistByWorkspaceRoot: parsed.approvalCommandAllowlistByWorkspaceRoot || {},
-      approvalPromptStateByThreadId: parsed.approvalPromptStateByThreadId || {},
-      availableModelCatalog: parsed.availableModelCatalog || {
-        models: [],
-        updatedAt: "",
-      },
-    };
+    this.state = normalizeSessionState(parsed);
   }
 
   save() {
+    this.state = normalizeSessionState(this.state);
     writeJsonStateFile(this.filePath, this.state);
   }
 
   getBinding(bindingKey) {
-    return this.state.bindings[bindingKey] || null;
+    return this.state.bindings[normalizeValue(bindingKey)] || null;
   }
 
   listBindings() {
@@ -54,16 +54,26 @@ class SessionStore {
   }
 
   getActiveWorkspaceRoot(bindingKey) {
-    return normalizeValue(this.state.bindings[bindingKey]?.activeWorkspaceRoot);
+    return normalizeValue(this.state.bindings[normalizeValue(bindingKey)]?.activeWorkspaceRoot);
   }
 
   updateBinding(bindingKey, nextBinding) {
-    this.state.bindings[bindingKey] = {
-      ...(this.state.bindings[bindingKey] || {}),
+    const normalizedBindingKey = normalizeValue(bindingKey);
+    if (!normalizedBindingKey) {
+      return null;
+    }
+    const current = this.getBinding(normalizedBindingKey) || {};
+    const normalizedBinding = normalizeSessionBinding({
+      ...current,
       ...(nextBinding || {}),
+      updatedAt: new Date().toISOString(),
+    });
+    this.state.bindings = {
+      ...(this.state.bindings || {}),
+      [normalizedBindingKey]: normalizedBinding,
     };
     this.save();
-    return this.state.bindings[bindingKey];
+    return this.state.bindings[normalizedBindingKey];
   }
 
   getThreadIdForWorkspace(bindingKey, workspaceRoot) {
@@ -71,7 +81,7 @@ class SessionStore {
     if (!normalizedWorkspaceRoot) {
       return "";
     }
-    return this.state.bindings[bindingKey]?.threadIdByWorkspaceRoot?.[normalizedWorkspaceRoot] || "";
+    return this.state.bindings[normalizeValue(bindingKey)]?.threadIdByWorkspaceRoot?.[normalizedWorkspaceRoot] || "";
   }
 
   setThreadIdForWorkspace(bindingKey, workspaceRoot, threadId, extra = {}) {
@@ -248,42 +258,71 @@ class SessionStore {
     return current;
   }
 
-  getApprovalPromptState(threadId) {
+  getPendingApprovalForThread(threadId) {
     const normalizedThreadId = normalizeValue(threadId);
     if (!normalizedThreadId) {
       return null;
     }
     const raw = this.state.approvalPromptStateByThreadId?.[normalizedThreadId];
-    if (!raw || typeof raw !== "object") {
-      return null;
-    }
-    return {
-      requestId: normalizeValue(raw.requestId),
-      signature: normalizeValue(raw.signature),
-      promptedAt: normalizeValue(raw.promptedAt),
-    };
+    const normalized = normalizePendingApprovalRecord(raw);
+    return normalized ? { ...normalized } : null;
   }
 
-  rememberApprovalPrompt(threadId, requestId, signature = "") {
+  listPendingApprovals() {
+    return listPendingApprovalEntries(this.state).map((entry) => ({
+      threadId: entry.threadId,
+      approval: { ...entry.approval },
+    }));
+  }
+
+  rememberPendingApprovalForThread(threadId, approval, {
+    signature = "",
+    promptedAt = "",
+  } = {}) {
     const normalizedThreadId = normalizeValue(threadId);
-    const normalizedRequestId = normalizeValue(requestId);
-    const normalizedSignature = normalizeValue(signature);
-    if (!normalizedThreadId || !normalizedRequestId) {
+    if (!normalizedThreadId) {
+      return null;
+    }
+    const existing = this.getPendingApprovalForThread(normalizedThreadId);
+    const normalizedApproval = normalizePendingApprovalRecord({
+      ...(existing || {}),
+      ...(approval || {}),
+      signature: normalizeValue(signature)
+        || normalizeValue(approval?.signature)
+        || normalizeValue(existing?.signature)
+        || "",
+      promptedAt: normalizeValue(promptedAt) || normalizeValue(approval?.promptedAt) || new Date().toISOString(),
+    });
+    if (!normalizedApproval) {
       return null;
     }
     this.state.approvalPromptStateByThreadId = {
       ...(this.state.approvalPromptStateByThreadId || {}),
-      [normalizedThreadId]: {
-        requestId: normalizedRequestId,
-        signature: normalizedSignature,
-        promptedAt: new Date().toISOString(),
-      },
+      [normalizedThreadId]: normalizedApproval,
     };
     this.save();
-    return this.getApprovalPromptState(normalizedThreadId);
+    return this.getPendingApprovalForThread(normalizedThreadId);
   }
 
-  clearApprovalPrompt(threadId) {
+  getApprovalPromptState(threadId) {
+    return this.getPendingApprovalForThread(threadId);
+  }
+
+  rememberApprovalPrompt(threadId, requestIdOrApproval, signature = "") {
+    if (requestIdOrApproval && typeof requestIdOrApproval === "object") {
+      return this.rememberPendingApprovalForThread(threadId, requestIdOrApproval, { signature });
+    }
+    const existing = this.getPendingApprovalForThread(threadId) || {};
+    return this.rememberPendingApprovalForThread(threadId, {
+      ...existing,
+      requestId: requestIdOrApproval,
+    }, {
+      signature,
+      promptedAt: new Date().toISOString(),
+    });
+  }
+
+  clearPendingApprovalForThread(threadId) {
     const normalizedThreadId = normalizeValue(threadId);
     if (!normalizedThreadId || !this.state.approvalPromptStateByThreadId?.[normalizedThreadId]) {
       return;
@@ -294,6 +333,10 @@ class SessionStore {
     delete next[normalizedThreadId];
     this.state.approvalPromptStateByThreadId = next;
     this.save();
+  }
+
+  clearApprovalPrompt(threadId) {
+    this.clearPendingApprovalForThread(threadId);
   }
 
   getAvailableModelCatalog() {
@@ -325,57 +368,6 @@ class SessionStore {
   buildBindingKey({ workspaceId, accountId, senderId }) {
     return `${normalizeValue(workspaceId)}:${normalizeValue(accountId)}:${normalizeValue(senderId)}`;
   }
-}
-
-function createEmptyState() {
-  return {
-    bindings: {},
-    approvalCommandAllowlistByWorkspaceRoot: {},
-    approvalPromptStateByThreadId: {},
-    availableModelCatalog: {
-      models: [],
-      updatedAt: "",
-    },
-  };
-}
-
-function validateSessionStoreState(state) {
-  if (!isPlainObject(state)) {
-    return "session store top-level state must be an object";
-  }
-  if ("bindings" in state && !isPlainObject(state.bindings)) {
-    return "session store bindings must be an object";
-  }
-  if (
-    "approvalCommandAllowlistByWorkspaceRoot" in state
-    && !isPlainObject(state.approvalCommandAllowlistByWorkspaceRoot)
-  ) {
-    return "session store approvalCommandAllowlistByWorkspaceRoot must be an object";
-  }
-  if (
-    "approvalPromptStateByThreadId" in state
-    && !isPlainObject(state.approvalPromptStateByThreadId)
-  ) {
-    return "session store approvalPromptStateByThreadId must be an object";
-  }
-  if ("availableModelCatalog" in state) {
-    if (!isPlainObject(state.availableModelCatalog)) {
-      return "session store availableModelCatalog must be an object";
-    }
-    if (
-      "models" in state.availableModelCatalog
-      && !Array.isArray(state.availableModelCatalog.models)
-    ) {
-      return "session store availableModelCatalog.models must be an array";
-    }
-    if (
-      "updatedAt" in state.availableModelCatalog
-      && typeof state.availableModelCatalog.updatedAt !== "string"
-    ) {
-      return "session store availableModelCatalog.updatedAt must be a string";
-    }
-  }
-  return true;
 }
 
 function normalizeValue(value) {

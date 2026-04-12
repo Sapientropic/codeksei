@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { normalizeAccountId } = require("./account-store");
+const { writeTextFileAtomically } = require("../../../core/json-state");
 
 function ensureSyncBufferDir(config) {
   fs.mkdirSync(config.syncBufferDir, { recursive: true });
@@ -25,7 +26,7 @@ function loadSyncBuffer(config, accountId) {
 
 function saveSyncBuffer(config, accountId, buffer) {
   const filePath = resolveSyncBufferPath(config, accountId);
-  fs.writeFileSync(filePath, String(buffer || ""), "utf8");
+  writeTextFileAtomically(filePath, String(buffer || ""), { encoding: "utf8" });
 }
 
 module.exports = {

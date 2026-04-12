@@ -1,12 +1,10 @@
 const { CodexRpcClient } = require("../adapters/runtime/codex/rpc-client");
+const { mapCodexMessageToRuntimeEvent } = require("../adapters/runtime/codex/events");
 const {
-  extractAssistantText,
-  extractFailureText,
   extractThreadId,
   extractThreadIdFromParams,
-  extractTurnIdFromParams,
-  isAssistantItemCompleted,
 } = require("../adapters/runtime/codex/message-utils");
+const { RUNTIME_EVENT_TYPES } = require("../contracts/runtime-events");
 const { resolveCodexWorkspaceRoot } = require("./workspace-alias");
 
 const DEFAULT_TIMEOUT_MS = 120_000;
@@ -246,34 +244,42 @@ function waitForSemanticTurnCompletion(client, threadId, timeoutMs) {
 
     const unsubscribe = client.onMessage((message) => {
       const params = message?.params || {};
-      const messageThreadId = extractThreadIdFromParams(params);
+      // Keep semantic review on the same normalized runtime event contract as
+      // the main chat/runtime path. Otherwise upstream RPC drift gets fixed in
+      // one place and silently reintroduced here.
+      const runtimeEvent = mapCodexMessageToRuntimeEvent(message);
+      const messageThreadId = normalizeText(runtimeEvent?.payload?.threadId)
+        || extractThreadIdFromParams(params);
       if (messageThreadId && messageThreadId !== threadId) {
         return;
       }
 
-      if (message?.method === "turn/started" || message?.method === "turn/start") {
-        activeTurnId = extractTurnIdFromParams(params) || activeTurnId;
+      if (runtimeEvent?.type === RUNTIME_EVENT_TYPES.TURN_STARTED) {
+        activeTurnId = normalizeText(runtimeEvent.payload.turnId) || activeTurnId;
         return;
       }
 
       // Review summarization is meant to be a pure thinking pass over the
       // provided source pack. If Codex wants tools or escalation here, the
       // safe behavior is to abort and fall back to deterministic extraction.
-      if (isApprovalRequest(message)) {
+      if (runtimeEvent?.type === RUNTIME_EVENT_TYPES.APPROVAL_REQUESTED) {
         cleanup();
         reject(new Error("semantic review requested approval"));
         return;
       }
 
-      if (message?.method === "item/agentMessage/delta" || isAssistantItemCompleted(message)) {
-        const itemId = normalizeText(params?.itemId || params?.item?.id) || `item-${itemOrder.length + 1}`;
-        const nextText = extractAssistantText(params);
+      if (
+        runtimeEvent?.type === RUNTIME_EVENT_TYPES.REPLY_DELTA
+        || runtimeEvent?.type === RUNTIME_EVENT_TYPES.REPLY_COMPLETED
+      ) {
+        const itemId = normalizeText(runtimeEvent.payload.itemId) || `item-${itemOrder.length + 1}`;
+        const nextText = normalizeText(runtimeEvent.payload.text);
         if (!textByItemId.has(itemId)) {
           itemOrder.push(itemId);
           textByItemId.set(itemId, "");
         }
         if (nextText) {
-          if (message?.method === "item/agentMessage/delta") {
+          if (runtimeEvent.type === RUNTIME_EVENT_TYPES.REPLY_DELTA) {
             textByItemId.set(itemId, `${textByItemId.get(itemId) || ""}${nextText}`);
           } else {
             textByItemId.set(itemId, nextText);
@@ -282,14 +288,14 @@ function waitForSemanticTurnCompletion(client, threadId, timeoutMs) {
         return;
       }
 
-      if (message?.method === "turn/failed") {
+      if (runtimeEvent?.type === RUNTIME_EVENT_TYPES.TURN_FAILED) {
         cleanup();
-        reject(new Error(extractFailureText(params)));
+        reject(new Error(normalizeText(runtimeEvent.payload.text) || "semantic review failed"));
         return;
       }
 
-      if (message?.method === "turn/completed") {
-        const completedTurnId = extractTurnIdFromParams(params);
+      if (runtimeEvent?.type === RUNTIME_EVENT_TYPES.TURN_COMPLETED) {
+        const completedTurnId = normalizeText(runtimeEvent.payload.turnId);
         if (activeTurnId && completedTurnId && completedTurnId !== activeTurnId) {
           return;
         }
@@ -310,10 +316,6 @@ function waitForSemanticTurnCompletion(client, threadId, timeoutMs) {
       }
     });
   });
-}
-
-function isApprovalRequest(message) {
-  return typeof message?.method === "string" && message.method.endsWith("requestApproval");
 }
 
 function parseSemanticJson(text) {
@@ -521,4 +523,7 @@ function formatErrorMessage(error) {
 
 module.exports = {
   maybeGenerateSemanticReview,
+  __testing: {
+    waitForSemanticTurnCompletion,
+  },
 };

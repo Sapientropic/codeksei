@@ -1,5 +1,7 @@
 const fs = require("fs");
 const path = require("path");
+const { normalizeWorkspaceBootstrapConfig } = require("../contracts/config-files");
+const { loadJsonConfig } = require("./config-loader");
 
 const DEFAULT_BOOTSTRAP_PROFILE = Object.freeze({
   primaryFiles: [
@@ -37,12 +39,6 @@ const DEFAULT_BOOTSTRAP_PROFILE = Object.freeze({
   ],
   recentFiles: [],
 });
-
-let workspaceBootstrapConfigCache = {
-  filePath: "",
-  mtimeMs: -1,
-  value: {},
-};
 
 function buildWorkspaceContinuityInstructions(workspaceRoot, config = {}) {
   const normalizedWorkspaceRoot = normalizeWorkspaceRoot(workspaceRoot);
@@ -107,48 +103,14 @@ function loadWorkspaceBootstrapConfig(config = {}) {
   if (!filePath) {
     return {};
   }
-  let stats = null;
-  try {
-    stats = fs.statSync(filePath);
-  } catch {
-    workspaceBootstrapConfigCache = {
-      filePath: "",
-      mtimeMs: -1,
-      value: {},
-    };
-    return {};
-  }
-
-  if (!stats.isFile()) {
-    return {};
-  }
-
-  const normalizedPath = normalizeDisplayPath(filePath);
-  if (
-    workspaceBootstrapConfigCache.filePath === normalizedPath
-    && workspaceBootstrapConfigCache.mtimeMs === stats.mtimeMs
-  ) {
-    return workspaceBootstrapConfigCache.value;
-  }
-
-  try {
-    const raw = fs.readFileSync(filePath, "utf8");
-    const parsed = JSON.parse(raw);
-    const value = parsed && typeof parsed === "object" ? parsed : {};
-    workspaceBootstrapConfigCache = {
-      filePath: normalizedPath,
-      mtimeMs: stats.mtimeMs,
-      value,
-    };
-    return value;
-  } catch {
-    workspaceBootstrapConfigCache = {
-      filePath: normalizedPath,
-      mtimeMs: stats.mtimeMs,
-      value: {},
-    };
-    return {};
-  }
+  return loadJsonConfig({
+    filePath,
+    label: "workspace bootstrap",
+    normalize: normalizeWorkspaceBootstrapConfig,
+    fallback: {},
+    missing: "fallback",
+    invalid: "fallback",
+  });
 }
 
 function selectWorkspaceOverrides(workspaces, workspaceRoot) {

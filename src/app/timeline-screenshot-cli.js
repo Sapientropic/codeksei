@@ -3,10 +3,12 @@ const path = require("path");
 
 const { resolveSelectedAccount } = require("../adapters/channel/weixin/account-store");
 const { SessionStore } = require("../adapters/runtime/codex/session-store");
+const { getCommandArgsSchema } = require("../contracts/command-args");
+const { parseCliArgs } = require("../core/cli-args");
 const { resolvePreferredSenderId } = require("../core/default-targets");
 const { TimelineScreenshotQueueStore } = require("../core/timeline-screenshot-queue-store");
 
-async function runTimelineScreenshotCommand(config, args = process.argv.slice(4)) {
+async function runTimelineScreenshotCommand(config, args = []) {
   const options = parseTimelineScreenshotArgs(args);
   if (options.help) {
     printTimelineScreenshotHelp();
@@ -41,55 +43,10 @@ async function runTimelineScreenshotCommand(config, args = process.argv.slice(4)
 }
 
 function parseTimelineScreenshotArgs(args) {
-  const options = {
-    help: false,
-    user: "",
-    outputFile: "",
-    forwardArgs: [],
-  };
-
-  for (let index = 0; index < args.length; index += 1) {
-    const token = String(args[index] || "").trim();
-    if (!token) {
-      continue;
-    }
-    if (token === "--help" || token === "-h") {
-      options.help = true;
-      continue;
-    }
-    if (token === "--send") {
-      continue;
-    }
-    if (token === "--demo") {
-      continue;
-    }
-    if (token === "--user") {
-      const value = String(args[index + 1] || "").trim();
-      if (!value || value.startsWith("--")) {
-        throw new Error("参数缺少值: --user");
-      }
-      options.user = value;
-      index += 1;
-      continue;
-    }
-    if (token === "--output") {
-      const value = String(args[index + 1] || "").trim();
-      if (!value || value.startsWith("--")) {
-        throw new Error("参数缺少值: --output");
-      }
-      options.outputFile = path.resolve(value);
-      index += 1;
-      continue;
-    }
-
-    options.forwardArgs.push(token);
-    const next = String(args[index + 1] || "").trim();
-    if (token.startsWith("--") && next && !next.startsWith("--")) {
-      options.forwardArgs.push(next);
-      index += 1;
-    }
+  const options = parseCliArgs(args, getCommandArgsSchema("timelineScreenshot"));
+  if (options.outputFile) {
+    options.outputFile = path.resolve(options.outputFile);
   }
-
   return options;
 }
 

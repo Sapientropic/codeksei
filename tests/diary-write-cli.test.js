@@ -136,7 +136,7 @@ test("runDiaryWriteCommand accepts fragment writes without requiring todo state"
     await runDiaryWriteCommand({
       diaryDir: tempRoot,
       timezone: "Asia/Shanghai",
-    });
+    }, process.argv.slice(4));
 
     const content = fs.readFileSync(path.join(tempRoot, "2026-04-11.md"), "utf8");
     assert.match(content, /## 今日碎片\n\n- 今天忙了一整天，晚饭前明显感觉能量很低，还有点晕。/);
@@ -277,7 +277,7 @@ test("--timeline-text still rejects non todo-done writes", () => {
 test("parseArgs reports missing option values explicitly", () => {
   assert.throws(
     () => parseArgs(["--section", "todo", "--state", "done", "--text", "x", "--timeline-text", "--time", "22:00"]),
-    /--timeline-text 需要一个值/
+    /参数缺少值: --timeline-text/
   );
 });
 

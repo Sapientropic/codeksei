@@ -1,6 +1,8 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { normalizeWorkspaceAliasManifest } = require("../contracts/config-files");
+const { loadJsonConfig } = require("./config-loader");
 
 const DEFAULT_ALIAS_MANIFEST = path.join(os.homedir(), ".codex", "windows-ascii-alias", "aliases.json");
 
@@ -66,20 +68,22 @@ function loadAliasMappings(options = {}) {
   const manifestPath = typeof options.manifestPath === "string" && options.manifestPath.trim()
     ? options.manifestPath.trim()
     : DEFAULT_ALIAS_MANIFEST;
-  try {
-    const raw = fs.readFileSync(manifestPath, "utf8");
-    const parsed = JSON.parse(raw);
-    const mappings = Array.isArray(parsed?.mappings) ? parsed.mappings : [];
-    return mappings
-      .map((mapping) => ({
-        slug: normalizeText(mapping?.slug),
-        targetPath: normalizeWorkspaceRoot(mapping?.target_path),
-        aliasPath: normalizeWorkspaceRoot(mapping?.alias_path),
-      }))
-      .filter((mapping) => mapping.slug && mapping.targetPath && mapping.aliasPath);
-  } catch {
-    return [];
-  }
+  const manifest = loadJsonConfig({
+    filePath: manifestPath,
+    label: "workspace alias manifest",
+    normalize: normalizeWorkspaceAliasManifest,
+    fallback: { mappings: [] },
+    missing: "fallback",
+    invalid: "fallback",
+  });
+  const mappings = Array.isArray(manifest?.mappings) ? manifest.mappings : [];
+  return mappings
+    .map((mapping) => ({
+      slug: normalizeText(mapping?.slug),
+      targetPath: normalizeWorkspaceRoot(mapping?.target_path),
+      aliasPath: normalizeWorkspaceRoot(mapping?.alias_path),
+    }))
+    .filter((mapping) => mapping.slug && mapping.targetPath && mapping.aliasPath);
 }
 
 function convertRootedPath(pathValue, fromRoot, toRoot) {

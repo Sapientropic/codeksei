@@ -39,7 +39,7 @@ function createControlCommandHandlers({
         requestId: approval.requestId,
         decision,
       });
-      sessionStore.clearApprovalPrompt(threadId);
+      clearPendingApproval(sessionStore, threadId);
       console.log(
         `[codeksei] approval response delivered thread=${threadId} requestId=${approval.requestId} decision=${decision}`
       );
@@ -126,3 +126,13 @@ function normalizeCommandArgument(value) {
 module.exports = {
   createControlCommandHandlers,
 };
+
+function clearPendingApproval(sessionStore, threadId) {
+  if (typeof sessionStore?.clearPendingApprovalForThread === "function") {
+    sessionStore.clearPendingApprovalForThread(threadId);
+    return;
+  }
+  if (typeof sessionStore?.clearApprovalPrompt === "function") {
+    sessionStore.clearApprovalPrompt(threadId);
+  }
+}
