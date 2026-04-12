@@ -31,13 +31,10 @@ class ReminderQueueStore {
       label: "reminder queue",
       schema: reminderQueueStateSchema,
     });
-    const normalizedState = /** @type {{ reminders?: unknown[] }} */ (parsed || {});
-    const reminders = Array.isArray(normalizedState.reminders) ? normalizedState.reminders : [];
+    const normalizedState = /** @type {{ reminders?: import("../contracts/queue-items").ReminderQueueEntry[] }} */ (parsed || {});
+    const reminders = Array.isArray(normalizedState.reminders) ? normalizedState.reminders.slice() : [];
     this.state = {
-      reminders: reminders
-        .map(normalizeReminderQueueEntry)
-        .filter(Boolean)
-        .sort(compareReminderQueueEntries),
+      reminders: reminders.sort(compareReminderQueueEntries),
     };
   }
 

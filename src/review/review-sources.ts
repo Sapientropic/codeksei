@@ -1,9 +1,10 @@
 // @ts-check
 
-const fs = require("fs");
-const path = require("path");
-const { normalizeDisplayPath } = require("../core/path-utils");
-const { parseManagedBulletList } = require("./review-document");
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+import { normalizeDisplayPath } from "../core/path-utils";
+import { parseManagedBulletList } from "./review-document";
 
 function collectDiaryEntries(diaryDir: any, startDate: any, endDate: any) {
   const normalizedDiaryDir = normalizeText(diaryDir);
@@ -182,11 +183,9 @@ function escapeRegExp(value: any) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-module.exports = {
+export {
   collectDiaryEntries,
   collectNightlyEntries,
   parseDiaryFile,
   parseNightlyReviewFile,
 };
-
-export {};

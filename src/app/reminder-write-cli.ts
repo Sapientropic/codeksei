@@ -1,22 +1,48 @@
-const crypto = require("crypto");
+import * as crypto from "node:crypto";
 
-const { resolveSelectedAccount } = require("../adapters/channel/weixin/account-store");
-const { loadPersistedContextTokens } = require("../adapters/channel/weixin/context-token-store");
-const { ReminderQueueStore } = require("../state/reminder-queue-store");
-const { SessionStore } = require("../adapters/runtime/codex/session-store");
-const { getCommandArgsSchema } = require("../contracts/command-args");
-const { parseCliArgs } = require("../core/cli-args");
-const { resolvePreferredSenderId } = require("../workspace/default-targets");
-const {
+import { SessionStore } from "../adapters/runtime/codex/session-store";
+import { getCommandArgsSchema } from "../contracts/command-args";
+import {
   LEGACY_TIMELINE_TIMEZONE,
   coerceLocalDateTimeToIso,
-} = require("../core/timezone");
+} from "../core/timezone";
+import { resolvePreferredSenderId } from "../workspace/default-targets";
+import * as accountStoreModule from "../adapters/channel/weixin/account-store";
+import * as contextTokenStoreModule from "../adapters/channel/weixin/context-token-store";
+import * as cliArgsModule from "../core/cli-args";
+import * as reminderQueueStoreModule from "../state/reminder-queue-store";
 
 const DELAY_UNIT_MS = {
   s: 1_000,
   m: 60_000,
   h: 60 * 60_000,
   d: 24 * 60 * 60_000,
+};
+
+interface ReminderWriteOptions extends Record<string, unknown> {
+  delay?: unknown;
+  at?: unknown;
+  text?: unknown;
+  user?: unknown;
+  useStdin?: boolean;
+}
+
+const { resolveSelectedAccount } = accountStoreModule as {
+  resolveSelectedAccount(config: Record<string, unknown>): { accountId: string };
+};
+
+const { loadPersistedContextTokens } = contextTokenStoreModule as {
+  loadPersistedContextTokens(config: Record<string, unknown>, accountId: string): Record<string, string>;
+};
+
+const { parseCliArgs } = cliArgsModule as {
+  parseCliArgs(args: string[], schema: unknown): ReminderWriteOptions;
+};
+
+const { ReminderQueueStore } = reminderQueueStoreModule as {
+  ReminderQueueStore: new (args: { filePath: string }) => {
+    enqueue(reminder: Record<string, unknown>): { id: string };
+  };
 };
 
 async function runReminderWriteCommand(config: any, args: any[] = []) {
@@ -39,7 +65,7 @@ async function runReminderWriteCommand(config: any, args: any[] = []) {
   const senderId = resolvePreferredSenderId({
     config,
     accountId: account.accountId,
-    explicitUser: options.user,
+    explicitUser: typeof options.user === "string" ? options.user : "",
     sessionStore,
   });
   if (!senderId) {
@@ -65,7 +91,7 @@ async function runReminderWriteCommand(config: any, args: any[] = []) {
   console.log(`reminder queued: ${reminder.id}`);
 }
 
-function parseArgs(args: any) {
+function parseArgs(args: string[]): ReminderWriteOptions {
   return parseCliArgs(args, getCommandArgsSchema("reminderWrite"));
 }
 
@@ -172,12 +198,10 @@ function buildAbsoluteTimeExample(timezone: any = LEGACY_TIMELINE_TIMEZONE) {
   return `${explicit || "2026-04-07T21:30+08:00"} 或 2026-04-07 21:30（后者按当前 timezone 解释）`;
 }
 
-module.exports = {
+export {
   buildAbsoluteTimeExample,
   normalizeAbsoluteTimeString,
   parseAbsoluteTime,
   resolveDueAtMs,
   runReminderWriteCommand,
 };
-
-export {};

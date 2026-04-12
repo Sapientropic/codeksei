@@ -14,11 +14,9 @@ function resolvePromptPersonEn(config: any = {}) {
   return resolveConfiguredPersonName(config) || "the person you're with";
 }
 
-module.exports = {
+export {
   normalizePersonName,
   resolveConfiguredPersonName,
   resolvePromptPersonEn,
   resolvePromptPersonZh,
 };
-
-export {};

@@ -1,6 +1,6 @@
-const fs = require("fs");
-const path = require("path");
-const { readForeignJsonDocument } = require("../state/json-state");
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { readForeignJsonDocument } from "../state/json-state";
 
 const LEGACY_TIMELINE_TIMEZONE = "Asia/Shanghai";
 const DEFAULT_FALLBACK_TIMEZONE = "UTC";
@@ -186,11 +186,11 @@ function readProposals(stateDoc: any, factsDoc: any) {
   return Array.isArray(factsDoc?.proposals) ? factsDoc.proposals : [];
 }
 
-function readJsonFile(filePath: any) {
+function readJsonFile(filePath: string): Record<string, unknown> | null {
   // Timeline state/taxonomy/facts are foreign documents produced by another
   // workflow. Parse them gently and let that workflow own recovery instead of
   // moving files aside as if codeksei fully owned their schema.
-  return readForeignJsonDocument(filePath, { fallback: null });
+  return readForeignJsonDocument<Record<string, unknown> | null>(filePath, { fallback: null });
 }
 
 function formatDateInTimezone(value: any, timezone: any = LEGACY_TIMELINE_TIMEZONE) {
@@ -417,7 +417,7 @@ function formatInTimezone(value: any, timezone: any, locale: any, options: any) 
   }).format(date);
 }
 
-module.exports = {
+export {
   DEFAULT_FALLBACK_TIMEZONE,
   LEGACY_TIMELINE_TIMEZONE,
   buildZonedIsoString,
@@ -434,5 +434,3 @@ module.exports = {
   resolveTimelineStateFiles,
   resolveTimezoneConfig,
 };
-
-export {};

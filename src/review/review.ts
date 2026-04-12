@@ -1,29 +1,30 @@
-const fs = require("fs");
-const path = require("path");
-const { normalizeReviewSchemaConfig } = require("../contracts/config-files");
-const { loadJsonConfig } = require("../core/config-loader");
-const { writeForeignTextDocument } = require("../state/json-state");
-const { maybeGenerateSemanticReview } = require("./review-semantic");
-const { LEGACY_TIMELINE_TIMEZONE } = require("../core/timezone");
-const {
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+import { normalizeReviewSchemaConfig } from "../contracts/config-files";
+import { loadJsonConfig } from "../core/config-loader";
+import { LEGACY_TIMELINE_TIMEZONE } from "../core/timezone";
+import {
   normalizeDisplayPath,
   resolveCrossPlatformPath,
   resolveCrossPlatformPathFromRoot,
-} = require("../core/path-utils");
-const {
+} from "../core/path-utils";
+import { writeForeignTextDocument } from "../state/json-state";
+import {
   buildReviewDraft,
   mergeReviewDraft,
   resolveReviewWindow,
-} = require("./review-draft");
-const {
+} from "./review-draft";
+import {
   buildReviewFileSkeleton,
   buildReviewSections,
   syncReviewContent,
-} = require("./review-document");
-const {
+} from "./review-document";
+import { maybeGenerateSemanticReview } from "./review-semantic";
+import {
   collectDiaryEntries,
   collectNightlyEntries,
-} = require("./review-sources");
+} from "./review-sources";
 
 const DEFAULT_REVIEW_MODELS = {
   nightly: {
@@ -216,12 +217,10 @@ function ensureTrailingNewline(value: any) {
   return normalized.endsWith("\n") ? normalized : `${normalized}\n`;
 }
 
-module.exports = {
+export {
   buildReview,
   loadReviewSchemaConfig,
   resolveReviewProfile,
   resolveReviewWindow,
   writeReview,
 };
-
-export {};
