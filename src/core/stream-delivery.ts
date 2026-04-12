@@ -439,6 +439,7 @@ class StreamDelivery {
     }
 
     const settledWechatDelivery = prefersSettledDelivery(state);
+    const streamingPreserveBlock = Boolean(streamPrepared?.preserveBlock);
     const tracePayload = buildDeliveryTracePayload(state, {
       force,
       trigger,
@@ -456,12 +457,12 @@ class StreamDelivery {
           userId: state.replyTarget.userId,
           text: delta,
           contextToken: state.replyTarget.contextToken,
-          preserveBlock: settledWechatDelivery,
+          preserveBlock: settledWechatDelivery || streamingPreserveBlock,
           trace: this.deliveryTraceEnabled
             ? {
               ...tracePayload,
               origin: "stream-delivery",
-              preserveBlock: settledWechatDelivery,
+              preserveBlock: settledWechatDelivery || streamingPreserveBlock,
             }
             : null,
         });

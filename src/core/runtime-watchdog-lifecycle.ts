@@ -1,55 +1,143 @@
-// @ts-check
-
-const {
+import {
   RUNTIME_EVENT_TYPES,
-} = require("../contracts/runtime-events");
+  type RuntimeEvent,
+} from "../contracts/runtime-events";
+import type {
+  PendingApprovalState,
+  PreparedRuntimeMessage,
+  ReplyTarget,
+  ThreadBindingRef,
+  UnknownRecord,
+} from "./runtime-types";
 
-/**
- * @typedef {{
- *   userId: string,
- *   contextToken: string,
- * }} DeliveryTarget
- */
+interface DeliveryTarget {
+  userId: string;
+  contextToken: string;
+}
 
-/**
- * @typedef {{
- *   noticeTimer: NodeJS.Timeout,
- *   failureTimer: NodeJS.Timeout,
- *   noticeSent: boolean,
- * }} RuntimeEventWatchdogEntry
- */
+interface RuntimeEventWatchdogEntry {
+  noticeTimer: NodeJS.Timeout;
+  failureTimer: NodeJS.Timeout;
+  noticeSent: boolean;
+}
 
-/**
- * @typedef {{
- *   timer: NodeJS.Timeout,
- * }} TurnSettlementWatchdogEntry
- */
+interface TurnSettlementWatchdogEntry {
+  timer: NodeJS.Timeout;
+}
 
-/**
- * @typedef {{
- *   bindingKey: string,
- *   workspaceRoot: string,
- * }} WorkspaceBootstrapEntry
- */
+interface WorkspaceBootstrapEntry {
+  bindingKey: string;
+  workspaceRoot: string;
+}
 
-class RuntimeWatchdogLifecycle {
-  buildApprovalPromptSignature: any;
-  buildApprovalPromptText: any;
-  channelAdapter: any;
-  firstRuntimeEventFailureTimeoutMs: any;
-  firstRuntimeEventNoticeTimeoutMs: any;
-  matchesBuiltInCommandPrefix: any;
-  matchesCommandPrefix: any;
-  normalizeCommandArgument: any;
-  normalizeText: any;
-  pendingRuntimeEventWatchdogs: Map<any, any>;
-  pendingTurnSettlementWatchdogs: Map<any, any>;
-  pendingWorkspaceBootstrapByThreadId: Map<any, any>;
-  resolveReplyTargetForBinding: any;
-  runtimeAdapter: any;
-  streamDelivery: any;
-  streamSettlementTimeoutMs: any;
-  threadStateStore: any;
+interface SessionBindingSnapshot extends Record<string, unknown> {
+  bindingKey: string;
+  threadIdByWorkspaceRoot?: Record<string, string>;
+}
+
+interface SessionStoreLike {
+  getThreadIdForWorkspace(bindingKey: string, workspaceRoot: string): string;
+  findBindingForThreadId(threadId: unknown): ThreadBindingRef | null;
+  rememberWorkspaceBootstrapForThread(bindingKey: string, workspaceRoot: string, threadId: string): void;
+  getApprovalCommandAllowlistForWorkspace(workspaceRoot: string): string[][];
+  getPendingApprovalForThread(threadId: string): PendingApprovalState | null;
+  rememberPendingApprovalForThread(
+    threadId: string,
+    approval: PendingApprovalState,
+    options?: { signature?: string; promptedAt?: string },
+  ): PendingApprovalState | null;
+  listBindings(): SessionBindingSnapshot[];
+  listPendingApprovals(): Array<{ threadId: string; approval: PendingApprovalState }>;
+  clearPendingApprovalForThread?(threadId: unknown): void;
+  clearApprovalPrompt?(threadId: unknown): void;
+}
+
+interface RuntimeAdapterLike {
+  getSessionStore(): SessionStoreLike;
+  respondApproval(args: { requestId: string; decision: "accept" | "decline" }): Promise<unknown>;
+  resumeThread(args: { threadId: string }): Promise<unknown>;
+}
+
+interface ChannelAdapterLike {
+  sendText(payload: {
+    userId: string;
+    text: string;
+    contextToken: string;
+    preserveBlock?: boolean;
+  }): Promise<unknown>;
+  sendTyping(payload: {
+    userId: string;
+    status: number;
+    contextToken: string;
+  }): Promise<unknown>;
+}
+
+interface StreamDeliveryLike {
+  handleRuntimeEvent(event: RuntimeEvent<UnknownRecord>): Promise<void>;
+  finalizeAbandonedTurn(args: {
+    threadId: string;
+    turnId?: string;
+    trailingText?: string;
+  }): Promise<unknown>;
+  setReplyTarget(bindingKey: string, target: ReplyTarget): void;
+}
+
+interface ThreadStateSnapshot {
+  status?: string;
+  turnId?: string;
+  pendingApproval?: PendingApprovalState | null;
+}
+
+interface ThreadStateStoreLike {
+  getThreadState(threadId: string): ThreadStateSnapshot | null;
+  markTurnFailed(threadId: string, turnId: string, message?: string): unknown;
+  resolveApproval(threadId: string, status?: string): unknown;
+  hydratePendingApproval(threadId: string, approval: PendingApprovalState): unknown;
+}
+
+type BuildApprovalPromptSignature = (approval: PendingApprovalState) => string;
+type BuildApprovalPromptText = (approval: PendingApprovalState) => string;
+type MatchesBuiltInCommandPrefix = (commandTokens: unknown) => boolean;
+type MatchesCommandPrefix = (commandTokens: unknown, allowlist: string[][]) => boolean;
+type NormalizeCommandArgument = (value: unknown) => string;
+type NormalizeText = (value: unknown) => string;
+type ResolveReplyTargetForBinding = (bindingKey: string) => ReplyTarget | null;
+
+interface RuntimeWatchdogLifecycleDependencies {
+  buildApprovalPromptSignature: BuildApprovalPromptSignature;
+  buildApprovalPromptText: BuildApprovalPromptText;
+  channelAdapter: ChannelAdapterLike;
+  matchesBuiltInCommandPrefix: MatchesBuiltInCommandPrefix;
+  matchesCommandPrefix: MatchesCommandPrefix;
+  normalizeCommandArgument: NormalizeCommandArgument;
+  normalizeText: NormalizeText;
+  resolveReplyTargetForBinding: ResolveReplyTargetForBinding;
+  runtimeAdapter: RuntimeAdapterLike;
+  streamDelivery: StreamDeliveryLike;
+  streamSettlementTimeoutMs: number;
+  threadStateStore: ThreadStateStoreLike;
+  firstRuntimeEventFailureTimeoutMs: number;
+  firstRuntimeEventNoticeTimeoutMs: number;
+}
+
+export class RuntimeWatchdogLifecycle {
+  readonly buildApprovalPromptSignature: BuildApprovalPromptSignature;
+  readonly buildApprovalPromptText: BuildApprovalPromptText;
+  readonly channelAdapter: ChannelAdapterLike;
+  readonly firstRuntimeEventFailureTimeoutMs: number;
+  readonly firstRuntimeEventNoticeTimeoutMs: number;
+  readonly matchesBuiltInCommandPrefix: MatchesBuiltInCommandPrefix;
+  readonly matchesCommandPrefix: MatchesCommandPrefix;
+  readonly normalizeCommandArgument: NormalizeCommandArgument;
+  readonly normalizeText: NormalizeText;
+  readonly pendingRuntimeEventWatchdogs: Map<string, RuntimeEventWatchdogEntry>;
+  readonly pendingTurnSettlementWatchdogs: Map<string, TurnSettlementWatchdogEntry>;
+  readonly pendingWorkspaceBootstrapByThreadId: Map<string, WorkspaceBootstrapEntry>;
+  readonly resolveReplyTargetForBinding: ResolveReplyTargetForBinding;
+  readonly runtimeAdapter: RuntimeAdapterLike;
+  readonly streamDelivery: StreamDeliveryLike;
+  readonly streamSettlementTimeoutMs: number;
+  readonly threadStateStore: ThreadStateStoreLike;
 
   constructor({
     buildApprovalPromptSignature,
@@ -66,7 +154,7 @@ class RuntimeWatchdogLifecycle {
     threadStateStore,
     firstRuntimeEventFailureTimeoutMs,
     firstRuntimeEventNoticeTimeoutMs,
-  }: any) {
+  }: RuntimeWatchdogLifecycleDependencies) {
     this.buildApprovalPromptSignature = buildApprovalPromptSignature;
     this.buildApprovalPromptText = buildApprovalPromptText;
     this.channelAdapter = channelAdapter;
@@ -81,21 +169,28 @@ class RuntimeWatchdogLifecycle {
     this.threadStateStore = threadStateStore;
     this.firstRuntimeEventFailureTimeoutMs = firstRuntimeEventFailureTimeoutMs;
     this.firstRuntimeEventNoticeTimeoutMs = firstRuntimeEventNoticeTimeoutMs;
-    /** @type {Map<string, RuntimeEventWatchdogEntry>} */
     this.pendingRuntimeEventWatchdogs = new Map();
-    /** @type {Map<string, TurnSettlementWatchdogEntry>} */
     this.pendingTurnSettlementWatchdogs = new Map();
-    /** @type {Map<string, WorkspaceBootstrapEntry>} */
     this.pendingWorkspaceBootstrapByThreadId = new Map();
   }
 
-  observeRuntimeEvent(event: any) {
+  observeRuntimeEvent(event: RuntimeEvent<UnknownRecord>): void {
     this.confirmPendingWorkspaceBootstrap(event);
     this.clearRuntimeEventWatchdog(event?.payload?.threadId);
     this.refreshTurnSettlementWatchdog(event);
   }
 
-  scheduleRuntimeEventWatchdog({ bindingKey, workspaceRoot, normalized, threadId = "" }: any) {
+  scheduleRuntimeEventWatchdog({
+    bindingKey,
+    workspaceRoot,
+    normalized,
+    threadId = "",
+  }: {
+    bindingKey: string;
+    workspaceRoot: string;
+    normalized: PreparedRuntimeMessage;
+    threadId?: string;
+  }): void {
     const sessionStore = this.runtimeAdapter.getSessionStore();
     const candidateThreadId = this.normalizeCommandArgument(threadId)
       || sessionStore.getThreadIdForWorkspace(bindingKey, workspaceRoot);
@@ -164,7 +259,7 @@ class RuntimeWatchdogLifecycle {
     });
   }
 
-  clearRuntimeEventWatchdog(threadId: any) {
+  clearRuntimeEventWatchdog(threadId: unknown): void {
     const normalizedThreadId = this.normalizeCommandArgument(threadId);
     if (!normalizedThreadId) {
       return;
@@ -178,7 +273,7 @@ class RuntimeWatchdogLifecycle {
     this.pendingRuntimeEventWatchdogs.delete(normalizedThreadId);
   }
 
-  refreshTurnSettlementWatchdog(event: any) {
+  refreshTurnSettlementWatchdog(event: RuntimeEvent<UnknownRecord>): void {
     const threadId = this.normalizeCommandArgument(event?.payload?.threadId);
     const turnId = this.normalizeCommandArgument(event?.payload?.turnId);
     if (!threadId || !turnId) {
@@ -232,7 +327,7 @@ class RuntimeWatchdogLifecycle {
       this.threadStateStore.markTurnFailed(
         threadId,
         turnId,
-        "这轮回复已经开始输出，但 Codex runtime 一直没有发回完成或失败事件。"
+        "这轮回复已经开始输出，但 Codex runtime 一直没有发回完成或失败事件。",
       );
       clearPendingApproval(this.runtimeAdapter.getSessionStore(), threadId);
       await this.stopTypingForThread(threadId);
@@ -240,7 +335,7 @@ class RuntimeWatchdogLifecycle {
     this.pendingTurnSettlementWatchdogs.set(watchdogKey, { timer });
   }
 
-  clearTurnSettlementWatchdog(threadId: any, turnId: any) {
+  clearTurnSettlementWatchdog(threadId: unknown, turnId: unknown): void {
     const watchdogKey = buildTurnSettlementWatchdogKey(threadId, turnId, this.normalizeCommandArgument);
     if (!watchdogKey) {
       return;
@@ -253,7 +348,15 @@ class RuntimeWatchdogLifecycle {
     this.pendingTurnSettlementWatchdogs.delete(watchdogKey);
   }
 
-  queuePendingWorkspaceBootstrap({ bindingKey, workspaceRoot, threadId }: any) {
+  queuePendingWorkspaceBootstrap({
+    bindingKey,
+    workspaceRoot,
+    threadId,
+  }: {
+    bindingKey: string;
+    workspaceRoot: string;
+    threadId: string;
+  }): void {
     const normalizedBindingKey = this.normalizeText(bindingKey);
     const normalizedWorkspaceRoot = this.normalizeText(workspaceRoot);
     const normalizedThreadId = this.normalizeText(threadId);
@@ -266,7 +369,7 @@ class RuntimeWatchdogLifecycle {
     });
   }
 
-  confirmPendingWorkspaceBootstrap(event: any) {
+  confirmPendingWorkspaceBootstrap(event: RuntimeEvent<UnknownRecord>): void {
     if (!event || event.type === RUNTIME_EVENT_TYPES.USAGE_UPDATED) {
       return;
     }
@@ -285,12 +388,12 @@ class RuntimeWatchdogLifecycle {
     this.runtimeAdapter.getSessionStore().rememberWorkspaceBootstrapForThread(
       pending.bindingKey,
       pending.workspaceRoot,
-      threadId
+      threadId,
     );
     this.pendingWorkspaceBootstrapByThreadId.delete(threadId);
   }
 
-  async handleRuntimeEvent(event: any) {
+  async handleRuntimeEvent(event: RuntimeEvent<UnknownRecord>): Promise<void> {
     await this.streamDelivery.handleRuntimeEvent(event);
     if (!event) {
       return;
@@ -311,40 +414,45 @@ class RuntimeWatchdogLifecycle {
     if (!linked?.workspaceRoot) {
       return;
     }
+    const eventThreadId = this.normalizeCommandArgument(event.payload.threadId);
+    const approval = normalizePendingApprovalState(event.payload, eventThreadId, this.normalizeText);
+    if (!eventThreadId || !approval.requestId) {
+      return;
+    }
     const allowlist = sessionStore.getApprovalCommandAllowlistForWorkspace(linked.workspaceRoot);
     const shouldAutoApprove = this.matchesBuiltInCommandPrefix(event.payload.commandTokens)
       || this.matchesCommandPrefix(event.payload.commandTokens, allowlist);
     if (!shouldAutoApprove) {
-      const promptState = sessionStore.getPendingApprovalForThread(event.payload.threadId);
-      const promptSignature = this.buildApprovalPromptSignature(event.payload);
+      const promptState = sessionStore.getPendingApprovalForThread(eventThreadId);
+      const promptSignature = this.buildApprovalPromptSignature(approval);
       if (promptState?.signature && promptState.signature === promptSignature) {
-        sessionStore.rememberPendingApprovalForThread(event.payload.threadId, event.payload, {
+        sessionStore.rememberPendingApprovalForThread(eventThreadId, approval, {
           signature: promptSignature,
           promptedAt: promptState.promptedAt || new Date().toISOString(),
         });
         console.log(
-          `[codeksei] approval prompt deduped thread=${event.payload.threadId} requestId=${event.payload.requestId}`
+          `[codeksei] approval prompt deduped thread=${eventThreadId} requestId=${approval.requestId}`,
         );
         return;
       }
-      sessionStore.rememberPendingApprovalForThread(event.payload.threadId, event.payload, {
+      sessionStore.rememberPendingApprovalForThread(eventThreadId, approval, {
         signature: promptSignature,
       });
       await this.sendApprovalPrompt({
         bindingKey: linked.bindingKey,
-        approval: event.payload,
+        approval,
       });
       return;
     }
-    clearPendingApproval(sessionStore, event.payload.threadId);
+    clearPendingApproval(sessionStore, eventThreadId);
     await this.runtimeAdapter.respondApproval({
-      requestId: event.payload.requestId,
+      requestId: approval.requestId,
       decision: "accept",
     }).catch(() => {});
-    this.threadStateStore.resolveApproval(event.payload.threadId, "running");
+    this.threadStateStore.resolveApproval(eventThreadId, "running");
   }
 
-  async stopTypingForThread(threadId: any) {
+  async stopTypingForThread(threadId: unknown): Promise<void> {
     const linked = this.runtimeAdapter.getSessionStore().findBindingForThreadId(threadId);
     const target = linked?.bindingKey ? this.resolveReplyTargetForBinding(linked.bindingKey) : null;
     if (!target) {
@@ -357,7 +465,7 @@ class RuntimeWatchdogLifecycle {
     }).catch(() => {});
   }
 
-  async sendFailureToThread(threadId: any, text: any) {
+  async sendFailureToThread(threadId: unknown, text: unknown): Promise<void> {
     const linked = this.runtimeAdapter.getSessionStore().findBindingForThreadId(threadId);
     const target = linked?.bindingKey ? this.resolveReplyTargetForBinding(linked.bindingKey) : null;
     if (!target) {
@@ -370,16 +478,22 @@ class RuntimeWatchdogLifecycle {
     }).catch(() => {});
   }
 
-  async sendApprovalPrompt({ bindingKey, approval }: any) {
+  async sendApprovalPrompt({
+    bindingKey,
+    approval,
+  }: {
+    bindingKey: string;
+    approval: PendingApprovalState;
+  }): Promise<void> {
     const target = this.resolveReplyTargetForBinding(bindingKey);
     if (!target) {
       console.warn(
-        `[codeksei] approval prompt skipped binding=${bindingKey} requestId=${approval?.requestId || ""} reason=no_reply_target`
+        `[codeksei] approval prompt skipped binding=${bindingKey} requestId=${approval?.requestId || ""} reason=no_reply_target`,
       );
       return;
     }
     console.log(
-      `[codeksei] approval prompt sending binding=${bindingKey} user=${target.userId} requestId=${approval?.requestId || ""}`
+      `[codeksei] approval prompt sending binding=${bindingKey} user=${target.userId} requestId=${approval?.requestId || ""}`,
     );
     await this.channelAdapter.sendTyping({
       userId: target.userId,
@@ -393,14 +507,14 @@ class RuntimeWatchdogLifecycle {
       preserveBlock: true,
     });
     console.log(
-      `[codeksei] approval prompt delivered binding=${bindingKey} user=${target.userId} requestId=${approval?.requestId || ""}`
+      `[codeksei] approval prompt delivered binding=${bindingKey} user=${target.userId} requestId=${approval?.requestId || ""}`,
     );
   }
 
-  async restoreBoundThreadSubscriptions() {
+  async restoreBoundThreadSubscriptions(): Promise<void> {
     const sessionStore = this.runtimeAdapter.getSessionStore();
     const bindings = sessionStore.listBindings();
-    const seenThreadIds = new Set();
+    const seenThreadIds = new Set<string>();
 
     for (const binding of bindings) {
       const bindingKey = this.normalizeText(binding?.bindingKey);
@@ -432,17 +546,21 @@ class RuntimeWatchdogLifecycle {
   }
 }
 
-function clearPendingApproval(sessionStore: any, threadId: any) {
-  if (typeof sessionStore?.clearPendingApprovalForThread === "function") {
+function clearPendingApproval(sessionStore: SessionStoreLike, threadId: unknown): void {
+  if (typeof sessionStore.clearPendingApprovalForThread === "function") {
     sessionStore.clearPendingApprovalForThread(threadId);
     return;
   }
-  if (typeof sessionStore?.clearApprovalPrompt === "function") {
+  if (typeof sessionStore.clearApprovalPrompt === "function") {
     sessionStore.clearApprovalPrompt(threadId);
   }
 }
 
-function buildTurnSettlementWatchdogKey(threadId: any, turnId: any, normalizeCommandArgument: any) {
+function buildTurnSettlementWatchdogKey(
+  threadId: unknown,
+  turnId: unknown,
+  normalizeCommandArgument: NormalizeCommandArgument,
+): string {
   const normalizedThreadId = normalizeCommandArgument(threadId);
   const normalizedTurnId = normalizeCommandArgument(turnId);
   if (!normalizedThreadId || !normalizedTurnId) {
@@ -451,6 +569,23 @@ function buildTurnSettlementWatchdogKey(threadId: any, turnId: any, normalizeCom
   return `${normalizedThreadId}:${normalizedTurnId}`;
 }
 
-module.exports = { RuntimeWatchdogLifecycle };
-
-export {};
+function normalizePendingApprovalState(
+  payload: UnknownRecord,
+  threadId: string,
+  normalizeText: NormalizeText,
+): PendingApprovalState {
+  const commandTokens = Array.isArray(payload.commandTokens)
+    ? payload.commandTokens
+      .map((token) => normalizeText(token))
+      .filter(Boolean)
+    : [];
+  return {
+    threadId,
+    requestId: normalizeText(payload.requestId),
+    reason: normalizeText(payload.reason),
+    command: normalizeText(payload.command),
+    commandTokens,
+    signature: normalizeText(payload.signature),
+    promptedAt: normalizeText(payload.promptedAt),
+  };
+}

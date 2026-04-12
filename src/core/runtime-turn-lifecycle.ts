@@ -1,23 +1,131 @@
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import type { SessionStore } from "../adapters/runtime/codex/session-store";
+import type {
+  AttachmentFailure,
+  HandlePreparedMessageOptions,
+  NormalizedIncomingMessage,
+  PreparedRuntimeMessage,
+  ReplyTarget,
+  RuntimeTurnSendResult,
+  SendLocalFileRequest,
+  TimelineScreenshotRequest,
+  RuntimeTurnSendState,
+  UserTypingOptions,
+} from "./runtime-types";
 
-class RuntimeTurnLifecycle {
-  buildCodexInboundText: any;
-  channelAdapter: any;
-  config: any;
-  formatErrorMessage: any;
-  maybeDispatchCommand: any;
-  normalizeText: any;
-  persistIncomingWeixinAttachments: any;
-  queuePendingWorkspaceBootstrap: any;
-  resolveDefaultTerminalUser: any;
-  resolveTimelineScreenshotOutput: any;
-  resolveWorkspaceRoot: any;
-  runtimeAdapter: any;
-  scheduleRuntimeEventWatchdog: any;
-  streamDelivery: any;
-  timelineIntegration: any;
+interface RuntimeTurnConfig extends Record<string, unknown> {
+  stateDir: string;
+  weixinCdnBaseUrl?: string;
+  codexAccessMode?: string;
+}
+
+interface PersistedAttachmentResult {
+  saved: unknown[];
+  failed: AttachmentFailure[];
+}
+
+interface ChannelAdapterLike {
+  getKnownContextTokens(): Record<string, string>;
+  sendFile(payload: { userId: string; filePath: string; contextToken: string }): Promise<unknown>;
+  sendText(payload: {
+    userId: string;
+    text: string;
+    contextToken: string;
+    preserveBlock?: boolean;
+  }): Promise<unknown>;
+  sendTyping(payload: { userId: string; status: number; contextToken: string }): Promise<unknown>;
+}
+
+interface TimelineIntegrationLike {
+  runSubcommand(command: string, args: string[]): Promise<unknown>;
+}
+
+interface StreamDeliveryLike {
+  setReplyTarget(bindingKey: string, target: ReplyTarget): void;
+  queueReplyTargetForThread(threadId: string, target: ReplyTarget): void;
+}
+
+interface RuntimeAdapterLike {
+  getSessionStore(): SessionStore;
+  sendTextTurn(args: {
+    bindingKey: string;
+    workspaceRoot: string;
+    text: string;
+    model?: string;
+    accessMode?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<RuntimeTurnSendState>;
+}
+
+type FormatErrorMessage = (error: unknown) => string;
+type MaybeDispatchCommand = (normalized: NormalizedIncomingMessage) => Promise<boolean>;
+type NormalizeText = (value: unknown) => string;
+type PersistIncomingWeixinAttachments = (args: {
+  attachments: unknown[];
+  stateDir: string;
+  cdnBaseUrl: unknown;
+  messageId: string;
+  receivedAt: string;
+  workspaceRoot: string;
+}) => Promise<PersistedAttachmentResult>;
+type QueuePendingWorkspaceBootstrap = (payload: {
+  bindingKey: string;
+  workspaceRoot: string;
+  threadId: string;
+}) => void;
+type ResolveDefaultTerminalUser = () => string;
+type ResolveTimelineScreenshotOutput = (args: string[]) => string;
+type ResolveWorkspaceRoot = (bindingKey: string) => string;
+type ScheduleRuntimeEventWatchdog = (payload: {
+  bindingKey: string;
+  workspaceRoot: string;
+  normalized: PreparedRuntimeMessage;
+  threadId?: string;
+}) => void;
+type BuildCodexInboundText = (
+  normalized: NormalizedIncomingMessage,
+  persisted: PersistedAttachmentResult,
+  config: RuntimeTurnConfig,
+) => string;
+
+type HandlePreparedMessageResult = void | RuntimeTurnSendResult;
+
+interface RuntimeTurnLifecycleDependencies {
+  channelAdapter: ChannelAdapterLike;
+  config: RuntimeTurnConfig;
+  formatErrorMessage: FormatErrorMessage;
+  maybeDispatchCommand: MaybeDispatchCommand;
+  normalizeText: NormalizeText;
+  persistIncomingWeixinAttachments: PersistIncomingWeixinAttachments;
+  queuePendingWorkspaceBootstrap: QueuePendingWorkspaceBootstrap;
+  resolveDefaultTerminalUser: ResolveDefaultTerminalUser;
+  resolveTimelineScreenshotOutput: ResolveTimelineScreenshotOutput;
+  resolveWorkspaceRoot: ResolveWorkspaceRoot;
+  runtimeAdapter: RuntimeAdapterLike;
+  scheduleRuntimeEventWatchdog: ScheduleRuntimeEventWatchdog;
+  streamDelivery: StreamDeliveryLike;
+  timelineIntegration: TimelineIntegrationLike;
+  buildCodexInboundText: BuildCodexInboundText;
+}
+
+export class RuntimeTurnLifecycle {
+  readonly buildCodexInboundText: BuildCodexInboundText;
+  readonly channelAdapter: ChannelAdapterLike;
+  readonly config: RuntimeTurnConfig;
+  readonly formatErrorMessage: FormatErrorMessage;
+  readonly maybeDispatchCommand: MaybeDispatchCommand;
+  readonly normalizeText: NormalizeText;
+  readonly persistIncomingWeixinAttachments: PersistIncomingWeixinAttachments;
+  readonly queuePendingWorkspaceBootstrap: QueuePendingWorkspaceBootstrap;
+  readonly resolveDefaultTerminalUser: ResolveDefaultTerminalUser;
+  readonly resolveTimelineScreenshotOutput: ResolveTimelineScreenshotOutput;
+  readonly resolveWorkspaceRoot: ResolveWorkspaceRoot;
+  readonly runtimeAdapter: RuntimeAdapterLike;
+  readonly scheduleRuntimeEventWatchdog: ScheduleRuntimeEventWatchdog;
+  readonly streamDelivery: StreamDeliveryLike;
+  readonly timelineIntegration: TimelineIntegrationLike;
 
   constructor({
     channelAdapter,
@@ -35,7 +143,7 @@ class RuntimeTurnLifecycle {
     streamDelivery,
     timelineIntegration,
     buildCodexInboundText,
-  }: any) {
+  }: RuntimeTurnLifecycleDependencies) {
     this.channelAdapter = channelAdapter;
     this.config = config;
     this.formatErrorMessage = formatErrorMessage;
@@ -53,7 +161,7 @@ class RuntimeTurnLifecycle {
     this.buildCodexInboundText = buildCodexInboundText;
   }
 
-  async sendTimelineScreenshot({ senderId = "", args = [], outputFile = "" }: any = {}) {
+  async sendTimelineScreenshot({ senderId = "", args = [], outputFile = "" }: TimelineScreenshotRequest = {}) {
     const targetUserId = this.normalizeText(senderId) || this.resolveDefaultTerminalUser();
     if (!targetUserId) {
       throw new Error("无法确定时间轴截图要发送给哪个微信用户，先配置 CODEKSEI_ALLOWED_USER_IDS");
@@ -64,7 +172,7 @@ class RuntimeTurnLifecycle {
     }
 
     const normalizedArgs = Array.isArray(args)
-      ? args.map((value: any) => String(value ?? "")).filter(Boolean)
+      ? args.map((value) => String(value ?? "")).filter(Boolean)
       : [];
     const resolvedOutputFile = this.normalizeText(outputFile) || this.resolveTimelineScreenshotOutput(normalizedArgs);
     const finalArgs = resolvedOutputFile
@@ -86,7 +194,7 @@ class RuntimeTurnLifecycle {
     });
   }
 
-  async sendLocalFileToCurrentChat({ senderId = "", filePath = "" }: any = {}) {
+  async sendLocalFileToCurrentChat({ senderId = "", filePath = "" }: SendLocalFileRequest = {}) {
     const targetUserId = this.normalizeText(senderId) || this.resolveDefaultTerminalUser();
     if (!targetUserId) {
       throw new Error("无法确定文件要发送给哪个微信用户，先配置 CODEKSEI_ALLOWED_USER_IDS");
@@ -123,11 +231,14 @@ class RuntimeTurnLifecycle {
     });
   }
 
-  async handlePreparedMessage(normalized: any, {
-    allowCommands,
-    reportFailureToUser = true,
-    throwOnFailure = false,
-  }: any) {
+  async handlePreparedMessage(
+    normalized: NormalizedIncomingMessage,
+    {
+      allowCommands,
+      reportFailureToUser = true,
+      throwOnFailure = false,
+    }: HandlePreparedMessageOptions,
+  ): Promise<HandlePreparedMessageResult> {
     const bindingKey = this.runtimeAdapter.getSessionStore().buildBindingKey({
       workspaceId: normalized.workspaceId,
       accountId: normalized.accountId,
@@ -168,12 +279,18 @@ class RuntimeTurnLifecycle {
       }).catch(() => {});
     }
     if (throwOnFailure) {
-      throw sendResult.error || new Error(this.normalizeText(sendResult.reason) || "runtime_send_failed");
+      if ("error" in sendResult && sendResult.error) {
+        throw sendResult.error;
+      }
+      throw new Error(this.normalizeText(sendResult.reason) || "runtime_send_failed");
     }
     return sendResult;
   }
 
-  async prepareIncomingMessageForRuntime(normalized: any, workspaceRoot: any) {
+  async prepareIncomingMessageForRuntime(
+    normalized: NormalizedIncomingMessage,
+    workspaceRoot: string,
+  ): Promise<PreparedRuntimeMessage | null> {
     const attachments = Array.isArray(normalized.attachments) ? normalized.attachments : [];
     if (!attachments.length) {
       return {
@@ -182,6 +299,7 @@ class RuntimeTurnLifecycle {
         text: this.buildCodexInboundText(normalized, { saved: [], failed: [] }, this.config),
         attachments: [],
         attachmentFailures: [],
+        workspaceRoot,
       };
     }
 
@@ -197,7 +315,7 @@ class RuntimeTurnLifecycle {
     if (!persisted.saved.length && persisted.failed.length && !String(normalized.text || "").trim()) {
       await this.channelAdapter.sendText({
         userId: normalized.senderId,
-        text: `图片/附件接收失败：${persisted.failed.map((item: any) => item.reason).join("; ")}`,
+        text: `图片/附件接收失败：${persisted.failed.map((item) => item.reason).join("; ")}`,
         contextToken: normalized.contextToken,
         preserveBlock: true,
       }).catch(() => {});
@@ -208,7 +326,7 @@ class RuntimeTurnLifecycle {
     if (!codexInboundText) {
       await this.channelAdapter.sendText({
         userId: normalized.senderId,
-        text: `图片/附件接收失败：${persisted.failed.map((item: any) => item.reason).join("; ")}`,
+        text: `图片/附件接收失败：${persisted.failed.map((item) => item.reason).join("; ")}`,
         contextToken: normalized.contextToken,
         preserveBlock: true,
       }).catch(() => {});
@@ -221,16 +339,20 @@ class RuntimeTurnLifecycle {
       text: codexInboundText,
       attachments: persisted.saved,
       attachmentFailures: persisted.failed,
+      workspaceRoot,
     };
   }
 
-  async withUserTyping({
-    userId,
-    contextToken = "",
-    clearOnSuccess = true,
-  }: any, work: any) {
+  async withUserTyping<T>(
+    {
+      userId,
+      contextToken = "",
+      clearOnSuccess = true,
+    }: UserTypingOptions,
+    work: (() => Promise<T>) | null | undefined,
+  ): Promise<T> {
     const normalizedUserId = this.normalizeText(userId);
-    const runner = typeof work === "function" ? work : async () => undefined;
+    const runner = typeof work === "function" ? work : async () => undefined as T;
     if (!normalizedUserId) {
       return runner();
     }
@@ -262,7 +384,12 @@ class RuntimeTurnLifecycle {
     workspaceRoot,
     normalized,
     prepared,
-  }: any) {
+  }: {
+    bindingKey: string;
+    workspaceRoot: string;
+    normalized: NormalizedIncomingMessage;
+    prepared: PreparedRuntimeMessage;
+  }): Promise<RuntimeTurnSendResult> {
     try {
       const turn = await this.withUserTyping({
         userId: normalized.senderId,
@@ -276,7 +403,7 @@ class RuntimeTurnLifecycle {
         workspaceRoot,
         text: prepared.text,
         model: this.runtimeAdapter.getSessionStore().getCodexParamsForWorkspace(bindingKey, workspaceRoot).model,
-        accessMode: this.config.codexAccessMode,
+        accessMode: this.normalizeText(this.config.codexAccessMode),
         metadata: {
           workspaceId: prepared.workspaceId,
           accountId: prepared.accountId,
@@ -315,7 +442,3 @@ class RuntimeTurnLifecycle {
     }
   }
 }
-
-module.exports = { RuntimeTurnLifecycle };
-
-export {};

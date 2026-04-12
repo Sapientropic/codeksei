@@ -1,5 +1,5 @@
 const Module = require("node:module");
-const { resolveRuntimeRequest } = require("./runtime-paths");
+const { resolveRuntimeRequest } = require("./runtime-paths.ts");
 
 const originalResolveFilename = Module._resolveFilename;
 

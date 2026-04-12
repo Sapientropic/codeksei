@@ -1,69 +1,217 @@
-const { runSystemCheckinPoller } = require("../app/system-checkin-poller");
-const { resolvePreferredSenderId } = require("./default-targets");
-const { SystemMessageDispatcher } = require("./system-message-dispatcher");
-const { normalizeText } = require("./approval-command-policy");
+import type { SessionStore } from "../adapters/runtime/codex/session-store";
+import type { BackstageTaskLifecycle } from "./backstage-task-lifecycle";
+import type { RuntimeTurnLifecycle } from "./runtime-turn-lifecycle";
+import type { RuntimeWatchdogLifecycle } from "./runtime-watchdog-lifecycle";
+import type {
+  DeliveryFailurePayload,
+  HandlePreparedMessageOptions,
+  NormalizedIncomingMessage,
+  PendingApprovalState,
+  PreparedRuntimeMessage,
+  ReplyTarget,
+  RuntimeTurnSendState,
+  RuntimeTurnSendResult,
+  SendLocalFileRequest,
+  SystemDispatchResult,
+  TimelineScreenshotRequest,
+  UnknownRecord,
+} from "./runtime-types";
+import type { RuntimeEvent } from "../contracts/runtime-events";
+import type { SystemMessage } from "../contracts/queue-items";
+import * as systemCheckinPollerModule from "../app/system-checkin-poller";
+import * as defaultTargetsModule from "./default-targets";
+import * as systemMessageDispatcherModule from "./system-message-dispatcher";
+import * as approvalCommandPolicyModule from "./approval-command-policy";
+import * as appPollLoopModule from "./app-poll-loop";
+import * as appRuntimeFactoryModule from "./app-runtime-factory";
+import * as appRuntimeHelpersModule from "./app-runtime-helpers";
+import * as sharedBridgeHeartbeatModule from "./shared-bridge-heartbeat";
+import * as replyDeliveryFailureModule from "./reply-delivery-failure";
+
+const { runSystemCheckinPoller } = systemCheckinPollerModule as {
+  runSystemCheckinPoller: (config: AppConfig) => Promise<unknown>;
+};
+const { resolvePreferredSenderId } = defaultTargetsModule as {
+  resolvePreferredSenderId: (args: {
+    config: AppConfig;
+    accountId: string;
+    sessionStore: SessionStoreLike;
+  }) => string;
+};
+const { SystemMessageDispatcher } = systemMessageDispatcherModule as {
+  SystemMessageDispatcher: new (args: {
+    queueStore: SystemMessageQueueLike;
+    config: AppConfig;
+    accountId: string;
+  }) => SystemMessageDispatcherLike;
+};
+const { normalizeText } = approvalCommandPolicyModule as {
+  normalizeText: (value: unknown) => string;
+};
 const {
   formatErrorMessage,
   resolveLongPollTimeoutMs: resolveAppLongPollTimeoutMs,
   runAppPollLoop,
-} = require("./app-poll-loop");
-const { createAppServices } = require("./app-runtime-factory");
-const {
-  createShutdownController,
-} = require("./app-runtime-helpers");
-const { writeSharedBridgeHeartbeat } = require("./shared-bridge-heartbeat");
-const { handleReplyDeliveryFailure: processReplyDeliveryFailure } = require("./reply-delivery-failure");
+} = appPollLoopModule as {
+  formatErrorMessage: (error: unknown) => string;
+  resolveLongPollTimeoutMs: (args: {
+    systemMessageDispatcher: SystemMessageDispatcherLike | null;
+    activeAccountId: string;
+    timelineScreenshotQueue: TimelineScreenshotQueueLike;
+    reminderQueue: ReminderQueueLike;
+    defaultLongPollTimeoutMs: number;
+    minLongPollTimeoutMs: number;
+  }) => number;
+  runAppPollLoop: (args: Record<string, unknown>) => Promise<void>;
+};
+const { createAppServices } = appRuntimeFactoryModule as {
+  createAppServices: (args: Record<string, unknown>) => AppServices;
+};
+const { createShutdownController } = appRuntimeHelpersModule as {
+  createShutdownController: (shutdown: () => Promise<void>) => ShutdownController;
+};
+const { writeSharedBridgeHeartbeat } = sharedBridgeHeartbeatModule as {
+  writeSharedBridgeHeartbeat: (filePath: string, patch: Record<string, unknown>) => void;
+};
+const { handleReplyDeliveryFailure: processReplyDeliveryFailure } = replyDeliveryFailureModule as {
+  handleReplyDeliveryFailure: (
+    payload: DeliveryFailurePayload,
+    context: {
+      runtimeAdapter: RuntimeAdapterLike;
+      threadStateStore: ThreadStateStoreLike;
+      clearRuntimeEventWatchdog: (threadId: string) => void;
+      clearTurnSettlementWatchdog: (threadId: string, turnId: string) => void;
+      stopTypingForThread: (threadId: string) => Promise<void>;
+    },
+  ) => Promise<void>;
+};
 
 const DEFAULT_LONG_POLL_TIMEOUT_MS = 35_000;
 const MIN_LONG_POLL_TIMEOUT_MS = 2_000;
 const RETRY_DELAY_MS = 2_000;
 const BACKOFF_DELAY_MS = 30_000;
 const MAX_CONSECUTIVE_FAILURES = 3;
-class CodekseiApp {
-  activeAccountId: any;
-  backstageTaskLifecycle: any;
-  channelAdapter: any;
-  channelCommandRouter: any;
-  config: any;
-  reminderQueue: any;
-  runtimeAdapter: any;
-  runtimeEventChain: any;
-  runtimeTurnLifecycle: any;
-  runtimeWatchdogLifecycle: any;
-  streamDelivery: any;
-  systemMessageDispatcher: any;
-  systemMessageDispatcherState: Record<string, any>;
-  systemMessageQueue: any;
-  threadStateStore: any;
-  timelineIntegration: any;
-  timelineScreenshotQueue: any;
 
-  constructor(config: any) {
+interface AppConfig extends Record<string, unknown> {
+  stateDir: string;
+  workspaceRoot: string;
+  sharedBridgeHeartbeatFile?: string;
+  startWithCheckin?: boolean;
+  weixinReplyMode?: string;
+  weixinDeliveryTrace?: boolean;
+}
+
+interface ChannelAccount {
+  accountId: string;
+  baseUrl: string;
+}
+
+interface ChannelAdapterLike {
+  describe(): { id: string };
+  login(): Promise<unknown>;
+  printAccounts(): void;
+  resolveAccount(): ChannelAccount;
+  getKnownContextTokens(): Record<string, string>;
+  loadSyncBuffer(): string;
+  normalizeIncomingMessage(message: unknown): NormalizedIncomingMessage | null;
+}
+
+interface RuntimeState {
+  endpoint: string;
+  models: unknown[];
+}
+
+interface RuntimeAdapterLike {
+  initialize(): Promise<RuntimeState>;
+  close(): Promise<void>;
+  describe(): { id: string };
+  getSessionStore(): SessionStoreLike;
+  onEvent(listener: (event: RuntimeEvent<UnknownRecord>) => void): unknown;
+}
+
+interface SessionStoreLike {
+  getBinding(bindingKey: string): { senderId?: string } | null;
+  getActiveWorkspaceRoot(bindingKey: string): string;
+}
+
+interface TimelineIntegrationLike {
+  describe(): { id: string };
+}
+
+interface ThreadStateStoreLike {
+  snapshot(): unknown;
+  applyRuntimeEvent(event: unknown): void;
+  getThreadState(threadId: string): {
+    pendingApproval?: PendingApprovalState | null;
+  } | null;
+}
+
+interface SystemMessageQueueLike extends Record<string, unknown> {}
+
+interface TimelineScreenshotQueueLike extends Record<string, unknown> {}
+
+interface ReminderQueueLike extends Record<string, unknown> {}
+
+interface SystemMessageDispatcherLike {
+  hasPending(): boolean;
+}
+
+interface AppServices {
+  backstageTaskLifecycle: BackstageTaskLifecycle;
+  channelAdapter: ChannelAdapterLike;
+  channelCommandRouter: unknown;
+  reminderQueue: ReminderQueueLike;
+  runtimeAdapter: RuntimeAdapterLike;
+  runtimeTurnLifecycle: RuntimeTurnLifecycle;
+  runtimeWatchdogLifecycle: RuntimeWatchdogLifecycle;
+  streamDelivery: unknown;
+  systemMessageDispatcherState: { current: SystemMessageDispatcherLike | null };
+  systemMessageQueue: SystemMessageQueueLike;
+  threadStateStore: ThreadStateStoreLike;
+  timelineIntegration: TimelineIntegrationLike;
+  timelineScreenshotQueue: TimelineScreenshotQueueLike;
+}
+
+interface ShutdownController {
+  dispose(): void;
+}
+
+export class CodekseiApp {
+  activeAccountId: string;
+  backstageTaskLifecycle!: BackstageTaskLifecycle;
+  channelAdapter!: ChannelAdapterLike;
+  channelCommandRouter!: unknown;
+  readonly config: AppConfig;
+  reminderQueue!: ReminderQueueLike;
+  runtimeAdapter!: RuntimeAdapterLike;
+  runtimeEventChain: Promise<void>;
+  runtimeTurnLifecycle!: RuntimeTurnLifecycle;
+  runtimeWatchdogLifecycle!: RuntimeWatchdogLifecycle;
+  streamDelivery!: unknown;
+  systemMessageDispatcher: SystemMessageDispatcherLike | null;
+  systemMessageDispatcherState: { current: SystemMessageDispatcherLike | null };
+  systemMessageQueue!: SystemMessageQueueLike;
+  threadStateStore!: ThreadStateStoreLike;
+  timelineIntegration!: TimelineIntegrationLike;
+  timelineScreenshotQueue!: TimelineScreenshotQueueLike;
+
+  constructor(config: AppConfig) {
     this.config = config;
     this.activeAccountId = "";
-    this.channelAdapter = null;
-    this.runtimeAdapter = null;
-    this.timelineIntegration = null;
-    this.threadStateStore = null;
-    this.systemMessageQueue = null;
-    this.timelineScreenshotQueue = null;
-    this.reminderQueue = null;
     this.systemMessageDispatcher = null;
     this.systemMessageDispatcherState = { current: null };
-    this.streamDelivery = null;
-    this.runtimeWatchdogLifecycle = null;
-    this.channelCommandRouter = null;
-    this.runtimeTurnLifecycle = null;
-    this.backstageTaskLifecycle = null;
     Object.assign(this, createAppServices({
       config,
       resolveDefaultTerminalUser: () => this.resolveDefaultTerminalUser(),
-      resolveReplyTargetForBinding: (bindingKey: any) => this.resolveReplyTargetForBinding(bindingKey),
-      resolveWorkspaceRoot: (bindingKey: any) => this.resolveWorkspaceRoot(bindingKey),
-      handlePreparedMessage: (...args: any[]) => this.runtimeTurnLifecycle.handlePreparedMessage(...args),
-      sendTimelineScreenshot: (payload: any) => this.runtimeTurnLifecycle.sendTimelineScreenshot(payload),
-      handleReplyDeliveryFailure: (payload: any) => this.handleReplyDeliveryFailure(payload),
-    }));
+      resolveReplyTargetForBinding: (bindingKey: string) => this.resolveReplyTargetForBinding(bindingKey),
+      resolveWorkspaceRoot: (bindingKey: string) => this.resolveWorkspaceRoot(bindingKey),
+      handlePreparedMessage: (
+        normalized: NormalizedIncomingMessage,
+        options: HandlePreparedMessageOptions,
+      ) => this.runtimeTurnLifecycle.handlePreparedMessage(normalized, options),
+      sendTimelineScreenshot: (payload: TimelineScreenshotRequest) => this.runtimeTurnLifecycle.sendTimelineScreenshot(payload),
+      handleReplyDeliveryFailure: (payload: DeliveryFailurePayload) => this.handleReplyDeliveryFailure(payload),
+    }) as AppServices);
     this.runtimeEventChain = Promise.resolve();
     const runtimeAdapter = this.runtimeAdapter;
     const runtimeWatchdogLifecycle = this.runtimeWatchdogLifecycle;
@@ -71,20 +219,20 @@ class CodekseiApp {
     if (!runtimeAdapter || !runtimeWatchdogLifecycle || !threadStateStore) {
       throw new Error("app services failed to initialize");
     }
-    runtimeAdapter.onEvent((event: any) => {
+    runtimeAdapter.onEvent((event) => {
       runtimeWatchdogLifecycle.observeRuntimeEvent(event);
       threadStateStore.applyRuntimeEvent(event);
       this.runtimeEventChain = this.runtimeEventChain
         .catch(() => {})
         .then(() => runtimeWatchdogLifecycle.handleRuntimeEvent(event))
-        .catch((error: any) => {
+        .catch((error) => {
           const message = error instanceof Error ? error.stack || error.message : String(error);
           console.error(`[codeksei] runtime event handling failed type=${event?.type || "(unknown)"} ${message}`);
         });
     });
   }
 
-  printDoctor() {
+  printDoctor(): void {
     console.log(JSON.stringify({
       stateDir: this.config.stateDir,
       channel: this.channelAdapter.describe(),
@@ -94,15 +242,15 @@ class CodekseiApp {
     }, null, 2));
   }
 
-  async login() {
+  async login(): Promise<void> {
     await this.channelAdapter.login();
   }
 
-  printAccounts() {
+  printAccounts(): void {
     this.channelAdapter.printAccounts();
   }
 
-  updateBridgeHeartbeat(patch: any) {
+  updateBridgeHeartbeat(patch: Record<string, unknown>): void {
     const filePath = normalizeText(this.config.sharedBridgeHeartbeatFile);
     if (!filePath) {
       return;
@@ -114,7 +262,7 @@ class CodekseiApp {
     }
   }
 
-  async start() {
+  async start(): Promise<void> {
     const account = this.channelAdapter.resolveAccount();
     this.activeAccountId = account.accountId;
     this.updateBridgeHeartbeat({
@@ -155,15 +303,15 @@ class CodekseiApp {
     console.log(`[codeksei] workspaceRoot=${this.config.workspaceRoot}`);
     console.log(`[codeksei] knownContextTokens=${knownContextTokens}`);
     console.log(`[codeksei] syncBuffer=${syncBuffer ? "ready" : "empty"}`);
-    console.log(`[codeksei] weixinReplyMode=${this.config.weixinReplyMode}`);
+    console.log(`[codeksei] weixinReplyMode=${String(this.config.weixinReplyMode || "")}`);
     console.log(`[codeksei] weixinDeliveryTrace=${this.config.weixinDeliveryTrace ? "on" : "off"}`);
     console.log(`[codeksei] codexEndpoint=${runtimeState.endpoint}`);
     console.log(`[codeksei] codexModels=${runtimeState.models.length}`);
     console.log("[codeksei] 最小消息链路已启动，正在等待微信消息。");
     if (this.config.startWithCheckin) {
       console.log("[codeksei] checkin: enabled");
-      void runSystemCheckinPoller(this.config).catch((error: any) => {
-        console.error(`[codeksei] checkin poller stopped: ${error.message}`);
+      void runSystemCheckinPoller(this.config).catch((error) => {
+        console.error(`[codeksei] checkin poller stopped: ${error instanceof Error ? error.message : String(error)}`);
       });
     }
 
@@ -180,12 +328,12 @@ class CodekseiApp {
         },
         shutdown,
         channelAdapter: this.channelAdapter,
-        flushDueReminders: (currentAccount: any) => this.flushDueReminders(currentAccount),
+        flushDueReminders: (currentAccount: { accountId: string }) => this.flushDueReminders(currentAccount),
         flushPendingSystemMessages: () => this.flushPendingSystemMessages(),
-        flushPendingTimelineScreenshots: (currentAccount: any) => this.flushPendingTimelineScreenshots(currentAccount),
+        flushPendingTimelineScreenshots: (currentAccount: { accountId: string }) => this.flushPendingTimelineScreenshots(currentAccount),
         resolveLongPollTimeoutMs: () => this.resolveLongPollTimeoutMs(),
-        handleIncomingMessage: (message: any) => this.handleIncomingMessage(message),
-        updateBridgeHeartbeat: (patch: any) => this.updateBridgeHeartbeat(patch),
+        handleIncomingMessage: (message: unknown) => this.handleIncomingMessage(message),
+        updateBridgeHeartbeat: (patch: Record<string, unknown>) => this.updateBridgeHeartbeat(patch),
         retryDelayMs: RETRY_DELAY_MS,
         backoffDelayMs: BACKOFF_DELAY_MS,
         maxConsecutiveFailures: MAX_CONSECUTIVE_FAILURES,
@@ -202,15 +350,15 @@ class CodekseiApp {
     }
   }
 
-  async sendTimelineScreenshot({ senderId = "", args = [], outputFile = "" }: any = {}) {
+  async sendTimelineScreenshot({ senderId = "", args = [], outputFile = "" }: TimelineScreenshotRequest = {}) {
     return this.runtimeTurnLifecycle.sendTimelineScreenshot({ senderId, args, outputFile });
   }
 
-  async sendLocalFileToCurrentChat({ senderId = "", filePath = "" }: any = {}) {
+  async sendLocalFileToCurrentChat({ senderId = "", filePath = "" }: SendLocalFileRequest = {}) {
     return this.runtimeTurnLifecycle.sendLocalFileToCurrentChat({ senderId, filePath });
   }
 
-  async handleIncomingMessage(message: any) {
+  async handleIncomingMessage(message: unknown): Promise<void> {
     const normalized = this.channelAdapter.normalizeIncomingMessage(message);
     if (!normalized) {
       return;
@@ -219,7 +367,7 @@ class CodekseiApp {
     await this.handlePreparedMessage(normalized, { allowCommands: true });
   }
 
-  resolveDefaultTerminalUser() {
+  resolveDefaultTerminalUser(): string {
     return resolvePreferredSenderId({
       config: this.config,
       accountId: this.channelAdapter.resolveAccount().accountId,
@@ -227,11 +375,14 @@ class CodekseiApp {
     });
   }
 
-  async handlePreparedMessage(normalized: any, {
-    allowCommands,
-    reportFailureToUser = true,
-    throwOnFailure = false,
-  }: any) {
+  async handlePreparedMessage(
+    normalized: NormalizedIncomingMessage,
+    {
+      allowCommands,
+      reportFailureToUser = true,
+      throwOnFailure = false,
+    }: HandlePreparedMessageOptions,
+  ) {
     return this.runtimeTurnLifecycle.handlePreparedMessage(normalized, {
       allowCommands,
       reportFailureToUser,
@@ -239,7 +390,17 @@ class CodekseiApp {
     });
   }
 
-  scheduleRuntimeEventWatchdog({ bindingKey, workspaceRoot, normalized, threadId = "" }: any) {
+  scheduleRuntimeEventWatchdog({
+    bindingKey,
+    workspaceRoot,
+    normalized,
+    threadId = "",
+  }: {
+    bindingKey: string;
+    workspaceRoot: string;
+    normalized: PreparedRuntimeMessage;
+    threadId?: string;
+  }): void {
     this.runtimeWatchdogLifecycle.scheduleRuntimeEventWatchdog({
       bindingKey,
       workspaceRoot,
@@ -248,39 +409,47 @@ class CodekseiApp {
     });
   }
 
-  clearRuntimeEventWatchdog(threadId: any) {
+  clearRuntimeEventWatchdog(threadId: string): void {
     this.runtimeWatchdogLifecycle.clearRuntimeEventWatchdog(threadId);
   }
 
-  refreshTurnSettlementWatchdog(event: any) {
+  refreshTurnSettlementWatchdog(event: RuntimeEvent<UnknownRecord>): void {
     this.runtimeWatchdogLifecycle.refreshTurnSettlementWatchdog(event);
   }
 
-  clearTurnSettlementWatchdog(threadId: any, turnId: any) {
+  clearTurnSettlementWatchdog(threadId: string, turnId: string): void {
     this.runtimeWatchdogLifecycle.clearTurnSettlementWatchdog(threadId, turnId);
   }
 
-  queuePendingWorkspaceBootstrap({ bindingKey, workspaceRoot, threadId }: any) {
+  queuePendingWorkspaceBootstrap({
+    bindingKey,
+    workspaceRoot,
+    threadId,
+  }: {
+    bindingKey: string;
+    workspaceRoot: string;
+    threadId: string;
+  }): void {
     this.runtimeWatchdogLifecycle.queuePendingWorkspaceBootstrap({ bindingKey, workspaceRoot, threadId });
   }
 
-  confirmPendingWorkspaceBootstrap(event: any) {
+  confirmPendingWorkspaceBootstrap(event: RuntimeEvent<UnknownRecord>): void {
     this.runtimeWatchdogLifecycle.confirmPendingWorkspaceBootstrap(event);
   }
 
-  async prepareIncomingMessageForRuntime(normalized: any, workspaceRoot: any) {
+  async prepareIncomingMessageForRuntime(normalized: NormalizedIncomingMessage, workspaceRoot: string) {
     return this.runtimeTurnLifecycle.prepareIncomingMessageForRuntime(normalized, workspaceRoot);
   }
 
-  async flushPendingSystemMessages() {
+  async flushPendingSystemMessages(): Promise<void> {
     await this.backstageTaskLifecycle.flushPendingSystemMessages();
   }
 
-  async flushPendingTimelineScreenshots(account: any) {
+  async flushPendingTimelineScreenshots(account: { accountId: string }): Promise<void> {
     await this.backstageTaskLifecycle.flushPendingTimelineScreenshots(account);
   }
 
-  resolveLongPollTimeoutMs() {
+  resolveLongPollTimeoutMs(): number {
     return resolveAppLongPollTimeoutMs({
       systemMessageDispatcher: this.systemMessageDispatcher,
       activeAccountId: this.activeAccountId,
@@ -291,11 +460,11 @@ class CodekseiApp {
     });
   }
 
-  async flushDueReminders(account: any) {
+  async flushDueReminders(account: { accountId: string }): Promise<void> {
     await this.backstageTaskLifecycle.flushDueReminders(account);
   }
 
-  async dispatchSystemMessage(message: any) {
+  async dispatchSystemMessage(message: SystemMessage): Promise<SystemDispatchResult> {
     return this.backstageTaskLifecycle.dispatchSystemMessage(message);
   }
 
@@ -304,7 +473,7 @@ class CodekseiApp {
     turnId = "",
     error,
     sentText = "",
-  }: any) {
+  }: DeliveryFailurePayload): Promise<void> {
     await processReplyDeliveryFailure({
       threadId,
       turnId,
@@ -313,32 +482,39 @@ class CodekseiApp {
     }, {
       runtimeAdapter: this.runtimeAdapter,
       threadStateStore: this.threadStateStore,
-      clearRuntimeEventWatchdog: (candidateThreadId: any) => this.clearRuntimeEventWatchdog(candidateThreadId),
-      clearTurnSettlementWatchdog: (candidateThreadId: any, candidateTurnId: any) => {
+      clearRuntimeEventWatchdog: (candidateThreadId: string) => this.clearRuntimeEventWatchdog(candidateThreadId),
+      clearTurnSettlementWatchdog: (candidateThreadId: string, candidateTurnId: string) => {
         this.clearTurnSettlementWatchdog(candidateThreadId, candidateTurnId);
       },
-      stopTypingForThread: (candidateThreadId: any) => this.stopTypingForThread(candidateThreadId),
+      stopTypingForThread: (candidateThreadId: string) => this.stopTypingForThread(candidateThreadId),
     });
   }
 
-  resolveWorkspaceRoot(bindingKey: any) {
+  resolveWorkspaceRoot(bindingKey: string): string {
     const sessionStore = this.runtimeAdapter.getSessionStore();
     return sessionStore.getActiveWorkspaceRoot(bindingKey) || this.config.workspaceRoot;
   }
 
-  async handleRuntimeEvent(event: any) {
+  async handleRuntimeEvent(event: RuntimeEvent<UnknownRecord>): Promise<void> {
     await this.runtimeWatchdogLifecycle.handleRuntimeEvent(event);
   }
 
-  async stopTypingForThread(threadId: any) {
+  async stopTypingForThread(threadId: string): Promise<void> {
     await this.runtimeWatchdogLifecycle.stopTypingForThread(threadId);
   }
 
-  async withUserTyping({
-    userId,
-    contextToken = "",
-    clearOnSuccess = true,
-  }: any, work: any) {
+  async withUserTyping<T>(
+    {
+      userId,
+      contextToken = "",
+      clearOnSuccess = true,
+    }: {
+      userId: string;
+      contextToken?: string;
+      clearOnSuccess?: boolean;
+    },
+    work: () => Promise<T>,
+  ): Promise<T> {
     return this.runtimeTurnLifecycle.withUserTyping({
       userId,
       contextToken,
@@ -351,7 +527,12 @@ class CodekseiApp {
     workspaceRoot,
     normalized,
     prepared,
-  }: any) {
+  }: {
+    bindingKey: string;
+    workspaceRoot: string;
+    normalized: NormalizedIncomingMessage;
+    prepared: PreparedRuntimeMessage;
+  }): Promise<RuntimeTurnSendResult> {
     return this.runtimeTurnLifecycle.sendPreparedMessageToRuntime({
       bindingKey,
       workspaceRoot,
@@ -360,19 +541,25 @@ class CodekseiApp {
     });
   }
 
-  async sendFailureToThread(threadId: any, text: any) {
+  async sendFailureToThread(threadId: string, text: string): Promise<void> {
     await this.runtimeWatchdogLifecycle.sendFailureToThread(threadId, text);
   }
 
-  async sendApprovalPrompt({ bindingKey, approval }: any) {
+  async sendApprovalPrompt({
+    bindingKey,
+    approval,
+  }: {
+    bindingKey: string;
+    approval: PendingApprovalState;
+  }): Promise<void> {
     await this.runtimeWatchdogLifecycle.sendApprovalPrompt({ bindingKey, approval });
   }
 
-  async restoreBoundThreadSubscriptions() {
+  async restoreBoundThreadSubscriptions(): Promise<void> {
     await this.runtimeWatchdogLifecycle.restoreBoundThreadSubscriptions();
   }
 
-  resolveReplyTargetForBinding(bindingKey: any) {
+  resolveReplyTargetForBinding(bindingKey: string): ReplyTarget | null {
     const binding = this.runtimeAdapter.getSessionStore().getBinding(bindingKey) || null;
     const userId = normalizeText(binding?.senderId);
     if (!userId) {
@@ -389,7 +576,3 @@ class CodekseiApp {
     };
   }
 }
-
-module.exports = { CodekseiApp };
-
-export {};

@@ -194,6 +194,32 @@ function normalizeDeliveryDelta(delta: any, { streaming = false }: any = {}) {
   return normalized.replace(/^\n+/u, "");
 }
 
+function shouldPreserveStreamingBlock(prepared: any) {
+  const deliveredItems = Array.isArray(prepared?.deliveredItems) ? prepared.deliveredItems : [];
+  if (deliveredItems.length !== 1) {
+    return false;
+  }
+  const item = deliveredItems[0];
+  if (!item) {
+    return false;
+  }
+  // Single streaming bubbles should land in WeChat as one coherent message.
+  // Otherwise the transport layer re-splits on punctuation and turns a normal
+  // sentence like "在。你这会儿怎么样..." into multiple tiny bubbles.
+  return true;
+}
+
+function shouldScheduleStreamingIdleFlush(prepared: any) {
+  const deliveredItems = Array.isArray(prepared?.deliveredItems) ? prepared.deliveredItems : [];
+  if (!deliveredItems.length) {
+    return false;
+  }
+  // Idle flush is only for lightweight commentary. Letting unfinished final
+  // text flush on idle is what produced half-sentences like "...时间" followed
+  // by "线，不靠你自己回忆。" in separate WeChat bubbles.
+  return deliveredItems.every((item: any) => normalizeText(item?.phase) === "commentary");
+}
+
 function prepareStreamingDelivery(state: any, { completedOnly, force }: any) {
   const visibleItems = collectVisibleItems(state, { completedOnly });
   const deliveredItems = [];
@@ -243,6 +269,8 @@ function prepareStreamingDelivery(state: any, { completedOnly, force }: any) {
       deliveredItems,
       force,
     }),
+    preserveBlock: shouldPreserveStreamingBlock({ deliveredItems }),
+    idleFlushEligible: shouldScheduleStreamingIdleFlush({ deliveredItems }),
   };
 }
 
@@ -326,6 +354,8 @@ module.exports = {
   prefersSettledDelivery,
   prefersStreamingDelivery,
   prepareStreamingDelivery,
+  shouldPreserveStreamingBlock,
+  shouldScheduleStreamingIdleFlush,
 };
 
 export {};

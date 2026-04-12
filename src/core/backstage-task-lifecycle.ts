@@ -1,21 +1,134 @@
-class BackstageTaskLifecycle {
-  buildReminderSystemTrigger: any;
-  channelAdapter: any;
-  config: any;
-  formatErrorMessage: any;
-  getSystemMessageDispatcher: any;
-  getSystemMessageFailureRetryDelayMs: any;
-  handlePreparedMessage: any;
-  hasRpcId: any;
-  normalizeText: any;
-  reminderQueue: any;
-  resolveWorkspaceRoot: any;
-  runtimeAdapter: any;
-  sendTimelineScreenshot: any;
-  systemMessageBusyRetryMs: any;
-  systemMessageQueue: any;
-  threadStateStore: any;
-  timelineScreenshotQueue: any;
+import type { ReminderQueueEntry, SystemMessage } from "../contracts/queue-items";
+import type {
+  HandlePreparedMessageOptions,
+  NormalizedIncomingMessage,
+  PendingApprovalState,
+  SystemDispatchResult,
+  TimelineScreenshotRequest,
+} from "./runtime-types";
+
+interface AccountRef {
+  accountId: string;
+}
+
+interface ThreadStateSnapshot {
+  status?: string;
+  pendingApproval?: PendingApprovalState | null;
+}
+
+interface SessionStoreLike {
+  buildBindingKey(args: { workspaceId: string; accountId: string; senderId: string }): string;
+  getThreadIdForWorkspace(bindingKey: string, workspaceRoot: string): string;
+  getPendingApprovalForThread(threadId: string): PendingApprovalState | null;
+  getActiveWorkspaceRoot(bindingKey: string): string;
+}
+
+interface RuntimeAdapterLike {
+  getSessionStore(): SessionStoreLike;
+}
+
+interface ChannelAdapterLike {
+  getKnownContextTokens(): Record<string, string>;
+  sendTyping(payload: { userId: string; status: number; contextToken?: string }): Promise<unknown>;
+  sendText(payload: {
+    userId: string;
+    text: string;
+    contextToken?: string;
+    preserveBlock?: boolean;
+  }): Promise<unknown>;
+}
+
+interface ReminderQueueLike {
+  listDue(nowMs: number): ReminderQueueEntry[];
+  enqueue(reminder: ReminderQueueEntry): void;
+}
+
+interface SystemMessageQueueLike {
+  enqueue(message: Record<string, unknown>): void;
+}
+
+interface TimelineScreenshotJob extends Record<string, unknown> {
+  id: string;
+  senderId: string;
+  outputFile: string;
+  args: string[];
+}
+
+interface TimelineScreenshotQueueLike {
+  drainForAccount(accountId: string): TimelineScreenshotJob[];
+}
+
+interface SystemMessageDispatcherLike {
+  takeReadyPending(nowMs?: number): SystemMessage[];
+  complete(message: SystemMessage): void;
+  defer(
+    message: SystemMessage,
+    options: { delayMs: number; reason: string; countAttempt: boolean },
+  ): { status: string } | null;
+  deadLetter(message: SystemMessage, options: { reason: string }): void;
+  buildPreparedMessage(message: SystemMessage, contextToken?: string): NormalizedIncomingMessage | null;
+}
+
+interface ThreadStateStoreLike {
+  getThreadState(threadId: string): ThreadStateSnapshot | null;
+}
+
+type FormatErrorMessage = (error: unknown) => string;
+type GetSystemMessageDispatcher = () => SystemMessageDispatcherLike | null;
+type GetSystemMessageFailureRetryDelayMs = (attemptCount: number) => number;
+type HandlePreparedMessage = (
+  normalized: NormalizedIncomingMessage,
+  options: HandlePreparedMessageOptions,
+) => Promise<{ status: string; reason?: string } | void>;
+type HasRpcId = (requestId: unknown) => boolean;
+type NormalizeText = (value: unknown) => string;
+type SendTimelineScreenshot = (payload: TimelineScreenshotRequest) => Promise<unknown>;
+type BuildReminderSystemTrigger = (reminder: ReminderQueueEntry, config: BackstageConfig) => string;
+type ResolveWorkspaceRoot = (bindingKey: string) => string;
+
+interface BackstageConfig extends Record<string, unknown> {
+  workspaceId: string;
+  workspaceRoot: string;
+}
+
+interface BackstageTaskLifecycleDependencies {
+  channelAdapter: ChannelAdapterLike;
+  config: BackstageConfig;
+  formatErrorMessage: FormatErrorMessage;
+  getSystemMessageDispatcher: GetSystemMessageDispatcher;
+  getSystemMessageFailureRetryDelayMs: GetSystemMessageFailureRetryDelayMs;
+  handlePreparedMessage: HandlePreparedMessage;
+  hasRpcId: HasRpcId;
+  normalizeText: NormalizeText;
+  reminderQueue: ReminderQueueLike;
+  runtimeAdapter: RuntimeAdapterLike;
+  sendTimelineScreenshot: SendTimelineScreenshot;
+  systemMessageBusyRetryMs: number;
+  systemMessageQueue: SystemMessageQueueLike;
+  threadStateStore: ThreadStateStoreLike;
+  timelineScreenshotQueue: TimelineScreenshotQueueLike;
+  buildReminderSystemTrigger: BuildReminderSystemTrigger;
+  resolveWorkspaceRoot: ResolveWorkspaceRoot;
+}
+
+export class BackstageTaskLifecycle {
+  readonly buildReminderSystemTrigger: BuildReminderSystemTrigger;
+  readonly channelAdapter: ChannelAdapterLike;
+  readonly config: BackstageConfig;
+  readonly formatErrorMessage: FormatErrorMessage;
+  readonly getSystemMessageDispatcher: GetSystemMessageDispatcher;
+  readonly getSystemMessageFailureRetryDelayMs: GetSystemMessageFailureRetryDelayMs;
+  readonly handlePreparedMessage: HandlePreparedMessage;
+  readonly hasRpcId: HasRpcId;
+  readonly normalizeText: NormalizeText;
+  readonly reminderQueue: ReminderQueueLike;
+  readonly resolveWorkspaceRoot: ResolveWorkspaceRoot;
+  readonly runtimeAdapter: RuntimeAdapterLike;
+  readonly sendTimelineScreenshot: SendTimelineScreenshot;
+  readonly systemMessageBusyRetryMs: number;
+  readonly systemMessageQueue: SystemMessageQueueLike;
+  readonly threadStateStore: ThreadStateStoreLike;
+  readonly timelineScreenshotQueue: TimelineScreenshotQueueLike;
 
   constructor({
     channelAdapter,
@@ -35,7 +148,7 @@ class BackstageTaskLifecycle {
     timelineScreenshotQueue,
     buildReminderSystemTrigger,
     resolveWorkspaceRoot,
-  }: any) {
+  }: BackstageTaskLifecycleDependencies) {
     this.channelAdapter = channelAdapter;
     this.config = config;
     this.formatErrorMessage = formatErrorMessage;
@@ -55,11 +168,11 @@ class BackstageTaskLifecycle {
     this.resolveWorkspaceRoot = resolveWorkspaceRoot;
   }
 
-  async flushPendingSystemMessages() {
+  async flushPendingSystemMessages(): Promise<void> {
     const dispatcher = this.getSystemMessageDispatcher();
     const pendingMessages = dispatcher?.takeReadyPending(Date.now()) || [];
     for (const message of pendingMessages) {
-      let dispatchResult = null;
+      let dispatchResult: SystemDispatchResult | null = null;
       try {
         // Backstage scheduling needs an explicit result enum so busy deferrals,
         // retryable runtime failures, and terminal dead-letters do not collapse
@@ -84,7 +197,7 @@ class BackstageTaskLifecycle {
           });
           if (deferred?.status === "dead_letter") {
             console.warn(
-              `[codeksei] backstage message dead-lettered id=${message.id} reason=${dispatchResult.reason}`
+              `[codeksei] backstage message dead-lettered id=${message.id} reason=${dispatchResult.reason}`,
             );
           }
           break;
@@ -92,7 +205,7 @@ class BackstageTaskLifecycle {
         case "dead_letter":
           dispatcher?.deadLetter(message, { reason: dispatchResult.reason });
           console.warn(
-            `[codeksei] backstage message dead-lettered id=${message.id} reason=${dispatchResult.reason || "dead_letter"}`
+            `[codeksei] backstage message dead-lettered id=${message.id} reason=${dispatchResult.reason || "dead_letter"}`,
           );
           break;
         case "retryable_error":
@@ -104,7 +217,7 @@ class BackstageTaskLifecycle {
           });
           if (deferred?.status === "dead_letter") {
             console.warn(
-              `[codeksei] backstage message dead-lettered id=${message.id} reason=${this.normalizeText(dispatchResult?.reason) || "runtime_send_failed"}`
+              `[codeksei] backstage message dead-lettered id=${message.id} reason=${this.normalizeText(dispatchResult?.reason) || "runtime_send_failed"}`,
             );
           }
           break;
@@ -113,7 +226,7 @@ class BackstageTaskLifecycle {
     }
   }
 
-  async flushPendingTimelineScreenshots(account: any) {
+  async flushPendingTimelineScreenshots(account: AccountRef): Promise<void> {
     const pendingJobs = this.timelineScreenshotQueue.drainForAccount(account.accountId);
     for (const job of pendingJobs) {
       try {
@@ -138,10 +251,10 @@ class BackstageTaskLifecycle {
     }
   }
 
-  async flushDueReminders(account: any) {
+  async flushDueReminders(account: AccountRef): Promise<void> {
     const dueReminders = this.reminderQueue
       .listDue(Date.now())
-      .filter((reminder: any) => reminder.accountId === account.accountId);
+      .filter((reminder) => reminder.accountId === account.accountId);
 
     for (const reminder of dueReminders) {
       try {
@@ -163,7 +276,7 @@ class BackstageTaskLifecycle {
     }
   }
 
-  resolveReminderWorkspaceRoot(reminder: any) {
+  resolveReminderWorkspaceRoot(reminder: ReminderQueueEntry): string {
     const bindingKey = this.runtimeAdapter.getSessionStore().buildBindingKey({
       workspaceId: this.config.workspaceId,
       accountId: reminder.accountId,
@@ -172,11 +285,11 @@ class BackstageTaskLifecycle {
     return this.runtimeAdapter.getSessionStore().getActiveWorkspaceRoot(bindingKey) || this.config.workspaceRoot;
   }
 
-  async dispatchSystemMessage(message: any) {
+  async dispatchSystemMessage(message: SystemMessage): Promise<SystemDispatchResult> {
     const dispatcher = this.getSystemMessageDispatcher();
     const prepared = dispatcher?.buildPreparedMessage(
       message,
-      this.channelAdapter.getKnownContextTokens()[message.senderId] || ""
+      this.channelAdapter.getKnownContextTokens()[message.senderId] || "",
     );
     if (!prepared) {
       return { status: "dead_letter", reason: "invalid_system_message" };
@@ -213,7 +326,3 @@ class BackstageTaskLifecycle {
     };
   }
 }
-
-module.exports = { BackstageTaskLifecycle };
-
-export {};
