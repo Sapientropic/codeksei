@@ -1,9 +1,8 @@
-// @ts-nocheck
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
-const test = require("node:test");
-const assert = require("node:assert/strict");
+const fs: typeof import("node:fs") = require("node:fs");
+const os: typeof import("node:os") = require("node:os");
+const path: typeof import("node:path") = require("node:path");
+const test: typeof import("node:test") = require("node:test");
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 
 const {
   readForeignJsonDocument,
@@ -11,7 +10,7 @@ const {
   writeForeignTextDocument,
   writeManagedTextStateFile,
   writeJsonStateFile,
-} = require("../src/state/json-state");
+}: typeof import("../src/state/json-state") = require("../src/state/json-state");
 
 test("readJsonStateFile returns a cloned fallback when the file is missing", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-json-state-"));
@@ -60,7 +59,8 @@ test("readJsonStateFile isolates schema-invalid JSON even when JSON.parse succee
       if (!value || typeof value !== "object" || Array.isArray(value)) {
         return "session store must be an object";
       }
-      if (!value.bindings || typeof value.bindings !== "object" || Array.isArray(value.bindings)) {
+      const candidate = value as { bindings?: unknown };
+      if (!candidate.bindings || typeof candidate.bindings !== "object" || Array.isArray(candidate.bindings)) {
         return "session store bindings must be an object";
       }
       return true;

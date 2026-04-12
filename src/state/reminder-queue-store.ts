@@ -1,19 +1,24 @@
-const {
+import {
   ensureParentDirectory,
   readManagedJsonStateFile,
   writeManagedJsonStateFile,
-} = require("./json-state");
-const {
+} from "./json-state";
+import {
   compareReminderQueueEntries,
   normalizeReminderQueueEntry,
   reminderQueueStateSchema,
-} = require("../contracts/queue-items");
+  type ReminderQueueEntry,
+} from "../contracts/queue-items";
+
+interface ReminderQueueState {
+  reminders: ReminderQueueEntry[];
+}
 
 class ReminderQueueStore {
-  filePath: any;
-  state: Record<string, any>;
+  filePath: string;
+  state: ReminderQueueState;
 
-  constructor({ filePath }: any) {
+  constructor({ filePath }: { filePath: string }) {
     this.filePath = filePath;
     this.state = { reminders: [] };
     this.ensureParentDirectory();
@@ -32,7 +37,9 @@ class ReminderQueueStore {
       schema: reminderQueueStateSchema,
     });
     const normalizedState = /** @type {{ reminders?: import("../contracts/queue-items").ReminderQueueEntry[] }} */ (parsed || {});
-    const reminders = Array.isArray(normalizedState.reminders) ? normalizedState.reminders.slice() : [];
+    const reminders = Array.isArray(normalizedState.reminders)
+      ? normalizedState.reminders.slice() as ReminderQueueEntry[]
+      : [];
     this.state = {
       reminders: reminders.sort(compareReminderQueueEntries),
     };
@@ -42,7 +49,7 @@ class ReminderQueueStore {
     writeManagedJsonStateFile(this.filePath, this.state);
   }
 
-  enqueue(reminder: any) {
+  enqueue(reminder: unknown): ReminderQueueEntry {
     this.load();
     const normalized = normalizeReminderQueueEntry(reminder);
     if (!normalized) {
@@ -54,10 +61,10 @@ class ReminderQueueStore {
     return normalized;
   }
 
-  listDue(nowMs: any = Date.now()) {
+  listDue(nowMs = Date.now()): ReminderQueueEntry[] {
     this.load();
-    const due = [];
-    const pending = [];
+    const due: ReminderQueueEntry[] = [];
+    const pending: ReminderQueueEntry[] = [];
 
     for (const reminder of this.state.reminders) {
       if (reminder.dueAtMs <= nowMs) {
@@ -82,6 +89,4 @@ class ReminderQueueStore {
   }
 }
 
-module.exports = { ReminderQueueStore };
-
-export {};
+export { ReminderQueueStore };

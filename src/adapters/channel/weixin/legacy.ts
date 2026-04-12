@@ -1,12 +1,12 @@
-const crypto = require("crypto");
-const { listWeixinAccounts } = require("./account-store");
-const { resolveSelectedAccount } = require("./account-store");
-const { loadPersistedContextTokens, persistContextToken } = require("./context-token-store");
-const { runLegacyLoginFlow } = require("./login-legacy");
-const { getConfig, getUpdates, sendMessage, sendTyping } = require("./api");
-const { sendWeixinMediaFile } = require("./media-send");
-const { normalizeWeixinIncomingMessage } = require("./message-utils");
-const { loadSyncBuffer, saveSyncBuffer } = require("./sync-buffer-store");
+import * as crypto from "node:crypto";
+
+import { getConfig, getUpdates, sendMessage, sendTyping } from "./api";
+import { listWeixinAccounts, resolveSelectedAccount } from "./account-store";
+import { loadPersistedContextTokens, persistContextToken } from "./context-token-store";
+import { runLegacyLoginFlow } from "./login-legacy";
+import { sendWeixinMediaFile } from "./media-send";
+import { normalizeWeixinIncomingMessage } from "./message-utils";
+import { loadSyncBuffer, saveSyncBuffer } from "./sync-buffer-store";
 import type { SendWeixinMediaFileArgs, SendWeixinMediaFileResult } from "./media-types";
 
 const LONG_POLL_TIMEOUT_MS = 35_000;
@@ -86,7 +86,7 @@ interface LegacySendFileArgs {
 }
 
 interface SendLegacyTextChunkArgs {
-  sendMessageImpl?: (args: Record<string, unknown>) => Promise<unknown>;
+  sendMessageImpl?: typeof sendMessage;
   baseUrl: string;
   token: string;
   toUserId: string;
@@ -630,10 +630,8 @@ function formatErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error || "");
 }
 
-module.exports = {
+export {
   createLegacyWeixinChannelAdapter,
   packChunksForWeixinDelivery,
   sendLegacyTextChunk,
 };
-
-export {};

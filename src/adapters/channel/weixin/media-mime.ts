@@ -1,4 +1,4 @@
-const path = require("path");
+import * as path from "node:path";
 
 const MIME_BY_EXT: Record<string, string> = {
   ".png": "image/png",
@@ -14,11 +14,9 @@ const MIME_BY_EXT: Record<string, string> = {
   ".json": "application/json",
 };
 
-function getMimeFromFilename(filePath: any) {
+function getMimeFromFilename(filePath: unknown): string {
   const ext = path.extname(String(filePath || "")).toLowerCase();
   return MIME_BY_EXT[ext] || "application/octet-stream";
 }
 
-module.exports = { getMimeFromFilename };
-
-export {};
+export { getMimeFromFilename };

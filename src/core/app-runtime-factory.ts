@@ -99,14 +99,14 @@ const {
   matchesBuiltInCommandPrefix,
   matchesCommandPrefix,
   normalizeCommandArgument,
-  normalizeText,
+  normalizeTrimmedText,
 } = approvalCommandPolicyModule as {
   buildApprovalPromptSignature: (approval: unknown) => string;
   buildApprovalPromptText: (approval: unknown) => string;
   matchesBuiltInCommandPrefix: (commandTokens: unknown) => boolean;
   matchesCommandPrefix: (commandTokens: unknown, allowlist: string[][]) => boolean;
   normalizeCommandArgument: (value: unknown) => string;
-  normalizeText: (value: unknown) => string;
+  normalizeTrimmedText: (value: unknown) => string;
 };
 
 type AppFactoryConfig = AppRuntimeConfig;
@@ -162,7 +162,7 @@ export function createAppServices({
     matchesBuiltInCommandPrefix,
     matchesCommandPrefix,
     normalizeCommandArgument,
-    normalizeText,
+    normalizeText: normalizeTrimmedText,
     resolveReplyTargetForBinding: typedResolveReplyTargetForBinding,
     runtimeAdapter,
     streamDelivery,
@@ -198,7 +198,7 @@ export function createAppServices({
     config: typedConfig,
     formatErrorMessage,
     maybeDispatchCommand: (normalized: NormalizedIncomingMessage) => channelCommandRouter.maybeDispatchCommand(normalized),
-    normalizeText,
+      normalizeText: normalizeTrimmedText,
     persistIncomingWeixinAttachments,
     queuePendingWorkspaceBootstrap: (payload: {
       bindingKey: string;
@@ -229,7 +229,7 @@ export function createAppServices({
     getSystemMessageFailureRetryDelayMs,
     handlePreparedMessage: typedHandlePreparedMessage,
     hasRpcId,
-    normalizeText,
+      normalizeText: normalizeTrimmedText,
     reminderQueue,
     runtimeAdapter,
     sendTimelineScreenshot: typedSendTimelineScreenshot,

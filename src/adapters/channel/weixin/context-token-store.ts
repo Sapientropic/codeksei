@@ -1,22 +1,23 @@
-const fs = require("fs");
-const path = require("path");
-const { normalizeAccountId } = require("./account-store");
-const {
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+import { normalizeAccountId, type WeixinAccountConfig } from "./account-store";
+import {
   isPlainObject,
   readManagedJsonStateFile,
   writeManagedJsonStateFile,
-} = require("../../../state/json-state");
+} from "../../../state/json-state";
 
-function ensureAccountsDir(config: any) {
-  fs.mkdirSync(config.accountsDir, { recursive: true });
+function ensureAccountsDir(config: WeixinAccountConfig): void {
+  fs.mkdirSync(resolveAccountsDir(config), { recursive: true });
 }
 
-function resolveContextTokenPath(config: any, accountId: any) {
+function resolveContextTokenPath(config: WeixinAccountConfig, accountId: unknown): string {
   ensureAccountsDir(config);
-  return path.join(config.accountsDir, `${normalizeAccountId(accountId)}.context-tokens.json`);
+  return path.join(resolveAccountsDir(config), `${normalizeAccountId(accountId)}.context-tokens.json`);
 }
 
-function loadPersistedContextTokens(config: any, accountId: any) {
+function loadPersistedContextTokens(config: WeixinAccountConfig, accountId: unknown): Record<string, string> {
   const filePath = resolveContextTokenPath(config, accountId);
   const parsed = readManagedJsonStateFile({
     filePath,
@@ -28,24 +29,43 @@ function loadPersistedContextTokens(config: any, accountId: any) {
     return {};
   }
   return Object.fromEntries(
-    Object.entries(/** @type {Record<string, string>} */ (parsed))
-      .filter(([userId, token]: any) => typeof userId === "string" && userId.trim() && typeof token === "string" && token.trim())
-      .map(([userId, token]: any) => [userId.trim(), token.trim()])
+    Object.entries(parsed as Record<string, string>)
+      .filter((entry): entry is [string, string] => (
+        typeof entry[0] === "string"
+        && entry[0].trim().length > 0
+        && typeof entry[1] === "string"
+        && entry[1].trim().length > 0
+      ))
+      .map(([userId, token]) => [userId.trim(), token.trim()])
   );
 }
 
-function savePersistedContextTokens(config: any, accountId: any, tokens: any) {
+function savePersistedContextTokens(
+  config: WeixinAccountConfig,
+  accountId: unknown,
+  tokens: Record<string, unknown>,
+): Record<string, string> {
   const normalizedTokens = Object.fromEntries(
     Object.entries(tokens || {})
-      .filter(([userId, token]: any) => typeof userId === "string" && userId.trim() && typeof token === "string" && token.trim())
-      .map(([userId, token]: any) => [userId.trim(), token.trim()])
+      .filter((entry): entry is [string, string] => (
+        typeof entry[0] === "string"
+        && entry[0].trim().length > 0
+        && typeof entry[1] === "string"
+        && entry[1].trim().length > 0
+      ))
+      .map(([userId, token]) => [userId.trim(), token.trim()])
   );
   const filePath = resolveContextTokenPath(config, accountId);
   writeManagedJsonStateFile(filePath, normalizedTokens, { mode: 0o600 });
   return normalizedTokens;
 }
 
-function persistContextToken(config: any, accountId: any, userId: any, token: any) {
+function persistContextToken(
+  config: WeixinAccountConfig,
+  accountId: unknown,
+  userId: unknown,
+  token: unknown,
+): Record<string, string> {
   const normalizedUserId = typeof userId === "string" ? userId.trim() : "";
   const normalizedToken = typeof token === "string" ? token.trim() : "";
   if (!normalizedUserId || !normalizedToken) {
@@ -61,7 +81,7 @@ function persistContextToken(config: any, accountId: any, userId: any, token: an
   });
 }
 
-function clearPersistedContextTokens(config: any, accountId: any) {
+function clearPersistedContextTokens(config: WeixinAccountConfig, accountId: unknown): void {
   try {
     const filePath = resolveContextTokenPath(config, accountId);
     if (fs.existsSync(filePath)) {
@@ -72,7 +92,7 @@ function clearPersistedContextTokens(config: any, accountId: any) {
   }
 }
 
-function validateContextTokenMap(value: any) {
+function validateContextTokenMap(value: unknown): true | string {
   if (!isPlainObject(value)) {
     return "context token store must be an object";
   }
@@ -84,11 +104,13 @@ function validateContextTokenMap(value: any) {
   return true;
 }
 
-module.exports = {
+function resolveAccountsDir(config: WeixinAccountConfig): string {
+  return typeof config.accountsDir === "string" ? config.accountsDir : "";
+}
+
+export {
   clearPersistedContextTokens,
   loadPersistedContextTokens,
   persistContextToken,
   resolveContextTokenPath,
 };
-
-export {};

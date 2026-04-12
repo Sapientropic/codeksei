@@ -1,12 +1,23 @@
-const fs = require("fs");
-const path = require("path");
-const { execFileSync } = require("child_process");
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { execFileSync } from "node:child_process";
 
 const WINDOWS_CMD_SUFFIX_RE = /\.(cmd|bat)$/i;
 const WINDOWS_EXE_SUFFIX_RE = /\.(exe|com)$/i;
 const WINDOWS_COMMAND_SUFFIXES = [".cmd", ".exe", ".bat", ".com"];
 
-function normalizeCommandText(value: any) {
+interface ResolveExistingWindowsCommandCandidateOptions {
+  existsSyncImpl?: (filePath: fs.PathLike) => boolean;
+}
+
+interface ResolveSpawnCommandOptions extends ResolveExistingWindowsCommandCandidateOptions {
+  platform?: NodeJS.Platform;
+  execFileSyncImpl?: typeof execFileSync;
+}
+
+interface BuildSpawnInvocationOptions extends ResolveSpawnCommandOptions {}
+
+function normalizeCommandText(value: unknown): string {
   const normalized = typeof value === "string" ? value.trim() : "";
   if (!normalized) {
     return "";
@@ -20,7 +31,10 @@ function normalizeCommandText(value: any) {
   return normalized;
 }
 
-function resolveExistingWindowsCommandCandidate(command: any, { existsSyncImpl = fs.existsSync }: any = {}) {
+function resolveExistingWindowsCommandCandidate(
+  command: unknown,
+  { existsSyncImpl = fs.existsSync }: ResolveExistingWindowsCommandCandidateOptions = {},
+): string {
   const normalized = normalizeCommandText(command);
   if (!normalized) {
     return "";
@@ -41,11 +55,11 @@ function resolveExistingWindowsCommandCandidate(command: any, { existsSyncImpl =
   return "";
 }
 
-function resolveSpawnCommand(command: any, {
+function resolveSpawnCommand(command: unknown, {
   platform = process.platform,
   execFileSyncImpl = execFileSync,
   existsSyncImpl = fs.existsSync,
-}: any = {}) {
+}: ResolveSpawnCommandOptions = {}): string {
   const normalized = normalizeCommandText(command);
   if (!normalized || platform !== "win32") {
     return normalized;
@@ -63,12 +77,12 @@ function resolveSpawnCommand(command: any, {
     });
     const candidates = output
       .split(/\r?\n/)
-      .map((line: any) => normalizeCommandText(line))
+      .map((line) => normalizeCommandText(line))
       .filter(Boolean);
     const preferred = candidates.find(isPreferredWindowsCmdShim)
-      || candidates.find((candidate: any) => WINDOWS_EXE_SUFFIX_RE.test(candidate) && !isWindowsAppsPath(candidate))
-      || candidates.find((candidate: any) => WINDOWS_CMD_SUFFIX_RE.test(candidate))
-      || candidates.find((candidate: any) => WINDOWS_EXE_SUFFIX_RE.test(candidate))
+      || candidates.find((candidate) => WINDOWS_EXE_SUFFIX_RE.test(candidate) && !isWindowsAppsPath(candidate))
+      || candidates.find((candidate) => WINDOWS_CMD_SUFFIX_RE.test(candidate))
+      || candidates.find((candidate) => WINDOWS_EXE_SUFFIX_RE.test(candidate))
       || candidates[0];
     return preferred || normalized;
   } catch {
@@ -76,16 +90,16 @@ function resolveSpawnCommand(command: any, {
   }
 }
 
-function isPreferredWindowsCmdShim(candidate: any) {
+function isPreferredWindowsCmdShim(candidate: unknown): boolean {
   const normalized = normalizeCommandText(candidate).toLowerCase();
   return WINDOWS_CMD_SUFFIX_RE.test(normalized) && normalized.includes("\\appdata\\roaming\\npm\\");
 }
 
-function isWindowsAppsPath(candidate: any) {
+function isWindowsAppsPath(candidate: unknown): boolean {
   return normalizeCommandText(candidate).toLowerCase().includes("\\windowsapps\\");
 }
 
-function quoteWindowsCmdArg(value: any) {
+function quoteWindowsCmdArg(value: unknown): string {
   const text = String(value ?? "");
   if (!text.length) {
     return "\"\"";
@@ -97,7 +111,7 @@ function quoteWindowsCmdArg(value: any) {
   return `"${escaped.replace(/(\\+)$/g, "$1$1")}"`;
 }
 
-function buildSpawnInvocation(command: any, args: any[] = [], options: any = {}) {
+function buildSpawnInvocation(command: unknown, args: string[] = [], options: BuildSpawnInvocationOptions = {}) {
   const platform = options.platform || process.platform;
   const resolvedCommand = resolveSpawnCommand(command, {
     platform,
@@ -116,7 +130,13 @@ function buildSpawnInvocation(command: any, args: any[] = [], options: any = {})
   };
 }
 
-function resolveCodexTargetTriple({ platform = process.platform, arch = process.arch }: any = {}) {
+function resolveCodexTargetTriple({
+  platform = process.platform,
+  arch = process.arch,
+}: {
+  platform?: NodeJS.Platform;
+  arch?: string;
+} = {}): string {
   if (platform !== "win32") {
     return "";
   }
@@ -129,7 +149,13 @@ function resolveCodexTargetTriple({ platform = process.platform, arch = process.
   return "";
 }
 
-function resolveCodexPlatformPackageName({ platform = process.platform, arch = process.arch }: any = {}) {
+function resolveCodexPlatformPackageName({
+  platform = process.platform,
+  arch = process.arch,
+}: {
+  platform?: NodeJS.Platform;
+  arch?: string;
+} = {}): string {
   if (platform !== "win32") {
     return "";
   }
@@ -142,12 +168,12 @@ function resolveCodexPlatformPackageName({ platform = process.platform, arch = p
   return "";
 }
 
-function resolveBundledCodexBinary(command: any, {
+function resolveBundledCodexBinary(command: unknown, {
   platform = process.platform,
   arch = process.arch,
   execFileSyncImpl = execFileSync,
   existsSyncImpl = fs.existsSync,
-}: any = {}) {
+}: ResolveSpawnCommandOptions & { arch?: string } = {}): string {
   if (platform !== "win32") {
     return "";
   }
@@ -191,12 +217,10 @@ function resolveBundledCodexBinary(command: any, {
   return existsSyncImpl(candidate) ? candidate : "";
 }
 
-module.exports = {
+export {
   buildSpawnInvocation,
   normalizeCommandText,
   quoteWindowsCmdArg,
   resolveBundledCodexBinary,
   resolveSpawnCommand,
 };
-
-export {};

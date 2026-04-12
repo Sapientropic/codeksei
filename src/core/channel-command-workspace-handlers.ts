@@ -168,6 +168,8 @@ function createWorkspaceCommandHandlers({
           accessMode: config.codexAccessMode,
         });
       } catch (error) {
+        // This notice is only a courtesy. If the chat send itself also fails,
+        // we still want the next normal message to retry reread naturally.
         await channelAdapter.sendText({
           userId: normalized.senderId,
           text: `重读失败：${error instanceof Error ? error.message : String(error || "unknown error")}`,

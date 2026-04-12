@@ -21,6 +21,8 @@ test("command surface can resolve routed terminal commands from a single manifes
   assert.equal(findTerminalCommandManifest("timeline", "screenshot")?.runner, "timeline.screenshot");
   assert.equal(findTerminalCommandManifest("review", "weekly")?.argsSchemaKey, "review");
   assert.equal(findTerminalManifestByScriptName("note:auto")?.action, "note.auto");
+  assert.equal(findTerminalCommandManifest(" NOTE ", " AUTO ")?.action, "note.auto");
+  assert.equal(findTerminalManifestByScriptName(" Note:Auto ")?.action, "note.auto");
 });
 
 test("command surface groups still expose terminal and weixin help entries", () => {

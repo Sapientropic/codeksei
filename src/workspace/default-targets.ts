@@ -1,7 +1,7 @@
 import * as contextTokenStoreModule from "../adapters/channel/weixin/context-token-store";
 import type { SessionBinding } from "../contracts/session-state";
 
-const { loadPersistedContextTokens } = contextTokenStoreModule as {
+const { loadPersistedContextTokens } = contextTokenStoreModule as unknown as {
   loadPersistedContextTokens: (config: ConfigLike, accountId: string) => Record<string, string>;
 };
 

@@ -1,21 +1,24 @@
-// @ts-check
-
-const {
+import {
   compareTimelineScreenshotJobs,
   normalizeTimelineScreenshotJob,
   timelineScreenshotQueueStateSchema,
-} = require("../contracts/queue-items");
-const {
+  type TimelineScreenshotJob,
+} from "../contracts/queue-items";
+import {
   ensureParentDirectory,
   readManagedJsonStateFile,
   writeManagedJsonStateFile,
-} = require("./json-state");
+} from "./json-state";
+
+interface TimelineScreenshotQueueState {
+  jobs: TimelineScreenshotJob[];
+}
 
 class TimelineScreenshotQueueStore {
-  filePath: any;
-  state: Record<string, any>;
+  filePath: string;
+  state: TimelineScreenshotQueueState;
 
-  constructor({ filePath }: any) {
+  constructor({ filePath }: { filePath: string }) {
     this.filePath = filePath;
     this.state = { jobs: [] };
     this.ensureParentDirectory();
@@ -34,7 +37,9 @@ class TimelineScreenshotQueueStore {
       schema: timelineScreenshotQueueStateSchema,
     });
     const normalizedState = /** @type {{ jobs?: import("../contracts/queue-items").TimelineScreenshotJob[] }} */ (parsed || {});
-    const jobs = Array.isArray(normalizedState.jobs) ? normalizedState.jobs.slice() : [];
+    const jobs = Array.isArray(normalizedState.jobs)
+      ? normalizedState.jobs.slice() as TimelineScreenshotJob[]
+      : [];
     this.state = {
       jobs: jobs.sort(compareTimelineScreenshotJobs),
     };
@@ -44,7 +49,7 @@ class TimelineScreenshotQueueStore {
     writeManagedJsonStateFile(this.filePath, this.state);
   }
 
-  enqueue(job: any) {
+  enqueue(job: unknown): TimelineScreenshotJob {
     this.load();
     const normalized = normalizeTimelineScreenshotJob(job);
     if (!normalized) {
@@ -56,11 +61,11 @@ class TimelineScreenshotQueueStore {
     return normalized;
   }
 
-  drainForAccount(accountId: any) {
+  drainForAccount(accountId: unknown): TimelineScreenshotJob[] {
     this.load();
     const normalizedAccountId = normalizeText(accountId);
-    const drained = [];
-    const pending = [];
+    const drained: TimelineScreenshotJob[] = [];
+    const pending: TimelineScreenshotJob[] = [];
 
     for (const job of this.state.jobs) {
       if (job.accountId === normalizedAccountId) {
@@ -78,17 +83,15 @@ class TimelineScreenshotQueueStore {
     return drained;
   }
 
-  hasPendingForAccount(accountId: any) {
+  hasPendingForAccount(accountId: unknown): boolean {
     this.load();
     const normalizedAccountId = normalizeText(accountId);
-    return this.state.jobs.some((job: any) => job.accountId === normalizedAccountId);
+    return this.state.jobs.some((job) => job.accountId === normalizedAccountId);
   }
 }
 
-function normalizeText(value: any) {
+function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-module.exports = { TimelineScreenshotQueueStore };
-
-export {};
+export { TimelineScreenshotQueueStore };

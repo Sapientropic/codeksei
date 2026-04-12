@@ -1,8 +1,8 @@
 import * as approvalCommandPolicyModule from "./approval-command-policy";
 import type { ChannelAccount, ChannelAdapterLike } from "./app-service-contract";
 
-const { normalizeText } = approvalCommandPolicyModule as {
-  normalizeText: (value: unknown) => string;
+const { normalizeTrimmedText } = approvalCommandPolicyModule as {
+  normalizeTrimmedText: (value: unknown) => string;
 };
 
 interface LongPollSystemMessageDispatcher {
@@ -176,7 +176,7 @@ function assertWeixinUpdateResponse(response: WeixinUpdateResponse): asserts res
   const errcode = normalizeErrorCode(response?.errcode);
   if ((ret !== 0 && ret !== null) || (errcode !== 0 && errcode !== null)) {
     const error = new Error(
-      `weixin getUpdates ret=${ret ?? ""} errcode=${errcode ?? ""} errmsg=${normalizeText(response?.errmsg) || ""}`
+      `weixin getUpdates ret=${ret ?? ""} errcode=${errcode ?? ""} errmsg=${normalizeTrimmedText(response?.errmsg) || ""}`
     ) as Error & { ret?: number | null; errcode?: number | null };
     error.ret = ret;
     error.errcode = errcode;

@@ -591,28 +591,28 @@ const TERMINAL_COMMAND_MANIFEST_BY_KEY = new Map(
 const TERMINAL_COMMAND_MANIFEST_BY_SCRIPT_NAME = new Map(
   TERMINAL_COMMAND_MANIFEST
     .filter((entry: any) => entry.scriptName)
-    .map((entry: any) => [normalizeText(entry.scriptName), entry])
+    .map((entry: any) => [normalizeCommandLookupKey(entry.scriptName), entry])
 );
 
 function defineAction(entry: any) {
   const normalized = {
-    action: normalizeText(entry.action),
-    groupId: normalizeText(entry.groupId),
+    action: normalizeCommandLookupKey(entry.action),
+    groupId: normalizeCommandLookupKey(entry.groupId),
     summary: String(entry.summary || "").trim(),
     terminal: normalizeStringList(entry.terminal),
     weixin: normalizeStringList(entry.weixin),
-    status: normalizeText(entry.status) || "active",
-    entrypointType: normalizeText(entry.entrypointType),
+    status: normalizeCommandLookupKey(entry.status) || "active",
+    entrypointType: normalizeCommandLookupKey(entry.entrypointType),
     scriptName: String(entry.scriptName || "").trim(),
-    command: normalizeText(entry.command),
-    subcommand: normalizeText(entry.subcommand),
+    command: normalizeCommandLookupKey(entry.command),
+    subcommand: normalizeCommandLookupKey(entry.subcommand),
     runner: String(entry.runner || "").trim(),
     argsSchemaKey: String(entry.argsSchemaKey || "").trim(),
     kind: String(entry.kind || "").trim(),
     timelineSubcommand: String(entry.timelineSubcommand || "").trim(),
     help: Object.freeze({
-      topic: normalizeText(entry.help?.topic),
-      leafKey: normalizeText(entry.help?.leafKey) || normalizeText(entry.action),
+      topic: normalizeCommandLookupKey(entry.help?.topic),
+      leafKey: normalizeCommandLookupKey(entry.help?.leafKey) || normalizeCommandLookupKey(entry.action),
     }),
     approval: Object.freeze({
       autoApprove: Boolean(entry.approval?.autoApprove),
@@ -634,7 +634,7 @@ function listCommandActions() {
 }
 
 function findCommandAction(action: any) {
-  const entry = COMMAND_ACTIONS_BY_ID.get(normalizeText(action));
+  const entry = COMMAND_ACTIONS_BY_ID.get(normalizeCommandLookupKey(action));
   return entry ? cloneAction(entry) : null;
 }
 
@@ -655,13 +655,13 @@ function listTerminalCommandManifest() {
 }
 
 function findTerminalCommandManifest(command: any, subcommand: string = "") {
-  const key = [normalizeText(command), normalizeText(subcommand)].filter(Boolean).join(" ");
+  const key = [normalizeCommandLookupKey(command), normalizeCommandLookupKey(subcommand)].filter(Boolean).join(" ");
   const entry = TERMINAL_COMMAND_MANIFEST_BY_KEY.get(key);
   return entry ? { ...entry, approval: { ...entry.approval } } : null;
 }
 
 function findTerminalManifestByScriptName(scriptName: any) {
-  const entry = TERMINAL_COMMAND_MANIFEST_BY_SCRIPT_NAME.get(normalizeText(scriptName));
+  const entry = TERMINAL_COMMAND_MANIFEST_BY_SCRIPT_NAME.get(normalizeCommandLookupKey(scriptName));
   return entry ? { ...entry, approval: { ...entry.approval } } : null;
 }
 
@@ -675,7 +675,9 @@ function cloneAction(entry: any) {
   };
 }
 
-function normalizeText(value: any) {
+function normalizeCommandLookupKey(value: any) {
+  // Only internal command/manifest identifiers should fold case here.
+  // User-visible text stays trim-only in owner-local helpers elsewhere.
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 

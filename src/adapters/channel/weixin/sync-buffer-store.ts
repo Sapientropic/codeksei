@@ -1,18 +1,23 @@
-const fs = require("fs");
-const path = require("path");
-const { normalizeAccountId } = require("./account-store");
-const { writeManagedTextStateFile } = require("../../../state/json-state");
+import * as fs from "node:fs";
+import * as path from "node:path";
 
-function ensureSyncBufferDir(config: any) {
-  fs.mkdirSync(config.syncBufferDir, { recursive: true });
+import { normalizeAccountId, type WeixinAccountConfig } from "./account-store";
+import { writeManagedTextStateFile } from "../../../state/json-state";
+
+interface SyncBufferConfig extends WeixinAccountConfig {
+  syncBufferDir?: string;
 }
 
-function resolveSyncBufferPath(config: any, accountId: any) {
+function ensureSyncBufferDir(config: SyncBufferConfig): void {
+  fs.mkdirSync(resolveSyncBufferDir(config), { recursive: true });
+}
+
+function resolveSyncBufferPath(config: SyncBufferConfig, accountId: unknown): string {
   ensureSyncBufferDir(config);
-  return path.join(config.syncBufferDir, `${normalizeAccountId(accountId)}.txt`);
+  return path.join(resolveSyncBufferDir(config), `${normalizeAccountId(accountId)}.txt`);
 }
 
-function loadSyncBuffer(config: any, accountId: any) {
+function loadSyncBuffer(config: SyncBufferConfig, accountId: unknown): string {
   try {
     const filePath = resolveSyncBufferPath(config, accountId);
     if (!fs.existsSync(filePath)) {
@@ -24,15 +29,17 @@ function loadSyncBuffer(config: any, accountId: any) {
   }
 }
 
-function saveSyncBuffer(config: any, accountId: any, buffer: any) {
+function saveSyncBuffer(config: SyncBufferConfig, accountId: unknown, buffer: unknown): void {
   const filePath = resolveSyncBufferPath(config, accountId);
   writeManagedTextStateFile(filePath, String(buffer || ""), { encoding: "utf8" });
 }
 
-module.exports = {
+function resolveSyncBufferDir(config: SyncBufferConfig): string {
+  return String(config.syncBufferDir || "");
+}
+
+export {
   loadSyncBuffer,
   resolveSyncBufferPath,
   saveSyncBuffer,
 };
-
-export {};

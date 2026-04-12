@@ -1,9 +1,84 @@
-const { getCommandArgsSchema } = require("../contracts/command-args");
-const { parseCliArgs } = require("../core/cli-args");
-const { buildTerminalLeafHelp } = require("../core/command-registry");
-const { collectProjectRadars, listTrackedProjects, loadProjectRadarConfig } = require("../core/project-radar");
+import { getCommandArgsSchema } from "../contracts/command-args";
+import { parseCliArgs } from "../core/cli-args";
+import { buildTerminalLeafHelp } from "../core/command-registry";
+import * as projectRadarModule from "../core/project-radar";
 
-async function runProjectRadarCommand(config: any, args: any[] = []) {
+interface ProjectRadarOptions {
+  help: boolean;
+  list: boolean;
+  json: boolean;
+  project: string;
+  commits: string;
+  changes: string;
+}
+
+interface TrackedProject {
+  slug: string;
+  title: string;
+  aliases: string[];
+  repoRoot: string;
+  notePath: string;
+  timelineLabel: string;
+}
+
+interface ProjectRadarConfig {
+  workspaceRoot: string;
+  configFile: string;
+}
+
+interface ProjectGitStatusEntry {
+  code: string;
+  path: string;
+}
+
+interface ProjectGitCommit {
+  shortHash: string;
+  committedAt: string;
+  subject: string;
+}
+
+interface ProjectRadarResult {
+  workspaceRoot: string;
+  configFile: string;
+  generatedAt: string;
+  projects: Array<{
+    slug: string;
+    title: string;
+    repoRoot: string;
+    notePath: string;
+    timelineLabel: string;
+    readFirst: Array<{ kind: string; path: string; exists: boolean }>;
+    git: {
+      ok: boolean;
+      message: string;
+      branch: string;
+      upstream: string;
+      ahead: number;
+      behind: number;
+      dirty: boolean;
+      summary: {
+        staged: number;
+        unstaged: number;
+        untracked: number;
+        conflicted: number;
+      };
+      statusEntries: ProjectGitStatusEntry[];
+      recentCommits: ProjectGitCommit[];
+    };
+  }>;
+}
+
+const {
+  collectProjectRadars,
+  listTrackedProjects,
+  loadProjectRadarConfig,
+} = projectRadarModule as {
+  collectProjectRadars: (config: unknown, options: ProjectRadarOptions) => ProjectRadarResult;
+  listTrackedProjects: (config: unknown) => TrackedProject[];
+  loadProjectRadarConfig: (config: unknown) => ProjectRadarConfig;
+};
+
+async function runProjectRadarCommand(config: unknown, args: string[] = []) {
   const options = parseProjectRadarArgs(args);
   if (options.help) {
     console.log(buildTerminalLeafHelp("project.radar", { config }));
@@ -33,11 +108,11 @@ async function runProjectRadarCommand(config: any, args: any[] = []) {
   console.log(renderProjectRadarsText(result));
 }
 
-function parseProjectRadarArgs(args: any) {
-  return parseCliArgs(args, getCommandArgsSchema("projectRadar"));
+function parseProjectRadarArgs(args: string[]): ProjectRadarOptions {
+  return parseCliArgs(args, getCommandArgsSchema("projectRadar")) as unknown as ProjectRadarOptions;
 }
 
-function printProjectList(radarConfig: any, trackedProjects: any) {
+function printProjectList(radarConfig: ProjectRadarConfig, trackedProjects: TrackedProject[]): void {
   const lines = [
     `workspace: ${radarConfig.workspaceRoot}`,
     `config: ${radarConfig.configFile}`,
@@ -52,7 +127,7 @@ function printProjectList(radarConfig: any, trackedProjects: any) {
   console.log(lines.join("\n"));
 }
 
-function renderProjectRadarsText(result: any) {
+function renderProjectRadarsText(result: ProjectRadarResult): string {
   const lines = [
     `workspace: ${result.workspaceRoot}`,
     `config: ${result.configFile}`,
@@ -104,6 +179,4 @@ function renderProjectRadarsText(result: any) {
   return lines.join("\n");
 }
 
-module.exports = { runProjectRadarCommand };
-
-export {};
+export { runProjectRadarCommand };

@@ -1,14 +1,83 @@
-const { getCommandArgsSchema } = require("../contracts/command-args");
-const { parseCliArgs } = require("../core/cli-args");
-const { buildTerminalLeafHelp } = require("../core/command-registry");
+import { getCommandArgsSchema } from "../contracts/command-args";
+import { parseCliArgs } from "../core/cli-args";
+import { buildTerminalLeafHelp } from "../core/command-registry";
+import * as durableNoteSchemaModule from "../notes/durable-note-schema";
+import * as noteSyncModule from "../notes/note-sync";
+
+interface NoteAutoOptions {
+  help: boolean;
+  json: boolean;
+  project: string;
+  scope: string;
+  kind: string;
+  text: string;
+  useStdin: boolean;
+}
+
+interface DurableNoteRoute {
+  family: string;
+  kind: string;
+  filePath: string;
+  section: string;
+  style: string;
+  slot: string;
+  maxItems: string;
+  sections: string[];
+}
+
+interface EnsureSectionsResult {
+  changed: boolean;
+  filePath: string;
+  createdSections: string[];
+}
+
+interface NoteSyncResult {
+  changed: boolean;
+  filePath: string;
+}
+
+interface DurableNoteInspection {
+  mode: string;
+  workspaceRoot?: string;
+  project?: {
+    kinds: string[];
+    availableProjects: string[];
+  };
+  scopes?: Record<string, { filePath: string; kinds: string[]; sections: string[] }>;
+  family?: string;
+  filePath: string;
+  kinds?: string[];
+  sections?: string[];
+  route?: {
+    kind: string;
+    section: string;
+    style: string;
+    slot: string;
+    maxItems: number;
+  };
+}
+
 const {
   ensureDurableNoteSections,
   inspectDurableNoteRouting,
   resolveDurableNoteRoute,
-} = require("../notes/durable-note-schema");
-const { syncNoteFile } = require("../notes/note-sync");
+} = durableNoteSchemaModule as {
+  ensureDurableNoteSections: (filePath: string, sections: string[]) => EnsureSectionsResult;
+  inspectDurableNoteRouting: (config: unknown, options: NoteAutoOptions) => DurableNoteInspection;
+  resolveDurableNoteRoute: (config: unknown, options: NoteAutoOptions) => DurableNoteRoute;
+};
+const { syncNoteFile } = noteSyncModule as {
+  syncNoteFile: (options: {
+    filePath: string;
+    section: string;
+    text: string;
+    style: string;
+    slot: string;
+    maxItems: string;
+  }) => NoteSyncResult;
+};
 
-async function runNoteAutoCommand(config: any, args: any[] = []) {
+async function runNoteAutoCommand(config: unknown, args: string[] = []) {
   const options = parseNoteAutoArgs(args);
   if (options.help) {
     console.log(buildTerminalLeafHelp("note.auto"));
@@ -38,7 +107,7 @@ async function runNoteAutoCommand(config: any, args: any[] = []) {
   }
 }
 
-function runNoteMaybeCommand(config: any, args: any[] = []) {
+function runNoteMaybeCommand(config: unknown, args: string[] = []) {
   const options = parseNoteAutoArgs(args);
   if (options.help) {
     console.log(buildTerminalLeafHelp("note.maybe"));
@@ -53,11 +122,11 @@ function runNoteMaybeCommand(config: any, args: any[] = []) {
   console.log(formatInspection(inspection));
 }
 
-function parseNoteAutoArgs(args: any) {
-  return parseCliArgs(args, getCommandArgsSchema("noteAuto"));
+function parseNoteAutoArgs(args: string[]): NoteAutoOptions {
+  return parseCliArgs(args, getCommandArgsSchema("noteAuto")) as unknown as NoteAutoOptions;
 }
 
-async function resolveBody(options: any) {
+async function resolveBody(options: NoteAutoOptions): Promise<string> {
   const inline = String(options.text || "").trim();
   if (inline) {
     return inline;
@@ -68,11 +137,11 @@ async function resolveBody(options: any) {
   return readStdin();
 }
 
-function readStdin() {
-  return new Promise((resolve: any, reject: any) => {
+function readStdin(): Promise<string> {
+  return new Promise((resolve, reject) => {
     let buffer = "";
     process.stdin.setEncoding("utf8");
-    process.stdin.on("data", (chunk: any) => {
+    process.stdin.on("data", (chunk: string) => {
       buffer += chunk;
     });
     process.stdin.on("end", () => resolve(buffer.trim()));
@@ -80,15 +149,15 @@ function readStdin() {
   });
 }
 
-function formatInspection(inspection: any) {
+function formatInspection(inspection: DurableNoteInspection): string {
   if (inspection.mode === "overview") {
-    const scopeEntries = Object.entries(inspection.scopes || {}) as Array<[string, any]>;
+    const scopeEntries = Object.entries(inspection.scopes || {});
     const lines = [
       "durable note 路由概览：",
       "",
-      `workspace: ${inspection.workspaceRoot}`,
-      `project kinds: ${inspection.project.kinds.join(", ") || "none"}`,
-      `tracked projects: ${inspection.project.availableProjects.join(", ") || "none"}`,
+      `workspace: ${inspection.workspaceRoot || ""}`,
+      `project kinds: ${inspection.project?.kinds.join(", ") || "none"}`,
+      `tracked projects: ${inspection.project?.availableProjects.join(", ") || "none"}`,
     ];
     for (const [scope, info] of scopeEntries) {
       lines.push("");
@@ -101,27 +170,25 @@ function formatInspection(inspection: any) {
 
   if (inspection.mode === "family") {
     return [
-      `durable note family: ${inspection.family}`,
+      `durable note family: ${inspection.family || ""}`,
       `file: ${inspection.filePath}`,
-      `kinds: ${inspection.kinds.join(", ") || "none"}`,
-      `sections: ${inspection.sections.join(" / ") || "none"}`,
+      `kinds: ${inspection.kinds?.join(", ") || "none"}`,
+      `sections: ${inspection.sections?.join(" / ") || "none"}`,
     ].join("\n");
   }
 
   return [
-    `durable note route: ${inspection.family}:${inspection.route.kind}`,
+    `durable note route: ${inspection.family || ""}:${inspection.route?.kind || ""}`,
     `file: ${inspection.filePath}`,
-    `section: ${inspection.route.section}`,
-    `style: ${inspection.route.style}`,
-    `slot: ${inspection.route.slot || "-"}`,
-    `maxItems: ${inspection.route.maxItems || 0}`,
+    `section: ${inspection.route?.section || ""}`,
+    `style: ${inspection.route?.style || ""}`,
+    `slot: ${inspection.route?.slot || "-"}`,
+    `maxItems: ${inspection.route?.maxItems || 0}`,
   ].join("\n");
 }
 
-module.exports = {
+export {
   parseNoteAutoArgs,
   runNoteAutoCommand,
   runNoteMaybeCommand,
 };
-
-export {};

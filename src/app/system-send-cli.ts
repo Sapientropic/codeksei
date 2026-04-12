@@ -1,17 +1,63 @@
-const crypto = require("crypto");
-const fs = require("fs");
-const path = require("path");
+import * as crypto from "node:crypto";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
-const { resolveSelectedAccount } = require("../adapters/channel/weixin/account-store");
-const { loadPersistedContextTokens } = require("../adapters/channel/weixin/context-token-store");
-const { SessionStore } = require("../adapters/runtime/codex/session-store");
-const { getCommandArgsSchema } = require("../contracts/command-args");
-const { parseCliArgs } = require("../core/cli-args");
-const { buildTerminalLeafHelp } = require("../core/command-registry");
-const { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } = require("../workspace/default-targets");
-const { SystemMessageQueueStore } = require("../state/system-message-queue-store");
+import * as accountStoreModule from "../adapters/channel/weixin/account-store";
+import * as contextTokenStoreModule from "../adapters/channel/weixin/context-token-store";
+import { SessionStore } from "../adapters/runtime/codex/session-store";
+import { getCommandArgsSchema } from "../contracts/command-args";
+import { parseCliArgs } from "../core/cli-args";
+import { buildTerminalLeafHelp } from "../core/command-registry";
+import * as systemMessageQueueModule from "../state/system-message-queue-store";
+import { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } from "../workspace/default-targets";
 
-async function runSystemSendCommand(config: any, args: any[] = []) {
+interface SystemSendOptions {
+  help: boolean;
+  user: string;
+  text: string;
+  workspace: string;
+}
+
+interface RuntimeConfig extends Record<string, unknown> {
+  sessionsFile: string;
+  systemMessageQueueFile: string;
+  systemMessageDeadLetterFile: string;
+}
+
+interface SelectedAccount {
+  accountId: string;
+}
+
+interface QueuedSystemMessage {
+  id: string;
+  senderId: string;
+  workspaceRoot: string;
+}
+
+const { resolveSelectedAccount } = accountStoreModule as {
+  resolveSelectedAccount: (config: unknown) => SelectedAccount;
+};
+const { loadPersistedContextTokens } = contextTokenStoreModule as {
+  loadPersistedContextTokens: (config: unknown, accountId: string) => Record<string, string>;
+};
+const { SystemMessageQueueStore } = systemMessageQueueModule as {
+  SystemMessageQueueStore: new (args: {
+    filePath: string;
+    deadLetterFilePath: string;
+  }) => {
+    enqueue(message: {
+      id: string;
+      accountId: string;
+      senderId: string;
+      workspaceRoot: string;
+      text: string;
+      kind: string;
+      createdAt: string;
+    }): QueuedSystemMessage;
+  };
+};
+
+async function runSystemSendCommand(config: RuntimeConfig, args: string[] = []) {
   const options = parseSystemSendArgs(args);
   if (options.help) {
     console.log(buildTerminalLeafHelp("system.send"));
@@ -75,14 +121,8 @@ async function runSystemSendCommand(config: any, args: any[] = []) {
   console.log(`workspace: ${queued.workspaceRoot}`);
 }
 
-function parseSystemSendArgs(args: any) {
-  return parseCliArgs(args, getCommandArgsSchema("systemSend"));
+function parseSystemSendArgs(args: string[]): SystemSendOptions {
+  return parseCliArgs(args, getCommandArgsSchema("systemSend")) as unknown as SystemSendOptions;
 }
 
-function normalizeWorkspacePath(value: any) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-module.exports = { runSystemSendCommand };
-
-export {};
+export { runSystemSendCommand };

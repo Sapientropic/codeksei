@@ -3,7 +3,7 @@ import * as accountStoreModule from "../adapters/channel/weixin/account-store";
 import { SessionStore } from "../adapters/runtime/codex/session-store";
 import { accountsDir, sessionFile } from "./shared-process";
 
-const { loadWeixinAccount } = accountStoreModule as {
+const { loadWeixinAccount } = accountStoreModule as unknown as {
   loadWeixinAccount: (config: Record<string, unknown>, accountId: string) => Record<string, unknown>;
 };
 

@@ -39,7 +39,7 @@ import * as defaultTargetsModule from "../workspace/default-targets";
 import * as systemMessageDispatcherModule from "./system-message-dispatcher";
 import * as sharedBridgeHeartbeatModule from "../shared/shared-bridge-heartbeat";
 import * as replyDeliveryFailureModule from "./reply-delivery-failure";
-import { normalizeText } from "./approval-command-policy";
+import { normalizeTrimmedText } from "./approval-command-policy";
 import {
   formatErrorMessage,
   resolveLongPollTimeoutMs as resolveAppLongPollTimeoutMs,
@@ -144,6 +144,8 @@ export class CodekseiApp {
       runtimeWatchdogLifecycle.observeRuntimeEvent(event);
       threadStateStore.applyRuntimeEvent(event);
       this.runtimeEventChain = this.runtimeEventChain
+        // Reset the serialized promise chain after a rejected event so one bad
+        // runtime callback cannot block every later event in the same session.
         .catch(() => {})
         .then(() => runtimeWatchdogLifecycle.handleRuntimeEvent(event))
         .catch((error) => {
@@ -172,7 +174,7 @@ export class CodekseiApp {
   }
 
   updateBridgeHeartbeat(patch: Record<string, unknown>): void {
-    const filePath = normalizeText(this.config.sharedBridgeHeartbeatFile);
+    const filePath = normalizeTrimmedText(this.config.sharedBridgeHeartbeatFile);
     if (!filePath) {
       return;
     }
@@ -482,7 +484,7 @@ export class CodekseiApp {
 
   resolveReplyTargetForBinding(bindingKey: string): ReplyTarget | null {
     const binding = this.runtimeAdapter.getSessionStore().getBinding(bindingKey) || null;
-    const userId = normalizeText(binding?.senderId);
+    const userId = normalizeTrimmedText(binding?.senderId);
     if (!userId) {
       return null;
     }

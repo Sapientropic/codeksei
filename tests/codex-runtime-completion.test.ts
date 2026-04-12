@@ -1,13 +1,19 @@
-// @ts-nocheck
-const test = require("node:test");
-const assert = require("node:assert/strict");
+const test: typeof import("node:test") = require("node:test");
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 
-const { __testing } = require("../src/adapters/runtime/codex");
+const { __testing }: typeof import("../src/adapters/runtime/codex") = require("../src/adapters/runtime/codex");
+type WaitForTurnCompletionClient = Parameters<typeof __testing.waitForTurnCompletion>[0];
+type RuntimeMessageListener = Parameters<WaitForTurnCompletionClient["onMessage"]>[0];
 
-function createFakeClient() {
-  let listener = null;
+interface FakeClient extends Partial<WaitForTurnCompletionClient> {
+  onMessage(nextListener: RuntimeMessageListener): () => void;
+  emit(message: Record<string, unknown>): void;
+}
+
+function createFakeClient(): FakeClient {
+  let listener: RuntimeMessageListener | null = null;
   return {
-    onMessage(nextListener) {
+    onMessage(nextListener: RuntimeMessageListener) {
       listener = nextListener;
       return () => {
         if (listener === nextListener) {
@@ -15,8 +21,8 @@ function createFakeClient() {
         }
       };
     },
-    emit(message) {
-      if (typeof listener === "function") {
+    emit(message: Record<string, unknown>) {
+      if (listener) {
         listener(message);
       }
     },
@@ -25,7 +31,7 @@ function createFakeClient() {
 
 test("runtime turn completion follows normalized runtime events instead of raw RPC branches", async () => {
   const client = createFakeClient();
-  const completion = __testing.waitForTurnCompletion(client, "thread-1");
+  const completion = __testing.waitForTurnCompletion(client as WaitForTurnCompletionClient, "thread-1");
 
   client.emit({
     method: "turn/start",
@@ -80,7 +86,7 @@ test("runtime turn completion follows normalized runtime events instead of raw R
 
 test("runtime turn completion surfaces normalized failures", async () => {
   const client = createFakeClient();
-  const completion = __testing.waitForTurnCompletion(client, "thread-1");
+  const completion = __testing.waitForTurnCompletion(client as WaitForTurnCompletionClient, "thread-1");
 
   client.emit({
     method: "turn/started",

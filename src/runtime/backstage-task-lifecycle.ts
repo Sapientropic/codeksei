@@ -188,6 +188,8 @@ export class BackstageTaskLifecycle {
       } catch (error) {
         const messageText = error instanceof Error ? error.message : String(error || "unknown error");
         console.error(`[codeksei] timeline screenshot failed job=${job.id} ${messageText}`);
+        // The job has already failed locally. Clearing typing state and sending
+        // the user-facing failure notice are best-effort cleanup steps only.
         await this.channelAdapter.sendTyping({
           userId: job.senderId,
           status: 0,

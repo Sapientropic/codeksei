@@ -15,8 +15,8 @@ const TERMINAL_BIN_EXECUTABLES = new Set([
 ]);
 
 function buildApprovalPromptText(approval: any) {
-  const reasonText = normalizeText(approval?.reason);
-  const commandText = normalizeText(approval?.command);
+  const reasonText = normalizeTrimmedText(approval?.reason);
+  const commandText = normalizeTrimmedText(approval?.command);
   const sections = ["Codex 请求授权"];
 
   if (reasonText && reasonText !== commandText) {
@@ -40,8 +40,8 @@ function buildApprovalPromptText(approval: any) {
 }
 
 function buildApprovalPromptSignature(approval: any) {
-  const reasonText = normalizeText(approval?.reason);
-  const commandText = normalizeText(approval?.command);
+  const reasonText = normalizeTrimmedText(approval?.reason);
+  const commandText = normalizeTrimmedText(approval?.command);
   const commandTokens = Array.isArray(approval?.commandTokens)
     ? approval.commandTokens.map((token: any) => normalizeCommandArgument(token)).filter(Boolean)
     : [];
@@ -208,7 +208,7 @@ function normalizeCommandArgument(value: any) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function normalizeText(value: any) {
+function normalizeTrimmedText(value: any) {
   return typeof value === "string" ? value.trim() : "";
 }
 
@@ -218,6 +218,6 @@ export {
   matchesBuiltInCommandPrefix,
   matchesCommandPrefix,
   normalizeCommandArgument,
-  normalizeText,
+  normalizeTrimmedText,
   splitCommandLine,
 };

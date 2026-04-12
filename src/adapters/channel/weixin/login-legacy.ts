@@ -1,15 +1,34 @@
-const { redactSensitiveText } = require("./redact");
-const {
+import { redactSensitiveText } from "./redact";
+import {
   ACTIVE_LOGIN_TTL_MS,
   MAX_QR_REFRESH_COUNT,
   ensureTrailingSlash,
   finishWeixinLogin,
   printQrCode,
-} = require("./login-common");
+} from "./login-common";
+import type { WeixinAccountConfig } from "./account-store";
 
 const QR_LONG_POLL_TIMEOUT_MS = 35_000;
 
-async function fetchQrCode(apiBaseUrl: any, botType: any) {
+interface LegacyQrResponse {
+  qrcode_img_content: string;
+  qrcode: string;
+}
+
+interface LegacyLoginStatusResponse extends Record<string, unknown> {
+  status?: string;
+  bot_token?: string;
+  ilink_bot_id?: string;
+  baseurl?: string;
+  ilink_user_id?: string;
+}
+
+interface LegacyLoginConfig extends WeixinAccountConfig {
+  weixinBaseUrl?: string;
+  weixinQrBotType?: string;
+}
+
+async function fetchQrCode(apiBaseUrl: string, botType: string): Promise<LegacyQrResponse> {
   const base = ensureTrailingSlash(apiBaseUrl);
   const url = new URL(`ilink/bot/get_bot_qrcode?bot_type=${encodeURIComponent(botType)}`, base);
   const response = await fetch(url.toString());
@@ -17,10 +36,10 @@ async function fetchQrCode(apiBaseUrl: any, botType: any) {
     const body = await response.text().catch(() => "(unreadable)");
     throw new Error(`二维码获取失败: ${response.status} ${response.statusText} ${redactSensitiveText(body)}`);
   }
-  return /** @type {Promise<any>} */ (response.json());
+  return response.json() as Promise<LegacyQrResponse>;
 }
 
-async function pollQrStatus(apiBaseUrl: any, qrcode: any) {
+async function pollQrStatus(apiBaseUrl: string, qrcode: string): Promise<LegacyLoginStatusResponse> {
   const base = ensureTrailingSlash(apiBaseUrl);
   const url = new URL(`ilink/bot/get_qrcode_status?qrcode=${encodeURIComponent(qrcode)}`, base);
   const controller = new AbortController();
@@ -47,7 +66,15 @@ async function pollQrStatus(apiBaseUrl: any, qrcode: any) {
   }
 }
 
-async function waitForLegacyWeixinLogin({ apiBaseUrl, botType, timeoutMs }: any) {
+async function waitForLegacyWeixinLogin({
+  apiBaseUrl,
+  botType,
+  timeoutMs,
+}: {
+  apiBaseUrl: string;
+  botType: string;
+  timeoutMs: number;
+}) {
   let qrResponse = await fetchQrCode(apiBaseUrl, botType);
   let startedAt = Date.now();
   let scannedPrinted = false;
@@ -111,16 +138,14 @@ async function waitForLegacyWeixinLogin({ apiBaseUrl, botType, timeoutMs }: any)
   throw new Error("登录超时，请重新执行 login");
 }
 
-async function runLegacyLoginFlow(config: any) {
+async function runLegacyLoginFlow(config: LegacyLoginConfig): Promise<void> {
   console.log("[codeksei] 正在启动微信扫码登录（legacy）...");
   const result = await waitForLegacyWeixinLogin({
-    apiBaseUrl: config.weixinBaseUrl,
-    botType: config.weixinQrBotType,
+    apiBaseUrl: String(config.weixinBaseUrl || ""),
+    botType: String(config.weixinQrBotType || ""),
     timeoutMs: 480_000,
   });
   finishWeixinLogin(config, result);
 }
 
-module.exports = { runLegacyLoginFlow };
-
-export {};
+export { runLegacyLoginFlow };

@@ -1,19 +1,17 @@
-// @ts-nocheck
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
-const test = require("node:test");
-const assert = require("node:assert/strict");
+const fs: typeof import("node:fs") = require("node:fs");
+const os: typeof import("node:os") = require("node:os");
+const path: typeof import("node:path") = require("node:path");
+const test: typeof import("node:test") = require("node:test");
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 
-const { ReminderQueueStore } = require("../src/state/reminder-queue-store");
+const { ReminderQueueStore }: typeof import("../src/state/reminder-queue-store") = require("../src/state/reminder-queue-store");
 
-function createStore() {
+function createStore(): { filePath: string; store: InstanceType<typeof ReminderQueueStore> } {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-reminder-queue-"));
+  const filePath = path.join(tempRoot, "reminder-queue.json");
   return {
-    filePath: path.join(tempRoot, "reminder-queue.json"),
-    store: new ReminderQueueStore({
-      filePath: path.join(tempRoot, "reminder-queue.json"),
-    }),
+    filePath,
+    store: new ReminderQueueStore({ filePath }),
   };
 }
 

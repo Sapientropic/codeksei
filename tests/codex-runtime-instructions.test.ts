@@ -1,11 +1,10 @@
-// @ts-nocheck
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
+const test: typeof import("node:test") = require("node:test");
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
+const fs: typeof import("node:fs") = require("node:fs");
+const os: typeof import("node:os") = require("node:os");
+const path: typeof import("node:path") = require("node:path");
 
-const { loadWechatInstructions } = require("../src/adapters/runtime/codex");
+const { loadWechatInstructions }: typeof import("../src/adapters/runtime/codex") = require("../src/adapters/runtime/codex");
 
 test("loadWechatInstructions appends local overlays after public defaults", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-instructions-"));

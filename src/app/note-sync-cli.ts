@@ -1,12 +1,47 @@
-const { getCommandArgsSchema } = require("../contracts/command-args");
-const { parseCliArgs } = require("../core/cli-args");
-const { buildTerminalLeafHelp } = require("../core/command-registry");
+import { getCommandArgsSchema } from "../contracts/command-args";
+import { parseCliArgs } from "../core/cli-args";
+import { buildTerminalLeafHelp } from "../core/command-registry";
+import * as noteSyncModule from "../notes/note-sync";
+
+interface NoteSyncOptions {
+  help: boolean;
+  project: string;
+  path: string;
+  section: string;
+  text: string;
+  style: string;
+  slot: string;
+  maxItems: string;
+  useStdin: boolean;
+}
+
+interface NoteSyncTarget {
+  kind: string;
+  label: string;
+  filePath: string;
+}
+
+interface NoteSyncResult {
+  changed: boolean;
+  filePath: string;
+}
+
 const {
   resolveNoteSyncTarget,
   syncNoteFile,
-} = require("../notes/note-sync");
+} = noteSyncModule as {
+  resolveNoteSyncTarget: (config: unknown, options: NoteSyncOptions) => NoteSyncTarget;
+  syncNoteFile: (options: {
+    filePath: string;
+    section: string;
+    text: string;
+    style: string;
+    slot: string;
+    maxItems: string;
+  }) => NoteSyncResult;
+};
 
-async function runNoteSyncCommand(config: any, args: any[] = []) {
+async function runNoteSyncCommand(config: unknown, args: string[] = []) {
   const options = parseNoteSyncArgs(args);
   if (options.help) {
     console.log(buildTerminalLeafHelp("note.sync"));
@@ -32,11 +67,11 @@ async function runNoteSyncCommand(config: any, args: any[] = []) {
   console.log(`note ${action}: ${result.filePath} [${options.section}]`);
 }
 
-function parseNoteSyncArgs(args: any) {
-  return parseCliArgs(args, getCommandArgsSchema("noteSync"));
+function parseNoteSyncArgs(args: string[]): NoteSyncOptions {
+  return parseCliArgs(args, getCommandArgsSchema("noteSync")) as unknown as NoteSyncOptions;
 }
 
-async function resolveBody(options: any) {
+async function resolveBody(options: NoteSyncOptions): Promise<string> {
   const inline = String(options.text || "").trim();
   if (inline) {
     return inline;
@@ -47,11 +82,11 @@ async function resolveBody(options: any) {
   return readStdin();
 }
 
-function readStdin() {
-  return new Promise((resolve: any, reject: any) => {
+function readStdin(): Promise<string> {
+  return new Promise((resolve, reject) => {
     let buffer = "";
     process.stdin.setEncoding("utf8");
-    process.stdin.on("data", (chunk: any) => {
+    process.stdin.on("data", (chunk: string) => {
       buffer += chunk;
     });
     process.stdin.on("end", () => resolve(buffer.trim()));
@@ -59,9 +94,7 @@ function readStdin() {
   });
 }
 
-module.exports = {
+export {
   parseNoteSyncArgs,
   runNoteSyncCommand,
 };
-
-export {};

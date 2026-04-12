@@ -5,8 +5,41 @@ const FILE_ITEM_TYPE = 4;
 const VIDEO_ITEM_TYPE = 5;
 const BOT_MESSAGE_TYPE = 2;
 
-function normalizeWeixinIncomingMessage(message: any, config: any, accountId: any) {
-  if (!message || typeof message !== "object") {
+type LooseRecord = Record<string, unknown>;
+
+interface WeixinIncomingConfig extends Record<string, unknown> {
+  workspaceId?: unknown;
+}
+
+interface WeixinAttachmentPayload {
+  kind: "image" | "file" | "video";
+  body: LooseRecord;
+  media: LooseRecord;
+}
+
+interface WeixinAttachmentItem {
+  kind: "image" | "file" | "video";
+  itemType: number;
+  index: number;
+  fileName: string;
+  sizeBytes: number;
+  directUrls: string[];
+  mediaRef: {
+    encryptQueryParam: string;
+    aesKey: string;
+    aesKeyHex: string;
+    encryptType: number;
+    fileKey: string;
+  };
+  rawItem: LooseRecord;
+}
+
+function normalizeWeixinIncomingMessage(
+  message: unknown,
+  config: WeixinIncomingConfig,
+  accountId: unknown,
+) {
+  if (!isRecord(message)) {
     return null;
   }
   if (Number(message.message_type) === BOT_MESSAGE_TYPE) {
@@ -39,7 +72,7 @@ function normalizeWeixinIncomingMessage(message: any, config: any, accountId: an
   };
 }
 
-function extractTextBody(itemList: any) {
+function extractTextBody(itemList: unknown): string {
   if (!Array.isArray(itemList) || !itemList.length) {
     return "";
   }
@@ -56,12 +89,12 @@ function extractTextBody(itemList: any) {
   return "";
 }
 
-function extractAttachmentItems(itemList: any) {
+function extractAttachmentItems(itemList: unknown): WeixinAttachmentItem[] {
   if (!Array.isArray(itemList) || !itemList.length) {
     return [];
   }
 
-  const attachments = [];
+  const attachments: WeixinAttachmentItem[] = [];
   for (let index = 0; index < itemList.length; index += 1) {
     const normalized = normalizeAttachmentItem(itemList[index], index);
     if (normalized) {
@@ -72,16 +105,18 @@ function extractAttachmentItems(itemList: any) {
   return attachments;
 }
 
-function normalizeAttachmentItem(item: any, index: any) {
-  const itemType = Number(item?.type);
-  const payload = resolveAttachmentPayload(itemType, item);
+function normalizeAttachmentItem(item: unknown, index: number): WeixinAttachmentItem | null {
+  const record = isRecord(item) ? item : null;
+  if (!record) {
+    return null;
+  }
+  const itemType = Number(record.type);
+  const payload = resolveAttachmentPayload(itemType, record);
   if (!payload) {
     return null;
   }
 
-  const media = payload.media && typeof payload.media === "object"
-    ? payload.media
-    : {};
+  const media = payload.media;
 
   return {
     kind: payload.kind,
@@ -90,15 +125,15 @@ function normalizeAttachmentItem(item: any, index: any) {
     fileName: normalizeText(
       payload.body?.file_name
       || payload.body?.filename
-      || item?.file_name
-      || item?.filename
+      || record.file_name
+      || record.filename
     ),
     sizeBytes: parseOptionalInt(
       payload.body?.len
       || payload.body?.file_size
       || payload.body?.size
       || payload.body?.video_size
-      || item?.len
+      || record.len
     ),
     directUrls: collectStringValues([
       payload.body?.url,
@@ -114,51 +149,54 @@ function normalizeAttachmentItem(item: any, index: any) {
         || media?.encrypted_query_param
         || payload.body?.encrypt_query_param
         || payload.body?.encrypted_query_param
-        || item?.encrypt_query_param
-        || item?.encrypted_query_param
+        || record.encrypt_query_param
+        || record.encrypted_query_param
       ),
       aesKey: normalizeText(
         media?.aes_key
         || payload.body?.aes_key
-        || item?.aes_key
+        || record.aes_key
       ),
       aesKeyHex: normalizeText(
         payload.body?.aeskey
         || payload.body?.aes_key_hex
-        || item?.aeskey
+        || record.aeskey
       ),
       encryptType: Number(
         media?.encrypt_type
         ?? payload.body?.encrypt_type
-        ?? item?.encrypt_type
+        ?? record.encrypt_type
         ?? 1
       ),
       fileKey: normalizeText(
         media?.filekey
         || payload.body?.filekey
-        || item?.filekey
+        || record.filekey
       ),
     },
-    rawItem: item,
+    rawItem: record,
   };
 }
 
-function resolveAttachmentPayload(itemType: any, item: any) {
-  if (itemType === IMAGE_ITEM_TYPE && item?.image_item && typeof item.image_item === "object") {
-    return { kind: "image", body: item.image_item, media: item.image_item.media };
+function resolveAttachmentPayload(itemType: number, item: LooseRecord): WeixinAttachmentPayload | null {
+  if (itemType === IMAGE_ITEM_TYPE && isRecord(item.image_item)) {
+    const imageItem = item.image_item as LooseRecord;
+    return { kind: "image", body: imageItem, media: isRecord(imageItem.media) ? imageItem.media : {} };
   }
-  if (itemType === FILE_ITEM_TYPE && item?.file_item && typeof item.file_item === "object") {
-    return { kind: "file", body: item.file_item, media: item.file_item.media };
+  if (itemType === FILE_ITEM_TYPE && isRecord(item.file_item)) {
+    const fileItem = item.file_item as LooseRecord;
+    return { kind: "file", body: fileItem, media: isRecord(fileItem.media) ? fileItem.media : {} };
   }
-  if (itemType === VIDEO_ITEM_TYPE && item?.video_item && typeof item.video_item === "object") {
-    return { kind: "video", body: item.video_item, media: item.video_item.media };
+  if (itemType === VIDEO_ITEM_TYPE && isRecord(item.video_item)) {
+    const videoItem = item.video_item as LooseRecord;
+    return { kind: "video", body: videoItem, media: isRecord(videoItem.media) ? videoItem.media : {} };
   }
   return null;
 }
 
-function collectStringValues(values: any) {
-  const seen = new Set();
-  const result = [];
+function collectStringValues(values: unknown[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
   for (const value of values) {
     const normalized = normalizeText(value);
     if (!normalized || seen.has(normalized)) {
@@ -170,7 +208,7 @@ function collectStringValues(values: any) {
   return result;
 }
 
-function parseOptionalInt(value: any) {
+function parseOptionalInt(value: unknown): number {
   if (value == null || value === "") {
     return 0;
   }
@@ -178,11 +216,11 @@ function parseOptionalInt(value: any) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
-function normalizeText(value: any) {
+function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function resolveReceivedAt(message: any) {
+function resolveReceivedAt(message: LooseRecord): string {
   const rawMs = Number(message?.create_time_ms);
   if (Number.isFinite(rawMs) && rawMs > 0) {
     return new Date(rawMs).toISOString();
@@ -194,8 +232,10 @@ function resolveReceivedAt(message: any) {
   return new Date().toISOString();
 }
 
-module.exports = {
+function isRecord(value: unknown): value is LooseRecord {
+  return Boolean(value) && typeof value === "object";
+}
+
+export {
   normalizeWeixinIncomingMessage,
 };
-
-export {};
