@@ -56,7 +56,7 @@ class RuntimeTurnLifecycle {
   async sendTimelineScreenshot({ senderId = "", args = [], outputFile = "" }: any = {}) {
     const targetUserId = this.normalizeText(senderId) || this.resolveDefaultTerminalUser();
     if (!targetUserId) {
-      throw new Error("无法确定时间轴截图要发送给哪个微信用户，先配置 CODEKSEI_ALLOWED_USER_IDS（或旧的 CYBERBOSS_ALLOWED_USER_IDS）");
+      throw new Error("无法确定时间轴截图要发送给哪个微信用户，先配置 CODEKSEI_ALLOWED_USER_IDS");
     }
     const contextToken = this.channelAdapter.getKnownContextTokens()[targetUserId] || "";
     if (!contextToken) {
@@ -89,7 +89,7 @@ class RuntimeTurnLifecycle {
   async sendLocalFileToCurrentChat({ senderId = "", filePath = "" }: any = {}) {
     const targetUserId = this.normalizeText(senderId) || this.resolveDefaultTerminalUser();
     if (!targetUserId) {
-      throw new Error("无法确定文件要发送给哪个微信用户，先配置 CODEKSEI_ALLOWED_USER_IDS（或旧的 CYBERBOSS_ALLOWED_USER_IDS）");
+      throw new Error("无法确定文件要发送给哪个微信用户，先配置 CODEKSEI_ALLOWED_USER_IDS");
     }
 
     const contextToken = this.channelAdapter.getKnownContextTokens()[targetUserId] || "";

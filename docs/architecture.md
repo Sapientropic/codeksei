@@ -96,7 +96,6 @@ shared mode 让照看在你换入口、换窗口、或短暂离开之后，依�
 主要状态默认在：
 
 - `~/.codeksei`
-- 兼容旧目录 `~/.cyberboss`
 
 常见持久化对象：
 
@@ -130,4 +129,4 @@ shared mode 让照看在你换入口、换窗口、或短暂离开之后，依�
 ## 8. Compatibility Boundary
 
 公开表面统一按 `Codeksei / codeksei / CODEKSEI_*` 书写。
-旧的 `cyberboss` 兼容主要收口在 `src/core/branding.ts`、shared wrapper 和旧 marker 读取，用来承接已有本地状态，而不是继续扩散成公开默认入口。
+运行时、shared wrapper、managed marker 与脚本入口都只认 `codeksei` 这一套命名，不再保留旧别名或旧状态目录 fallback。

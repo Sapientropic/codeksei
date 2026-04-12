@@ -4,8 +4,6 @@ const os = require("os");
 const path = require("path");
 const { execFileSync, spawn } = require("child_process");
 const {
-  APP_NAME,
-  PACKAGE_NAME,
   ensureStateDirectory,
   readPrefixedBoolEnv,
   readPrefixedEnv,
@@ -372,7 +370,6 @@ function startSharedBridge() {
     cwd: rootDir,
     env: {
       CODEKSEI_CODEX_ENDPOINT: listenUrl,
-      CYBERBOSS_CODEX_ENDPOINT: listenUrl,
     },
   });
   writePidFile(bridgePidFile, pid);
@@ -398,7 +395,6 @@ async function ensureSharedAppServer() {
 
   const env: Record<string, string> = {
     CODEKSEI_STATE_DIR: stateDir,
-    CYBERBOSS_STATE_DIR: stateDir,
     TIMELINE_FOR_AGENT_STATE_DIR: stateDir,
   };
   if (!process.env.TIMELINE_FOR_AGENT_CHROME_PATH) {

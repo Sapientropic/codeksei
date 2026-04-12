@@ -41,7 +41,7 @@ test("root helper scripts no longer execute deleted repo-root JS wrappers", () =
     "scripts/uninstall-background-tasks.ps1",
   ];
 
-  const legacyWrapperPattern = /bin\/(?:codeksei|cyberboss)\.js|scripts\/shared-(?:start|open|status|supervisor|watchdog)\.js/u;
+  const legacyWrapperPattern = /bin\/codeksei\.js|scripts\/shared-(?:start|open|status|supervisor|watchdog)\.js/u;
   for (const relativePath of helperFiles) {
     const source = readScript(relativePath);
     assert.doesNotMatch(source, legacyWrapperPattern, `${relativePath} should not execute deleted JS wrappers`);

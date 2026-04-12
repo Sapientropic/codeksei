@@ -9,15 +9,13 @@
 
 ## 命名
 
-对外统一用新名字；旧名字只保留最小迁移兼容。
+对外统一只用新名字。
 
 当前主入口：
 
 - 包名：`codeksei`
 - CLI：`codeksei`
 - env 前缀：`CODEKSEI_*`
-
-- 旧别名仍接受：`cyberboss`、`CYBERBOSS_*`
 
 README、帮助文本和公开示例默认都按 `codeksei` 书写。
 

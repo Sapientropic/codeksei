@@ -7,7 +7,7 @@ const path = require("path");
 const { resolveCodexWorkspaceRoot } = require("../src/core/workspace-alias");
 
 test("resolveCodexWorkspaceRoot falls back to the real workspace when alias path is stale", () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cyberboss-alias-"));
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-alias-"));
   const targetPath = path.join(tempRoot, "工程问题");
   fs.mkdirSync(targetPath);
 
@@ -29,7 +29,7 @@ test("resolveCodexWorkspaceRoot falls back to the real workspace when alias path
 });
 
 test("resolveCodexWorkspaceRoot keeps using an alias when the alias directory exists", () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cyberboss-alias-"));
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-alias-"));
   const targetPath = path.join(tempRoot, "工程问题");
   const aliasPath = path.join(tempRoot, "ws-engineering-issues");
   fs.mkdirSync(targetPath);

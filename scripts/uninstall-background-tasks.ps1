@@ -6,11 +6,7 @@ $taskNames = @(
   "Codeksei Shared Start",
   "Codeksei Shared Unlock",
   "Codeksei Shared Resume",
-  "Codeksei Shared Watchdog",
-  "Cyberboss Shared Start",
-  "Cyberboss Shared Unlock",
-  "Cyberboss Shared Resume",
-  "Cyberboss Shared Watchdog"
+  "Codeksei Shared Watchdog"
 )
 
 foreach ($taskName in $taskNames) {

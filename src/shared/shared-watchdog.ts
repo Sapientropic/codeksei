@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const {
-  ensureCompatHomeEnv,
+  ensureCodekseiHomeEnv,
   ensureStateDirectory,
 } = require("../core/branding");
 const { loadEnvStack } = require("../core/env-loader");
@@ -19,7 +19,7 @@ function loadEnv() {
 }
 
 function ensureRuntimeEnv() {
-  ensureCompatHomeEnv({ fallbackRoot: resolvePackageRoot(__dirname) });
+  ensureCodekseiHomeEnv({ fallbackRoot: resolvePackageRoot(__dirname) });
 }
 
 loadEnv();
@@ -248,7 +248,6 @@ function printSummary(state: any) {
   console.log(`readyz=${state.after?.appServer?.ready ? "ok" : "down"}`);
   console.log(`shared_app_server_pid=${state.after?.appServer?.readyPid || "missing"}`);
   console.log(`shared_codeksei_pid=${state.after?.bridge?.pid || "missing"}`);
-  console.log(`shared_cyberboss_pid=${state.after?.bridge?.pid || "missing"}`);
   console.log(`shared_bridge_heartbeat=${state.after?.bridge?.heartbeatStatus || "missing"}`);
   console.log(`shared_bridge_heartbeat_at=${state.after?.bridge?.heartbeatUpdatedAt || "missing"}`);
   if (Array.isArray(state.actions) && state.actions.length) {

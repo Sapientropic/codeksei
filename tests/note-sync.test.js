@@ -11,7 +11,7 @@ const {
 
 test("note sync prepends bullet entries and dedupes existing text", () => {
   const source = [
-    "# Cyberboss",
+    "# Codeksei",
     "",
     "## 最近动作",
     "- 老动作",
@@ -39,12 +39,12 @@ test("note sync prepends bullet entries and dedupes existing text", () => {
 
 test("note sync replaces managed slot blocks inside a section", () => {
   const source = [
-    "# Cyberboss",
+    "# Codeksei",
     "",
     "## 当前状态",
-    "<!-- cyberboss-note-sync:current-status:start -->",
+    "<!-- codeksei-note-sync:current-status:start -->",
     "旧状态",
-    "<!-- cyberboss-note-sync:current-status:end -->",
+    "<!-- codeksei-note-sync:current-status:end -->",
     "",
   ].join("\n");
 
@@ -56,7 +56,6 @@ test("note sync replaces managed slot blocks inside a section", () => {
   });
 
   assert.match(result.content, /current-status:start -->\n新状态\n<!-- codeksei-note-sync:current-status:end/u);
-  assert.doesNotMatch(result.content, /cyberboss-note-sync:current-status:end/u);
   assert.doesNotMatch(result.content, /旧状态/u);
 });
 

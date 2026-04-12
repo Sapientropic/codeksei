@@ -23,40 +23,20 @@ function withPatchedEnv(patch, fn) {
   }
 }
 
-test("readConfig prefers CODEKSEI_* over CYBERBOSS_*", () => {
+test("readConfig uses CODEKSEI_* values", () => {
   const originalArgv = process.argv;
   process.argv = ["node", "codeksei.js"];
 
   try {
     const config = withPatchedEnv({
       CODEKSEI_USER_NAME: "NewName",
-      CYBERBOSS_USER_NAME: "LegacyName",
       CODEKSEI_WORKSPACE_ROOT: "E:/new-workspace",
-      CYBERBOSS_WORKSPACE_ROOT: "E:/legacy-workspace",
       CODEKSEI_WEIXIN_REPLY_MODE: "settled",
-      CYBERBOSS_WEIXIN_REPLY_MODE: "stream",
     }, () => readConfig());
 
     assert.equal(config.userName, "NewName");
     assert.equal(config.workspaceRoot, "E:/new-workspace");
     assert.equal(config.weixinReplyMode, "settled");
-  } finally {
-    process.argv = originalArgv;
-  }
-});
-
-test("readConfig still accepts legacy CYBERBOSS_* values", () => {
-  const originalArgv = process.argv;
-  process.argv = ["node", "codeksei.js"];
-
-  try {
-    const config = withPatchedEnv({
-      CYBERBOSS_USER_NAME: "LegacyName",
-      CYBERBOSS_WORKSPACE_ROOT: "E:/legacy-workspace",
-    }, () => readConfig());
-
-    assert.equal(config.userName, "LegacyName");
-    assert.equal(config.workspaceRoot, "E:/legacy-workspace");
   } finally {
     process.argv = originalArgv;
   }
@@ -186,19 +166,14 @@ test("readConfig exposes unified timezone metadata", () => {
   }
 });
 
-test("resolveStateDir reuses legacy directory until new directory exists", () => {
+test("resolveStateDir defaults to the codeksei state directory", () => {
   const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-home-"));
-  const legacyStateDir = path.join(tempHome, ".cyberboss");
-  const newStateDir = path.join(tempHome, ".codeksei");
+  const stateDir = path.join(tempHome, ".codeksei");
   const originalHomedir = os.homedir;
 
   os.homedir = () => tempHome;
   try {
-    fs.mkdirSync(legacyStateDir, { recursive: true });
-    assert.equal(branding.resolveStateDir({ env: {} }), legacyStateDir);
-
-    fs.mkdirSync(newStateDir, { recursive: true });
-    assert.equal(branding.resolveStateDir({ env: {} }), newStateDir);
+    assert.equal(branding.resolveStateDir({ env: {} }), stateDir);
   } finally {
     os.homedir = originalHomedir;
   }

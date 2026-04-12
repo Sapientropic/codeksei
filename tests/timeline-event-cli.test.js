@@ -21,7 +21,7 @@ test("timeline:event builds a single-event write payload from friendly flags", (
     "--title", "看提交历史",
     "--category", "work",
     "--subcategory", "work.dev",
-    "--tag", "cyberboss",
+    "--tag", "codeksei",
     "--tag", "timeline",
   ]);
 
@@ -36,7 +36,7 @@ test("timeline:event builds a single-event write payload from friendly flags", (
   assert.equal(payload.events[0].endAt, "2026-04-10T10:15:00+08:00");
   assert.equal(payload.events[0].categoryId, "work");
   assert.equal(payload.events[0].subcategoryId, "work.dev");
-  assert.deepEqual(payload.events[0].tags, ["cyberboss", "timeline"]);
+  assert.deepEqual(payload.events[0].tags, ["codeksei", "timeline"]);
   assert.equal(payload.events[0].note, "为了补日记和时间线先核对最近改动。");
   assert.match(payload.events[0].id, /^evt_/);
 });

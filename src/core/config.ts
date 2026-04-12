@@ -31,7 +31,6 @@ function readConfig() {
   return {
     stateDir,
     codekseiHome: appHome,
-    cyberbossHome: appHome,
     workspaceId: readPrefixedEnv(process.env, "WORKSPACE_ID") || "default",
     workspaceRoot,
     timezone: timezoneConfig.timezone,

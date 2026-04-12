@@ -6,11 +6,11 @@ const {
   sanitizeReplyText,
 } = require("../src/core/stream-delivery/visible-text");
 
-test("visible text sanitizer suppresses silent system sentinels", () => {
+test("visible text sanitizer suppresses the SILENT sentinel", () => {
   assert.deepEqual(
     sanitizeReplyText(
       { provider: "system" },
-      "{ \"cyberboss_action\": \"silent\" }\nCB_SILENT"
+      "SILENT"
     ),
     {
       suppress: true,

@@ -1,12 +1,9 @@
 #!/bin/zsh
 set -euo pipefail
 
-PORT="${CODEKSEI_SHARED_PORT:-${CYBERBOSS_SHARED_PORT:-8765}}"
+PORT="${CODEKSEI_SHARED_PORT:-8765}"
 LISTEN_URL="ws://127.0.0.1:${PORT}"
-STATE_DIR="${CODEKSEI_STATE_DIR:-${CYBERBOSS_STATE_DIR:-$HOME/.codeksei}}"
-if [[ ! -d "${STATE_DIR}" && -d "$HOME/.cyberboss" ]]; then
-  STATE_DIR="$HOME/.cyberboss"
-fi
+STATE_DIR="${CODEKSEI_STATE_DIR:-$HOME/.codeksei}"
 LOG_DIR="${STATE_DIR}/logs"
 PID_FILE="${LOG_DIR}/shared-app-server.pid"
 LOG_FILE="${LOG_DIR}/shared-app-server.log"
@@ -18,10 +15,9 @@ function lookup_listen_pid() {
 
 mkdir -p "${LOG_DIR}"
 export CODEKSEI_STATE_DIR="${STATE_DIR}"
-export CYBERBOSS_STATE_DIR="${STATE_DIR}"
 export TIMELINE_FOR_AGENT_STATE_DIR="${STATE_DIR}"
 if [[ -z "${TIMELINE_FOR_AGENT_CHROME_PATH:-}" ]]; then
-  export TIMELINE_FOR_AGENT_CHROME_PATH="${CODEKSEI_SCREENSHOT_CHROME_PATH:-${CYBERBOSS_SCREENSHOT_CHROME_PATH:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}}"
+  export TIMELINE_FOR_AGENT_CHROME_PATH="${CODEKSEI_SCREENSHOT_CHROME_PATH:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 fi
 
 if [[ -f "${PID_FILE}" ]]; then

@@ -51,9 +51,9 @@ test("review document skeleton creates managed blocks for every generated sectio
   assert.match(content, /## Agent 判断/u);
 });
 
-test("review document sync upgrades legacy managed markers and refreshes frontmatter", () => {
+test("review document sync refreshes frontmatter and managed blocks", () => {
   const review = createReviewFixture();
-  const legacy = [
+  const existing = [
     "---",
     "created: 2026-04-11T00:00",
     "updated: 2026-04-11",
@@ -71,18 +71,17 @@ test("review document sync upgrades legacy managed markers and refreshes frontma
     "# 2026-04 月复盘",
     "",
     "## 每天收口摘录",
-    "<!-- cyberboss-review:daily-summaries:start -->",
+    "<!-- codeksei-review:daily-summaries:start -->",
     "- 旧内容",
-    "<!-- cyberboss-review:daily-summaries:end -->",
+    "<!-- codeksei-review:daily-summaries:end -->",
     "",
   ].join("\n");
 
-  const synced = syncReviewContent(legacy, review, new Date("2026-04-12T12:00:00.000Z"));
+  const synced = syncReviewContent(existing, review, new Date("2026-04-12T12:00:00.000Z"));
   assert.match(synced, /updated: 2026-04-12/u);
   assert.match(synced, /source_diary_days: 3/u);
   assert.match(synced, /source_nightly_days: 1/u);
   assert.match(synced, /codeksei-review:daily-summaries:start/u);
-  assert.doesNotMatch(synced, /cyberboss-review:daily-summaries:start/u);
 });
 
 test("review document parser ignores generated fallback bullets inside managed blocks", () => {

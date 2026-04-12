@@ -1,9 +1,6 @@
 // @ts-check
 
-const {
-  PRIMARY_REVIEW_MARKER_PREFIX,
-  LEGACY_REVIEW_MARKER_PREFIX,
-} = require("./branding");
+const { PRIMARY_REVIEW_MARKER_PREFIX } = require("./branding");
 const {
   LEGACY_TIMELINE_TIMEZONE,
   formatDateInTimezone,
@@ -11,7 +8,6 @@ const {
 } = require("./timezone");
 
 const REVIEW_MARKER_PREFIX = PRIMARY_REVIEW_MARKER_PREFIX;
-const REVIEW_MARKER_PREFIXES = [PRIMARY_REVIEW_MARKER_PREFIX, LEGACY_REVIEW_MARKER_PREFIX];
 
 function buildReviewSections(kind: any, carryLabel: any) {
   if (kind === "nightly") {
@@ -148,11 +144,9 @@ function buildManagedBlock(slot: any, body: any) {
 }
 
 function hasManagedBlock(content: any, slot: any) {
-  return REVIEW_MARKER_PREFIXES.some((prefix: any) => {
-    const markerStart = `<!-- ${prefix}:${slot}:start -->`;
-    const markerEnd = `<!-- ${prefix}:${slot}:end -->`;
-    return content.includes(markerStart) && content.includes(markerEnd);
-  });
+  const markerStart = `<!-- ${REVIEW_MARKER_PREFIX}:${slot}:start -->`;
+  const markerEnd = `<!-- ${REVIEW_MARKER_PREFIX}:${slot}:end -->`;
+  return content.includes(markerStart) && content.includes(markerEnd);
 }
 
 function readManagedBlock(content: any, slot: any) {
@@ -162,13 +156,10 @@ function readManagedBlock(content: any, slot: any) {
 }
 
 function buildManagedBlockPattern(slot: any, captureBody: boolean = false) {
-  // Keep reading both legacy and current marker prefixes so old review notes
-  // can be upgraded in place instead of silently forking a second managed block.
-  const prefixPattern = REVIEW_MARKER_PREFIXES.map(escapeRegExp).join("|");
   const normalizedSlot = escapeRegExp(slot);
   const bodyPattern = captureBody ? "([\\s\\S]*?)" : "[\\s\\S]*?";
   return new RegExp(
-    `<!--\\s*(?:${prefixPattern}):${normalizedSlot}:start\\s*-->\\n?${bodyPattern}\\n?<!--\\s*(?:${prefixPattern}):${normalizedSlot}:end\\s*-->`,
+    `<!--\\s*${escapeRegExp(REVIEW_MARKER_PREFIX)}:${normalizedSlot}:start\\s*-->\\n?${bodyPattern}\\n?<!--\\s*${escapeRegExp(REVIEW_MARKER_PREFIX)}:${normalizedSlot}:end\\s*-->`,
     "u"
   );
 }

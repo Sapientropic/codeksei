@@ -1,10 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { writeForeignTextDocument } = require("./json-state");
-const {
-  PRIMARY_NOTE_SYNC_MARKER_PREFIX,
-  LEGACY_NOTE_SYNC_MARKER_PREFIX,
-} = require("./branding");
+const { PRIMARY_NOTE_SYNC_MARKER_PREFIX } = require("./branding");
 const {
   normalizeDisplayPath,
   resolveCrossPlatformPath,
@@ -14,7 +11,6 @@ const {
 const { listTrackedProjects } = require("./project-radar");
 
 const SLOT_MARKER_PREFIX = PRIMARY_NOTE_SYNC_MARKER_PREFIX;
-const SLOT_MARKER_PREFIXES = [PRIMARY_NOTE_SYNC_MARKER_PREFIX, LEGACY_NOTE_SYNC_MARKER_PREFIX];
 
 function resolveNoteSyncTarget(config: any = {}, options: any = {}) {
   const normalizedProject = normalizeText(options.project);
@@ -159,10 +155,9 @@ function buildManagedBlock(slot: any, text: any, style: any) {
 }
 
 function buildManagedSlotPattern(slot: any) {
-  const prefixPattern = SLOT_MARKER_PREFIXES.map(escapeRegExp).join("|");
   const normalizedSlot = escapeRegExp(slot);
   return new RegExp(
-    `<!--\\s*(?:${prefixPattern}):${normalizedSlot}:start\\s*-->[\\s\\S]*?<!--\\s*(?:${prefixPattern}):${normalizedSlot}:end\\s*-->`,
+    `<!--\\s*${escapeRegExp(SLOT_MARKER_PREFIX)}:${normalizedSlot}:start\\s*-->[\\s\\S]*?<!--\\s*${escapeRegExp(SLOT_MARKER_PREFIX)}:${normalizedSlot}:end\\s*-->`,
     "u"
   );
 }
