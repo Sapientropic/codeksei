@@ -1,7 +1,13 @@
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
-const { resolveCrossPlatformPath } = require("./path-utils");
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import * as pathUtilsModule from "./path-utils";
+
+const { resolveCrossPlatformPath } = pathUtilsModule as {
+  resolveCrossPlatformPath: (value: string) => string;
+};
+
+type EnvMap = Record<string, unknown>;
 
 const PACKAGE_NAME = "codeksei";
 const PRIMARY_ENV_PREFIX = "CODEKSEI";
@@ -14,19 +20,20 @@ const PRIMARY_RPC_CLIENT_INFO = {
   title: "Codeksei Agent",
   version: "0.1.0",
 };
-function normalizeEnvValue(value: any) {
+
+function normalizeEnvValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function readNamedEnv(env: any, key: any) {
+function readNamedEnv(env: EnvMap, key: string): string {
   return normalizeEnvValue(env?.[key]);
 }
 
-function readPrefixedEnv(env: any, suffix: any) {
+function readPrefixedEnv(env: EnvMap, suffix: string): string {
   return readNamedEnv(env, `${PRIMARY_ENV_PREFIX}_${suffix}`);
 }
 
-function readNamedBoolEnv(env: any, key: any, defaultValue: boolean = false) {
+function readNamedBoolEnv(env: EnvMap, key: string, defaultValue: boolean = false): boolean {
   const raw = readNamedEnv(env, key).toLowerCase();
   if (!raw) {
     return defaultValue;
@@ -40,27 +47,27 @@ function readNamedBoolEnv(env: any, key: any, defaultValue: boolean = false) {
   return defaultValue;
 }
 
-function readPrefixedBoolEnv(env: any, suffix: any, defaultValue: boolean = false) {
+function readPrefixedBoolEnv(env: EnvMap, suffix: string, defaultValue: boolean = false): boolean {
   return readNamedBoolEnv(env, `${PRIMARY_ENV_PREFIX}_${suffix}`, defaultValue);
 }
 
-function readPrefixedListEnv(env: any, suffix: any) {
+function readPrefixedListEnv(env: EnvMap, suffix: string): string[] {
   return String(readPrefixedEnv(env, suffix) || "")
     .split(",")
-    .map((item: any) => item.trim())
+    .map((item) => item.trim())
     .filter(Boolean);
 }
 
-function readPrefixedIntEnv(env: any, suffix: any, defaultValue: number = 0) {
+function readPrefixedIntEnv(env: EnvMap, suffix: string, defaultValue: number = 0): number {
   const value = Number.parseInt(readPrefixedEnv(env, suffix), 10);
   return Number.isFinite(value) ? value : defaultValue;
 }
 
-function getPrimaryStateDir() {
+function getPrimaryStateDir(): string {
   return path.join(os.homedir(), PRIMARY_STATE_DIRNAME);
 }
 
-function resolveStateDir({ env = process.env }: any = {}) {
+function resolveStateDir({ env = process.env as EnvMap }: { env?: EnvMap } = {}): string {
   const explicit = readPrefixedEnv(env, "STATE_DIR");
   if (explicit) {
     return resolveCrossPlatformPath(explicit);
@@ -68,13 +75,19 @@ function resolveStateDir({ env = process.env }: any = {}) {
   return getPrimaryStateDir();
 }
 
-function ensureStateDirectory({ env = process.env }: any = {}) {
+function ensureStateDirectory({ env = process.env as EnvMap }: { env?: EnvMap } = {}): string {
   const stateDir = resolveStateDir({ env });
   fs.mkdirSync(stateDir, { recursive: true });
   return stateDir;
 }
 
-function listEnvFileCandidates({ cwd = process.cwd(), env = process.env }: any = {}) {
+function listEnvFileCandidates({
+  cwd = process.cwd(),
+  env = process.env as EnvMap,
+}: {
+  cwd?: string;
+  env?: EnvMap;
+} = {}): string[] {
   const stateDir = resolveStateDir({ env });
   return [
     path.join(cwd, ".env"),
@@ -82,11 +95,23 @@ function listEnvFileCandidates({ cwd = process.cwd(), env = process.env }: any =
   ];
 }
 
-function resolveAppHome({ env = process.env, fallbackRoot = "" }: any = {}) {
+function resolveAppHome({
+  env = process.env as EnvMap,
+  fallbackRoot = "",
+}: {
+  env?: EnvMap;
+  fallbackRoot?: string;
+} = {}): string {
   return readPrefixedEnv(env, "HOME") || fallbackRoot;
 }
 
-function ensureCodekseiHomeEnv({ env = process.env, fallbackRoot = "" }: any = {}) {
+function ensureCodekseiHomeEnv({
+  env = process.env as EnvMap,
+  fallbackRoot = "",
+}: {
+  env?: EnvMap;
+  fallbackRoot?: string;
+} = {}): string {
   const resolved = resolveAppHome({ env, fallbackRoot });
   if (!resolved) {
     return "";
@@ -97,7 +122,7 @@ function ensureCodekseiHomeEnv({ env = process.env, fallbackRoot = "" }: any = {
   return resolved;
 }
 
-module.exports = {
+export {
   PACKAGE_NAME,
   PRIMARY_CHANNEL_VERSION,
   PRIMARY_ENV_PREFIX,
@@ -117,5 +142,3 @@ module.exports = {
   ensureCodekseiHomeEnv,
   ensureStateDirectory,
 };
-
-export {};
