@@ -16,8 +16,8 @@ const {
 } = require("../contracts/queue-items");
 const {
   ensureParentDirectory,
-  readJsonStateFile,
-  writeJsonStateFile,
+  readManagedJsonStateFile,
+  writeManagedJsonStateFile,
 } = require("./json-state");
 
 const SYSTEM_MESSAGE_IN_FLIGHT_LEASE_MS = 60_000;
@@ -38,7 +38,7 @@ class SystemMessageQueueStore {
   }
 
   load() {
-    const parsed = readJsonStateFile({
+    const parsed = readManagedJsonStateFile({
       filePath: this.filePath,
       fallback: { messages: [] },
       label: "system message queue",
@@ -61,13 +61,13 @@ class SystemMessageQueueStore {
     const nextMessages = Array.isArray(messages)
       ? messages.map(normalizeSystemMessage).filter(Boolean).sort(compareSystemMessages)
       : [];
-    writeJsonStateFile(this.filePath, { messages: nextMessages });
+    writeManagedJsonStateFile(this.filePath, { messages: nextMessages });
     this.state = { messages: nextMessages };
     return nextMessages;
   }
 
   loadDeadLetters() {
-    const parsed = readJsonStateFile({
+    const parsed = readManagedJsonStateFile({
       filePath: this.deadLetterFilePath,
       fallback: { entries: [] },
       label: "system message dead letter",
@@ -89,7 +89,7 @@ class SystemMessageQueueStore {
         .filter(Boolean)
         .sort(compareSystemMessageDeadLetters)
       : [];
-    writeJsonStateFile(this.deadLetterFilePath, { entries: nextEntries });
+    writeManagedJsonStateFile(this.deadLetterFilePath, { entries: nextEntries });
     return { entries: nextEntries };
   }
 

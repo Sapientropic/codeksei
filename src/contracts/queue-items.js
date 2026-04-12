@@ -152,6 +152,49 @@ function validateTimelineScreenshotQueueState(state) {
   return true;
 }
 
+function normalizeReminderQueueEntry(reminder) {
+  if (!isPlainObject(reminder)) {
+    return null;
+  }
+
+  const id = normalizeText(reminder.id);
+  const accountId = normalizeText(reminder.accountId);
+  const senderId = normalizeText(reminder.senderId);
+  const contextToken = normalizeText(reminder.contextToken);
+  const text = normalizeText(reminder.text);
+  const dueAtMs = normalizePositiveInteger(reminder.dueAtMs);
+  const createdAt = normalizeIsoTime(reminder.createdAt) || new Date().toISOString();
+
+  if (!id || !accountId || !senderId || !contextToken || !text || !dueAtMs) {
+    return null;
+  }
+
+  return {
+    id,
+    accountId,
+    senderId,
+    contextToken,
+    text,
+    dueAtMs,
+    createdAt,
+  };
+}
+
+function validateReminderQueueState(state) {
+  if (!isPlainObject(state)) {
+    return "reminder queue top-level state must be an object";
+  }
+  if (!Array.isArray(state.reminders)) {
+    return "reminder queue reminders must be an array";
+  }
+  for (let index = 0; index < state.reminders.length; index += 1) {
+    if (!normalizeReminderQueueEntry(state.reminders[index])) {
+      return `reminder queue reminders[${index}] is invalid`;
+    }
+  }
+  return true;
+}
+
 function compareSystemMessages(left, right) {
   const leftReadyAt = parseIsoTime(left?.nextAttemptAt) || 0;
   const rightReadyAt = parseIsoTime(right?.nextAttemptAt) || 0;
@@ -180,6 +223,20 @@ function compareTimelineScreenshotJobs(left, right) {
   const rightTime = parseIsoTime(right?.createdAt) || 0;
   if (leftTime !== rightTime) {
     return leftTime - rightTime;
+  }
+  return String(left?.id || "").localeCompare(String(right?.id || ""));
+}
+
+function compareReminderQueueEntries(left, right) {
+  const leftDueAtMs = normalizePositiveInteger(left?.dueAtMs);
+  const rightDueAtMs = normalizePositiveInteger(right?.dueAtMs);
+  if (leftDueAtMs !== rightDueAtMs) {
+    return leftDueAtMs - rightDueAtMs;
+  }
+  const leftCreatedAt = parseIsoTime(left?.createdAt) || 0;
+  const rightCreatedAt = parseIsoTime(right?.createdAt) || 0;
+  if (leftCreatedAt !== rightCreatedAt) {
+    return leftCreatedAt - rightCreatedAt;
   }
   return String(left?.id || "").localeCompare(String(right?.id || ""));
 }
@@ -255,6 +312,11 @@ function normalizeNonNegativeInteger(value) {
   return Number.isInteger(numeric) && numeric >= 0 ? numeric : 0;
 }
 
+function normalizePositiveInteger(value) {
+  const numeric = Number.parseInt(String(value ?? ""), 10);
+  return Number.isInteger(numeric) && numeric > 0 ? numeric : 0;
+}
+
 function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -264,6 +326,7 @@ function isPlainObject(value) {
 }
 
 module.exports = {
+  compareReminderQueueEntries,
   SYSTEM_MESSAGE_KIND_POLICIES,
   clearSystemMessageInFlight,
   compareSystemMessageDeadLetters,
@@ -276,6 +339,8 @@ module.exports = {
   normalizeSystemMessageDeadLetterEntry,
   normalizeSystemMessageKind,
   normalizeTimelineScreenshotJob,
+  normalizeReminderQueueEntry,
+  validateReminderQueueState,
   validateSystemMessageDeadLetterState,
   validateSystemMessageQueueState,
   validateTimelineScreenshotQueueState,

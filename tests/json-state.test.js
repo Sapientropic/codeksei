@@ -7,6 +7,8 @@ const assert = require("node:assert/strict");
 const {
   readForeignJsonDocument,
   readJsonStateFile,
+  writeForeignTextDocument,
+  writeManagedTextStateFile,
   writeJsonStateFile,
 } = require("../src/core/json-state");
 
@@ -103,6 +105,22 @@ test("writeJsonStateFile writes the final JSON payload without leaving temp file
       nested: { value: 1 },
     }
   );
+  assert.equal(
+    fs.readdirSync(tempRoot).some((entry) => entry.endsWith(".tmp")),
+    false
+  );
+});
+
+test("managed and foreign text helpers both write atomically without leaving temp files behind", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-json-text-write-"));
+  const managedFilePath = path.join(tempRoot, "managed.txt");
+  const foreignFilePath = path.join(tempRoot, "foreign.md");
+
+  writeManagedTextStateFile(managedFilePath, "managed\n");
+  writeForeignTextDocument(foreignFilePath, "# foreign\n");
+
+  assert.equal(fs.readFileSync(managedFilePath, "utf8"), "managed\n");
+  assert.equal(fs.readFileSync(foreignFilePath, "utf8"), "# foreign\n");
   assert.equal(
     fs.readdirSync(tempRoot).some((entry) => entry.endsWith(".tmp")),
     false

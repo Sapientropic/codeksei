@@ -105,6 +105,10 @@ test("review:nightly builds a nightly closeout note from diary truth source", as
   assert.match(content, /## 睡前收口摘录/u);
   assert.match(content, /## 值得带走的信号/u);
   assert.doesNotMatch(content, /codeksei-todo:start/u);
+  assert.deepEqual(
+    fs.readdirSync(path.dirname(preview.notePath)).filter((entry) => entry.endsWith(".tmp")),
+    []
+  );
 });
 
 test("review:weekly builds a weekly review note from diary truth source", async () => {

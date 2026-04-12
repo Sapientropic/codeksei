@@ -1,43 +1,17 @@
-const { createWeixinChannelAdapter } = require("../adapters/channel/weixin");
-const { persistIncomingWeixinAttachments } = require("../adapters/channel/weixin/media-receive");
-const { createCodexRuntimeAdapter } = require("../adapters/runtime/codex");
-const { createTimelineIntegration } = require("../integrations/timeline");
-const { ChannelCommandRouter } = require("./channel-command-router");
-const { createControlCommandHandlers } = require("./channel-command-control-handlers");
-const { createWorkspaceCommandHandlers } = require("./channel-command-workspace-handlers");
-const { resolvePreferredSenderId } = require("./default-targets");
-const {
-  resolveConfiguredPersonName,
-  resolvePromptPersonEn,
-} = require("./person-reference");
-const { StreamDelivery } = require("./stream-delivery");
-const { ThreadStateStore } = require("./thread-state-store");
-const { SystemMessageQueueStore } = require("./system-message-queue-store");
-const { SystemMessageDispatcher } = require("./system-message-dispatcher");
-const { TimelineScreenshotQueueStore } = require("./timeline-screenshot-queue-store");
-const { BackstageTaskLifecycle } = require("./backstage-task-lifecycle");
-const { RuntimeTurnLifecycle } = require("./runtime-turn-lifecycle");
-const { RuntimeWatchdogLifecycle } = require("./runtime-watchdog-lifecycle");
-const { writeSharedBridgeHeartbeat } = require("./shared-bridge-heartbeat");
-const { ReminderQueueStore } = require("../adapters/channel/weixin/reminder-queue-store");
 const { runSystemCheckinPoller } = require("../app/system-checkin-poller");
-const {
-  LEGACY_TIMELINE_TIMEZONE,
-  formatDateTimeInTimezone,
-} = require("./timezone");
+const { resolvePreferredSenderId } = require("./default-targets");
+const { SystemMessageDispatcher } = require("./system-message-dispatcher");
+const { normalizeText } = require("./approval-command-policy");
 const {
   formatErrorMessage,
   resolveLongPollTimeoutMs: resolveAppLongPollTimeoutMs,
   runAppPollLoop,
 } = require("./app-poll-loop");
+const { createAppServices } = require("./app-runtime-factory");
 const {
-  buildApprovalPromptSignature,
-  buildApprovalPromptText,
-  matchesBuiltInCommandPrefix,
-  matchesCommandPrefix,
-  normalizeCommandArgument,
-  normalizeText,
-} = require("./approval-command-policy");
+  createShutdownController,
+} = require("./app-runtime-helpers");
+const { writeSharedBridgeHeartbeat } = require("./shared-bridge-heartbeat");
 const { handleReplyDeliveryFailure: processReplyDeliveryFailure } = require("./reply-delivery-failure");
 
 const DEFAULT_LONG_POLL_TIMEOUT_MS = 35_000;
@@ -45,116 +19,46 @@ const MIN_LONG_POLL_TIMEOUT_MS = 2_000;
 const RETRY_DELAY_MS = 2_000;
 const BACKOFF_DELAY_MS = 30_000;
 const MAX_CONSECUTIVE_FAILURES = 3;
-const FIRST_RUNTIME_EVENT_NOTICE_TIMEOUT_MS = 8_000;
-const FIRST_RUNTIME_EVENT_FAILURE_TIMEOUT_MS = 45_000;
-const SYSTEM_MESSAGE_BUSY_RETRY_MS = 30_000;
-const SYSTEM_MESSAGE_FAILURE_RETRY_DELAYS_MS = [30_000, 2 * 60_000, 5 * 60_000];
-// Once a reply has already started streaming, the common failure mode is a
-// long tool / search / browser phase with no assistant text for a while. Keep
-// the watchdog conservative so we do not prematurely cut off healthy turns.
-const STREAM_SETTLEMENT_TIMEOUT_MS = 5 * 60_000;
-
 class CyberbossApp {
   constructor(config) {
     this.config = config;
-    this.channelAdapter = createWeixinChannelAdapter(config);
-    this.runtimeAdapter = createCodexRuntimeAdapter(config);
-    this.timelineIntegration = createTimelineIntegration(config);
-    this.threadStateStore = new ThreadStateStore();
-    this.systemMessageQueue = new SystemMessageQueueStore({
-      filePath: config.systemMessageQueueFile,
-      deadLetterFilePath: config.systemMessageDeadLetterFile,
-    });
-    this.timelineScreenshotQueue = new TimelineScreenshotQueueStore({ filePath: config.timelineScreenshotQueueFile });
-    this.reminderQueue = new ReminderQueueStore({ filePath: config.reminderQueueFile });
+    this.activeAccountId = "";
+    this.channelAdapter = null;
+    this.runtimeAdapter = null;
+    this.timelineIntegration = null;
+    this.threadStateStore = null;
+    this.systemMessageQueue = null;
+    this.timelineScreenshotQueue = null;
+    this.reminderQueue = null;
     this.systemMessageDispatcher = null;
-    this.streamDelivery = new StreamDelivery({
-      channelAdapter: this.channelAdapter,
-      sessionStore: this.runtimeAdapter.getSessionStore(),
-      weixinReplyMode: config.weixinReplyMode,
-      deliveryTraceEnabled: config.weixinDeliveryTrace,
-      onDeliveryFailure: (payload) => this.handleReplyDeliveryFailure(payload),
-    });
-    // app.js keeps the top-level wiring and command routing, while the
-    // stateful runtime / backstage lifecycles live in dedicated modules. This
-    // avoids repeating the same typing, watchdog, and retry semantics in both
-    // the constructor setup and the tail of this file.
-    this.runtimeWatchdogLifecycle = new RuntimeWatchdogLifecycle({
-      buildApprovalPromptSignature,
-      buildApprovalPromptText,
-      channelAdapter: this.channelAdapter,
-      matchesBuiltInCommandPrefix,
-      matchesCommandPrefix,
-      normalizeCommandArgument,
-      normalizeText,
-      resolveReplyTargetForBinding: (bindingKey) => this.resolveReplyTargetForBinding(bindingKey),
-      runtimeAdapter: this.runtimeAdapter,
-      streamDelivery: this.streamDelivery,
-      streamSettlementTimeoutMs: STREAM_SETTLEMENT_TIMEOUT_MS,
-      threadStateStore: this.threadStateStore,
-      firstRuntimeEventFailureTimeoutMs: FIRST_RUNTIME_EVENT_FAILURE_TIMEOUT_MS,
-      firstRuntimeEventNoticeTimeoutMs: FIRST_RUNTIME_EVENT_NOTICE_TIMEOUT_MS,
-    });
-    this.channelCommandRouter = new ChannelCommandRouter({
-      workspaceHandlers: createWorkspaceCommandHandlers({
-        channelAdapter: this.channelAdapter,
-        config: this.config,
-        resolveWorkspaceRoot: (bindingKey) => this.resolveWorkspaceRoot(bindingKey),
-        runtimeAdapter: this.runtimeAdapter,
-        scheduleRuntimeEventWatchdog: (payload) => this.runtimeWatchdogLifecycle.scheduleRuntimeEventWatchdog(payload),
-        streamDelivery: this.streamDelivery,
-        threadStateStore: this.threadStateStore,
-      }),
-      controlHandlers: createControlCommandHandlers({
-        channelAdapter: this.channelAdapter,
-        resolveWorkspaceRoot: (bindingKey) => this.resolveWorkspaceRoot(bindingKey),
-        runtimeAdapter: this.runtimeAdapter,
-        threadStateStore: this.threadStateStore,
-      }),
-    });
-    this.runtimeTurnLifecycle = new RuntimeTurnLifecycle({
-      channelAdapter: this.channelAdapter,
-      config: this.config,
-      formatErrorMessage,
-      maybeDispatchCommand: (normalized) => this.channelCommandRouter.maybeDispatchCommand(normalized),
-      normalizeText,
-      persistIncomingWeixinAttachments,
-      queuePendingWorkspaceBootstrap: (payload) => this.runtimeWatchdogLifecycle.queuePendingWorkspaceBootstrap(payload),
+    this.systemMessageDispatcherState = { current: null };
+    this.streamDelivery = null;
+    this.runtimeWatchdogLifecycle = null;
+    this.channelCommandRouter = null;
+    this.runtimeTurnLifecycle = null;
+    this.backstageTaskLifecycle = null;
+    Object.assign(this, createAppServices({
+      config,
       resolveDefaultTerminalUser: () => this.resolveDefaultTerminalUser(),
-      resolveTimelineScreenshotOutput,
+      resolveReplyTargetForBinding: (bindingKey) => this.resolveReplyTargetForBinding(bindingKey),
       resolveWorkspaceRoot: (bindingKey) => this.resolveWorkspaceRoot(bindingKey),
-      runtimeAdapter: this.runtimeAdapter,
-      scheduleRuntimeEventWatchdog: (payload) => this.runtimeWatchdogLifecycle.scheduleRuntimeEventWatchdog(payload),
-      streamDelivery: this.streamDelivery,
-      timelineIntegration: this.timelineIntegration,
-      buildCodexInboundText,
-    });
-    this.backstageTaskLifecycle = new BackstageTaskLifecycle({
-      channelAdapter: this.channelAdapter,
-      config: this.config,
-      formatErrorMessage,
-      getSystemMessageDispatcher: () => this.systemMessageDispatcher,
-      getSystemMessageFailureRetryDelayMs,
       handlePreparedMessage: (...args) => this.runtimeTurnLifecycle.handlePreparedMessage(...args),
-      hasRpcId,
-      normalizeText,
-      reminderQueue: this.reminderQueue,
-      runtimeAdapter: this.runtimeAdapter,
       sendTimelineScreenshot: (payload) => this.runtimeTurnLifecycle.sendTimelineScreenshot(payload),
-      systemMessageBusyRetryMs: SYSTEM_MESSAGE_BUSY_RETRY_MS,
-      systemMessageQueue: this.systemMessageQueue,
-      threadStateStore: this.threadStateStore,
-      timelineScreenshotQueue: this.timelineScreenshotQueue,
-      buildReminderSystemTrigger,
-      resolveWorkspaceRoot: (bindingKey) => this.resolveWorkspaceRoot(bindingKey),
-    });
+      handleReplyDeliveryFailure: (payload) => this.handleReplyDeliveryFailure(payload),
+    }));
     this.runtimeEventChain = Promise.resolve();
-    this.runtimeAdapter.onEvent((event) => {
-      this.runtimeWatchdogLifecycle.observeRuntimeEvent(event);
-      this.threadStateStore.applyRuntimeEvent(event);
+    const runtimeAdapter = this.runtimeAdapter;
+    const runtimeWatchdogLifecycle = this.runtimeWatchdogLifecycle;
+    const threadStateStore = this.threadStateStore;
+    if (!runtimeAdapter || !runtimeWatchdogLifecycle || !threadStateStore) {
+      throw new Error("app services failed to initialize");
+    }
+    runtimeAdapter.onEvent((event) => {
+      runtimeWatchdogLifecycle.observeRuntimeEvent(event);
+      threadStateStore.applyRuntimeEvent(event);
       this.runtimeEventChain = this.runtimeEventChain
         .catch(() => {})
-        .then(() => this.runtimeWatchdogLifecycle.handleRuntimeEvent(event))
+        .then(() => runtimeWatchdogLifecycle.handleRuntimeEvent(event))
         .catch((error) => {
           const message = error instanceof Error ? error.stack || error.message : String(error);
           console.error(`[codeksei] runtime event handling failed type=${event?.type || "(unknown)"} ${message}`);
@@ -209,6 +113,7 @@ class CyberbossApp {
       config: this.config,
       accountId: account.accountId,
     });
+    this.systemMessageDispatcherState.current = this.systemMessageDispatcher;
     const runtimeState = await this.runtimeAdapter.initialize();
     const knownContextTokens = Object.keys(this.channelAdapter.getKnownContextTokens()).length;
     const syncBuffer = this.channelAdapter.loadSyncBuffer();
@@ -269,6 +174,7 @@ class CyberbossApp {
       });
     } finally {
       shutdown.dispose();
+      this.systemMessageDispatcherState.current = null;
       this.updateBridgeHeartbeat({
         pid: process.pid,
         status: "stopped",
@@ -450,7 +356,7 @@ class CyberbossApp {
 
   resolveReplyTargetForBinding(bindingKey) {
     const binding = this.runtimeAdapter.getSessionStore().getBinding(bindingKey) || null;
-    const userId = normalizeCommandArgument(binding?.senderId);
+    const userId = normalizeText(binding?.senderId);
     if (!userId) {
       return null;
     }
@@ -466,138 +372,4 @@ class CyberbossApp {
   }
 }
 
-function createShutdownController(onStop) {
-  let stopped = false;
-  let stoppingPromise = null;
-
-  const stop = async () => {
-    if (stopped) {
-      return stoppingPromise;
-    }
-    stopped = true;
-    stoppingPromise = Promise.resolve().then(onStop);
-    return stoppingPromise;
-  };
-
-  const handleSignal = () => {
-    stop().finally(() => {
-      process.exit(0);
-    });
-  };
-
-  process.on("SIGINT", handleSignal);
-  process.on("SIGTERM", handleSignal);
-
-  return {
-    get stopped() {
-      return stopped;
-    },
-    dispose() {
-      process.off("SIGINT", handleSignal);
-      process.off("SIGTERM", handleSignal);
-    },
-  };
-}
-
-function getSystemMessageFailureRetryDelayMs(attemptCount) {
-  const index = Math.max(0, Math.min(SYSTEM_MESSAGE_FAILURE_RETRY_DELAYS_MS.length - 1, Number(attemptCount) - 1));
-  return SYSTEM_MESSAGE_FAILURE_RETRY_DELAYS_MS[index];
-}
-
 module.exports = { CyberbossApp };
-
-function buildReminderSystemTrigger(reminder, config = {}) {
-  const reminderText = String(reminder?.text || "").trim();
-  const person = resolvePromptPersonEn(config);
-  return [
-    "A scheduled reminder is due.",
-    `Decide the most useful next move for ${person} right now.`,
-    "If a message is best, send one short and natural WeChat message.",
-    "Do not mention internal triggers.",
-    "Do not mechanically repeat the reminder text.",
-    `Reminder: ${reminderText}`,
-  ].join("\n");
-}
-
-function buildCodexInboundText(normalized, persisted = {}, config = {}) {
-  const text = String(normalized?.text || "").trim();
-  const saved = Array.isArray(persisted?.saved) ? persisted.saved : [];
-  const failed = Array.isArray(persisted?.failed) ? persisted.failed : [];
-  const configuredName = resolveConfiguredPersonName(config);
-  const person = resolvePromptPersonEn(config);
-  const localTime = formatWechatLocalTime(normalized?.receivedAt, config.timezone);
-  const lines = [];
-  if (localTime) {
-    lines.push(`[${localTime}]`);
-  }
-  if (text) {
-    if (lines.length) {
-      lines.push("");
-    }
-    lines.push(text);
-  }
-
-  if (saved.length) {
-    if (lines.length) {
-      lines.push("");
-    }
-    if (configuredName) {
-      lines.push(`${configuredName} sent image/file attachments. They were saved under the local data directory:`);
-    } else {
-      lines.push("The person in this thread sent image/file attachments. They were saved under the local data directory:");
-    }
-    for (const item of saved) {
-      const suffix = item.sourceFileName ? ` (original name: ${item.sourceFileName})` : "";
-      lines.push(`- [${item.kind}] ${item.absolutePath}${suffix}`);
-    }
-    lines.push(`You must read these files before replying to ${person}. Do not skip the read step.`);
-    lines.push(`If the required local tool is missing, tell ${person} exactly what is missing and that you cannot read the file yet. Do not pretend you already read it.`);
-  }
-
-  if (failed.length) {
-    if (lines.length) {
-      lines.push("");
-    }
-    lines.push("Attachment intake errors:");
-    for (const item of failed) {
-      const label = item.sourceFileName || item.kind || "attachment";
-      lines.push(`- ${label}: ${item.reason}`);
-    }
-  }
-
-  return lines.join("\n").trim();
-}
-
-function formatWechatLocalTime(receivedAt, timezone = LEGACY_TIMELINE_TIMEZONE) {
-  const value = typeof receivedAt === "string" ? receivedAt.trim() : "";
-  if (!value) {
-    return "";
-  }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-  return formatDateTimeInTimezone(parsed, timezone).replace("T", " ");
-}
-
-function stringifyRpcId(value) {
-  if (value == null) {
-    return "";
-  }
-  return String(value).trim();
-}
-
-function hasRpcId(value) {
-  return stringifyRpcId(value) !== "";
-}
-
-function resolveTimelineScreenshotOutput(args) {
-  const normalizedArgs = Array.isArray(args) ? args : [];
-  for (let index = 0; index < normalizedArgs.length; index += 1) {
-    if (String(normalizedArgs[index] || "").trim() !== "--output") {
-      continue;
-    }
-    return String(normalizedArgs[index + 1] || "").trim();
-  }
-  return "";
-}

@@ -140,6 +140,10 @@ test("runDiaryWriteCommand accepts fragment writes without requiring todo state"
 
     const content = fs.readFileSync(path.join(tempRoot, "2026-04-11.md"), "utf8");
     assert.match(content, /## 今日碎片\n\n- 今天忙了一整天，晚饭前明显感觉能量很低，还有点晕。/);
+    assert.deepEqual(
+      fs.readdirSync(tempRoot).filter((entry) => entry.endsWith(".tmp")),
+      []
+    );
   } finally {
     process.argv = originalArgv;
     fs.rmSync(tempRoot, { recursive: true, force: true });

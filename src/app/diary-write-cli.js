@@ -3,7 +3,7 @@ const path = require("path");
 const { PACKAGE_NAME } = require("../core/branding");
 const { getCommandArgsSchema } = require("../contracts/command-args");
 const { parseCliArgs } = require("../core/cli-args");
-const { writeTextFileAtomically } = require("../core/json-state");
+const { writeForeignTextDocument } = require("../core/json-state");
 const {
   LEGACY_TIMELINE_TIMEZONE,
   formatDateInTimezone,
@@ -77,7 +77,7 @@ async function runDiaryWriteCommand(config, args = []) {
     (draft, payload) => insertDiaryEntry(draft, payload, dateString),
     current
   );
-  writeTextFileAtomically(filePath, next, { encoding: "utf8" });
+  writeForeignTextDocument(filePath, next, { encoding: "utf8" });
   console.log(`diary written: ${filePath}`);
 }
 
@@ -300,7 +300,7 @@ function ensureDiaryFile(filePath, now, timezone = LEGACY_TIMELINE_TIMEZONE) {
   }
   const createdAt = formatDateTime(now, timezone);
   const updated = formatDate(now, timezone);
-  writeTextFileAtomically(filePath, buildDiaryFileSkeleton({ createdAt, updated }), { encoding: "utf8" });
+  writeForeignTextDocument(filePath, buildDiaryFileSkeleton({ createdAt, updated }), { encoding: "utf8" });
 }
 
 function buildDiaryFileSkeleton({ createdAt, updated }) {

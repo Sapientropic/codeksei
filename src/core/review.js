@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { normalizeReviewSchemaConfig } = require("../contracts/config-files");
 const { loadJsonConfig } = require("./config-loader");
-const { writeTextFileAtomically } = require("./json-state");
+const { writeForeignTextDocument } = require("./json-state");
 const { maybeGenerateSemanticReview } = require("./review-semantic");
 const { LEGACY_TIMELINE_TIMEZONE } = require("./timezone");
 const {
@@ -151,7 +151,7 @@ async function writeReview(config = {}, kind, options = {}) {
   const next = syncReviewContent(current, review, now);
   const changed = ensureTrailingNewline(current) !== ensureTrailingNewline(next);
   if (changed) {
-    writeTextFileAtomically(review.notePath, ensureTrailingNewline(next), { encoding: "utf8" });
+    writeForeignTextDocument(review.notePath, ensureTrailingNewline(next), { encoding: "utf8" });
   }
   return {
     changed,

@@ -7,13 +7,14 @@ const { loadPersistedContextTokens } = require("../adapters/channel/weixin/conte
 const { SessionStore } = require("../adapters/runtime/codex/session-store");
 const { getCommandArgsSchema } = require("../contracts/command-args");
 const { parseCliArgs } = require("../core/cli-args");
+const { buildTerminalLeafHelp } = require("../core/command-registry");
 const { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } = require("../core/default-targets");
 const { SystemMessageQueueStore } = require("../core/system-message-queue-store");
 
 async function runSystemSendCommand(config, args = []) {
   const options = parseSystemSendArgs(args);
   if (options.help) {
-    printSystemSendHelp();
+    console.log(buildTerminalLeafHelp("system.send"));
     return;
   }
 
@@ -34,7 +35,7 @@ async function runSystemSendCommand(config, args = []) {
     sessionStore,
   });
   if (!senderId || !text || !workspaceRoot) {
-    printSystemSendHelp();
+    console.log(buildTerminalLeafHelp("system.send"));
     throw new Error("system send 缺少必要参数");
   }
   if (!path.isAbsolute(workspaceRoot)) {
@@ -76,15 +77,6 @@ async function runSystemSendCommand(config, args = []) {
 
 function parseSystemSendArgs(args) {
   return parseCliArgs(args, getCommandArgsSchema("systemSend"));
-}
-
-function printSystemSendHelp() {
-  console.log(`
-用法: npm run system:send -- --text "<message>" [--user <wechat_user_id>] [--workspace /绝对路径]
-
-示例:
-  npm run system:send -- --text "提醒她今天早点睡" --workspace "$(pwd)"
-`);
 }
 
 function normalizeWorkspacePath(value) {

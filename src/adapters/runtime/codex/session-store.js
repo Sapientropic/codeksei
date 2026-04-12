@@ -11,8 +11,8 @@ const {
 } = require("../../../contracts/session-state");
 const {
   ensureParentDirectory,
-  readJsonStateFile,
-  writeJsonStateFile,
+  readManagedJsonStateFile,
+  writeManagedJsonStateFile,
 } = require("../../../core/json-state");
 
 class SessionStore {
@@ -28,7 +28,7 @@ class SessionStore {
   }
 
   load() {
-    const parsed = readJsonStateFile({
+    const parsed = readManagedJsonStateFile({
       filePath: this.filePath,
       fallback: createEmptySessionState(),
       label: "session store",
@@ -39,7 +39,7 @@ class SessionStore {
 
   save() {
     this.state = normalizeSessionState(this.state);
-    writeJsonStateFile(this.filePath, this.state);
+    writeManagedJsonStateFile(this.filePath, this.state);
   }
 
   getBinding(bindingKey) {

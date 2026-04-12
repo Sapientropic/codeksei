@@ -1,7 +1,10 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const packageJson = require("../package.json");
 
 const {
+  findTerminalManifestByScriptName,
+  listCommandActions,
   findTerminalCommandManifest,
   listCommandGroups,
   listTerminalCommandManifest,
@@ -17,6 +20,7 @@ test("command surface can resolve routed terminal commands from a single manifes
   assert.equal(findTerminalCommandManifest("note", "auto")?.action, "note.auto");
   assert.equal(findTerminalCommandManifest("timeline", "screenshot")?.runner, "timeline.screenshot");
   assert.equal(findTerminalCommandManifest("review", "weekly")?.argsSchemaKey, "review");
+  assert.equal(findTerminalManifestByScriptName("note:auto")?.action, "note.auto");
 });
 
 test("command surface groups still expose terminal and weixin help entries", () => {
@@ -28,4 +32,14 @@ test("command surface groups still expose terminal and weixin help entries", () 
   assert.ok(helpAction);
   assert.deepEqual(helpAction.terminal, ["help"]);
   assert.deepEqual(helpAction.weixin, ["/help"]);
+});
+
+test("active terminal actions all point at real package scripts", () => {
+  const scripts = packageJson.scripts || {};
+  const missing = listCommandActions()
+    .filter((action) => action.status === "active" && action.terminal.length && action.scriptName)
+    .map((action) => action.scriptName)
+    .filter((scriptName) => !(scriptName in scripts));
+
+  assert.deepEqual(missing, []);
 });

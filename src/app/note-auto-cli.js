@@ -1,5 +1,6 @@
 const { getCommandArgsSchema } = require("../contracts/command-args");
 const { parseCliArgs } = require("../core/cli-args");
+const { buildTerminalLeafHelp } = require("../core/command-registry");
 const {
   ensureDurableNoteSections,
   inspectDurableNoteRouting,
@@ -10,7 +11,7 @@ const { syncNoteFile } = require("../core/note-sync");
 async function runNoteAutoCommand(config, args = []) {
   const options = parseNoteAutoArgs(args);
   if (options.help) {
-    printNoteAutoHelp();
+    console.log(buildTerminalLeafHelp("note.auto"));
     return;
   }
 
@@ -40,7 +41,7 @@ async function runNoteAutoCommand(config, args = []) {
 function runNoteMaybeCommand(config, args = []) {
   const options = parseNoteAutoArgs(args);
   if (options.help) {
-    printNoteMaybeHelp();
+    console.log(buildTerminalLeafHelp("note.maybe"));
     return;
   }
 
@@ -114,40 +115,6 @@ function formatInspection(inspection) {
     `slot: ${inspection.route.slot || "-"}`,
     `maxItems: ${inspection.route.maxItems || 0}`,
   ].join("\n");
-}
-
-function printNoteAutoHelp() {
-  console.log([
-    "用法: npm run note:auto -- (--project <slug> | --scope <name>) --kind <kind> [--text \"内容\" | --stdin]",
-    "",
-    "说明：",
-    "  按 workspace 级 durable note schema 自动决定 file / section / style / slot。",
-    "  代码项目常用 --project；陪伴脉络、灵感等 durable note 用 --scope。",
-    "  公开示例默认用 --scope companion；旧的 --scope assistant 仍兼容。",
-    "",
-    "示例：",
-    "  npm run note:auto -- --project <slug> --kind recent --text \"补了 note:auto / note:maybe 路由层\"",
-    "  npm run note:auto -- --project <slug> --kind status --text \"当前已接上 durable note schema，下一步观察真实线程里的使用手感。\"",
-    "  npm run note:auto -- --scope companion --kind preference --text \"默认先接住、记住和接上，不把承接做成工具菜单。\"",
-    "  npm run note:auto -- --scope inspiration --kind idea --text \"做一个只在切换点发力的 transition mode，让主动提醒更像接线而不是催债。\"",
-  ].join("\n"));
-}
-
-function printNoteMaybeHelp() {
-  console.log([
-    "用法: npm run note:maybe -- [--project <slug> | --scope <name>] [--kind <kind>] [--json]",
-    "",
-    "说明：",
-    "  只看 durable note 路由，不落盘。",
-    "  不传参数时列出当前 workspace 可用 scope、kinds 和 tracked projects。",
-    "  companion 是公开默认 scope；assistant 仍作为兼容别名保留。",
-    "",
-    "示例：",
-    "  npm run note:maybe",
-    "  npm run note:maybe -- --project <slug>",
-    "  npm run note:maybe -- --scope companion --kind preference",
-    "  npm run note:maybe -- --scope inspiration --json",
-  ].join("\n"));
 }
 
 module.exports = {

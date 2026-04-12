@@ -1,0 +1,67 @@
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const test = require("node:test");
+const assert = require("node:assert/strict");
+
+const { ReminderQueueStore } = require("../src/adapters/channel/weixin/reminder-queue-store");
+
+function createStore() {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-reminder-queue-"));
+  return {
+    filePath: path.join(tempRoot, "reminder-queue.json"),
+    store: new ReminderQueueStore({
+      filePath: path.join(tempRoot, "reminder-queue.json"),
+    }),
+  };
+}
+
+test("ReminderQueueStore normalizes persisted reminders through the shared queue contract", () => {
+  const { store } = createStore();
+
+  const reminder = store.enqueue({
+    id: "reminder-1",
+    accountId: "acct-1",
+    senderId: "user-1",
+    contextToken: "ctx-1",
+    text: "起身喝水",
+    dueAtMs: "1712908800000",
+    createdAt: "2026-04-12T00:00:00.000Z",
+  });
+
+  assert.deepEqual(reminder, {
+    id: "reminder-1",
+    accountId: "acct-1",
+    senderId: "user-1",
+    contextToken: "ctx-1",
+    text: "起身喝水",
+    dueAtMs: 1712908800000,
+    createdAt: "2026-04-12T00:00:00.000Z",
+  });
+  assert.equal(store.peekNextDueAtMs(), 1712908800000);
+});
+
+test("ReminderQueueStore quarantines schema-invalid managed state on load", () => {
+  const { filePath } = createStore();
+  fs.writeFileSync(filePath, JSON.stringify({
+    reminders: [
+      {
+        id: "bad",
+        accountId: "acct-1",
+        senderId: "user-1",
+        contextToken: "ctx-1",
+        text: "bad",
+        dueAtMs: 0,
+      },
+    ],
+  }, null, 2), "utf8");
+
+  const reloaded = new ReminderQueueStore({ filePath });
+
+  assert.equal(reloaded.peekNextDueAtMs(), 0);
+  assert.equal(fs.existsSync(filePath), false);
+  assert.equal(
+    fs.readdirSync(path.dirname(filePath)).some((entry) => /^reminder-queue\.corrupt-.*\.json$/.test(entry)),
+    true
+  );
+});
