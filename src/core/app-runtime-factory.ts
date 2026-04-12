@@ -62,20 +62,9 @@ const STREAM_SETTLEMENT_TIMEOUT_MS = 5 * 60_000;
 const { createTimelineIntegration } = timelineIntegrationModule as {
   createTimelineIntegration: (config: AppFactoryConfig) => TimelineIntegrationLike;
 };
-const { ChannelCommandRouter } = channelCommandRouterModule as {
-  ChannelCommandRouter: new (args: {
-    workspaceHandlers: unknown;
-    controlHandlers: unknown;
-  }) => {
-    maybeDispatchCommand(normalized: NormalizedIncomingMessage): Promise<boolean>;
-  };
-};
-const { createControlCommandHandlers } = controlCommandHandlersModule as {
-  createControlCommandHandlers: (args: Record<string, unknown>) => unknown;
-};
-const { createWorkspaceCommandHandlers } = workspaceCommandHandlersModule as {
-  createWorkspaceCommandHandlers: (args: Record<string, unknown>) => unknown;
-};
+const { ChannelCommandRouter } = channelCommandRouterModule;
+const { createControlCommandHandlers } = controlCommandHandlersModule;
+const { createWorkspaceCommandHandlers } = workspaceCommandHandlersModule;
 const { ReminderQueueStore } = reminderQueueStoreModule as {
   ReminderQueueStore: new (args: { filePath: unknown }) => ReminderQueueLike;
 };

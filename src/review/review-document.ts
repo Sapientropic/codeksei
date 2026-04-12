@@ -6,6 +6,7 @@ import {
   formatDateTimeInTimezone,
 } from "../core/timezone";
 import * as brandingModule from "../core/branding";
+import type { ReviewDraft, ReviewKind, ReviewProfile } from "./review-types";
 
 const { PRIMARY_REVIEW_MARKER_PREFIX } = brandingModule as {
   PRIMARY_REVIEW_MARKER_PREFIX: string;
@@ -13,7 +14,25 @@ const { PRIMARY_REVIEW_MARKER_PREFIX } = brandingModule as {
 
 const REVIEW_MARKER_PREFIX = PRIMARY_REVIEW_MARKER_PREFIX;
 
-function buildReviewSections(kind: any, carryLabel: any) {
+interface ReviewSection {
+  heading: string;
+  slot?: string;
+  staticBody?: string;
+}
+
+interface ReviewDocumentInput {
+  diaryEntries: unknown[];
+  draft: ReviewDraft;
+  nightlyEntries: unknown[];
+  profile: ReviewProfile & { sections?: unknown[]; tags?: string[]; intro?: string };
+  window: {
+    endDate: string;
+    startDate: string;
+    timezone?: string;
+  };
+}
+
+function buildReviewSections(kind: ReviewKind, carryLabel: string): ReviewSection[] {
   if (kind === "nightly") {
     return [
       { heading: "## 今晚窗口", slot: "window" },
@@ -38,7 +57,7 @@ function buildReviewSections(kind: any, carryLabel: any) {
   ];
 }
 
-function buildReviewFileSkeleton(review: any, now: any = new Date()) {
+function buildReviewFileSkeleton(review: ReviewDocumentInput, now: Date = new Date()): string {
   const timezone = review?.window?.timezone || LEGACY_TIMELINE_TIMEZONE;
   const createdAt = formatDateTimeInTimezone(now, timezone);
   const updated = formatDateInTimezone(now, timezone);
@@ -61,15 +80,15 @@ function buildReviewFileSkeleton(review: any, now: any = new Date()) {
   frontmatter.push(
     "status: working",
     "tags:",
-    ...review.profile.tags.map((tag: any) => `  - ${tag}`),
+    ...(review.profile.tags || []).map((tag: string) => `  - ${tag}`),
     "---",
     `# ${review.draft.periodTitle}`,
     "",
-    `> ${review.profile.intro} `,
+    `> ${review.profile.intro || ""} `,
     ""
   );
 
-  for (const section of review.profile.sections) {
+  for (const section of (review.profile.sections || []) as ReviewSection[]) {
     frontmatter.push(section.heading);
     if (section.slot) {
       frontmatter.push(buildManagedBlock(section.slot, ""));
@@ -82,7 +101,7 @@ function buildReviewFileSkeleton(review: any, now: any = new Date()) {
   return frontmatter.join("\n");
 }
 
-function syncReviewContent(content: any, review: any, now: any = new Date()) {
+function syncReviewContent(content: string, review: ReviewDocumentInput, now: Date = new Date()): string {
   const timezone = review?.window?.timezone || LEGACY_TIMELINE_TIMEZONE;
   let next = ensureReviewSections(normalizeLineEnding(content), review);
   next = updateFrontmatterValue(next, "updated", formatDateInTimezone(now, timezone));
@@ -101,9 +120,9 @@ function syncReviewContent(content: any, review: any, now: any = new Date()) {
   return ensureTrailingNewline(next);
 }
 
-function ensureReviewSections(content: any, review: any) {
+function ensureReviewSections(content: string, review: ReviewDocumentInput): string {
   let next = content;
-  for (const section of review.profile.sections) {
+  for (const section of (review.profile.sections || []) as ReviewSection[]) {
     const headingPattern = new RegExp(`^${escapeRegExp(section.heading)}\\s*$`, "m");
     const hasHeading = headingPattern.test(next);
     const hasBlock = !section.slot || hasManagedBlock(next, section.slot);
@@ -130,7 +149,7 @@ function ensureReviewSections(content: any, review: any) {
   return next;
 }
 
-function upsertManagedBlock(content: any, slot: any, body: any) {
+function upsertManagedBlock(content: string, slot: string, body: unknown): string {
   const block = buildManagedBlock(slot, body);
   const pattern = buildManagedBlockPattern(slot);
   if (pattern.test(content)) {
@@ -139,7 +158,7 @@ function upsertManagedBlock(content: any, slot: any, body: any) {
   return `${content.replace(/\s*$/u, "")}\n\n${block}\n`;
 }
 
-function buildManagedBlock(slot: any, body: any) {
+function buildManagedBlock(slot: string, body: unknown): string {
   return [
     `<!-- ${REVIEW_MARKER_PREFIX}:${slot}:start -->`,
     String(body || "").trim(),
@@ -147,19 +166,19 @@ function buildManagedBlock(slot: any, body: any) {
   ].join("\n");
 }
 
-function hasManagedBlock(content: any, slot: any) {
+function hasManagedBlock(content: string, slot: string): boolean {
   const markerStart = `<!-- ${REVIEW_MARKER_PREFIX}:${slot}:start -->`;
   const markerEnd = `<!-- ${REVIEW_MARKER_PREFIX}:${slot}:end -->`;
   return content.includes(markerStart) && content.includes(markerEnd);
 }
 
-function readManagedBlock(content: any, slot: any) {
+function readManagedBlock(content: string, slot: string): string {
   const pattern = buildManagedBlockPattern(slot, true);
   const match = pattern.exec(content);
   return match?.[1] || "";
 }
 
-function buildManagedBlockPattern(slot: any, captureBody: boolean = false) {
+function buildManagedBlockPattern(slot: string, captureBody: boolean = false): RegExp {
   const normalizedSlot = escapeRegExp(slot);
   const bodyPattern = captureBody ? "([\\s\\S]*?)" : "[\\s\\S]*?";
   return new RegExp(
@@ -168,9 +187,9 @@ function buildManagedBlockPattern(slot: any, captureBody: boolean = false) {
   );
 }
 
-function parseManagedBulletList(content: any, slot: any) {
+function parseManagedBulletList(content: string, slot: string): string[] {
   return splitLines(readManagedBlock(content, slot))
-    .map((line: any) => {
+    .map((line: string) => {
       if (/^###\s+/u.test(line)) {
         return "";
       }
@@ -179,10 +198,10 @@ function parseManagedBulletList(content: any, slot: any) {
       }
       return normalizeLineItem(line);
     })
-    .filter((line: any) => line && !isGeneratedFallbackLine(line));
+    .filter((line: string) => line && !isGeneratedFallbackLine(line));
 }
 
-function replaceHeading(content: any, level: any, title: any) {
+function replaceHeading(content: string, level: number, title: string): string {
   const pattern = new RegExp(`^${"#".repeat(level)}\\s+.*$`, "m");
   if (!pattern.test(content)) {
     return content;
@@ -190,7 +209,7 @@ function replaceHeading(content: any, level: any, title: any) {
   return content.replace(pattern, `${"#".repeat(level)} ${title}`);
 }
 
-function updateFrontmatterValue(content: any, key: any, value: any) {
+function updateFrontmatterValue(content: string, key: string, value: string): string {
   if (!content.startsWith("---\n")) {
     return content;
   }
@@ -207,7 +226,7 @@ function updateFrontmatterValue(content: any, key: any, value: any) {
   return `---\n${nextFrontmatter}\n---\n${rest.replace(/^\n*/u, "")}`;
 }
 
-function isGeneratedFallbackLine(value: any) {
+function isGeneratedFallbackLine(value: unknown): boolean {
   const normalized = normalizeText(value);
   if (!normalized) {
     return true;
@@ -215,35 +234,35 @@ function isGeneratedFallbackLine(value: any) {
   return /还没有可用|还没有明显|没有明显还开着|没有明显的摩擦|下一次先从最小动作|明天先从最小动作|没有可引用的每日总结|没有值得回看的补充记录|睡前收口还没有写出来|还没有稳定到值得带走的信号/u.test(normalized);
 }
 
-function splitLines(body: any) {
+function splitLines(body: unknown): string[] {
   return normalizeLineEnding(body)
     .split("\n")
-    .map((line: any) => String(line || "").trim())
+    .map((line: string) => String(line || "").trim())
     .filter(Boolean);
 }
 
-function normalizeBody(value: any) {
+function normalizeBody(value: unknown): string {
   return normalizeLineEnding(value).trim();
 }
 
-function normalizeLineItem(value: any) {
+function normalizeLineItem(value: unknown): string {
   return normalizeBody(value).replace(/\s*\n+\s*/gu, " ").replace(/\s{2,}/gu, " ").trim();
 }
 
-function normalizeLineEnding(value: any) {
+function normalizeLineEnding(value: unknown): string {
   return String(value || "").replace(/\r\n/g, "\n");
 }
 
-function normalizeText(value: any) {
+function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function ensureTrailingNewline(value: any) {
+function ensureTrailingNewline(value: unknown): string {
   const normalized = normalizeLineEnding(value);
   return normalized.endsWith("\n") ? normalized : `${normalized}\n`;
 }
 
-function escapeRegExp(value: any) {
+function escapeRegExp(value: unknown): string {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 

@@ -1,15 +1,62 @@
 import { findModelByQuery } from "../adapters/runtime/codex/model-catalog";
+import type { ChannelAdapterLike, RuntimeAdapterLike } from "./app-service-contract";
+import type {
+  ChannelCommandRuntimeAdapter,
+  ChannelCommandSessionStore,
+  ChannelCommandThreadStateStore,
+} from "./channel-command-context";
 import { buildWeixinHelpText } from "./command-registry";
 import { buildChannelCommandContext } from "./channel-command-context";
+import type { ParsedChannelCommand } from "./channel-command-router";
+import type { NormalizedIncomingMessage, PendingApprovalState } from "./runtime-types";
+
+interface AvailableModelCatalogView {
+  models: Array<{ model: string }>;
+}
+
+interface ControlCommandSessionStore extends ChannelCommandSessionStore {
+  clearApprovalPrompt?(threadId: unknown): void;
+  clearPendingApprovalForThread?(threadId: unknown): void;
+  getAvailableModelCatalog(): AvailableModelCatalogView | null;
+  getCodexParamsForWorkspace(bindingKey: string, workspaceRoot: string): { model?: string };
+  rememberApprovalPrefixForWorkspace(workspaceRoot: string, commandTokens: string[]): unknown;
+  setCodexParamsForWorkspace(bindingKey: string, workspaceRoot: string, params: { model: string }): unknown;
+}
+
+interface ControlCommandRuntimeAdapter extends Pick<RuntimeAdapterLike, "respondApproval">, ChannelCommandRuntimeAdapter {
+  getSessionStore(): ControlCommandSessionStore;
+}
+
+interface ControlCommandThreadStateStore extends ChannelCommandThreadStateStore {
+  resolveApproval(threadId: string, status?: string): unknown;
+}
+
+type ControlCommandMessage = Pick<
+  NormalizedIncomingMessage,
+  "accountId" | "contextToken" | "provider" | "senderId" | "text" | "workspaceId"
+>;
+
+type ControlCommandChannelAdapter = Pick<ChannelAdapterLike, "sendText">;
+
+interface ControlCommandHandlers {
+  approval(normalized: ControlCommandMessage, command: ParsedChannelCommand): Promise<void>;
+  help(normalized: ControlCommandMessage, command?: ParsedChannelCommand): Promise<void>;
+  model(normalized: ControlCommandMessage, command: ParsedChannelCommand): Promise<void>;
+}
 
 function createControlCommandHandlers({
   channelAdapter,
   resolveWorkspaceRoot,
   runtimeAdapter,
   threadStateStore,
-}: any) {
+}: {
+  channelAdapter: ControlCommandChannelAdapter;
+  resolveWorkspaceRoot(bindingKey: string): string;
+  runtimeAdapter: ControlCommandRuntimeAdapter;
+  threadStateStore: ControlCommandThreadStateStore;
+}): ControlCommandHandlers {
   return {
-    async approval(normalized: any, command: any) {
+    async approval(normalized: ControlCommandMessage, command: ParsedChannelCommand): Promise<void> {
       const {
         sessionStore,
         threadId,
@@ -21,7 +68,7 @@ function createControlCommandHandlers({
         runtimeAdapter,
         threadStateStore,
       });
-      const approval = threadState?.pendingApproval || null;
+      const approval: PendingApprovalState | null = threadState?.pendingApproval || null;
       if (!threadId || approval?.requestId == null || String(approval.requestId).trim() === "") {
         await channelAdapter.sendText({
           userId: normalized.senderId,
@@ -57,7 +104,7 @@ function createControlCommandHandlers({
       });
     },
 
-    async model(normalized: any, command: any) {
+    async model(normalized: ControlCommandMessage, command: ParsedChannelCommand): Promise<void> {
       const {
         bindingKey,
         sessionStore,
@@ -77,7 +124,7 @@ function createControlCommandHandlers({
           `当前模型: ${currentModel || "(default)"}`,
         ];
         if (catalog?.models?.length) {
-          lines.push(`可用模型: ${catalog.models.map((item: any) => item.model).join("、")}`);
+          lines.push(`可用模型: ${catalog.models.map((item) => item.model).join("、")}`);
         } else {
           lines.push("可用模型: (未获取到模型列表)");
         }
@@ -109,7 +156,7 @@ function createControlCommandHandlers({
       });
     },
 
-    async help(normalized: any) {
+    async help(normalized: ControlCommandMessage): Promise<void> {
       await channelAdapter.sendText({
         userId: normalized.senderId,
         text: buildWeixinHelpText(),
@@ -119,7 +166,7 @@ function createControlCommandHandlers({
   };
 }
 
-function normalizeCommandArgument(value: any) {
+function normalizeCommandArgument(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
@@ -127,7 +174,7 @@ export {
   createControlCommandHandlers,
 };
 
-function clearPendingApproval(sessionStore: any, threadId: any) {
+function clearPendingApproval(sessionStore: ControlCommandSessionStore, threadId: string): void {
   if (typeof sessionStore?.clearPendingApprovalForThread === "function") {
     sessionStore.clearPendingApprovalForThread(threadId);
     return;

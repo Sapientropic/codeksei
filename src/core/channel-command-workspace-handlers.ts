@@ -1,10 +1,69 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import type {
+  AppRuntimeConfig,
+  ChannelAdapterLike,
+  RuntimeAdapterLike,
+  StreamDeliveryLike,
+} from "./app-service-contract";
+import type {
+  ChannelCommandRuntimeAdapter,
+  ChannelCommandSessionStore,
+  ChannelCommandThreadState,
+  ChannelCommandThreadStateStore,
+} from "./channel-command-context";
 import { buildChannelCommandContext } from "./channel-command-context";
+import type { ParsedChannelCommand } from "./channel-command-router";
+import type { NormalizedIncomingMessage, ThreadBindingRef } from "./runtime-types";
 
 const WINDOWS_DRIVE_PATH_RE = /^[A-Za-z]:\//;
 const WINDOWS_DRIVE_ROOT_RE = /^[A-Za-z]:\/$/;
 const WINDOWS_UNC_PREFIX_RE = /^\/\/\?\//;
+
+type WorkspaceCommandMessage = Pick<
+  NormalizedIncomingMessage,
+  "accountId" | "contextToken" | "provider" | "senderId" | "text" | "workspaceId"
+>;
+
+type WorkspaceCommandChannelAdapter = Pick<ChannelAdapterLike, "sendText">;
+type WorkspaceCommandConfig = Pick<AppRuntimeConfig, "codexAccessMode" | "workspaceRoot">;
+
+interface WorkspaceCommandSessionStore extends ChannelCommandSessionStore {
+  clearThreadIdForWorkspace(bindingKey: string, workspaceRoot: string): unknown;
+  findBindingForThreadId(threadId: string): ThreadBindingRef | null;
+  getCodexParamsForWorkspace(bindingKey: string, workspaceRoot: string): { model?: string };
+  setActiveWorkspaceRoot(bindingKey: string, workspaceRoot: string): unknown;
+  setThreadIdForWorkspace(bindingKey: string, workspaceRoot: string, threadId: string): unknown;
+}
+
+interface WorkspaceCommandRuntimeAdapter extends Pick<
+  RuntimeAdapterLike,
+  "cancelTurn" | "refreshThreadInstructions" | "resumeThread"
+>, ChannelCommandRuntimeAdapter {
+  getSessionStore(): WorkspaceCommandSessionStore;
+}
+
+interface WorkspaceCommandThreadStateStore extends ChannelCommandThreadStateStore {
+  getThreadState(threadId: string): ChannelCommandThreadState | null;
+}
+
+type WorkspaceCommandStreamDelivery = Pick<StreamDeliveryLike, "queueReplyTargetForThread">;
+
+interface WorkspaceCommandHandlers {
+  bind(normalized: WorkspaceCommandMessage, command: ParsedChannelCommand): Promise<void>;
+  new: (normalized: WorkspaceCommandMessage) => Promise<void>;
+  reread(normalized: WorkspaceCommandMessage): Promise<void>;
+  status(normalized: WorkspaceCommandMessage): Promise<void>;
+  stop(normalized: WorkspaceCommandMessage): Promise<void>;
+  switch(normalized: WorkspaceCommandMessage, command: ParsedChannelCommand): Promise<void>;
+}
+
+interface ScheduleRuntimeEventWatchdogPayload {
+  bindingKey: string;
+  normalized: WorkspaceCommandMessage;
+  threadId?: string;
+  workspaceRoot: string;
+}
 
 function createWorkspaceCommandHandlers({
   channelAdapter,
@@ -14,9 +73,17 @@ function createWorkspaceCommandHandlers({
   scheduleRuntimeEventWatchdog,
   streamDelivery,
   threadStateStore,
-}: any) {
+}: {
+  channelAdapter: WorkspaceCommandChannelAdapter;
+  config: WorkspaceCommandConfig;
+  resolveWorkspaceRoot(bindingKey: string): string;
+  runtimeAdapter: WorkspaceCommandRuntimeAdapter;
+  scheduleRuntimeEventWatchdog(payload: ScheduleRuntimeEventWatchdogPayload): void;
+  streamDelivery: WorkspaceCommandStreamDelivery;
+  threadStateStore: WorkspaceCommandThreadStateStore;
+}): WorkspaceCommandHandlers {
   return {
-    async bind(normalized: any, command: any) {
+    async bind(normalized: WorkspaceCommandMessage, command: ParsedChannelCommand): Promise<void> {
       const workspaceRoot = resolveBindWorkspaceRoot(command.args, config.workspaceRoot);
       if (!workspaceRoot) {
         await channelAdapter.sendText({
@@ -65,7 +132,7 @@ function createWorkspaceCommandHandlers({
       });
     },
 
-    async status(normalized: any) {
+    async status(normalized: WorkspaceCommandMessage): Promise<void> {
       const {
         bindingKey,
         sessionStore,
@@ -89,17 +156,21 @@ function createWorkspaceCommandHandlers({
         lines.push(`lastError: ${threadState.lastError}`);
       }
       if (usage) {
+        const modelContextWindow = Number(usage.modelContextWindow || 0);
+        const lastTotalTokens = Number(usage.lastTotalTokens || 0);
+        const primaryUsedPercent = Number(usage.primaryUsedPercent || 0);
+        const secondaryUsedPercent = Number(usage.secondaryUsedPercent || 0);
         const usageParts = [];
-        if (usage.modelContextWindow > 0 && usage.lastTotalTokens > 0) {
-          usageParts.push(`last ${formatCompactNumber(usage.lastTotalTokens)}/${formatCompactNumber(usage.modelContextWindow)}`);
-        } else if (usage.lastTotalTokens > 0) {
-          usageParts.push(`last ${formatCompactNumber(usage.lastTotalTokens)}`);
+        if (modelContextWindow > 0 && lastTotalTokens > 0) {
+          usageParts.push(`last ${formatCompactNumber(lastTotalTokens)}/${formatCompactNumber(modelContextWindow)}`);
+        } else if (lastTotalTokens > 0) {
+          usageParts.push(`last ${formatCompactNumber(lastTotalTokens)}`);
         }
-        if (usage.primaryUsedPercent > 0) {
-          usageParts.push(`5h ${usage.primaryUsedPercent}%`);
+        if (primaryUsedPercent > 0) {
+          usageParts.push(`5h ${primaryUsedPercent}%`);
         }
-        if (usage.secondaryUsedPercent > 0) {
-          usageParts.push(`7d ${usage.secondaryUsedPercent}%`);
+        if (secondaryUsedPercent > 0) {
+          usageParts.push(`7d ${secondaryUsedPercent}%`);
         }
         if (usageParts.length) {
           lines.push(`usage: ${usageParts.join(" | ")}`);
@@ -112,7 +183,7 @@ function createWorkspaceCommandHandlers({
       });
     },
 
-    async new(normalized: any) {
+    new: async (normalized: WorkspaceCommandMessage): Promise<void> => {
       const { bindingKey, sessionStore, workspaceRoot } = buildChannelCommandContext({
         normalized,
         resolveWorkspaceRoot,
@@ -127,7 +198,7 @@ function createWorkspaceCommandHandlers({
       });
     },
 
-    async reread(normalized: any) {
+    async reread(normalized: WorkspaceCommandMessage): Promise<void> {
       const {
         bindingKey,
         sessionStore,
@@ -178,7 +249,7 @@ function createWorkspaceCommandHandlers({
       }
     },
 
-    async switch(normalized: any, command: any) {
+    async switch(normalized: WorkspaceCommandMessage, command: ParsedChannelCommand): Promise<void> {
       const targetThreadId = normalizeCommandArgument(command.args);
       if (!targetThreadId) {
         await channelAdapter.sendText({
@@ -217,7 +288,7 @@ function createWorkspaceCommandHandlers({
       });
     },
 
-    async stop(normalized: any) {
+    async stop(normalized: WorkspaceCommandMessage): Promise<void> {
       const {
         threadId,
         threadState,
@@ -249,7 +320,7 @@ function createWorkspaceCommandHandlers({
   };
 }
 
-function formatCompactNumber(value: any) {
+function formatCompactNumber(value: unknown): string {
   const normalized = Number(value);
   if (!Number.isFinite(normalized) || normalized <= 0) {
     return "0";
@@ -263,11 +334,11 @@ function formatCompactNumber(value: any) {
   return String(Math.round(normalized));
 }
 
-function normalizeCommandArgument(value: any) {
+function normalizeCommandArgument(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function normalizeWorkspacePath(value: any) {
+function normalizeWorkspacePath(value: unknown): string {
   const normalized = String(value || "").trim();
   if (!normalized) {
     return "";
@@ -296,7 +367,7 @@ function normalizeWorkspacePath(value: any) {
   return normalizedDrivePrefix.replace(/\/+$/g, "");
 }
 
-function isAbsoluteWorkspacePath(value: any) {
+function isAbsoluteWorkspacePath(value: unknown): boolean {
   const normalized = normalizeWorkspacePath(value);
   if (!normalized) {
     return false;
@@ -307,7 +378,7 @@ function isAbsoluteWorkspacePath(value: any) {
   return path.posix.isAbsolute(normalized);
 }
 
-function resolveBindWorkspaceRoot(value: any, defaultWorkspaceRoot: any) {
+function resolveBindWorkspaceRoot(value: unknown, defaultWorkspaceRoot: unknown): string {
   const normalizedArg = normalizeCommandArgument(value);
   if (!normalizedArg || isDefaultWorkspaceAlias(normalizedArg)) {
     return normalizeWorkspacePath(defaultWorkspaceRoot);
@@ -315,7 +386,7 @@ function resolveBindWorkspaceRoot(value: any, defaultWorkspaceRoot: any) {
   return normalizeWorkspacePath(value);
 }
 
-function isDefaultWorkspaceAlias(value: any) {
+function isDefaultWorkspaceAlias(value: unknown): boolean {
   const normalized = normalizeCommandArgument(value);
   return normalized === "."
     || normalized === "here"
@@ -325,7 +396,7 @@ function isDefaultWorkspaceAlias(value: any) {
     || normalized === "这里";
 }
 
-function extractPathFromFileUri(value: any) {
+function extractPathFromFileUri(value: unknown): string {
   const input = String(value || "").trim();
   if (!/^file:\/\//i.test(input)) {
     return "";

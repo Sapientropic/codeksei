@@ -12,7 +12,29 @@ import { writeForeignTextDocument } from "../state/json-state";
 
 const SLOT_MARKER_PREFIX = PRIMARY_NOTE_SYNC_MARKER_PREFIX;
 
-function resolveNoteSyncTarget(config: any = {}, options: any = {}) {
+interface NoteSyncConfig {
+  projectRadarConfigFile?: unknown;
+  workspaceRoot?: unknown;
+}
+
+interface NoteSyncTarget {
+  filePath: string;
+  kind: "path" | "project";
+  label: string;
+}
+
+interface NoteSyncOptions {
+  filePath?: unknown;
+  maxItems?: unknown;
+  path?: unknown;
+  project?: unknown;
+  section?: unknown;
+  slot?: unknown;
+  style?: unknown;
+  text?: unknown;
+}
+
+function resolveNoteSyncTarget(config: NoteSyncConfig = {}, options: NoteSyncOptions = {}): NoteSyncTarget {
   const normalizedProject = normalizeText(options.project);
   const normalizedPath = normalizeText(options.path);
   if (normalizedProject && normalizedPath) {
@@ -24,9 +46,9 @@ function resolveNoteSyncTarget(config: any = {}, options: any = {}) {
 
   if (normalizedProject) {
     const trackedProjects = listTrackedProjects(config);
-    const matched = trackedProjects.find((project: any) => matchesProjectSelector(project, normalizedProject));
+    const matched = trackedProjects.find((project) => matchesProjectSelector(project, normalizedProject));
     if (!matched) {
-      const available = trackedProjects.map((project: any) => project.slug).join(", ");
+      const available = trackedProjects.map((project) => project.slug).join(", ");
       throw new Error(`找不到代码项目: ${normalizedProject}；当前可用 slug: ${available}`);
     }
     return {
@@ -43,15 +65,16 @@ function resolveNoteSyncTarget(config: any = {}, options: any = {}) {
   };
 }
 
-function resolveNotePath(workspaceRoot: any, targetPath: any) {
-  if (path.isAbsolute(targetPath) || path.win32.isAbsolute(targetPath)) {
-    return resolveCrossPlatformPath(targetPath);
+function resolveNotePath(workspaceRoot: unknown, targetPath: unknown): string {
+  const normalizedTargetPath = String(targetPath || "");
+  if (path.isAbsolute(normalizedTargetPath) || path.win32.isAbsolute(normalizedTargetPath)) {
+    return resolveCrossPlatformPath(normalizedTargetPath);
   }
   const baseRoot = normalizeText(workspaceRoot) || process.cwd();
-  return resolveCrossPlatformPathFromRoot(baseRoot, targetPath);
+  return resolveCrossPlatformPathFromRoot(baseRoot, normalizedTargetPath);
 }
 
-function syncNoteFile(options: any = {}) {
+function syncNoteFile(options: NoteSyncOptions = {}) {
   const filePath = normalizeText(options.filePath);
   if (!filePath) {
     throw new Error("note filePath 不能为空");
@@ -75,7 +98,7 @@ function syncNoteFile(options: any = {}) {
   };
 }
 
-function syncNoteContent(content: any, options: any = {}) {
+function syncNoteContent(content: unknown, options: NoteSyncOptions = {}) {
   const section = normalizeText(options.section);
   if (!section) {
     throw new Error("缺少 --section");
@@ -374,15 +397,15 @@ function appendSection(content: any, sectionTitle: any) {
   return `${normalized}\n\n${heading}\n`;
 }
 
-function matchesProjectSelector(project: any, selector: any) {
+function matchesProjectSelector(project: { aliases?: string[]; slug: string; title: string }, selector: unknown): boolean {
   const normalizedSelector = normalizeText(selector).toLowerCase();
   return project.slug.toLowerCase() === normalizedSelector
     || normalizeText(project.title).toLowerCase() === normalizedSelector
     || (Array.isArray(project.aliases)
-      && project.aliases.some((alias: any) => normalizeText(alias).toLowerCase() === normalizedSelector));
+      && project.aliases.some((alias: string) => normalizeText(alias).toLowerCase() === normalizedSelector));
 }
 
-function normalizeStyle(value: any) {
+function normalizeStyle(value: unknown): "bullet" | "paragraph" {
   const normalized = normalizeText(value).toLowerCase();
   if (!normalized || normalized === "bullet") {
     return "bullet";
@@ -393,7 +416,7 @@ function normalizeStyle(value: any) {
   throw new Error(`不支持的 note style: ${value}`);
 }
 
-function normalizeMaxItems(value: any) {
+function normalizeMaxItems(value: unknown): number {
   const raw = String(value || "").trim();
   if (!raw) {
     return 0;
@@ -405,11 +428,11 @@ function normalizeMaxItems(value: any) {
   return parsed;
 }
 
-function normalizeBulletText(value: any) {
+function normalizeBulletText(value: unknown): string {
   return normalizeParagraphText(value).replace(/\s*\n+\s*/gu, " ").replace(/\s{2,}/gu, " ").trim();
 }
 
-function normalizeParagraphText(value: any) {
+function normalizeParagraphText(value: unknown): string {
   return normalizeFileEnding(value).trim();
 }
 
@@ -425,11 +448,11 @@ function normalizeFileEnding(value: any) {
   return String(value || "").replace(/\r\n/g, "\n");
 }
 
-function normalizeText(value: any) {
+function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function ensureTrailingNewline(value: any) {
+function ensureTrailingNewline(value: unknown): string {
   const normalized = normalizeFileEnding(value);
   return normalized.endsWith("\n") ? normalized : `${normalized}\n`;
 }
@@ -438,7 +461,7 @@ function trimBlock(value: any) {
   return normalizeFileEnding(value).replace(/^\s*\n/gu, "").replace(/\n\s*$/gu, "").trimEnd();
 }
 
-function escapeRegExp(value: any) {
+function escapeRegExp(value: unknown): string {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 

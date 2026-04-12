@@ -2,7 +2,7 @@ const test: typeof import("node:test") = require("node:test");
 const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 const path: typeof import("node:path") = require("node:path");
 
-const runtimePaths = require("./helpers/runtime-paths") as {
+const runtimePaths = require("./helpers/runtime-paths.ts") as {
   repoRoot: string;
   resolveRepoRuntimeModule: (relativePath: string) => string;
   resolveRepoRuntimePath: (relativePath: string) => string;

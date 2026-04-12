@@ -57,7 +57,11 @@ const DEFAULT_REVIEW_MODELS = {
   },
 };
 
-function loadReviewSchemaConfig(config: any = {}) {
+interface ReviewSchemaWorkspaceProfile {
+  reviews?: Record<string, Record<string, unknown>>;
+}
+
+function loadReviewSchemaConfig(config: Record<string, unknown> = {}): Record<string, unknown> {
   const filePath = normalizeText(config.reviewSchemaConfigFile);
   if (!filePath) {
     return {};
@@ -82,9 +86,9 @@ function resolveReviewProfile(
   const required = options.required !== false;
   const workspaceRoot = resolveCrossPlatformPath(String(config.workspaceRoot || process.cwd()));
   const schemaConfig = loadReviewSchemaConfig(config);
-  const workspaceProfile: any = selectWorkspaceProfile(schemaConfig.workspaces, workspaceRoot);
+  const workspaceProfile = selectWorkspaceProfile(schemaConfig.workspaces, workspaceRoot);
   const reviews = workspaceProfile?.reviews && typeof workspaceProfile.reviews === "object"
-    ? (workspaceProfile.reviews as Record<string, any>)
+    ? workspaceProfile.reviews
     : {};
   const rawProfile = reviews[normalizedKind];
 
@@ -121,7 +125,7 @@ async function buildReview(config: Record<string, unknown> = {}, kind: unknown, 
     ...options,
     timezone,
   });
-  const diaryEntries = collectDiaryEntries(config.diaryDir, window.startDate, window.endDate) as DiaryReviewEntry[];
+  const diaryEntries = collectDiaryEntries(normalizeText(config.diaryDir), window.startDate, window.endDate) as DiaryReviewEntry[];
   const nightlyProfile = profile.kind === "nightly"
     ? null
     : resolveReviewProfile(config, "nightly", { required: false });
@@ -153,7 +157,11 @@ async function buildReview(config: Record<string, unknown> = {}, kind: unknown, 
   };
 }
 
-async function writeReview(config: any = {}, kind: any, options: any = {}) {
+async function writeReview(
+  config: Record<string, unknown> = {},
+  kind: unknown,
+  options: Record<string, unknown> = {},
+) {
   const review = await buildReview(config, kind, options);
   fs.mkdirSync(path.dirname(review.notePath), { recursive: true });
   const now = new Date();
@@ -191,39 +199,39 @@ function normalizeTags(value: unknown, fallback: string[]): string[] {
     .filter(Boolean);
 }
 
-function selectWorkspaceProfile(workspaces: any, workspaceRoot: any) {
+function selectWorkspaceProfile(workspaces: unknown, workspaceRoot: string): ReviewSchemaWorkspaceProfile {
   if (!workspaces || typeof workspaces !== "object") {
     return {};
   }
   const normalizedWorkspaceRoot = normalizeDisplayPath(workspaceRoot);
   for (const [candidateRoot, profile] of Object.entries(workspaces)) {
     if (normalizeDisplayPath(candidateRoot) === normalizedWorkspaceRoot) {
-      return profile && typeof profile === "object" ? profile : {};
+      return profile && typeof profile === "object" ? profile as ReviewSchemaWorkspaceProfile : {};
     }
   }
   return {};
 }
 
-function resolveWorkspacePath(workspaceRoot: any, targetPath: any) {
+function resolveWorkspacePath(workspaceRoot: string, targetPath: string): string {
   if (path.isAbsolute(targetPath) || path.win32.isAbsolute(targetPath)) {
     return resolveCrossPlatformPath(targetPath);
   }
   return resolveCrossPlatformPathFromRoot(workspaceRoot, ...String(targetPath || "").split("/"));
 }
 
-function normalizeRelativeOrAbsolutePath(value: any) {
+function normalizeRelativeOrAbsolutePath(value: unknown): string {
   return normalizeText(value).replace(/\\/g, "/");
 }
 
-function normalizeLineEnding(value: any) {
+function normalizeLineEnding(value: unknown): string {
   return String(value || "").replace(/\r\n/g, "\n");
 }
 
-function normalizeText(value: any) {
+function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function ensureTrailingNewline(value: any) {
+function ensureTrailingNewline(value: unknown): string {
   const normalized = normalizeLineEnding(value);
   return normalized.endsWith("\n") ? normalized : `${normalized}\n`;
 }

@@ -25,12 +25,36 @@ interface TimelineEventOptions extends Record<string, unknown> {
   tags?: unknown[];
 }
 
+interface TimelineEventConfig {
+  timezone?: unknown;
+}
+
+interface TimelineIntegrationRunner {
+  runSubcommand(command: string, args: string[]): Promise<unknown>;
+}
+
+interface TimelineEventPayload {
+  categoryId?: string;
+  endAt: string;
+  eventNodeId?: string;
+  id: string;
+  note?: string;
+  startAt: string;
+  subcategoryId?: string;
+  tags?: string[];
+  title: string;
+}
+
 const { parseCliArgs } = cliArgsModule as {
   parseCliArgs(args: string[], schema: unknown): TimelineEventOptions;
 };
 
-async function runTimelineEventCommand(timelineIntegration: any, configOrArgs: any = {}, argsMaybe: any[] = []) {
-  const config = Array.isArray(configOrArgs) ? {} : (configOrArgs || {});
+async function runTimelineEventCommand(
+  timelineIntegration: TimelineIntegrationRunner,
+  configOrArgs: TimelineEventConfig | string[] = {},
+  argsMaybe: string[] = [],
+): Promise<void> {
+  const config: TimelineEventConfig = Array.isArray(configOrArgs) ? {} : (configOrArgs || {});
   const args = Array.isArray(configOrArgs) ? configOrArgs : argsMaybe;
   const options = parseTimelineEventArgs(args);
   if (options.help) {
@@ -47,7 +71,7 @@ function parseTimelineEventArgs(args: string[]): TimelineEventOptions {
   return parseCliArgs(args, getCommandArgsSchema("timelineEvent"));
 }
 
-async function resolveNote(options: any) {
+async function resolveNote(options: TimelineEventOptions): Promise<string> {
   const inline = normalizeText(options.note);
   if (inline) {
     return inline;
@@ -58,7 +82,11 @@ async function resolveNote(options: any) {
   return normalizeText(await readStdin());
 }
 
-function buildTimelineEventWriteArgs(options: any, note: string = "", config: any = {}) {
+function buildTimelineEventWriteArgs(
+  options: TimelineEventOptions,
+  note: string = "",
+  config: TimelineEventConfig = {},
+): string[] {
   const date = normalizeDate(options.date);
   if (!date) {
     throw new Error("缺少有效日期，使用 --date YYYY-MM-DD");
@@ -83,7 +111,7 @@ function buildTimelineEventWriteArgs(options: any, note: string = "", config: an
   const endAt = normalizeTimelineEventTimestamp(date, options.end, "--end", timezone);
   validateEventRange({ date, startAt, endAt });
 
-  const event: any = {
+  const event: TimelineEventPayload = {
     id: normalizeText(options.eventId) || `evt_${crypto.randomUUID()}`,
     startAt,
     endAt,
@@ -102,7 +130,7 @@ function buildTimelineEventWriteArgs(options: any, note: string = "", config: an
     event.eventNodeId = normalizeText(options.eventNodeId);
   }
   if (Array.isArray(options.tags) && options.tags.length) {
-    event.tags = options.tags.map((tag: any) => normalizeText(tag)).filter(Boolean);
+    event.tags = options.tags.map((tag: unknown) => normalizeText(tag)).filter(Boolean);
   }
 
   const payload = {
@@ -124,12 +152,17 @@ function buildTimelineEventWriteArgs(options: any, note: string = "", config: an
   return args;
 }
 
-function normalizeDate(value: any) {
+function normalizeDate(value: unknown): string {
   const normalized = normalizeText(value);
   return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : "";
 }
 
-function normalizeTimelineEventTimestamp(date: any, value: any, flagName: any, timezone: any = LEGACY_TIMELINE_TIMEZONE) {
+function normalizeTimelineEventTimestamp(
+  date: string,
+  value: unknown,
+  flagName: string,
+  timezone: string = LEGACY_TIMELINE_TIMEZONE,
+): string {
   const normalized = normalizeText(value);
   if (!normalized) {
     throw new Error(`缺少时间，使用 ${flagName} HH:mm 或完整时间戳`);
@@ -146,7 +179,7 @@ function normalizeTimelineEventTimestamp(date: any, value: any, flagName: any, t
   throw new Error(`不支持的时间格式: ${flagName}=${normalized}`);
 }
 
-function validateEventRange({ date, startAt, endAt }: any) {
+function validateEventRange({ date, startAt, endAt }: { date: string; startAt: string; endAt: string }): void {
   if (!startAt.startsWith(`${date}T`) || !endAt.startsWith(`${date}T`)) {
     throw new Error("timeline:event 要求 start/end 都落在 --date 对应这一天内");
   }
@@ -161,11 +194,11 @@ function validateEventRange({ date, startAt, endAt }: any) {
   }
 }
 
-function readStdin() {
-  return new Promise((resolve: any, reject: any) => {
+function readStdin(): Promise<string> {
+  return new Promise((resolve: (value: string) => void, reject: (reason?: unknown) => void) => {
     let buffer = "";
     process.stdin.setEncoding("utf8");
-    process.stdin.on("data", (chunk: any) => {
+    process.stdin.on("data", (chunk: string) => {
       buffer += chunk;
     });
     process.stdin.on("end", () => resolve(buffer));
@@ -173,7 +206,7 @@ function readStdin() {
   });
 }
 
-function normalizeText(value: any) {
+function normalizeText(value: unknown): string {
   return String(value || "").replace(/\r\n/g, "\n").trim();
 }
 
@@ -184,6 +217,6 @@ export {
   normalizeTimelineEventTimestamp,
 };
 
-function normalizeTimezoneConfigValue(value: any) {
+function normalizeTimezoneConfigValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }

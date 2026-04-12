@@ -20,7 +20,33 @@ const DURABLE_NOTE_SCOPE_ALIASES = {
   inspiration: "inspiration",
 };
 
-function loadDurableNoteSchemaConfig(config: any = {}) {
+interface DurableNoteConfig {
+  durableNoteSchemaConfigFile?: unknown;
+  projectRadarConfigFile?: unknown;
+  workspaceRoot?: unknown;
+}
+
+interface DurableNoteInspectionOptions {
+  kind?: unknown;
+  project?: unknown;
+  scope?: unknown;
+}
+
+interface DurableNoteRouteDefinition {
+  maxItems: number;
+  section: string;
+  slot: string;
+  style: string;
+}
+
+interface DurableNoteFamily {
+  filePath: string;
+  kinds: Record<string, DurableNoteRouteDefinition>;
+  label?: string;
+  sections: string[];
+}
+
+function loadDurableNoteSchemaConfig(config: DurableNoteConfig = {}): Record<string, unknown> {
   const filePath = normalizeText(config.durableNoteSchemaConfigFile);
   if (!filePath) {
     return {};
@@ -35,10 +61,10 @@ function loadDurableNoteSchemaConfig(config: any = {}) {
   });
 }
 
-function resolveDurableNoteProfile(config: any = {}) {
+function resolveDurableNoteProfile(config: DurableNoteConfig = {}) {
   const workspaceRoot = resolveCrossPlatformPath(String(config.workspaceRoot || process.cwd()));
   const schemaConfig = loadDurableNoteSchemaConfig(config);
-  const workspaceProfile: any = selectWorkspaceProfile(schemaConfig.workspaces, workspaceRoot);
+  const workspaceProfile = selectWorkspaceProfile(schemaConfig.workspaces, workspaceRoot);
   const projectDefaults = normalizeFamily(workspaceProfile?.projectDefaults);
   const notes = normalizeNamedFamilies(workspaceProfile?.notes);
   return {
@@ -48,7 +74,10 @@ function resolveDurableNoteProfile(config: any = {}) {
   };
 }
 
-function inspectDurableNoteRouting(config: any = {}, options: any = {}) {
+function inspectDurableNoteRouting(
+  config: DurableNoteConfig = {},
+  options: DurableNoteInspectionOptions = {},
+) {
   const profile = resolveDurableNoteProfile(config);
   const project = normalizeText(options.project);
   const scope = canonicalizeDurableNoteScope(options.scope);
@@ -66,13 +95,13 @@ function inspectDurableNoteRouting(config: any = {}, options: any = {}) {
       kind,
       extra: {
         project: target.label,
-        availableProjects: listTrackedProjects(config).map((entry: any) => entry.slug),
+        availableProjects: listTrackedProjects(config).map((entry) => entry.slug),
       },
     });
   }
 
   if (scope) {
-    const family = profile.notes[scope];
+    const family = profile.notes[scope] as DurableNoteFamily | undefined;
     if (!family) {
       throw new Error(`找不到 durable note scope: ${scope}；当前可用 scope: ${listAvailableScopes(profile).join(", ") || "none"}`);
     }
@@ -92,33 +121,41 @@ function inspectDurableNoteRouting(config: any = {}, options: any = {}) {
     mode: "overview",
     workspaceRoot: profile.workspaceRoot,
     project: {
-      availableProjects: listTrackedProjects(config).map((entry: any) => entry.slug),
+      availableProjects: listTrackedProjects(config).map((entry) => entry.slug),
       sections: profile.projectDefaults.sections,
       kinds: Object.keys(profile.projectDefaults.kinds),
     },
     scopes: Object.fromEntries(
-      Object.entries(profile.notes).map(([familyId, family]: any) => [
+      Object.entries(profile.notes).map(([familyId, family]) => {
+        const typedFamily = family as DurableNoteFamily;
+        return [
         familyId,
         {
-          label: family.label || familyId,
-          filePath: resolveWorkspaceNotePath(profile.workspaceRoot, family.filePath),
-          sections: [...family.sections],
-          kinds: Object.keys(family.kinds),
+          label: typedFamily.label || familyId,
+          filePath: resolveWorkspaceNotePath(profile.workspaceRoot, typedFamily.filePath),
+          sections: [...typedFamily.sections],
+          kinds: Object.keys(typedFamily.kinds),
         },
-      ])
+      ];
+      })
     ),
   };
 }
 
-function resolveDurableNoteRoute(config: any = {}, options: any = {}) {
+function resolveDurableNoteRoute(
+  config: DurableNoteConfig = {},
+  options: DurableNoteInspectionOptions = {},
+) {
   const inspection = inspectDurableNoteRouting(config, options);
   if (inspection.mode !== "route") {
     throw new Error("缺少完整 durable note 路由参数：至少传 --kind，并配合 --project 或 --scope");
   }
-  return inspection.route;
+  return (inspection as unknown as {
+    route: DurableNoteRouteDefinition & { family: string; filePath: string; kind: string; sections: string[] };
+  }).route;
 }
 
-function ensureDurableNoteSections(filePath: any, sections: any[] = []) {
+function ensureDurableNoteSections(filePath: unknown, sections: unknown[] = []) {
   const normalizedPath = normalizeText(filePath);
   if (!normalizedPath) {
     throw new Error("durable note filePath 不能为空");
@@ -157,7 +194,25 @@ function ensureDurableNoteSections(filePath: any, sections: any[] = []) {
   };
 }
 
-function buildInspectionResult({ mode, familyId, familyLabel, filePath, sections, kinds, kind, extra }: any) {
+function buildInspectionResult({
+  mode,
+  familyId,
+  familyLabel,
+  filePath,
+  sections,
+  kinds,
+  kind,
+  extra,
+}: {
+  extra: Record<string, unknown>;
+  familyId: string;
+  familyLabel: string;
+  filePath: string;
+  kind: string;
+  kinds: Record<string, { maxItems: number; section: string; slot: string; style: string }>;
+  mode: string;
+  sections: string[];
+}) {
   const availableKinds = Object.keys(kinds);
   if (!kind) {
     return {
@@ -197,7 +252,7 @@ function buildInspectionResult({ mode, familyId, familyLabel, filePath, sections
   };
 }
 
-function selectWorkspaceProfile(workspaces: any, workspaceRoot: any) {
+function selectWorkspaceProfile(workspaces: unknown, workspaceRoot: string): Record<string, unknown> {
   if (!workspaces || typeof workspaces !== "object") {
     return {};
   }
@@ -210,7 +265,7 @@ function selectWorkspaceProfile(workspaces: any, workspaceRoot: any) {
   return {};
 }
 
-function normalizeNamedFamilies(rawFamilies: any) {
+function normalizeNamedFamilies(rawFamilies: unknown) {
   if (!rawFamilies || typeof rawFamilies !== "object") {
     return {};
   }
@@ -240,12 +295,14 @@ function normalizeNamedFamilies(rawFamilies: any) {
   }
 
   return Object.fromEntries(
-    Array.from(families.entries()).map(([familyId, entry]: any) => [familyId, entry.value])
+    Array.from(families.entries()).map(([familyId, entry]) => [familyId, entry.value])
   );
 }
 
-function normalizeFamily(rawFamily: any) {
-  const family = rawFamily && typeof rawFamily === "object" ? rawFamily : {};
+function normalizeFamily(rawFamily: unknown) {
+  const family = rawFamily && typeof rawFamily === "object"
+    ? rawFamily as Record<string, unknown>
+    : {};
   return {
     filePath: normalizeRelativeOrAbsolutePath(family.path),
     sections: normalizeSections(family.sections),
@@ -253,12 +310,12 @@ function normalizeFamily(rawFamily: any) {
   };
 }
 
-function normalizeKinds(rawKinds: any) {
+function normalizeKinds(rawKinds: unknown) {
   if (!rawKinds || typeof rawKinds !== "object") {
     return {};
   }
   const entries = Object.entries(rawKinds)
-    .map(([kind, rawRoute]: any) => {
+    .map(([kind, rawRoute]) => {
       const normalizedKind = normalizeText(kind).toLowerCase();
       const route = normalizeRoute(rawRoute);
       if (!normalizedKind || !route) {
@@ -270,8 +327,10 @@ function normalizeKinds(rawKinds: any) {
   return Object.fromEntries(entries);
 }
 
-function normalizeRoute(rawRoute: any) {
-  const route = rawRoute && typeof rawRoute === "object" ? rawRoute : {};
+function normalizeRoute(rawRoute: unknown) {
+  const route = rawRoute && typeof rawRoute === "object"
+    ? rawRoute as Record<string, unknown>
+    : {};
   const section = normalizeText(route.section);
   if (!section) {
     return null;
@@ -284,9 +343,9 @@ function normalizeRoute(rawRoute: any) {
   };
 }
 
-function normalizeSections(rawSections: any) {
+function normalizeSections(rawSections: unknown): string[] {
   return Array.isArray(rawSections)
-    ? rawSections.map((section: any) => normalizeText(section)).filter(Boolean)
+    ? rawSections.map((section: unknown) => normalizeText(section)).filter(Boolean)
     : [];
 }
 
@@ -299,7 +358,7 @@ function normalizePositiveInteger(value: any) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
-function normalizeRelativeOrAbsolutePath(targetPath: any) {
+function normalizeRelativeOrAbsolutePath(targetPath: unknown): string {
   const normalized = normalizeText(targetPath);
   if (!normalized) {
     return "";
@@ -307,7 +366,7 @@ function normalizeRelativeOrAbsolutePath(targetPath: any) {
   return normalized.replace(/\\/g, "/");
 }
 
-function resolveWorkspaceNotePath(workspaceRoot: any, targetPath: any) {
+function resolveWorkspaceNotePath(workspaceRoot: unknown, targetPath: unknown): string {
   const normalizedTargetPath = normalizeText(targetPath);
   if (!normalizedTargetPath) {
     return "";
@@ -318,11 +377,11 @@ function resolveWorkspaceNotePath(workspaceRoot: any, targetPath: any) {
   return resolveCrossPlatformPathFromRoot(workspaceRoot, ...normalizedTargetPath.split("/"));
 }
 
-function listAvailableScopes(profile: any) {
+function listAvailableScopes(profile: { notes?: Record<string, unknown> }): string[] {
   return Object.keys(profile.notes || {});
 }
 
-function canonicalizeDurableNoteScope(value: any) {
+function canonicalizeDurableNoteScope(value: unknown): string {
   const normalized = normalizeText(value).toLowerCase();
   if (!normalized) {
     return "";
@@ -330,15 +389,15 @@ function canonicalizeDurableNoteScope(value: any) {
   return DURABLE_NOTE_SCOPE_ALIASES[normalized as keyof typeof DURABLE_NOTE_SCOPE_ALIASES] || normalized;
 }
 
-function normalizeText(value: any) {
+function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function normalizeLineEnding(value: any) {
+function normalizeLineEnding(value: unknown): string {
   return String(value || "").replace(/\r\n/g, "\n");
 }
 
-function ensureTrailingNewline(value: any) {
+function ensureTrailingNewline(value: unknown): string {
   const normalized = normalizeLineEnding(value);
   return normalized.endsWith("\n") ? normalized : `${normalized}\n`;
 }
