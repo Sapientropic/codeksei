@@ -5,6 +5,7 @@ const {
   normalizeReminderQueueEntry,
   normalizeSystemMessage,
   normalizeTimelineScreenshotJob,
+  systemMessageQueueStateSchema,
 } = require("../src/contracts/queue-items");
 
 test("system message contract normalizes delivery metadata", () => {
@@ -78,4 +79,39 @@ test("reminder queue contract normalizes due time and created timestamp", () => 
     dueAtMs: 1712908800000,
     createdAt: "2026-04-12T00:00:00.000Z",
   });
+});
+
+test("system message queue schema canonicalizes legacy queue payloads at ingress", () => {
+  const parsed = systemMessageQueueStateSchema.safeParse({
+    retained: true,
+    messages: [{
+      id: "reminder:legacy",
+      accountId: "acct-1",
+      senderId: "user-1",
+      workspaceRoot: "E:/repo/current",
+      text: "Reminder trigger",
+      createdAt: "2026-04-12T00:00:00.000Z",
+      deliveryState: "in_flight",
+      inFlightAt: "",
+    }],
+  });
+
+  assert.equal(parsed.success, true);
+  assert.equal(parsed.data.retained, true);
+  assert.deepEqual(parsed.data.messages, [{
+    id: "reminder:legacy",
+    accountId: "acct-1",
+    senderId: "user-1",
+    workspaceRoot: "E:/repo/current",
+    text: "Reminder trigger",
+    kind: "reminder",
+    attemptCount: 0,
+    lastAttemptAt: "",
+    nextAttemptAt: "2026-04-12T00:00:00.000Z",
+    expiresAt: "2026-04-13T00:00:00.000Z",
+    lastFailureReason: "",
+    deliveryState: "pending",
+    inFlightAt: "",
+    createdAt: "2026-04-12T00:00:00.000Z",
+  }]);
 });

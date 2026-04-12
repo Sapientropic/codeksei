@@ -3,7 +3,7 @@
 const {
   LEGACY_TIMELINE_TIMEZONE,
   getCurrentDateStringInTimezone,
-} = require("./timezone");
+} = require("../core/timezone");
 
 function buildReviewDraft(profile: any, window: any, diaryEntries: any, nightlyEntries: any[] = []) {
   if (profile.kind === "nightly") {

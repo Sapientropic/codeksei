@@ -42,6 +42,9 @@ class SystemMessageQueueStore {
   }
 
   load() {
+    // systemMessageQueueStateSchema is the one ingress that repairs legacy queue
+    // payloads. Once data crosses that boundary, the store should sort/clone it
+    // instead of re-normalizing the same record on every load/save cycle.
     const parsed = readManagedJsonStateFile({
       filePath: this.filePath,
       fallback: { messages: [] },
@@ -49,12 +52,9 @@ class SystemMessageQueueStore {
       schema: systemMessageQueueStateSchema,
     });
     const normalizedState = /** @type {{ messages?: unknown[] }} */ (parsed || {});
-    const messages = Array.isArray(normalizedState.messages) ? normalizedState.messages : [];
+    const messages = Array.isArray(normalizedState.messages) ? normalizedState.messages.slice() : [];
     this.state = {
-      messages: messages
-        .map(normalizeSystemMessage)
-        .filter(Boolean)
-        .sort(compareSystemMessages),
+      messages: messages.sort(compareSystemMessages),
     };
   }
 
@@ -64,7 +64,7 @@ class SystemMessageQueueStore {
 
   persistMessages(messages: any) {
     const nextMessages = Array.isArray(messages)
-      ? messages.map(normalizeSystemMessage).filter(Boolean).sort(compareSystemMessages)
+      ? messages.slice().sort(compareSystemMessages)
       : [];
     writeManagedJsonStateFile(this.filePath, { messages: nextMessages });
     this.state = { messages: nextMessages };
@@ -79,21 +79,15 @@ class SystemMessageQueueStore {
       schema: systemMessageDeadLetterStateSchema,
     });
     const normalizedState = /** @type {{ entries?: unknown[] }} */ (parsed || {});
-    const entries = Array.isArray(normalizedState.entries) ? normalizedState.entries : [];
+    const entries = Array.isArray(normalizedState.entries) ? normalizedState.entries.slice() : [];
     return {
-      entries: entries
-        .map(normalizeSystemMessageDeadLetterEntry)
-        .filter(Boolean)
-        .sort(compareSystemMessageDeadLetters),
+      entries: entries.sort(compareSystemMessageDeadLetters),
     };
   }
 
   saveDeadLetters(state: any) {
     const nextEntries = Array.isArray(state?.entries)
-      ? state.entries
-        .map(normalizeSystemMessageDeadLetterEntry)
-        .filter(Boolean)
-        .sort(compareSystemMessageDeadLetters)
+      ? state.entries.slice().sort(compareSystemMessageDeadLetters)
       : [];
     writeManagedJsonStateFile(this.deadLetterFilePath, { entries: nextEntries });
     return { entries: nextEntries };
@@ -292,7 +286,7 @@ class SystemMessageQueueStore {
   moveMessagesToDeadLetter(messages: any, reason: any, nowMs: any = Date.now()) {
     const normalizedReason = normalizeText(reason) || "dead_letter";
     const normalizedMessages = Array.isArray(messages)
-      ? messages.map((message: any) => normalizeSystemMessage(message)).filter(Boolean)
+      ? messages.filter((message: any) => Boolean(message && normalizeText(message.id)))
       : [];
     if (!normalizedMessages.length) {
       return [];

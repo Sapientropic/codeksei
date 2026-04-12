@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { __testing } = require("../src/core/review-semantic");
+const { __testing } = require("../src/review/review-semantic");
 
 function createFakeClient() {
   let listener = null;

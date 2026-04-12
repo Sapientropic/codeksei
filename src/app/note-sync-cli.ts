@@ -4,7 +4,7 @@ const { buildTerminalLeafHelp } = require("../core/command-registry");
 const {
   resolveNoteSyncTarget,
   syncNoteFile,
-} = require("../core/note-sync");
+} = require("../notes/note-sync");
 
 async function runNoteSyncCommand(config: any, args: any[] = []) {
   const options = parseNoteSyncArgs(args);

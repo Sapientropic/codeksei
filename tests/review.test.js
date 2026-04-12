@@ -7,7 +7,7 @@ const assert = require("node:assert/strict");
 const {
   buildReview,
   writeReview,
-} = require("../src/core/review");
+} = require("../src/review/review");
 const { clearJsonConfigCache } = require("../src/core/config-loader");
 
 function setupReviewFixture() {

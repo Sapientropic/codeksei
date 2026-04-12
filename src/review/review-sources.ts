@@ -2,7 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { normalizeDisplayPath } = require("./path-utils");
+const { normalizeDisplayPath } = require("../core/path-utils");
 const { parseManagedBulletList } = require("./review-document");
 
 function collectDiaryEntries(diaryDir: any, startDate: any, endDate: any) {

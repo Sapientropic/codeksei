@@ -5,7 +5,7 @@ const {
   buildReviewDraft,
   mergeReviewDraft,
   resolveReviewWindow,
-} = require("../src/core/review-draft");
+} = require("../src/review/review-draft");
 
 function createNightlyProfile() {
   return {

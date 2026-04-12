@@ -1,15 +1,15 @@
 const fs = require("fs");
 const path = require("path");
 const { normalizeReviewSchemaConfig } = require("../contracts/config-files");
-const { loadJsonConfig } = require("./config-loader");
-const { writeForeignTextDocument } = require("./json-state");
+const { loadJsonConfig } = require("../core/config-loader");
+const { writeForeignTextDocument } = require("../core/json-state");
 const { maybeGenerateSemanticReview } = require("./review-semantic");
-const { LEGACY_TIMELINE_TIMEZONE } = require("./timezone");
+const { LEGACY_TIMELINE_TIMEZONE } = require("../core/timezone");
 const {
   normalizeDisplayPath,
   resolveCrossPlatformPath,
   resolveCrossPlatformPathFromRoot,
-} = require("./path-utils");
+} = require("../core/path-utils");
 const {
   buildReviewDraft,
   mergeReviewDraft,

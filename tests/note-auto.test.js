@@ -8,8 +8,8 @@ const {
   ensureDurableNoteSections,
   inspectDurableNoteRouting,
   resolveDurableNoteRoute,
-} = require("../src/core/durable-note-schema");
-const { syncNoteFile } = require("../src/core/note-sync");
+} = require("../src/notes/durable-note-schema");
+const { syncNoteFile } = require("../src/notes/note-sync");
 
 function setupWorkspaceFixture() {
   const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-note-auto-"));
