@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const {
   isBriefStreamingProgressText,
   sanitizeReplyText,
-} = require("../src/core/stream-delivery/visible-text");
+} = require("../src/runtime/stream-delivery/visible-text");
 
 test("visible text sanitizer suppresses the SILENT sentinel", () => {
   assert.deepEqual(

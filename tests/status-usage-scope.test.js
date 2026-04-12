@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { ThreadStateStore } = require("../src/core/thread-state-store");
+const { ThreadStateStore } = require("../src/runtime/thread-state-store");
 const { buildChannelCommandContext } = require("../src/core/channel-command-context");
 
 test("channel command context only exposes usage for the current thread", () => {

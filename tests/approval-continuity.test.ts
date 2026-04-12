@@ -1,14 +1,18 @@
-// @ts-nocheck
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
-const test = require("node:test");
-const assert = require("node:assert/strict");
+const fs: typeof import("node:fs") = require("node:fs");
+const os: typeof import("node:os") = require("node:os");
+const path: typeof import("node:path") = require("node:path");
+const test: typeof import("node:test") = require("node:test");
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 
-const { SessionStore } = require("../src/adapters/runtime/codex/session-store");
-const { ThreadStateStore } = require("../src/core/thread-state-store");
-const { createControlCommandHandlers } = require("../src/core/channel-command-control-handlers");
-const { RuntimeWatchdogLifecycle } = require("../src/core/runtime-watchdog-lifecycle");
+const { SessionStore }: typeof import("../src/adapters/runtime/codex/session-store") = require("../src/adapters/runtime/codex/session-store");
+const { ThreadStateStore }: typeof import("../src/runtime/thread-state-store") = require("../src/runtime/thread-state-store");
+const { createControlCommandHandlers }: typeof import("../src/core/channel-command-control-handlers") = require("../src/core/channel-command-control-handlers");
+const { RuntimeWatchdogLifecycle }: typeof import("../src/runtime/runtime-watchdog-lifecycle") = require("../src/runtime/runtime-watchdog-lifecycle");
+import type {
+  ChannelAdapterLike,
+  RuntimeAdapterLike,
+  StreamDeliveryLike,
+} from "../src/core/app-service-contract";
 
 function createSessionStoreFixture() {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-approval-"));
@@ -39,12 +43,12 @@ function createSessionStoreFixture() {
 test("approval commands still resolve persisted pending approval after a restart", async () => {
   const { sessionStore } = createSessionStoreFixture();
   const threadStateStore = new ThreadStateStore();
-  const runtimeCalls = [];
-  const textCalls = [];
+  const runtimeCalls: Array<{ requestId: string; decision: "accept" | "decline" }> = [];
+  const textCalls: Array<{ text: string }> = [];
   const handlers = createControlCommandHandlers({
     channelAdapter: {
-      async sendText(payload) {
-        textCalls.push(payload);
+      async sendText(payload: { text?: unknown }) {
+        textCalls.push({ text: String(payload.text || "") });
       },
     },
     resolveWorkspaceRoot() {
@@ -54,7 +58,7 @@ test("approval commands still resolve persisted pending approval after a restart
       getSessionStore() {
         return sessionStore;
       },
-      async respondApproval(payload) {
+      async respondApproval(payload: { requestId: string; decision: "accept" | "decline" }) {
         runtimeCalls.push(payload);
       },
     },
@@ -81,8 +85,8 @@ test("approval commands still resolve persisted pending approval after a restart
 test("restoreBoundThreadSubscriptions rehydrates persisted approval into thread runtime state", async () => {
   const { bindingKey, sessionStore } = createSessionStoreFixture();
   const threadStateStore = new ThreadStateStore();
-  const resumedThreads = [];
-  const streamTargets = [];
+  const resumedThreads: string[] = [];
+  const streamTargets: Array<{ bindingKey: string; target: unknown }> = [];
   const lifecycle = new RuntimeWatchdogLifecycle({
     buildApprovalPromptSignature() {
       return "";
@@ -97,7 +101,7 @@ test("restoreBoundThreadSubscriptions rehydrates persisted approval into thread 
       sendTyping() {
         return Promise.resolve();
       },
-    },
+    } as unknown as ChannelAdapterLike,
     matchesBuiltInCommandPrefix() {
       return false;
     },
@@ -110,11 +114,12 @@ test("restoreBoundThreadSubscriptions rehydrates persisted approval into thread 
     normalizeText(value) {
       return typeof value === "string" ? value.trim() : "";
     },
-    resolveReplyTargetForBinding(candidateBindingKey) {
+    resolveReplyTargetForBinding(candidateBindingKey: string) {
       if (candidateBindingKey === bindingKey) {
         return {
           userId: "user-1",
           contextToken: "ctx-1",
+          provider: "weixin",
         };
       }
       return null;
@@ -123,15 +128,15 @@ test("restoreBoundThreadSubscriptions rehydrates persisted approval into thread 
       getSessionStore() {
         return sessionStore;
       },
-      async resumeThread({ threadId }) {
+      async resumeThread({ threadId }: { threadId: string }) {
         resumedThreads.push(threadId);
       },
-    },
+    } as unknown as RuntimeAdapterLike,
     streamDelivery: {
-      setReplyTarget(bindingKeyValue, target) {
+      setReplyTarget(bindingKeyValue: string, target: unknown) {
         streamTargets.push({ bindingKey: bindingKeyValue, target });
       },
-    },
+    } as unknown as StreamDeliveryLike,
     streamSettlementTimeoutMs: 1000,
     threadStateStore,
     firstRuntimeEventFailureTimeoutMs: 1000,

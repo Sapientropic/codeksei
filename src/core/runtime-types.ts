@@ -8,7 +8,9 @@ export interface ReplyTarget {
   provider: string;
 }
 
-export interface AttachmentFailure extends UnknownRecord {
+export interface AttachmentFailure {
+  kind?: string;
+  sourceFileName?: string;
   reason: string;
 }
 

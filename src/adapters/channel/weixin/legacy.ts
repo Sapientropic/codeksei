@@ -7,6 +7,7 @@ const { getConfig, getUpdates, sendMessage, sendTyping } = require("./api");
 const { sendWeixinMediaFile } = require("./media-send");
 const { normalizeWeixinIncomingMessage } = require("./message-utils");
 const { loadSyncBuffer, saveSyncBuffer } = require("./sync-buffer-store");
+import type { SendWeixinMediaFileArgs, SendWeixinMediaFileResult } from "./media-types";
 
 const LONG_POLL_TIMEOUT_MS = 35_000;
 const SEND_MESSAGE_CHUNK_INTERVAL_MS = 350;
@@ -96,6 +97,10 @@ interface SendLegacyTextChunkArgs {
 }
 
 type RetrySendCallback<T> = () => Promise<T>;
+
+const sendWeixinMediaFileImpl = sendWeixinMediaFile as (
+  args: SendWeixinMediaFileArgs,
+) => Promise<SendWeixinMediaFileResult>;
 
 function createLegacyWeixinChannelAdapter(config: LegacyWeixinConfig) {
   let selectedAccount: LegacyWeixinAccount | null = null;
@@ -286,19 +291,19 @@ function createLegacyWeixinChannelAdapter(config: LegacyWeixinConfig) {
         },
       });
     },
-    async sendFile({ userId, filePath, contextToken = "" }: LegacySendFileArgs) {
+    async sendFile({ userId, filePath, contextToken = "" }: LegacySendFileArgs): Promise<SendWeixinMediaFileResult> {
       const account = ensureAccount();
       const resolvedToken = resolveContextToken(userId, contextToken);
       if (!resolvedToken) {
         throw new Error(`缺少 context_token，无法发送文件给用户 ${userId}`);
       }
-      return sendWeixinMediaFile({
+      return sendWeixinMediaFileImpl({
         filePath,
         to: userId,
         contextToken: resolvedToken,
         baseUrl: account.baseUrl,
         token: account.token,
-        cdnBaseUrl: config.weixinCdnBaseUrl,
+        cdnBaseUrl: typeof config.weixinCdnBaseUrl === "string" ? config.weixinCdnBaseUrl : "",
       });
     },
   };

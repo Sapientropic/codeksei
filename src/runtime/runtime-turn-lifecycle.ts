@@ -8,9 +8,8 @@ import type {
   RuntimeAdapterLike,
   StreamDeliveryLike,
   TimelineIntegrationLike,
-} from "./app-service-contract";
+} from "../core/app-service-contract";
 import type {
-  AttachmentFailure,
   HandlePreparedMessageOptions,
   NormalizedIncomingMessage,
   PreparedRuntimeMessage,
@@ -20,12 +19,13 @@ import type {
   TimelineScreenshotRequest,
   RuntimeTurnSendState,
   UserTypingOptions,
-} from "./runtime-types";
+} from "../core/runtime-types";
+import type {
+  IncomingWeixinAttachment,
+  PersistIncomingWeixinAttachmentsResult,
+} from "../adapters/channel/weixin/media-types";
 
-interface PersistedAttachmentResult {
-  saved: unknown[];
-  failed: AttachmentFailure[];
-}
+type PersistedAttachmentResult = PersistIncomingWeixinAttachmentsResult;
 
 type RuntimeTurnConfig = AppRuntimeConfig;
 
@@ -33,7 +33,7 @@ type FormatErrorMessage = (error: unknown) => string;
 type MaybeDispatchCommand = (normalized: NormalizedIncomingMessage) => Promise<boolean>;
 type NormalizeText = (value: unknown) => string;
 type PersistIncomingWeixinAttachments = (args: {
-  attachments: unknown[];
+  attachments: IncomingWeixinAttachment[];
   stateDir: string;
   cdnBaseUrl: unknown;
   messageId: string;
@@ -261,7 +261,9 @@ export class RuntimeTurnLifecycle {
     normalized: NormalizedIncomingMessage,
     workspaceRoot: string,
   ): Promise<PreparedRuntimeMessage | null> {
-    const attachments = Array.isArray(normalized.attachments) ? normalized.attachments : [];
+    const attachments = Array.isArray(normalized.attachments)
+      ? normalized.attachments as IncomingWeixinAttachment[]
+      : [];
     if (!attachments.length) {
       return {
         ...normalized,

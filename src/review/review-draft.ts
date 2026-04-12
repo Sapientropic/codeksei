@@ -4,15 +4,36 @@ import {
   LEGACY_TIMELINE_TIMEZONE,
   getCurrentDateStringInTimezone,
 } from "../core/timezone";
+import type {
+  DiaryReviewEntry,
+  DiarySupplementEntry,
+  NightlyReviewEntry,
+  ReviewDatedLines,
+  ReviewDraft,
+  ReviewKind,
+  ReviewProfile,
+  ReviewSemanticPatch,
+  ReviewSupplementGroup,
+  ReviewWindow,
+} from "./review-types";
 
-function buildReviewDraft(profile: any, window: any, diaryEntries: any, nightlyEntries: any[] = []) {
+function buildReviewDraft(
+  profile: ReviewProfile,
+  window: ReviewWindow,
+  diaryEntries: DiaryReviewEntry[],
+  nightlyEntries: NightlyReviewEntry[] = [],
+): ReviewDraft {
   if (profile.kind === "nightly") {
     return buildNightlyDraft(profile, window, diaryEntries);
   }
   return buildPeriodicReviewDraft(profile, window, diaryEntries, nightlyEntries);
 }
 
-function buildNightlyDraft(profile: any, window: any, diaryEntries: any) {
+function buildNightlyDraft(
+  profile: ReviewProfile,
+  window: ReviewWindow,
+  diaryEntries: DiaryReviewEntry[],
+): ReviewDraft {
   const entry = diaryEntries[0] || null;
   const openTodos = entry ? entry.todo.open.length : 0;
   const doneTodos = entry ? entry.todo.done.length : 0;
@@ -27,7 +48,7 @@ function buildNightlyDraft(profile: any, window: any, diaryEntries: any) {
     ...openLoops,
   ]).slice(0, 5);
   const closeout = dedupeStatements(
-    entry && entry.summary.length ? entry.summary : progress
+    entry && entry.summary.length ? entry.summary : progress,
   ).slice(0, 6);
   const signals = dedupeStatements([
     ...(entry ? entry.fragment : []),
@@ -68,28 +89,31 @@ function buildNightlyDraft(profile: any, window: any, diaryEntries: any) {
   };
 }
 
-function buildPeriodicReviewDraft(profile: any, window: any, diaryEntries: any, nightlyEntries: any[] = []) {
+function buildPeriodicReviewDraft(
+  profile: ReviewProfile,
+  window: ReviewWindow,
+  diaryEntries: DiaryReviewEntry[],
+  nightlyEntries: NightlyReviewEntry[] = [],
+): ReviewDraft {
   const latestEntry = diaryEntries[diaryEntries.length - 1] || null;
-  const nightlyByDate = new Map(
-    nightlyEntries.map((entry: any) => [entry.date, entry])
-  );
-  const totalOpenTodos = diaryEntries.reduce((sum: any, entry: any) => sum + entry.todo.open.length, 0);
-  const totalDoneTodos = diaryEntries.reduce((sum: any, entry: any) => sum + entry.todo.done.length, 0);
-  const totalTimelineFacts = diaryEntries.reduce((sum: any, entry: any) => sum + entry.timeline.length, 0);
+  const nightlyByDate = new Map(nightlyEntries.map((entry) => [entry.date, entry]));
+  const totalOpenTodos = diaryEntries.reduce((sum, entry) => sum + entry.todo.open.length, 0);
+  const totalDoneTodos = diaryEntries.reduce((sum, entry) => sum + entry.todo.done.length, 0);
+  const totalTimelineFacts = diaryEntries.reduce((sum, entry) => sum + entry.timeline.length, 0);
 
   const progress = dedupeStatements(
-    diaryEntries.flatMap((entry: any) => selectPeriodicProgress(entry, nightlyByDate.get(entry.date)))
+    diaryEntries.flatMap((entry) => selectPeriodicProgress(entry, nightlyByDate.get(entry.date))),
   ).slice(0, 8);
 
   const friction = dedupeStatements(
-    diaryEntries.flatMap((entry: any) => selectPeriodicFriction(entry, nightlyByDate.get(entry.date)))
+    diaryEntries.flatMap((entry) => selectPeriodicFriction(entry, nightlyByDate.get(entry.date))),
   ).slice(0, 8);
 
   const latestNightly = latestEntry ? nightlyByDate.get(latestEntry.date) || null : null;
   const openLoops = dedupeStatements(
     latestNightly?.openLoops?.length
       ? latestNightly.openLoops
-      : (latestEntry ? latestEntry.todo.open : [])
+      : (latestEntry ? latestEntry.todo.open : []),
   ).slice(0, 8);
 
   const carryForward = dedupeStatements([
@@ -99,16 +123,16 @@ function buildPeriodicReviewDraft(profile: any, window: any, diaryEntries: any, 
   ]).slice(0, 5);
 
   const dailySummaries = diaryEntries
-    .map((entry: any) => ({
+    .map((entry): ReviewDatedLines => ({
       date: entry.date,
       lines: dedupeStatements(
-        selectPeriodicCloseout(entry, nightlyByDate.get(entry.date))
+        selectPeriodicCloseout(entry, nightlyByDate.get(entry.date)),
       ).slice(0, 6),
     }))
-    .filter((entry: any) => entry.lines.length);
+    .filter((entry) => entry.lines.length);
 
   const supplements = diaryEntries
-    .flatMap((entry: any) => selectPeriodicSupplementGroups(entry, nightlyByDate.get(entry.date)))
+    .flatMap((entry) => selectPeriodicSupplementGroups(entry, nightlyByDate.get(entry.date)))
     .slice(-8);
   const windowFacts = [
     `时间范围：${window.startDate} ~ ${window.endDate}`,
@@ -145,7 +169,11 @@ function buildPeriodicReviewDraft(profile: any, window: any, diaryEntries: any, 
   };
 }
 
-function mergeReviewDraft(kind: any, deterministicDraft: any, semanticData: any) {
+function mergeReviewDraft(
+  kind: ReviewKind,
+  deterministicDraft: ReviewDraft,
+  semanticData: ReviewSemanticPatch | null | undefined,
+): ReviewDraft {
   if (!semanticData || typeof semanticData !== "object") {
     return deterministicDraft;
   }
@@ -153,13 +181,16 @@ function mergeReviewDraft(kind: any, deterministicDraft: any, semanticData: any)
   const mergedInsights = {
     ...deterministicDraft.insights,
   };
-  for (const [key, value] of Object.entries(semanticData)) {
+  const semanticEntries = Object.entries(semanticData) as Array<
+    [keyof ReviewSemanticPatch, ReviewSemanticPatch[keyof ReviewSemanticPatch]]
+  >;
+  for (const [key, value] of semanticEntries) {
     if (Array.isArray(value) && value.length) {
-      mergedInsights[key] = value;
+      (mergedInsights as Record<string, unknown>)[key] = value;
     }
   }
 
-  const mergedDraft = {
+  const mergedDraft: ReviewDraft = {
     ...deterministicDraft,
     insights: mergedInsights,
     content: {
@@ -172,8 +203,8 @@ function mergeReviewDraft(kind: any, deterministicDraft: any, semanticData: any)
     mergedDraft.content.friction = renderBulletList(mergedInsights.friction, "今天还没有明显的摩擦摘要。");
     mergedDraft.content["open-loops"] = renderBulletList(mergedInsights.openLoops, "今晚没有明显还开着的线头。");
     mergedDraft.content["carry-forward"] = renderBulletList(mergedInsights.carryForward, "明天先从最小动作重新接上。");
-    mergedDraft.content.closeout = renderBulletList(mergedInsights.closeout, "今天的睡前收口还没有写出来。");
-    mergedDraft.content.signals = renderBulletList(mergedInsights.signals, "今天还没有稳定到值得带走的信号。");
+    mergedDraft.content.closeout = renderBulletList(mergedInsights.closeout || [], "今天的睡前收口还没有写出来。");
+    mergedDraft.content.signals = renderBulletList(mergedInsights.signals || [], "今天还没有稳定到值得带走的信号。");
     return mergedDraft;
   }
 
@@ -181,12 +212,12 @@ function mergeReviewDraft(kind: any, deterministicDraft: any, semanticData: any)
   mergedDraft.content.friction = renderBulletList(mergedInsights.friction, "这段时间还没有明显的摩擦摘要。");
   mergedDraft.content["open-loops"] = renderBulletList(mergedInsights.openLoops, "这一周期末尾没有明显还开着的线头。");
   mergedDraft.content["carry-forward"] = renderBulletList(mergedInsights.carryForward, "下一次先从最小动作重新接上。");
-  mergedDraft.content["daily-summaries"] = renderDatedGroups(mergedInsights.dailySummaries, "这段时间没有可引用的每日总结。");
-  mergedDraft.content.supplements = renderSupplementGroups(mergedInsights.supplements, "这段时间没有值得回看的补充记录。");
+  mergedDraft.content["daily-summaries"] = renderDatedGroups(mergedInsights.dailySummaries || [], "这段时间没有可引用的每日总结。");
+  mergedDraft.content.supplements = renderSupplementGroups(mergedInsights.supplements || [], "这段时间没有值得回看的补充记录。");
   return mergedDraft;
 }
 
-function resolveReviewWindow(kind: any, options: any = {}) {
+function resolveReviewWindow(kind: ReviewKind, options: { week?: unknown; month?: unknown; date?: unknown; timezone?: unknown } = {}): ReviewWindow {
   const normalizedKind = normalizeText(kind).toLowerCase();
   if (normalizedKind === "nightly") {
     return resolveNightlyWindow(options);
@@ -197,20 +228,22 @@ function resolveReviewWindow(kind: any, options: any = {}) {
   return resolveMonthlyWindow(options);
 }
 
-function resolveNightlyWindow(options: any = {}) {
+function resolveNightlyWindow(options: { date?: unknown; timezone?: unknown } = {}): ReviewWindow {
+  const timezone = normalizeText(options.timezone) || LEGACY_TIMELINE_TIMEZONE;
   const baseDate = normalizeText(options.date)
     ? parseDateString(normalizeText(options.date))
-    : parseDateString(getCurrentDateStringInTimezone(options.timezone || LEGACY_TIMELINE_TIMEZONE));
+    : parseDateString(getCurrentDateStringInTimezone(timezone));
   const label = formatUtcDate(baseDate);
   return {
     label,
     startDate: label,
     endDate: label,
-    timezone: options.timezone || LEGACY_TIMELINE_TIMEZONE,
+    timezone,
   };
 }
 
-function resolveWeeklyWindow(options: any = {}) {
+function resolveWeeklyWindow(options: { week?: unknown; date?: unknown; timezone?: unknown } = {}): ReviewWindow {
+  const timezone = normalizeText(options.timezone) || LEGACY_TIMELINE_TIMEZONE;
   if (normalizeText(options.week)) {
     const match = /^(\d{4})-W(\d{2})$/u.exec(normalizeText(options.week));
     if (!match) {
@@ -225,13 +258,13 @@ function resolveWeeklyWindow(options: any = {}) {
       label: `${year}-W${String(week).padStart(2, "0")}`,
       startDate: formatUtcDate(start),
       endDate: formatUtcDate(end),
-      timezone: options.timezone || LEGACY_TIMELINE_TIMEZONE,
+      timezone,
     };
   }
 
   const baseDate = normalizeText(options.date)
     ? parseDateString(normalizeText(options.date))
-    : parseDateString(getCurrentDateStringInTimezone(options.timezone || LEGACY_TIMELINE_TIMEZONE));
+    : parseDateString(getCurrentDateStringInTimezone(timezone));
   const start = startOfIsoWeek(baseDate);
   const end = addDays(start, 6);
   const week = isoWeekNumber(baseDate);
@@ -239,11 +272,11 @@ function resolveWeeklyWindow(options: any = {}) {
     label: `${baseDate.getUTCFullYear()}-W${String(week).padStart(2, "0")}`,
     startDate: formatUtcDate(start),
     endDate: formatUtcDate(end),
-    timezone: options.timezone || LEGACY_TIMELINE_TIMEZONE,
+    timezone,
   };
 }
 
-function resolveMonthlyWindow(options: any = {}) {
+function resolveMonthlyWindow(options: { month?: unknown; date?: unknown; timezone?: unknown } = {}): ReviewWindow {
   let year = 0;
   let month = 0;
   if (normalizeText(options.month)) {
@@ -254,9 +287,10 @@ function resolveMonthlyWindow(options: any = {}) {
     year = Number.parseInt(match[1], 10);
     month = Number.parseInt(match[2], 10);
   } else {
+    const timezone = normalizeText(options.timezone) || LEGACY_TIMELINE_TIMEZONE;
     const baseDate = normalizeText(options.date)
       ? parseDateString(normalizeText(options.date))
-      : parseDateString(getCurrentDateStringInTimezone(options.timezone || LEGACY_TIMELINE_TIMEZONE));
+      : parseDateString(getCurrentDateStringInTimezone(timezone));
     year = baseDate.getUTCFullYear();
     month = baseDate.getUTCMonth() + 1;
   }
@@ -266,75 +300,78 @@ function resolveMonthlyWindow(options: any = {}) {
     label: `${year}-${String(month).padStart(2, "0")}`,
     startDate: formatUtcDate(start),
     endDate: formatUtcDate(end),
-    timezone: options.timezone || LEGACY_TIMELINE_TIMEZONE,
+    timezone: normalizeText(options.timezone) || LEGACY_TIMELINE_TIMEZONE,
   };
 }
 
-function selectProgressFromDiary(entry: any) {
+function selectProgressFromDiary(entry: DiaryReviewEntry | null): string[] {
   if (!entry) {
     return [];
   }
   const progressFromSummary = entry.summary.filter(
-    (line: any) => !looksLikeCarryForward(line) && !hasFrictionSignal(line)
+    (line) => !looksLikeCarryForward(line) && !hasFrictionSignal(line),
   );
   return progressFromSummary.length ? progressFromSummary : entry.timeline;
 }
 
-function selectFrictionFromDiary(entry: any) {
+function selectFrictionFromDiary(entry: DiaryReviewEntry | null): string[] {
   if (!entry) {
     return [];
   }
   return [
     ...entry.fragment.filter(hasFrictionSignal),
     ...selectFrictionFromSupplements(entry.supplement),
-    ...entry.summary.filter((line: any) => hasFrictionSignal(line)),
+    ...entry.summary.filter(hasFrictionSignal),
   ];
 }
 
-function selectPeriodicProgress(entry: any, nightlyEntry: any) {
+function selectPeriodicProgress(entry: DiaryReviewEntry, nightlyEntry: NightlyReviewEntry | null | undefined): string[] {
   if (nightlyEntry?.progress?.length) {
     return nightlyEntry.progress;
   }
   return selectProgressFromDiary(entry);
 }
 
-function selectPeriodicFriction(entry: any, nightlyEntry: any) {
+function selectPeriodicFriction(entry: DiaryReviewEntry, nightlyEntry: NightlyReviewEntry | null | undefined): string[] {
   if (nightlyEntry?.friction?.length) {
     return nightlyEntry.friction;
   }
   return selectFrictionFromDiary(entry);
 }
 
-function selectPeriodicCloseout(entry: any, nightlyEntry: any) {
+function selectPeriodicCloseout(entry: DiaryReviewEntry, nightlyEntry: NightlyReviewEntry | null | undefined): string[] {
   if (nightlyEntry?.closeout?.length) {
     return nightlyEntry.closeout;
   }
-  if (entry?.summary?.length) {
+  if (entry.summary.length) {
     return entry.summary;
   }
   return selectProgressFromDiary(entry);
 }
 
-function selectPeriodicSupplementGroups(entry: any, nightlyEntry: any) {
+function selectPeriodicSupplementGroups(
+  entry: DiaryReviewEntry,
+  nightlyEntry: NightlyReviewEntry | null | undefined,
+): ReviewSupplementGroup[] {
   if (nightlyEntry?.signals?.length) {
     return [{
       date: entry.date,
       title: "夜间收口提炼",
-      body: nightlyEntry.signals.map((line: any) => `- ${normalizeLineItem(line)}`).join("\n"),
+      body: nightlyEntry.signals.map((line) => `- ${normalizeLineItem(line)}`).join("\n"),
     }];
   }
   return entry.supplement
-    .map((item: any) => ({
+    .map((item): ReviewSupplementGroup => ({
       date: entry.date,
       title: item.title,
       body: toCompactSentence(item.body),
     }))
-    .filter((item: any) => item.body);
+    .filter((item) => item.body);
 }
 
-function selectFrictionFromSupplements(items: any) {
-  return (Array.isArray(items) ? items : [])
-    .map((item: any) => {
+function selectFrictionFromSupplements(items: DiarySupplementEntry[]): string[] {
+  return items
+    .map((item) => {
       const seed = item.title || toCompactSentence(item.body);
       if (!hasFrictionSignal(seed) && !hasFrictionSignal(item.body)) {
         return "";
@@ -348,9 +385,9 @@ function selectFrictionFromSupplements(items: any) {
     .filter(Boolean);
 }
 
-function selectSignalFromSupplements(items: any) {
-  return (Array.isArray(items) ? items : [])
-    .map((item: any) => {
+function selectSignalFromSupplements(items: DiarySupplementEntry[]): string[] {
+  return items
+    .map((item) => {
       const title = normalizeLineItem(item.title);
       if (title) {
         return title;
@@ -360,18 +397,18 @@ function selectSignalFromSupplements(items: any) {
     .filter(Boolean);
 }
 
-function renderBulletList(items: any, fallbackText: any) {
-  const lines = Array.isArray(items) && items.length
-    ? items.map((item: any) => `- ${normalizeLineItem(item)}`)
+function renderBulletList(items: string[], fallbackText: string): string {
+  const lines = items.length
+    ? items.map((item) => `- ${normalizeLineItem(item)}`)
     : [`- ${fallbackText}`];
   return lines.join("\n");
 }
 
-function renderDatedGroups(groups: any, fallbackText: any) {
-  if (!Array.isArray(groups) || !groups.length) {
+function renderDatedGroups(groups: ReviewDatedLines[], fallbackText: string): string {
+  if (!groups.length) {
     return `- ${fallbackText}`;
   }
-  const parts = [];
+  const parts: string[] = [];
   for (const group of groups) {
     parts.push(`### ${group.date}`);
     for (const line of group.lines) {
@@ -381,11 +418,11 @@ function renderDatedGroups(groups: any, fallbackText: any) {
   return parts.join("\n");
 }
 
-function renderSupplementGroups(items: any, fallbackText: any) {
-  if (!Array.isArray(items) || !items.length) {
+function renderSupplementGroups(items: ReviewSupplementGroup[], fallbackText: string): string {
+  if (!items.length) {
     return `- ${fallbackText}`;
   }
-  const parts = [];
+  const parts: string[] = [];
   for (const item of items) {
     const heading = item.title
       ? `### ${item.date} ${item.title}`
@@ -396,7 +433,7 @@ function renderSupplementGroups(items: any, fallbackText: any) {
   return parts.join("\n\n");
 }
 
-function hasFrictionSignal(value: any) {
+function hasFrictionSignal(value: unknown): boolean {
   const normalized = normalizeText(value);
   if (!normalized) {
     return false;
@@ -404,7 +441,7 @@ function hasFrictionSignal(value: any) {
   return /(偏重|头痛|忘|烦|卡|累|耗|断开|岔开|拖|收不住|重复发送|截断|低电量|羞耻|分心)/u.test(normalized);
 }
 
-function looksLikeCarryForward(value: any) {
+function looksLikeCarryForward(value: unknown): boolean {
   const normalized = normalizeText(value);
   if (!normalized) {
     return false;
@@ -412,10 +449,10 @@ function looksLikeCarryForward(value: any) {
   return /^(明天|下周|下个月|后面|下一步|后续)/u.test(normalized);
 }
 
-function dedupeStatements(items: any) {
-  const seen = new Set();
-  const result = [];
-  for (const rawItem of Array.isArray(items) ? items : []) {
+function dedupeStatements(items: unknown[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const rawItem of items) {
     const item = normalizeLineItem(rawItem);
     if (!item) {
       continue;
@@ -430,7 +467,7 @@ function dedupeStatements(items: any) {
   return result;
 }
 
-function truncateSentence(value: any, maxLength: any) {
+function truncateSentence(value: unknown, maxLength: number): string {
   const normalized = normalizeText(value);
   if (!normalized || normalized.length <= maxLength) {
     return normalized;
@@ -438,21 +475,21 @@ function truncateSentence(value: any, maxLength: any) {
   return `${normalized.slice(0, Math.max(0, maxLength - 1)).replace(/[，。；,;:\s]+$/u, "")}…`;
 }
 
-function toCompactSentence(value: any) {
+function toCompactSentence(value: unknown): string {
   return normalizeBody(value).replace(/\s*\n+\s*/gu, " ").replace(/\s{2,}/gu, " ").trim();
 }
 
-function createUtcDate(year: any, month: any, day: any) {
+function createUtcDate(year: number, month: number, day: number): Date {
   return new Date(Date.UTC(year, month - 1, day));
 }
 
-function addDays(date: any, offset: any) {
+function addDays(date: Date, offset: number): Date {
   const next = new Date(date.getTime());
   next.setUTCDate(next.getUTCDate() + offset);
   return next;
 }
 
-function parseDateString(value: any) {
+function parseDateString(value: string): Date {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(value);
   if (!match) {
     throw new Error(`日期格式应为 YYYY-MM-DD: ${value}`);
@@ -460,41 +497,41 @@ function parseDateString(value: any) {
   return createUtcDate(
     Number.parseInt(match[1], 10),
     Number.parseInt(match[2], 10),
-    Number.parseInt(match[3], 10)
+    Number.parseInt(match[3], 10),
   );
 }
 
-function startOfIsoWeek(date: any) {
+function startOfIsoWeek(date: Date): Date {
   const day = date.getUTCDay() || 7;
   return addDays(date, 1 - day);
 }
 
-function isoWeekNumber(date: any) {
+function isoWeekNumber(date: Date): number {
   const thursday = addDays(startOfIsoWeek(date), 3);
   const firstThursday = addDays(startOfIsoWeek(createUtcDate(thursday.getUTCFullYear(), 1, 4)), 3);
   return Math.round((thursday.getTime() - firstThursday.getTime()) / 604800000) + 1;
 }
 
-function formatUtcDate(date: any) {
+function formatUtcDate(date: Date): string {
   const year = date.getUTCFullYear();
   const month = String(date.getUTCMonth() + 1).padStart(2, "0");
   const day = String(date.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
-function normalizeBody(value: any) {
+function normalizeBody(value: unknown): string {
   return normalizeLineEnding(value).trim();
 }
 
-function normalizeLineItem(value: any) {
+function normalizeLineItem(value: unknown): string {
   return normalizeBody(value).replace(/\s*\n+\s*/gu, " ").replace(/\s{2,}/gu, " ").trim();
 }
 
-function normalizeLineEnding(value: any) {
+function normalizeLineEnding(value: unknown): string {
   return String(value || "").replace(/\r\n/g, "\n");
 }
 
-function normalizeText(value: any) {
+function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 

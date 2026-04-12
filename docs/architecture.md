@@ -9,17 +9,18 @@
 
 `src/core/*`
 
-`src/core` 现在只负责最靠里的编排壳层。
+`src/core` 现在只负责最上层编排壳层。
 
 负责：
 
 - 组装 channel / runtime / integration
-- 驱动 app poll loop、runtime turn/watchdog/backstage lifecycle
-- 协调 command router、stream delivery、thread state
+- 驱动 app poll loop
+- 协调 command router 与 app-level wiring
 - 保持 app-level wiring 与 bridge coordination
 
 不负责：
 
+- runtime lifecycle / stream delivery / thread state 实现
 - managed state 文件读写细节
 - workspace continuity 工具
 - shared heartbeat owner
@@ -27,7 +28,34 @@
 
 一句话理解：`src/core` 负责“把系统接起来”，不再负责“把状态怎么存、workspace 怎么找、复用说明怎么拼”。
 
-## 2. State Ownership
+## 2. Runtime Subsystem
+
+`src/runtime/*`
+
+这一层收口真正的 runtime orchestration 子系统。
+
+当前包括：
+
+- `runtime-turn-lifecycle.ts`
+- `runtime-watchdog-lifecycle.ts`
+- `backstage-task-lifecycle.ts`
+- `thread-state-store.ts`
+- `stream-delivery.ts`
+- `stream-delivery/*`
+
+负责：
+
+- runtime turn / approval / watchdog / backstage 调度
+- thread state 与 stream delivery owner
+- 把 channel / runtime adapter 之间的会话级协作收口成稳定实现
+
+不负责：
+
+- app CLI wiring
+- managed state store owner
+- review / notes / timeline 的领域逻辑
+
+## 3. State Ownership
 
 `src/state/*`
 
@@ -48,7 +76,7 @@
 
 这一层是“状态怎么进、怎么存、怎么隔离坏文件”的真相层。
 
-## 3. Workspace Continuity
+## 4. Workspace Continuity
 
 `src/workspace/*`
 
@@ -71,7 +99,7 @@
 - runtime thread/session 主链
 - review / note / adapter 业务规则
 
-## 4. Channel Adapters
+## 5. Channel Adapters
 
 `src/adapters/channel/*`
 
@@ -94,7 +122,7 @@
 - Codex thread 语义
 - review / durable note / timeline 业务规则
 
-## 5. Runtime Adapters
+## 6. Runtime Adapters
 
 `src/adapters/runtime/*`
 
@@ -113,7 +141,7 @@
 - `bootstrap.ts` 负责 thread bootstrap / instruction refresh 文本
 - `diagnostics.ts` 负责 workspace diagnostics / turn completion wait
 
-## 6. Shared Mode
+## 7. Shared Mode
 
 公开入口脚本在 `scripts/*.sh` / `scripts/*.ps1`，shared lifecycle 逻辑收口在 `src/shared/*`。
 
@@ -128,7 +156,7 @@
 
 `src/shared/shared-bridge-heartbeat.ts` 现在是 heartbeat ingress 与 owner，不再挂在 `src/core`。
 
-## 7. Integrations And Operational Layer
+## 8. Integrations And Operational Layer
 
 `src/integrations/*`、`src/review/*`、`src/notes/*`、`src/app/*`
 
@@ -147,8 +175,9 @@
 - `src/notes` 不直接依赖 adapter 层
 - `src/state` 不直接依赖 app CLI 层
 - `src/core` 不重新吸回 review / notes 的实现细节
+- `src/runtime` 不重新吸回 review / notes / app CLI 的实现细节
 
-## 8. Persistence Model
+## 9. Persistence Model
 
 主要状态默认在：
 
@@ -167,7 +196,7 @@
 
 本地优先会落实在这里：状态、日志、提醒队列和生活记录默认都留在自己手里。
 
-## 9. Compatibility Boundary
+## 10. Compatibility Boundary
 
 公开表面统一按 `Codeksei / codeksei / CODEKSEI_*` 书写。
 运行时、shared wrapper、managed marker 与脚本入口都只认 `codeksei` 这一套命名，不再保留旧别名或旧状态目录 fallback。

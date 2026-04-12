@@ -8,12 +8,12 @@ import {
 import type {
   ChannelAdapterLike,
   SessionStoreLike,
-} from "./app-service-contract";
+} from "../core/app-service-contract";
 import type {
   DeliveryFailurePayload,
   ReplyTarget,
   UnknownRecord,
-} from "./runtime-types";
+} from "../core/runtime-types";
 import { computeVisibleDeliveryDelta } from "./stream-delivery/delta-merge";
 import {
   buildCurrentSafeReplyText,

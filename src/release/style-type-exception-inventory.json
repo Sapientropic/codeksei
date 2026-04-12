@@ -28,21 +28,17 @@
     "src/adapters/channel/weixin/login-legacy.ts",
     "src/adapters/channel/weixin/login-v2.ts",
     "src/adapters/channel/weixin/media-mime.ts",
-    "src/adapters/channel/weixin/media-receive.ts",
     "src/adapters/channel/weixin/message-utils-v2.ts",
-    "src/adapters/channel/weixin/media-send.ts",
     "src/adapters/channel/weixin/protocol.ts",
     "src/adapters/channel/weixin/sync-buffer-store.ts",
     "src/adapters/channel/weixin/message-utils.ts",
     "src/adapters/channel/weixin/redact.ts"
   ],
   "tsNoCheckAllowlist": [
-    "tests/approval-continuity.test.ts",
     "tests/reminder-queue-store.test.ts",
     "tests/codex-runtime-completion.test.ts",
     "tests/codex-runtime-instructions.test.ts",
     "tests/managed-state-consumers.test.ts",
-    "tests/json-state.test.ts",
-    "tests/weixin-send-retry.test.ts"
+    "tests/json-state.test.ts"
   ]
 }

@@ -31,6 +31,11 @@ const rules: Array<{
     forbiddenPrefixes: ["src/review/", "src/notes/"],
     reason: "core should remain orchestration shell, not absorb review/notes logic",
   },
+  {
+    sourcePrefix: "src/runtime/",
+    forbiddenPrefixes: ["src/review/", "src/notes/", "src/app/"],
+    reason: "runtime should stay below domain logic and above app CLI wiring",
+  },
 ];
 
 test("architecture boundaries keep review notes state and core decoupled", () => {
