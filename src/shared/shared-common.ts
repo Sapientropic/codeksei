@@ -1,32 +1,57 @@
-const fs = require("fs");
-const http = require("http");
-const os = require("os");
-const path = require("path");
-const { execFileSync, spawn } = require("child_process");
+import * as fs from "node:fs";
+import * as http from "node:http";
+import * as os from "node:os";
+import * as path from "node:path";
+import { execFileSync, spawn } from "node:child_process";
+import * as brandingModule from "../core/branding";
+import * as envLoaderModule from "../core/env-loader";
+import {
+  readManagedJsonStateFile,
+  writeTextFileAtomically,
+  writeManagedJsonStateFile,
+} from "../state/json-state";
+import * as accountStoreModule from "../adapters/channel/weixin/account-store";
+import { SessionStore } from "../adapters/runtime/codex/session-store";
+import * as sharedBridgeHeartbeatModule from "./shared-bridge-heartbeat";
+import * as codexSpawnModule from "../core/codex-spawn";
+import { resolvePackageRoot } from "../core/path-utils";
+
 const {
   ensureStateDirectory,
   readPrefixedBoolEnv,
   readPrefixedEnv,
   resolveStateDir,
-} = require("../core/branding");
-const { loadEnvStack } = require("../core/env-loader");
-const {
-  readManagedJsonStateFile,
-  writeTextFileAtomically,
-  writeManagedJsonStateFile,
-} = require("../state/json-state");
-const { loadWeixinAccount } = require("../adapters/channel/weixin/account-store");
-const { SessionStore } = require("../adapters/runtime/codex/session-store");
+} = brandingModule as {
+  ensureStateDirectory: (args: { env: NodeJS.ProcessEnv }) => void;
+  readPrefixedBoolEnv: (env: NodeJS.ProcessEnv, key: string, fallback?: boolean) => boolean;
+  readPrefixedEnv: (env: NodeJS.ProcessEnv, key: string) => string;
+  resolveStateDir: (args: { env: NodeJS.ProcessEnv }) => string;
+};
+const { loadEnvStack } = envLoaderModule as {
+  loadEnvStack: (args: { cwd: string; env: NodeJS.ProcessEnv }) => void;
+};
+const { loadWeixinAccount } = accountStoreModule as {
+  loadWeixinAccount: (config: Record<string, unknown>, accountId: string) => Record<string, unknown>;
+};
 const {
   DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS,
   classifySharedBridgeHeartbeat,
   readSharedBridgeHeartbeat,
-} = require("./shared-bridge-heartbeat");
+} = sharedBridgeHeartbeatModule as {
+  DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS: number;
+  classifySharedBridgeHeartbeat: (
+    record: unknown,
+    options?: { expectedPid?: number; maxAgeMs?: number },
+  ) => { status: string; healthy: boolean; updatedAt: string };
+  readSharedBridgeHeartbeat: (filePath: string) => Record<string, unknown> | null;
+};
 const {
   buildSpawnInvocation,
   resolveBundledCodexBinary,
-} = require("../core/codex-spawn");
-const { resolvePackageRoot } = require("../core/path-utils");
+} = codexSpawnModule as {
+  buildSpawnInvocation: (command: string, args: string[]) => { command: string; args: string[] };
+  resolveBundledCodexBinary: (command?: string) => string;
+};
 
 const rootDir = resolvePackageRoot(__dirname);
 loadSharedEnv();
@@ -220,28 +245,76 @@ function openLogFile(filePath: any) {
   return fs.openSync(filePath, "a");
 }
 
+interface SpawnDetachedCommandDependencies {
+  buildSpawnInvocation: (command: string, args: string[]) => { command: string; args: string[] };
+  closeFd: (fd: number) => void;
+  openLogFile: (filePath: string) => number;
+  spawn: (
+    command: string,
+    args: string[],
+    options: { stdio: [string, number, number] } & Record<string, unknown>,
+  ) => { pid?: number; unref: () => void };
+}
+
+const DEFAULT_SPAWN_DETACHED_DEPS: SpawnDetachedCommandDependencies = {
+  buildSpawnInvocation,
+  closeFd: (fd) => fs.closeSync(fd),
+  openLogFile,
+  spawn: (command, args, options) => spawn(command, args, options as any),
+};
+
+function safeCloseFd(fd: number, closeFd: (fd: number) => void) {
+  if (!Number.isInteger(fd) || fd < 0) {
+    return;
+  }
+  try {
+    closeFd(fd);
+  } catch {}
+}
+
 /**
  * @param {string} command
  * @param {string[]} args
  * @param {{ logFile?: string, cwd?: string, env?: Record<string, string> }} [options]
  */
-function spawnDetachedCommand(command: any, args: any, { logFile, cwd = rootDir, env = {} }: any = {}) {
+function spawnDetachedCommand(
+  command: any,
+  args: any,
+  { logFile, cwd = rootDir, env = {} }: any = {},
+  {
+    buildSpawnInvocation: buildSpawnInvocationImpl = buildSpawnInvocation,
+    closeFd = DEFAULT_SPAWN_DETACHED_DEPS.closeFd,
+    openLogFile: openLogFileImpl = openLogFile,
+    spawn: spawnImpl = DEFAULT_SPAWN_DETACHED_DEPS.spawn,
+  }: Partial<SpawnDetachedCommandDependencies> = {},
+) {
   if (!logFile) {
     throw new Error("spawnDetachedCommand requires logFile");
   }
-  const stdoutFd = openLogFile(logFile);
-  const stderrFd = openLogFile(logFile);
-  const spawnSpec = buildSpawnInvocation(command, args);
-  const child = spawn(spawnSpec.command, spawnSpec.args, {
-    cwd,
-    env: { ...process.env, ...env },
-    detached: true,
-    stdio: ["ignore", stdoutFd, stderrFd],
-    shell: false,
-    windowsHide: true,
-  });
-  child.unref();
-  return child.pid;
+  let stdoutFd = -1;
+  let stderrFd = -1;
+
+  try {
+    stdoutFd = openLogFileImpl(logFile);
+    stderrFd = openLogFileImpl(logFile);
+    const spawnSpec = buildSpawnInvocationImpl(command, args);
+    const child = spawnImpl(spawnSpec.command, spawnSpec.args, {
+      cwd,
+      env: { ...process.env, ...env },
+      detached: true,
+      stdio: ["ignore", stdoutFd, stderrFd],
+      shell: false,
+      windowsHide: true,
+    });
+    child.unref();
+    return Number(child.pid || 0);
+  } finally {
+    // The detached child inherits duplicated handles during spawn. The parent
+    // must always close its own copies immediately so repeated supervisor
+    // restarts do not leak log fds in the long-lived desktop session.
+    safeCloseFd(stdoutFd, closeFd);
+    safeCloseFd(stderrFd, closeFd);
+  }
 }
 
 function readProcessCommandLine(pid: any) {
@@ -624,43 +697,41 @@ function sleep(ms: any) {
   return new Promise((resolve: any) => setTimeout(resolve, ms));
 }
 
-module.exports = {
-  rootDir,
-  port,
-  listenUrl,
-  stateDir,
-  logDir,
-  appServerPidFile,
-  bridgePidFile,
-  supervisorPidFile,
-  appServerLogFile,
-  bridgeLogFile,
-  supervisorLogFile,
-  bridgeHeartbeatFile,
-  watchdogStateFile,
+export {
   BRIDGE_HEARTBEAT_MAX_AGE_MS,
-  ensureLogDir,
-  isPidAlive,
-  readPidFile,
-  writePidFile,
-  readJsonFile,
-  writeJsonFile,
-  removePidFileIfMatches,
+  appServerLogFile,
+  appServerPidFile,
+  bridgeHeartbeatFile,
+  bridgeLogFile,
+  bridgePidFile,
   buildSpawnInvocation,
-  spawnDetachedCommand,
-  readProcessCommandLine,
-  stopManagedProcess,
-  readSharedBridgeHealth,
-  waitForSharedBridgeHealthy,
-  startSharedBridge,
-  startSharedSupervisor,
-  resolveReadyAppServerPid,
-  ensureSharedAppServer,
-  ensureManagedAppServer,
   ensureBridgeNotRunning,
+  ensureLogDir,
+  ensureManagedAppServer,
   ensureManagedBridge,
   ensureManagedSupervisor,
+  ensureSharedAppServer,
+  isPidAlive,
+  listenUrl,
+  logDir,
+  port,
+  readJsonFile,
+  readPidFile,
+  readProcessCommandLine,
+  readSharedBridgeHealth,
+  removePidFileIfMatches,
   resolveBoundThread,
+  resolveReadyAppServerPid,
+  rootDir,
+  spawnDetachedCommand,
+  startSharedBridge,
+  startSharedSupervisor,
+  stateDir,
+  stopManagedProcess,
+  supervisorLogFile,
+  supervisorPidFile,
+  waitForSharedBridgeHealthy,
+  watchdogStateFile,
+  writeJsonFile,
+  writePidFile,
 };
-
-export {};

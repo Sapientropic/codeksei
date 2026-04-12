@@ -1,22 +1,22 @@
-const http = require("http");
-const {
-  listenUrl,
+import * as http from "node:http";
+import {
   appServerPidFile,
   bridgePidFile,
-  supervisorPidFile,
-  watchdogStateFile,
-  readPidFile,
   isPidAlive,
+  listenUrl,
+  readJsonFile,
+  readPidFile,
   readSharedBridgeHealth,
   resolveReadyAppServerPid,
-  readJsonFile,
-} = require("./shared-common");
+  supervisorPidFile,
+  watchdogStateFile,
+} from "./shared-common";
 
 async function main() {
   const ready = await checkReadyz();
   const readyAppServerPid = ready ? await resolveReadyAppServerPid() : 0;
   const bridgeHealth = readSharedBridgeHealth();
-  const watchdogState = readJsonFile(watchdogStateFile) || {};
+  const watchdogState = (readJsonFile(watchdogStateFile) || {}) as Record<string, unknown>;
   console.log(`listen=${listenUrl}`);
   printPidState("shared_supervisor_pid", supervisorPidFile);
   printPidState("shared_app_server_pid", appServerPidFile, readyAppServerPid);
@@ -67,11 +67,6 @@ function normalizeText(value: any) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-module.exports = {
-  checkReadyz,
-  main,
-};
-
 if (require.main === module) {
   main().catch((error: any) => {
     console.error(error.message || String(error));
@@ -79,4 +74,7 @@ if (require.main === module) {
   });
 }
 
-export {};
+export {
+  checkReadyz,
+  main,
+};

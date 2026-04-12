@@ -1,12 +1,19 @@
-const { spawn } = require("child_process");
-const { readPrefixedEnv } = require("../core/branding");
-const { resolveCodexWorkspaceRoot } = require("../workspace/workspace-alias");
-const {
-  listenUrl,
+import { spawn } from "node:child_process";
+import * as brandingModule from "../core/branding";
+import * as workspaceAliasModule from "../workspace/workspace-alias";
+import {
   buildSpawnInvocation,
   ensureSharedAppServer,
+  listenUrl,
   resolveBoundThread,
-} = require("./shared-common");
+} from "./shared-common";
+
+const { readPrefixedEnv } = brandingModule as {
+  readPrefixedEnv: (env: NodeJS.ProcessEnv, key: string) => string;
+};
+const { resolveCodexWorkspaceRoot } = workspaceAliasModule as {
+  resolveCodexWorkspaceRoot: (workspaceRoot: string) => string;
+};
 
 async function main() {
   const workspaceRoot = readPrefixedEnv(process.env, "WORKSPACE_ROOT") || process.cwd();
@@ -40,10 +47,6 @@ async function main() {
   });
 }
 
-module.exports = {
-  main,
-};
-
 if (require.main === module) {
   main().catch((error: any) => {
     console.error(error.message || String(error));
@@ -51,4 +54,4 @@ if (require.main === module) {
   });
 }
 
-export {};
+export { main };

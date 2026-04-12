@@ -111,7 +111,9 @@ const { resolveConfiguredPersonName } = personReferenceModule as {
 };
 
 interface RuntimeConfig extends Record<string, unknown> {
+  sessionsFile: string;
   stateDir: string;
+  workspaceId: string;
   workspaceRoot: string;
   startWithCheckin?: boolean;
   weixinInstructionsFile?: string;

@@ -1,7 +1,24 @@
-import type { SessionStore } from "../adapters/runtime/codex/session-store";
+import { createAppServices } from "./app-runtime-factory";
+import type {
+  AppRuntimeConfig,
+  AppServiceFactory,
+  AppServices,
+  BackstageTaskLifecycleLike,
+  ChannelAdapterLike,
+  ChannelCommandRouterLike,
+  ReminderQueueLike,
+  RuntimeAdapterLike,
+  RuntimeTurnLifecycleLike,
+  RuntimeWatchdogLifecycleLike,
+  SessionStoreLike,
+  SystemMessageDispatcherLike,
+  SystemMessageDispatcherRef,
+  SystemMessageQueueLike,
+  ThreadStateStoreLike,
+  TimelineIntegrationLike,
+  TimelineScreenshotQueueLike,
+} from "./app-service-contract";
 import type { BackstageTaskLifecycle } from "./backstage-task-lifecycle";
-import type { RuntimeTurnLifecycle } from "./runtime-turn-lifecycle";
-import type { RuntimeWatchdogLifecycle } from "./runtime-watchdog-lifecycle";
 import type {
   DeliveryFailurePayload,
   HandlePreparedMessageOptions,
@@ -23,7 +40,6 @@ import * as defaultTargetsModule from "../workspace/default-targets";
 import * as systemMessageDispatcherModule from "./system-message-dispatcher";
 import * as approvalCommandPolicyModule from "./approval-command-policy";
 import * as appPollLoopModule from "./app-poll-loop";
-import * as appRuntimeFactoryModule from "./app-runtime-factory";
 import * as appRuntimeHelpersModule from "./app-runtime-helpers";
 import * as sharedBridgeHeartbeatModule from "../shared/shared-bridge-heartbeat";
 import * as replyDeliveryFailureModule from "./reply-delivery-failure";
@@ -64,9 +80,6 @@ const {
   }) => number;
   runAppPollLoop: (args: Record<string, unknown>) => Promise<void>;
 };
-const { createAppServices } = appRuntimeFactoryModule as {
-  createAppServices: (args: Record<string, unknown>) => AppServices;
-};
 const { createShutdownController } = appRuntimeHelpersModule as {
   createShutdownController: (shutdown: () => Promise<void>) => ShutdownController;
 };
@@ -92,115 +105,41 @@ const RETRY_DELAY_MS = 2_000;
 const BACKOFF_DELAY_MS = 30_000;
 const MAX_CONSECUTIVE_FAILURES = 3;
 
-interface AppConfig extends Record<string, unknown> {
-  stateDir: string;
-  workspaceRoot: string;
-  sharedBridgeHeartbeatFile?: string;
-  startWithCheckin?: boolean;
-  weixinReplyMode?: string;
-  weixinDeliveryTrace?: boolean;
-}
-
-interface ChannelAccount {
-  accountId: string;
-  baseUrl: string;
-}
-
-interface ChannelAdapterLike {
-  describe(): { id: string };
-  login(): Promise<unknown>;
-  printAccounts(): void;
-  resolveAccount(): ChannelAccount;
-  getKnownContextTokens(): Record<string, string>;
-  loadSyncBuffer(): string;
-  normalizeIncomingMessage(message: unknown): NormalizedIncomingMessage | null;
-}
-
-interface RuntimeState {
-  endpoint: string;
-  models: unknown[];
-}
-
-interface RuntimeAdapterLike {
-  initialize(): Promise<RuntimeState>;
-  close(): Promise<void>;
-  describe(): { id: string };
-  getSessionStore(): SessionStoreLike;
-  onEvent(listener: (event: RuntimeEvent<UnknownRecord>) => void): unknown;
-}
-
-interface SessionStoreLike {
-  getBinding(bindingKey: string): { senderId?: string } | null;
-  getActiveWorkspaceRoot(bindingKey: string): string;
-}
-
-interface TimelineIntegrationLike {
-  describe(): { id: string };
-}
-
-interface ThreadStateStoreLike {
-  snapshot(): unknown;
-  applyRuntimeEvent(event: unknown): void;
-  getThreadState(threadId: string): {
-    pendingApproval?: PendingApprovalState | null;
-  } | null;
-}
-
-interface SystemMessageQueueLike extends Record<string, unknown> {}
-
-interface TimelineScreenshotQueueLike extends Record<string, unknown> {}
-
-interface ReminderQueueLike extends Record<string, unknown> {}
-
-interface SystemMessageDispatcherLike {
-  hasPending(): boolean;
-}
-
-interface AppServices {
-  backstageTaskLifecycle: BackstageTaskLifecycle;
-  channelAdapter: ChannelAdapterLike;
-  channelCommandRouter: unknown;
-  reminderQueue: ReminderQueueLike;
-  runtimeAdapter: RuntimeAdapterLike;
-  runtimeTurnLifecycle: RuntimeTurnLifecycle;
-  runtimeWatchdogLifecycle: RuntimeWatchdogLifecycle;
-  streamDelivery: unknown;
-  systemMessageDispatcherState: { current: SystemMessageDispatcherLike | null };
-  systemMessageQueue: SystemMessageQueueLike;
-  threadStateStore: ThreadStateStoreLike;
-  timelineIntegration: TimelineIntegrationLike;
-  timelineScreenshotQueue: TimelineScreenshotQueueLike;
-}
+type AppConfig = AppRuntimeConfig;
 
 interface ShutdownController {
   dispose(): void;
 }
 
+interface CodekseiAppOptions {
+  createAppServices?: AppServiceFactory;
+}
+
 export class CodekseiApp {
   activeAccountId: string;
-  backstageTaskLifecycle!: BackstageTaskLifecycle;
+  backstageTaskLifecycle!: BackstageTaskLifecycleLike;
   channelAdapter!: ChannelAdapterLike;
-  channelCommandRouter!: unknown;
+  channelCommandRouter!: ChannelCommandRouterLike;
   readonly config: AppConfig;
   reminderQueue!: ReminderQueueLike;
   runtimeAdapter!: RuntimeAdapterLike;
   runtimeEventChain: Promise<void>;
-  runtimeTurnLifecycle!: RuntimeTurnLifecycle;
-  runtimeWatchdogLifecycle!: RuntimeWatchdogLifecycle;
-  streamDelivery!: unknown;
+  runtimeTurnLifecycle!: RuntimeTurnLifecycleLike;
+  runtimeWatchdogLifecycle!: RuntimeWatchdogLifecycleLike;
+  streamDelivery!: AppServices["streamDelivery"];
   systemMessageDispatcher: SystemMessageDispatcherLike | null;
-  systemMessageDispatcherState: { current: SystemMessageDispatcherLike | null };
+  systemMessageDispatcherState: SystemMessageDispatcherRef;
   systemMessageQueue!: SystemMessageQueueLike;
   threadStateStore!: ThreadStateStoreLike;
   timelineIntegration!: TimelineIntegrationLike;
   timelineScreenshotQueue!: TimelineScreenshotQueueLike;
 
-  constructor(config: AppConfig) {
+  constructor(config: AppConfig, { createAppServices: createAppServicesOverride = createAppServices }: CodekseiAppOptions = {}) {
     this.config = config;
     this.activeAccountId = "";
     this.systemMessageDispatcher = null;
     this.systemMessageDispatcherState = { current: null };
-    Object.assign(this, createAppServices({
+    const services = createAppServicesOverride({
       config,
       resolveDefaultTerminalUser: () => this.resolveDefaultTerminalUser(),
       resolveReplyTargetForBinding: (bindingKey: string) => this.resolveReplyTargetForBinding(bindingKey),
@@ -211,7 +150,8 @@ export class CodekseiApp {
       ) => this.runtimeTurnLifecycle.handlePreparedMessage(normalized, options),
       sendTimelineScreenshot: (payload: TimelineScreenshotRequest) => this.runtimeTurnLifecycle.sendTimelineScreenshot(payload),
       handleReplyDeliveryFailure: (payload: DeliveryFailurePayload) => this.handleReplyDeliveryFailure(payload),
-    }) as AppServices);
+    });
+    Object.assign(this, services);
     this.runtimeEventChain = Promise.resolve();
     const runtimeAdapter = this.runtimeAdapter;
     const runtimeWatchdogLifecycle = this.runtimeWatchdogLifecycle;
@@ -359,7 +299,7 @@ export class CodekseiApp {
   }
 
   async handleIncomingMessage(message: unknown): Promise<void> {
-    const normalized = this.channelAdapter.normalizeIncomingMessage(message);
+    const normalized = this.channelAdapter.normalizeIncomingMessage(message) as NormalizedIncomingMessage | null;
     if (!normalized) {
       return;
     }

@@ -23,23 +23,26 @@ README、帮助文本和公开示例默认都按 `codeksei` 书写。
 
 首次使用时，先记住这一组主入口即可。
 
-最常用：
+最常用（公共 CLI）：
 
-- `npm run login`
-- `npm run accounts`
+- `codeksei login`
+- `codeksei accounts`
+- `codeksei doctor`
+- `codeksei help`
+
+仓库脚本 / shared 模式：
+
 - `npm run shared:start`
 - `npm run shared:open`
 - `npm run shared:status`
 - `npm run shared:watchdog`
 - `npm run background:install`
 - `npm run background:uninstall`
-- `npm run doctor`
-- `npm run help`
 
 说明：
 
 - 日常使用默认走共享模式，让微信入口和终端执行落在同一条线上
-- `npm run start` / `npm run start:checkin` 更适合最小链路调试
+- `codeksei start` / `npm run start:checkin` 更适合最小链路调试
 
 ## 微信命令
 
@@ -62,15 +65,15 @@ README、帮助文本和公开示例默认都按 `codeksei` 书写。
 
 这一组负责把一天里真实发生过的事留下来。
 
-- `npm run timeline:event -- --date YYYY-MM-DD --start HH:mm --end HH:mm --title "标题" --subcategory <id>`
-- `npm run timeline:write -- --date YYYY-MM-DD --json '{"events":[...]}'`
-- `npm run timeline:read -- --date YYYY-MM-DD`
-- `npm run timeline:categories`
-- `npm run timeline:proposals -- --help`
-- `npm run timeline:build`
-- `npm run timeline:serve`
-- `npm run timeline:dev`
-- `npm run timeline:screenshot -- --send`
+- `codeksei timeline event --date YYYY-MM-DD --start HH:mm --end HH:mm --title "标题" --subcategory <id>`
+- `codeksei timeline write --date YYYY-MM-DD --json '{"events":[...]}'`
+- `codeksei timeline read --date YYYY-MM-DD`
+- `codeksei timeline categories`
+- `codeksei timeline proposals --help`
+- `codeksei timeline build`
+- `codeksei timeline serve`
+- `codeksei timeline dev`
+- `codeksei timeline screenshot --send`
 
 建议：
 
@@ -87,10 +90,10 @@ README、帮助文本和公开示例默认都按 `codeksei` 书写。
 
 Diary 用来接那些更琐碎、更生活化、也最容易散掉的东西。
 
-- `npm run diary:write -- --section todo --state open --text "内容"`
-- `npm run diary:write -- --section todo --state done --text "内容" --timeline-text "HH:mm-HH:mm ..."`
-- `npm run diary:write -- --section timeline --text "17:30-17:58 做了什么"`
-- `npm run diary:write -- --date 2026-04-06 --section supplement --title "标题" --text "内容"`
+- `codeksei diary write --section todo --state open --text "内容"`
+- `codeksei diary write --section todo --state done --text "内容" --timeline-text "HH:mm-HH:mm ..."`
+- `codeksei diary write --section timeline --text "17:30-17:58 做了什么"`
+- `codeksei diary write --date 2026-04-06 --section supplement --title "标题" --text "内容"`
 
 约定：
 
@@ -109,9 +112,9 @@ Diary 用来接那些更琐碎、更生活化、也最容易散掉的东西。
 
 提醒会替生活节奏留出一个外部支点。
 
-- `npm run reminder:write -- --delay 30m --text "起身喝水"`
-- `npm run reminder:write -- --at 2026-04-07 21:30 --text "收今晚的日记"`
-- `npm run reminder:write -- --delay 2h --text "继续推进这个任务" --user <senderId>`
+- `codeksei reminder write --delay 30m --text "起身喝水"`
+- `codeksei reminder write --at 2026-04-07 21:30 --text "收今晚的日记"`
+- `codeksei reminder write --delay 2h --text "继续推进这个任务" --user <senderId>`
 
 建议：
 
@@ -123,12 +126,12 @@ Diary 用来接那些更琐碎、更生活化、也最容易散掉的东西。
 
 Durable note 负责把值得长期记住的判断、偏好和项目脉络，放到更稳定的位置。
 
-- `npm run note:auto -- --project <slug> --kind recent --text "..."`
-- `npm run note:auto -- --scope companion --kind preference --text "..."`
-- `npm run note:maybe -- --project <slug>`
-- `npm run note:maybe -- --scope companion --kind preference`
-- `npm run note:sync -- --project <slug> --section "最近动作" --text "..."`
-- `npm run note:sync -- --path "/absolute/path/to/note.md" --section "当前定位" --text "..."`
+- `codeksei note auto --project <slug> --kind recent --text "..."`
+- `codeksei note auto --scope companion --kind preference --text "..."`
+- `codeksei note maybe --project <slug>`
+- `codeksei note maybe --scope companion --kind preference`
+- `codeksei note sync --project <slug> --section "最近动作" --text "..."`
+- `codeksei note sync --path "/absolute/path/to/note.md" --section "当前定位" --text "..."`
 
 建议：
 
@@ -143,12 +146,12 @@ Durable note 负责把值得长期记住的判断、偏好和项目脉络，放�
 
 复盘用于把日常记录慢慢压成更稳定的节奏感。
 
-- `npm run review:nightly`
-- `npm run review:nightly -- --date 2026-04-10`
-- `npm run review:weekly`
-- `npm run review:weekly -- --week 2026-W15`
-- `npm run review:monthly`
-- `npm run review:monthly -- --month 2026-04`
+- `codeksei review nightly`
+- `codeksei review nightly --date 2026-04-10`
+- `codeksei review weekly`
+- `codeksei review weekly --week 2026-W15`
+- `codeksei review monthly`
+- `codeksei review monthly --month 2026-04`
 
 说明：
 
@@ -163,8 +166,8 @@ nightly 更接近睡前收口；weekly / monthly 更接近重新校准生活和�
 
 Project radar 用于回答“项目现在在哪、应该从哪里重新进去”。
 
-- `npm run project:radar -- --list`
-- `npm run project:radar -- --project <slug> --json`
+- `codeksei project radar --list`
+- `codeksei project radar --project <slug> --json`
 
 用途：
 

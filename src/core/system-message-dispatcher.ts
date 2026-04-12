@@ -1,4 +1,8 @@
-const { resolvePromptPersonEn } = require("./person-reference");
+import * as personReferenceModule from "./person-reference";
+
+const { resolvePromptPersonEn } = personReferenceModule as {
+  resolvePromptPersonEn: (config: Record<string, unknown>) => string;
+};
 
 class SystemMessageDispatcher {
   accountId: any;
@@ -79,6 +83,4 @@ function normalizeText(value: any) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-module.exports = { SystemMessageDispatcher };
-
-export {};
+export { SystemMessageDispatcher };

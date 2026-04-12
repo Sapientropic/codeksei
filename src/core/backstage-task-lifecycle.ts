@@ -1,5 +1,15 @@
 import type { ReminderQueueEntry, SystemMessage } from "../contracts/queue-items";
 import type {
+  AppRuntimeConfig,
+  ChannelAdapterLike,
+  ReminderQueueLike,
+  RuntimeAdapterLike,
+  SystemMessageDispatcherLike,
+  SystemMessageQueueLike,
+  ThreadStateStoreLike,
+  TimelineScreenshotQueueLike,
+} from "./app-service-contract";
+import type {
   HandlePreparedMessageOptions,
   NormalizedIncomingMessage,
   PendingApprovalState,
@@ -16,63 +26,6 @@ interface ThreadStateSnapshot {
   pendingApproval?: PendingApprovalState | null;
 }
 
-interface SessionStoreLike {
-  buildBindingKey(args: { workspaceId: string; accountId: string; senderId: string }): string;
-  getThreadIdForWorkspace(bindingKey: string, workspaceRoot: string): string;
-  getPendingApprovalForThread(threadId: string): PendingApprovalState | null;
-  getActiveWorkspaceRoot(bindingKey: string): string;
-}
-
-interface RuntimeAdapterLike {
-  getSessionStore(): SessionStoreLike;
-}
-
-interface ChannelAdapterLike {
-  getKnownContextTokens(): Record<string, string>;
-  sendTyping(payload: { userId: string; status: number; contextToken?: string }): Promise<unknown>;
-  sendText(payload: {
-    userId: string;
-    text: string;
-    contextToken?: string;
-    preserveBlock?: boolean;
-  }): Promise<unknown>;
-}
-
-interface ReminderQueueLike {
-  listDue(nowMs: number): ReminderQueueEntry[];
-  enqueue(reminder: ReminderQueueEntry): void;
-}
-
-interface SystemMessageQueueLike {
-  enqueue(message: Record<string, unknown>): void;
-}
-
-interface TimelineScreenshotJob extends Record<string, unknown> {
-  id: string;
-  senderId: string;
-  outputFile: string;
-  args: string[];
-}
-
-interface TimelineScreenshotQueueLike {
-  drainForAccount(accountId: string): TimelineScreenshotJob[];
-}
-
-interface SystemMessageDispatcherLike {
-  takeReadyPending(nowMs?: number): SystemMessage[];
-  complete(message: SystemMessage): void;
-  defer(
-    message: SystemMessage,
-    options: { delayMs: number; reason: string; countAttempt: boolean },
-  ): { status: string } | null;
-  deadLetter(message: SystemMessage, options: { reason: string }): void;
-  buildPreparedMessage(message: SystemMessage, contextToken?: string): NormalizedIncomingMessage | null;
-}
-
-interface ThreadStateStoreLike {
-  getThreadState(threadId: string): ThreadStateSnapshot | null;
-}
-
 type FormatErrorMessage = (error: unknown) => string;
 type GetSystemMessageDispatcher = () => SystemMessageDispatcherLike | null;
 type GetSystemMessageFailureRetryDelayMs = (attemptCount: number) => number;
@@ -86,10 +39,7 @@ type SendTimelineScreenshot = (payload: TimelineScreenshotRequest) => Promise<un
 type BuildReminderSystemTrigger = (reminder: ReminderQueueEntry, config: BackstageConfig) => string;
 type ResolveWorkspaceRoot = (bindingKey: string) => string;
 
-interface BackstageConfig extends Record<string, unknown> {
-  workspaceId: string;
-  workspaceRoot: string;
-}
+type BackstageConfig = AppRuntimeConfig;
 
 interface BackstageTaskLifecycleDependencies {
   channelAdapter: ChannelAdapterLike;

@@ -1,5 +1,21 @@
 import { createWeixinChannelAdapter } from "../adapters/channel/weixin";
 import { createCodexRuntimeAdapter } from "../adapters/runtime/codex";
+import type {
+  AppRuntimeConfig,
+  AppServices,
+  ChannelAdapterLike,
+  ChannelCommandRouterLike,
+  CreateAppServicesArgs,
+  ReminderQueueLike,
+  RuntimeAdapterLike,
+  StreamDeliveryLike,
+  SystemMessageDispatcherLike,
+  SystemMessageDispatcherRef,
+  SystemMessageQueueLike,
+  ThreadStateStoreLike,
+  TimelineIntegrationLike,
+  TimelineScreenshotQueueLike,
+} from "./app-service-contract";
 import { BackstageTaskLifecycle } from "./backstage-task-lifecycle";
 import { RuntimeTurnLifecycle } from "./runtime-turn-lifecycle";
 import type {
@@ -115,18 +131,7 @@ const { formatErrorMessage } = appPollLoopModule as {
   formatErrorMessage: (error: unknown) => string;
 };
 
-interface AppFactoryConfig extends Record<string, unknown> {
-  stateDir: string;
-  sessionsFile: string;
-  workspaceId: string;
-  workspaceRoot: string;
-  systemMessageQueueFile?: unknown;
-  systemMessageDeadLetterFile?: unknown;
-  timelineScreenshotQueueFile?: unknown;
-  reminderQueueFile?: unknown;
-  weixinReplyMode?: unknown;
-  weixinDeliveryTrace?: unknown;
-}
+type AppFactoryConfig = AppRuntimeConfig;
 
 type ResolveDefaultTerminalUser = () => string;
 type ResolveReplyTargetForBinding = (bindingKey: string) => ReplyTarget | null;
@@ -138,82 +143,6 @@ type HandlePreparedMessage = (
 type SendTimelineScreenshot = (payload: TimelineScreenshotRequest) => Promise<unknown>;
 type HandleReplyDeliveryFailure = (payload: DeliveryFailurePayload) => Promise<void>;
 
-interface CreateAppServicesArgs extends Record<string, unknown> {
-  config: AppFactoryConfig;
-  resolveDefaultTerminalUser: ResolveDefaultTerminalUser;
-  resolveReplyTargetForBinding: ResolveReplyTargetForBinding;
-  resolveWorkspaceRoot: ResolveWorkspaceRoot;
-  handlePreparedMessage: HandlePreparedMessage;
-  sendTimelineScreenshot: SendTimelineScreenshot;
-  handleReplyDeliveryFailure: HandleReplyDeliveryFailure;
-}
-
-interface ChannelAdapterLike {
-  describe(): { id: string };
-  login(): Promise<unknown>;
-  printAccounts(): void;
-  resolveAccount(): { accountId: string; baseUrl: string };
-  getKnownContextTokens(): Record<string, string>;
-  loadSyncBuffer(): string;
-  normalizeIncomingMessage(message: unknown): NormalizedIncomingMessage | null;
-  sendText(payload: {
-    userId: string;
-    text: string;
-    contextToken: string;
-    preserveBlock?: boolean;
-  }): Promise<unknown>;
-  sendTyping(payload: { userId: string; status: number; contextToken: string }): Promise<unknown>;
-  sendFile(payload: { userId: string; filePath: string; contextToken?: string }): Promise<unknown>;
-}
-
-interface ReminderQueueLike extends Record<string, unknown> {
-  listDue(nowMs: number): unknown[];
-  peekNextDueAtMs(): number;
-  enqueue(reminder: unknown): void;
-}
-
-interface SystemMessageQueueLike extends Record<string, unknown> {
-  enqueue(message: Record<string, unknown>): void;
-}
-
-interface TimelineScreenshotQueueLike extends Record<string, unknown> {
-  drainForAccount(accountId: string): Array<{
-    id: string;
-    senderId: string;
-    outputFile: string;
-    args: string[];
-  }>;
-}
-
-interface StreamDeliveryLike {
-  setReplyTarget(bindingKey: string, target: ReplyTarget): void;
-  queueReplyTargetForThread(threadId: string, target: ReplyTarget): void;
-  handleRuntimeEvent(event: unknown): Promise<void>;
-  finalizeAbandonedTurn(args: {
-    threadId: string;
-    turnId?: string;
-    trailingText?: string;
-  }): Promise<unknown>;
-}
-
-interface ThreadStateStoreLike extends Record<string, unknown> {
-  snapshot(): unknown;
-  applyRuntimeEvent(event: unknown): void;
-  getThreadState(threadId: string): {
-    status?: string;
-    turnId?: string;
-    pendingApproval?: unknown;
-  } | null;
-  markTurnFailed(threadId: string, turnId: string, message?: string): unknown;
-  resolveApproval(threadId: string, status?: string): unknown;
-  hydratePendingApproval(threadId: string, approval: unknown): unknown;
-}
-
-interface TimelineIntegrationLike {
-  describe(): { id: string };
-  runSubcommand(command: string, args: string[]): Promise<unknown>;
-}
-
 export function createAppServices({
   config,
   resolveDefaultTerminalUser,
@@ -222,25 +151,15 @@ export function createAppServices({
   handlePreparedMessage,
   sendTimelineScreenshot,
   handleReplyDeliveryFailure,
-}: Record<string, unknown>) {
-  const typedArgs = {
-    config,
-    resolveDefaultTerminalUser,
-    resolveReplyTargetForBinding,
-    resolveWorkspaceRoot,
-    handlePreparedMessage,
-    sendTimelineScreenshot,
-    handleReplyDeliveryFailure,
-  } as CreateAppServicesArgs;
-  const {
-    config: typedConfig,
-    resolveDefaultTerminalUser: typedResolveDefaultTerminalUser,
-    resolveReplyTargetForBinding: typedResolveReplyTargetForBinding,
-    resolveWorkspaceRoot: typedResolveWorkspaceRoot,
-    handlePreparedMessage: typedHandlePreparedMessage,
-    sendTimelineScreenshot: typedSendTimelineScreenshot,
-    handleReplyDeliveryFailure: typedHandleReplyDeliveryFailure,
-  } = typedArgs;
+}: CreateAppServicesArgs): AppServices {
+  const typedConfig = config;
+  const typedResolveDefaultTerminalUser = resolveDefaultTerminalUser;
+  const typedResolveReplyTargetForBinding = resolveReplyTargetForBinding;
+  const typedResolveWorkspaceRoot = resolveWorkspaceRoot;
+  const typedHandlePreparedMessage = handlePreparedMessage;
+  const typedSendTimelineScreenshot = sendTimelineScreenshot;
+  const typedHandleReplyDeliveryFailure = handleReplyDeliveryFailure;
+
   const channelAdapter = createWeixinChannelAdapter(typedConfig);
   const runtimeAdapter = createCodexRuntimeAdapter(typedConfig);
   const timelineIntegration = createTimelineIntegration(typedConfig);
@@ -257,7 +176,7 @@ export function createAppServices({
     weixinReplyMode: typedConfig.weixinReplyMode,
     deliveryTraceEnabled: typedConfig.weixinDeliveryTrace,
     onDeliveryFailure: (payload: DeliveryFailurePayload) => typedHandleReplyDeliveryFailure(payload),
-  } as any);
+  });
   const runtimeWatchdogLifecycle = new RuntimeWatchdogLifecycle({
     buildApprovalPromptSignature,
     buildApprovalPromptText,
@@ -273,7 +192,7 @@ export function createAppServices({
     threadStateStore,
     firstRuntimeEventFailureTimeoutMs: FIRST_RUNTIME_EVENT_FAILURE_TIMEOUT_MS,
     firstRuntimeEventNoticeTimeoutMs: FIRST_RUNTIME_EVENT_NOTICE_TIMEOUT_MS,
-  } as any);
+  });
   const channelCommandRouter = new ChannelCommandRouter({
     workspaceHandlers: createWorkspaceCommandHandlers({
       channelAdapter,
@@ -295,7 +214,7 @@ export function createAppServices({
       runtimeAdapter,
       threadStateStore,
     }),
-  } as any);
+  }) as ChannelCommandRouterLike;
   const runtimeTurnLifecycle = new RuntimeTurnLifecycle({
     channelAdapter,
     config: typedConfig,
@@ -321,14 +240,14 @@ export function createAppServices({
     streamDelivery,
     timelineIntegration,
     buildCodexInboundText,
-  } as any);
+  });
 
-  const systemMessageDispatcherState: { current: unknown } = { current: null };
+  const systemMessageDispatcherState: SystemMessageDispatcherRef = { current: null };
   const backstageTaskLifecycle = new BackstageTaskLifecycle({
     channelAdapter,
     config: typedConfig,
     formatErrorMessage,
-    getSystemMessageDispatcher: () => systemMessageDispatcherState.current as any,
+    getSystemMessageDispatcher: () => systemMessageDispatcherState.current,
     getSystemMessageFailureRetryDelayMs,
     handlePreparedMessage: typedHandlePreparedMessage,
     hasRpcId,
@@ -342,21 +261,21 @@ export function createAppServices({
     timelineScreenshotQueue,
     buildReminderSystemTrigger,
     resolveWorkspaceRoot: typedResolveWorkspaceRoot,
-  } as any);
+  });
 
   return {
     backstageTaskLifecycle,
-    channelAdapter: channelAdapter as unknown as ChannelAdapterLike,
+    channelAdapter,
     channelCommandRouter,
     reminderQueue,
     runtimeAdapter,
     runtimeTurnLifecycle,
     runtimeWatchdogLifecycle,
-    streamDelivery: streamDelivery as unknown as StreamDeliveryLike,
+    streamDelivery,
     systemMessageDispatcherState,
     systemMessageQueue,
-    threadStateStore: threadStateStore as unknown as ThreadStateStoreLike,
+    threadStateStore,
     timelineIntegration,
-    timelineScreenshotQueue: timelineScreenshotQueue as unknown as TimelineScreenshotQueueLike,
+    timelineScreenshotQueue,
   };
 }

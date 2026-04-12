@@ -1,14 +1,21 @@
-const {
+import * as brandingModule from "../core/branding";
+import * as sharedWatchdogModule from "./shared-watchdog";
+import {
   ensureLogDir,
-  supervisorPidFile,
-  readPidFile,
-  writePidFile,
-  removePidFileIfMatches,
   isPidAlive,
+  readPidFile,
   readProcessCommandLine,
-} = require("./shared-common");
-const { runWatchdogOnce } = require("./shared-watchdog");
-const { readPrefixedEnv } = require("../core/branding");
+  removePidFileIfMatches,
+  supervisorPidFile,
+  writePidFile,
+} from "./shared-common";
+
+const { runWatchdogOnce } = sharedWatchdogModule as {
+  runWatchdogOnce: (options?: { shouldPrintSummary?: boolean }) => Promise<Record<string, unknown>>;
+};
+const { readPrefixedEnv } = brandingModule as {
+  readPrefixedEnv: (env: NodeJS.ProcessEnv, key: string) => string;
+};
 
 const DEFAULT_INTERVAL_MINUTES = 5;
 
@@ -58,6 +65,10 @@ function buildStateSignature(state: any) {
 function logLine(message: any) {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] ${message}`);
+}
+
+function isRecord(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === "object";
 }
 
 function ensureSingleInstance() {
@@ -119,7 +130,13 @@ async function main() {
           ? ` actions=${state.actions.join(" | ")}`
           : "";
         const error = state.error ? ` error=${state.error}` : "";
-        logLine(`result=${state.result} readyz=${state.after?.appServer?.ready ? "ok" : "down"} bridge=${state.after?.bridge?.heartbeatStatus || "missing"}${actions}${error}`);
+        const after = isRecord(state.after) ? state.after : {};
+        const appServerState = isRecord(after.appServer) ? after.appServer : {};
+        const bridgeState = isRecord(after.bridge) ? after.bridge : {};
+        logLine(
+          `result=${state.result} readyz=${appServerState.ready ? "ok" : "down"} `
+          + `bridge=${String(bridgeState.heartbeatStatus || "missing")}${actions}${error}`
+        );
         lastLoggedSignature = signature;
       }
     } catch (error) {
@@ -135,10 +152,6 @@ async function main() {
   logLine(`stopped pid=${process.pid}`);
 }
 
-module.exports = {
-  main,
-};
-
 if (require.main === module) {
   main().catch((error: any) => {
     logLine(`fatal=${formatErrorMessage(error)}`);
@@ -146,4 +159,4 @@ if (require.main === module) {
   });
 }
 
-export {};
+export { main };

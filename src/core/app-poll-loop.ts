@@ -1,8 +1,10 @@
-// @ts-check
+import * as approvalCommandPolicyModule from "./approval-command-policy";
 
-const { normalizeText } = require("./approval-command-policy");
+const { normalizeText } = approvalCommandPolicyModule as {
+  normalizeText: (value: unknown) => string;
+};
 
-function resolveLongPollTimeoutMs({
+export function resolveLongPollTimeoutMs({
   systemMessageDispatcher = null,
   activeAccountId = "",
   timelineScreenshotQueue = null,
@@ -30,7 +32,7 @@ function resolveLongPollTimeoutMs({
   return Math.max(minLongPollTimeoutMs, Math.min(defaultLongPollTimeoutMs, remainingMs));
 }
 
-async function runAppPollLoop({
+export async function runAppPollLoop({
   account,
   runtimeState,
   shutdown,
@@ -136,7 +138,7 @@ function isSessionExpiredError(error: any) {
     || String(error?.message || "").includes("会话已失效");
 }
 
-function formatErrorMessage(error: any) {
+export function formatErrorMessage(error: any) {
   const raw = error instanceof Error ? error.message : String(error || "unknown error");
   if (isSessionExpiredError(error)) {
     return "微信会话已失效，请重新执行 `npm run login`";
@@ -156,12 +158,7 @@ function defaultSleep(ms: any) {
   return new Promise((resolve: any) => setTimeout(resolve, ms));
 }
 
-module.exports = {
+export {
   assertWeixinUpdateResponse,
-  formatErrorMessage,
   isSessionExpiredError,
-  resolveLongPollTimeoutMs,
-  runAppPollLoop,
 };
-
-export {};

@@ -36,6 +36,7 @@
 ```bash
 npm install -g codeksei
 codeksei help
+codeksei review weekly --help
 ```
 
 如果你想直接体验它更完整的样子，让 WeChat 和终端接到同一条共享线程：
@@ -109,7 +110,7 @@ npm run shared:start
 
 ### 1. 先选安装方式
 
-如果你想按本文完整使用共享模式，先 clone 仓库，再跑 `npm run ...`：
+如果你想按本文完整使用共享模式，先 clone 仓库，再跑 shared / background 脚本：
 
 ```bash
 git clone https://github.com/Sapientropic/codeksei.git
@@ -122,11 +123,13 @@ npm install
 ```bash
 npm install -g codeksei
 codeksei help
+codeksei review weekly --help
 ```
 
 说明：
 
-- 本文后续命令示例默认按仓库工作树写成 `npm run ...`
+- 公共 CLI 示例默认写成 `codeksei ...`
+- 只有 shared / background / maintainer 脚本继续写成 `npm run ...`
 - 全局安装更适合先体验基础 CLI；共享模式相关脚本在仓库内运行最直接
 
 ### 2. 配置最小环境变量
@@ -178,7 +181,7 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - `CODEKSEI_WEIXIN_REPLY_MODE=stream` 现在更接近 hybrid stream：优先在自然句边界或已完成块发送，避免把半句 final 提前裂成多个微信气泡
 - `CODEKSEI_WEIXIN_REPLY_MODE=settled` 仍表示“等整轮收口后再发”：只发送最新的可见最终回复
 - `CODEKSEI_USER_NAME` 决定对话里怎么称呼你，不参与消息路由
-- `CODEKSEI_ALLOWED_USER_IDS` 必须填写微信桥实际观测到的 sender id；最简单的做法是先跑 `npm run accounts`
+- `CODEKSEI_ALLOWED_USER_IDS` 必须填写微信桥实际观测到的 sender id；最简单的做法是先跑 `codeksei accounts`，如果你当前就在仓库工作树里，也可以直接用 `npm run accounts`
 - 微信 persona / continuity instructions 默认来自仓库里的 `templates/weixin-instructions.md`，如需本地覆盖可在状态目录放 `weixin-instructions.local.md`
 - 如果你在共享模式下使用多 workspace，建议启动前就设置好 `CODEKSEI_WORKSPACE_ROOT`
 - `CODEKSEI_TIMEZONE` 可选；若显式设置，它会统一驱动 reminder / diary / review / timeline 的本地时间解释
@@ -234,13 +237,18 @@ npm run background:uninstall
 终端：
 
 ```bash
-npm run login
-npm run accounts
+codeksei login
+codeksei accounts
+codeksei doctor
+codeksei help
+```
+
+终端（仓库 shared 脚本）：
+
+```bash
 npm run shared:start
 npm run shared:open
 npm run shared:status
-npm run doctor
-npm run help
 ```
 
 微信：

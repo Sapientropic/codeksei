@@ -3,6 +3,14 @@ import {
   type RuntimeEvent,
 } from "../contracts/runtime-events";
 import type {
+  ChannelAdapterLike,
+  RuntimeAdapterLike,
+  SessionBindingSnapshot,
+  SessionStoreLike,
+  StreamDeliveryLike,
+  ThreadStateStoreLike,
+} from "./app-service-contract";
+import type {
   PendingApprovalState,
   PreparedRuntimeMessage,
   ReplyTarget,
@@ -30,69 +38,10 @@ interface WorkspaceBootstrapEntry {
   workspaceRoot: string;
 }
 
-interface SessionBindingSnapshot extends Record<string, unknown> {
-  bindingKey: string;
-  threadIdByWorkspaceRoot?: Record<string, string>;
-}
-
-interface SessionStoreLike {
-  getThreadIdForWorkspace(bindingKey: string, workspaceRoot: string): string;
-  findBindingForThreadId(threadId: unknown): ThreadBindingRef | null;
-  rememberWorkspaceBootstrapForThread(bindingKey: string, workspaceRoot: string, threadId: string): void;
-  getApprovalCommandAllowlistForWorkspace(workspaceRoot: string): string[][];
-  getPendingApprovalForThread(threadId: string): PendingApprovalState | null;
-  rememberPendingApprovalForThread(
-    threadId: string,
-    approval: PendingApprovalState,
-    options?: { signature?: string; promptedAt?: string },
-  ): PendingApprovalState | null;
-  listBindings(): SessionBindingSnapshot[];
-  listPendingApprovals(): Array<{ threadId: string; approval: PendingApprovalState }>;
-  clearPendingApprovalForThread?(threadId: unknown): void;
-  clearApprovalPrompt?(threadId: unknown): void;
-}
-
-interface RuntimeAdapterLike {
-  getSessionStore(): SessionStoreLike;
-  respondApproval(args: { requestId: string; decision: "accept" | "decline" }): Promise<unknown>;
-  resumeThread(args: { threadId: string }): Promise<unknown>;
-}
-
-interface ChannelAdapterLike {
-  sendText(payload: {
-    userId: string;
-    text: string;
-    contextToken: string;
-    preserveBlock?: boolean;
-  }): Promise<unknown>;
-  sendTyping(payload: {
-    userId: string;
-    status: number;
-    contextToken: string;
-  }): Promise<unknown>;
-}
-
-interface StreamDeliveryLike {
-  handleRuntimeEvent(event: RuntimeEvent<UnknownRecord>): Promise<void>;
-  finalizeAbandonedTurn(args: {
-    threadId: string;
-    turnId?: string;
-    trailingText?: string;
-  }): Promise<unknown>;
-  setReplyTarget(bindingKey: string, target: ReplyTarget): void;
-}
-
 interface ThreadStateSnapshot {
   status?: string;
   turnId?: string;
   pendingApproval?: PendingApprovalState | null;
-}
-
-interface ThreadStateStoreLike {
-  getThreadState(threadId: string): ThreadStateSnapshot | null;
-  markTurnFailed(threadId: string, turnId: string, message?: string): unknown;
-  resolveApproval(threadId: string, status?: string): unknown;
-  hydratePendingApproval(threadId: string, approval: PendingApprovalState): unknown;
 }
 
 type BuildApprovalPromptSignature = (approval: PendingApprovalState) => string;
