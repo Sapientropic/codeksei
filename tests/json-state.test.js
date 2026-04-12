@@ -5,6 +5,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const {
+  readForeignJsonDocument,
   readJsonStateFile,
   writeJsonStateFile,
 } = require("../src/core/json-state");
@@ -68,6 +69,21 @@ test("readJsonStateFile isolates schema-invalid JSON even when JSON.parse succee
   assert.equal(
     fs.readdirSync(tempRoot).some((entry) => /^sessions\.corrupt-.*\.json$/.test(entry)),
     true
+  );
+});
+
+test("readForeignJsonDocument falls back without quarantining foreign files", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-json-foreign-"));
+  const filePath = path.join(tempRoot, "timeline-state.json");
+  fs.writeFileSync(filePath, "{broken", "utf8");
+
+  const result = readForeignJsonDocument(filePath, { fallback: { ok: false } });
+
+  assert.deepEqual(result, { ok: false });
+  assert.equal(fs.existsSync(filePath), true);
+  assert.equal(
+    fs.readdirSync(tempRoot).some((entry) => entry.includes(".corrupt-")),
+    false
   );
 });
 

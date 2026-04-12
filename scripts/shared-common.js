@@ -13,6 +13,12 @@ const {
 } = require("../src/core/branding");
 const { loadEnvStack } = require("../src/core/env-loader");
 const {
+  readManagedJsonStateFile,
+  writeManagedJsonStateFile,
+} = require("../src/core/json-state");
+const { loadWeixinAccount } = require("../src/adapters/channel/weixin/account-store");
+const { SessionStore } = require("../src/adapters/runtime/codex/session-store");
+const {
   DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS,
   classifySharedBridgeHeartbeat,
   readSharedBridgeHeartbeat,
@@ -100,16 +106,15 @@ function removePidFileIfMatches(filePath, pid) {
 }
 
 function readJsonFile(filePath) {
-  try {
-    return JSON.parse(fs.readFileSync(filePath, "utf8"));
-  } catch {
-    return null;
-  }
+  return readManagedJsonStateFile({
+    filePath,
+    fallback: null,
+    label: "shared state",
+  });
 }
 
 function writeJsonFile(filePath, payload) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf8");
+  writeManagedJsonStateFile(filePath, payload);
 }
 
 function findListeningPidByPort(targetPort) {
@@ -666,20 +671,18 @@ function resolveCurrentAccountId() {
   if (!fs.existsSync(accountsDir)) {
     return "";
   }
+  const accountsConfig = {
+    accountsDir,
+    weixinBaseUrl: "",
+    weixinRouteTag: "",
+  };
   const entries = fs.readdirSync(accountsDir)
     .filter((name) => name.endsWith(".json") && !name.endsWith(".context-tokens.json"))
-    .map((name) => {
-      const fullPath = path.join(accountsDir, name);
-      try {
-        const parsed = JSON.parse(fs.readFileSync(fullPath, "utf8"));
-        return {
-          accountId: normalizeText(parsed?.accountId),
-          savedAt: parseTimestamp(parsed?.savedAt),
-        };
-      } catch {
-        return null;
-      }
-    })
+    .map((name) => loadWeixinAccount(accountsConfig, name.slice(0, -5)))
+    .map((account) => account ? {
+      accountId: normalizeText(account.accountId),
+      savedAt: parseTimestamp(account.savedAt),
+    } : null)
     .filter(Boolean)
     .filter((entry) => entry.accountId);
   entries.sort((left, right) => right.savedAt - left.savedAt);
@@ -690,9 +693,9 @@ function resolveBoundThread(workspaceRoot) {
   if (!fs.existsSync(sessionFile)) {
     throw new Error(`session file not found: ${sessionFile}`);
   }
-  const data = JSON.parse(fs.readFileSync(sessionFile, "utf8"));
+  const sessionStore = new SessionStore({ filePath: sessionFile });
   const currentAccountId = resolveCurrentAccountId();
-  const bindings = Object.values(data.bindings || {})
+  const bindings = sessionStore.listBindings()
     .filter((binding) => !currentAccountId || normalizeText(binding?.accountId) === currentAccountId)
     .sort((left, right) => parseTimestamp(right?.updatedAt) - parseTimestamp(left?.updatedAt));
 

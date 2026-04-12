@@ -1,5 +1,5 @@
 const fs = require("fs");
-const path = require("path");
+const { writeForeignJsonDocument } = require("../../core/json-state");
 
 const {
   LEGACY_TIMELINE_TIMEZONE,
@@ -215,20 +215,10 @@ function writeTimelineSnapshot(paths, snapshot) {
 }
 
 function writeJsonFile(filePath, value) {
-  const tempPath = path.join(
-    path.dirname(filePath),
-    `.${path.basename(filePath)}.${process.pid}.${Date.now()}.tmp`
-  );
-  try {
-    fs.writeFileSync(tempPath, JSON.stringify(value, null, 2));
-    fs.renameSync(tempPath, filePath);
-  } finally {
-    try {
-      fs.rmSync(tempPath, { force: true });
-    } catch {
-      // Ignore temp cleanup after the final file is already in place.
-    }
-  }
+  // Timeline state files belong to the upstream timeline domain. We still
+  // write them atomically, but we do not quarantine "corrupt" files here the
+  // way we do for bridge-managed runtime state.
+  writeForeignJsonDocument(filePath, value);
 }
 
 function normalizeText(value) {

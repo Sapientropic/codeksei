@@ -1,6 +1,11 @@
 const fs = require("fs");
 const path = require("path");
 const { normalizeRouteTag } = require("./protocol");
+const {
+  isPlainObject,
+  readManagedJsonStateFile,
+  writeManagedJsonStateFile,
+} = require("../../../core/json-state");
 
 function normalizeAccountId(raw) {
   return String(raw || "")
@@ -53,12 +58,7 @@ function saveWeixinAccount(config, rawAccountId, update) {
       : normalizeRouteTag(existing.routeTag || config.weixinRouteTag),
     savedAt: new Date().toISOString(),
   };
-  fs.writeFileSync(filePath, JSON.stringify(next, null, 2), "utf8");
-  try {
-    fs.chmodSync(filePath, 0o600);
-  } catch {
-    // best effort
-  }
+  writeManagedJsonStateFile(filePath, next, { mode: 0o600 });
   return next;
 }
 
@@ -67,26 +67,26 @@ function loadWeixinAccount(config, accountId) {
   if (!normalized) {
     return null;
   }
-  try {
-    const raw = fs.readFileSync(resolveAccountPath(config, normalized), "utf8");
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") {
-      return null;
-    }
-    return {
-      accountId: normalized,
-      rawAccountId: typeof parsed.rawAccountId === "string" ? parsed.rawAccountId : "",
-      token: typeof parsed.token === "string" ? parsed.token : "",
-      baseUrl: typeof parsed.baseUrl === "string" && parsed.baseUrl.trim() ? parsed.baseUrl.trim() : config.weixinBaseUrl,
-      userId: typeof parsed.userId === "string" ? parsed.userId : "",
-      routeTag: Object.prototype.hasOwnProperty.call(parsed, "routeTag")
-        ? normalizeRouteTag(parsed.routeTag)
-        : normalizeRouteTag(config.weixinRouteTag),
-      savedAt: typeof parsed.savedAt === "string" ? parsed.savedAt : "",
-    };
-  } catch {
+  const parsed = readManagedJsonStateFile({
+    filePath: resolveAccountPath(config, normalized),
+    fallback: null,
+    label: "weixin account",
+    validate: validateWeixinAccountRecord,
+  });
+  if (!parsed || !isPlainObject(parsed)) {
     return null;
   }
+  return {
+    accountId: normalized,
+    rawAccountId: typeof parsed.rawAccountId === "string" ? parsed.rawAccountId : "",
+    token: typeof parsed.token === "string" ? parsed.token : "",
+    baseUrl: typeof parsed.baseUrl === "string" && parsed.baseUrl.trim() ? parsed.baseUrl.trim() : config.weixinBaseUrl,
+    userId: typeof parsed.userId === "string" ? parsed.userId : "",
+    routeTag: Object.prototype.hasOwnProperty.call(parsed, "routeTag")
+      ? normalizeRouteTag(parsed.routeTag)
+      : normalizeRouteTag(config.weixinRouteTag),
+    savedAt: typeof parsed.savedAt === "string" ? parsed.savedAt : "",
+  };
 }
 
 function listWeixinAccounts(config) {
@@ -122,6 +122,34 @@ function resolveSelectedAccount(config) {
     throw new Error(`微信账号缺少 token: ${accounts[0].accountId}，请重新执行 login`);
   }
   return accounts[0];
+}
+
+function validateWeixinAccountRecord(value) {
+  if (!isPlainObject(value)) {
+    return "weixin account state must be an object";
+  }
+  if ("accountId" in value && typeof value.accountId !== "string") {
+    return "weixin account accountId must be a string";
+  }
+  if ("rawAccountId" in value && typeof value.rawAccountId !== "string") {
+    return "weixin account rawAccountId must be a string";
+  }
+  if ("token" in value && typeof value.token !== "string") {
+    return "weixin account token must be a string";
+  }
+  if ("baseUrl" in value && typeof value.baseUrl !== "string") {
+    return "weixin account baseUrl must be a string";
+  }
+  if ("userId" in value && typeof value.userId !== "string") {
+    return "weixin account userId must be a string";
+  }
+  if ("routeTag" in value && typeof value.routeTag !== "string") {
+    return "weixin account routeTag must be a string";
+  }
+  if ("savedAt" in value && typeof value.savedAt !== "string") {
+    return "weixin account savedAt must be a string";
+  }
+  return true;
 }
 
 module.exports = {

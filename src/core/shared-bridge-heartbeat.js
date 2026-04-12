@@ -1,15 +1,19 @@
-const fs = require("fs");
-const path = require("path");
+const {
+  isPlainObject,
+  readManagedJsonStateFile,
+  writeManagedJsonStateFile,
+} = require("./json-state");
 
 const DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS = 120_000;
 
 function readSharedBridgeHeartbeat(filePath) {
-  try {
-    const raw = fs.readFileSync(filePath, "utf8");
-    return normalizeHeartbeat(JSON.parse(raw));
-  } catch {
-    return null;
-  }
+  const parsed = readManagedJsonStateFile({
+    filePath,
+    fallback: null,
+    label: "shared bridge heartbeat",
+    validate: validateHeartbeatRecord,
+  });
+  return normalizeHeartbeat(parsed);
 }
 
 function writeSharedBridgeHeartbeat(filePath, patch) {
@@ -19,8 +23,7 @@ function writeSharedBridgeHeartbeat(filePath, patch) {
     ...(patch || {}),
     updatedAt: new Date().toISOString(),
   });
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(next, null, 2), "utf8");
+  writeManagedJsonStateFile(filePath, next);
   return next;
 }
 
@@ -130,6 +133,52 @@ function normalizeCount(value) {
 
 function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function validateHeartbeatRecord(value) {
+  if (!isPlainObject(value)) {
+    return "shared bridge heartbeat must be an object";
+  }
+  if ("pid" in value && typeof value.pid !== "number" && typeof value.pid !== "string") {
+    return "shared bridge heartbeat pid must be numeric";
+  }
+  if ("status" in value && typeof value.status !== "string") {
+    return "shared bridge heartbeat status must be a string";
+  }
+  if ("accountId" in value && typeof value.accountId !== "string") {
+    return "shared bridge heartbeat accountId must be a string";
+  }
+  if ("workspaceRoot" in value && typeof value.workspaceRoot !== "string") {
+    return "shared bridge heartbeat workspaceRoot must be a string";
+  }
+  if ("codexEndpoint" in value && typeof value.codexEndpoint !== "string") {
+    return "shared bridge heartbeat codexEndpoint must be a string";
+  }
+  if ("startedAt" in value && typeof value.startedAt !== "string") {
+    return "shared bridge heartbeat startedAt must be a string";
+  }
+  if ("updatedAt" in value && typeof value.updatedAt !== "string") {
+    return "shared bridge heartbeat updatedAt must be a string";
+  }
+  if ("stoppedAt" in value && typeof value.stoppedAt !== "string") {
+    return "shared bridge heartbeat stoppedAt must be a string";
+  }
+  if ("lastPollStartedAt" in value && typeof value.lastPollStartedAt !== "string") {
+    return "shared bridge heartbeat lastPollStartedAt must be a string";
+  }
+  if ("lastPollSucceededAt" in value && typeof value.lastPollSucceededAt !== "string") {
+    return "shared bridge heartbeat lastPollSucceededAt must be a string";
+  }
+  if ("lastPollFailedAt" in value && typeof value.lastPollFailedAt !== "string") {
+    return "shared bridge heartbeat lastPollFailedAt must be a string";
+  }
+  if ("consecutiveFailures" in value && typeof value.consecutiveFailures !== "number" && typeof value.consecutiveFailures !== "string") {
+    return "shared bridge heartbeat consecutiveFailures must be numeric";
+  }
+  if ("lastError" in value && typeof value.lastError !== "string") {
+    return "shared bridge heartbeat lastError must be a string";
+  }
+  return true;
 }
 
 module.exports = {

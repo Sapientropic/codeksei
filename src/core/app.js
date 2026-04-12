@@ -1,13 +1,11 @@
-const os = require("os");
 const path = require("path");
-const crypto = require("crypto");
-const fs = require("fs");
 const { createWeixinChannelAdapter } = require("../adapters/channel/weixin");
 const { persistIncomingWeixinAttachments } = require("../adapters/channel/weixin/media-receive");
 const { createCodexRuntimeAdapter } = require("../adapters/runtime/codex");
-const { findModelByQuery } = require("../adapters/runtime/codex/model-catalog");
 const { createTimelineIntegration } = require("../integrations/timeline");
-const { buildWeixinHelpText } = require("./command-registry");
+const { ChannelCommandRouter } = require("./channel-command-router");
+const { createControlCommandHandlers } = require("./channel-command-control-handlers");
+const { createWorkspaceCommandHandlers } = require("./channel-command-workspace-handlers");
 const { resolvePreferredSenderId } = require("./default-targets");
 const {
   resolveConfiguredPersonName,
@@ -18,6 +16,9 @@ const { ThreadStateStore } = require("./thread-state-store");
 const { SystemMessageQueueStore } = require("./system-message-queue-store");
 const { SystemMessageDispatcher } = require("./system-message-dispatcher");
 const { TimelineScreenshotQueueStore } = require("./timeline-screenshot-queue-store");
+const { BackstageTaskLifecycle } = require("./backstage-task-lifecycle");
+const { RuntimeTurnLifecycle } = require("./runtime-turn-lifecycle");
+const { RuntimeWatchdogLifecycle } = require("./runtime-watchdog-lifecycle");
 const { writeSharedBridgeHeartbeat } = require("./shared-bridge-heartbeat");
 const { ReminderQueueStore } = require("../adapters/channel/weixin/reminder-queue-store");
 const { runSystemCheckinPoller } = require("../app/system-checkin-poller");
@@ -62,18 +63,86 @@ class CyberbossApp {
       deliveryTraceEnabled: config.weixinDeliveryTrace,
       onDeliveryFailure: (payload) => this.handleReplyDeliveryFailure(payload),
     });
-    this.pendingRuntimeEventWatchdogs = new Map();
-    this.pendingTurnSettlementWatchdogs = new Map();
-    this.pendingWorkspaceBootstrapByThreadId = new Map();
+    // app.js keeps the top-level wiring and command routing, while the
+    // stateful runtime / backstage lifecycles live in dedicated modules. This
+    // avoids repeating the same typing, watchdog, and retry semantics in both
+    // the constructor setup and the tail of this file.
+    this.runtimeWatchdogLifecycle = new RuntimeWatchdogLifecycle({
+      buildApprovalPromptSignature,
+      buildApprovalPromptText,
+      channelAdapter: this.channelAdapter,
+      matchesBuiltInCommandPrefix,
+      matchesCommandPrefix,
+      normalizeCommandArgument,
+      normalizeText,
+      resolveReplyTargetForBinding: (bindingKey) => this.resolveReplyTargetForBinding(bindingKey),
+      runtimeAdapter: this.runtimeAdapter,
+      streamDelivery: this.streamDelivery,
+      streamSettlementTimeoutMs: STREAM_SETTLEMENT_TIMEOUT_MS,
+      threadStateStore: this.threadStateStore,
+      firstRuntimeEventFailureTimeoutMs: FIRST_RUNTIME_EVENT_FAILURE_TIMEOUT_MS,
+      firstRuntimeEventNoticeTimeoutMs: FIRST_RUNTIME_EVENT_NOTICE_TIMEOUT_MS,
+    });
+    this.channelCommandRouter = new ChannelCommandRouter({
+      workspaceHandlers: createWorkspaceCommandHandlers({
+        channelAdapter: this.channelAdapter,
+        config: this.config,
+        resolveWorkspaceRoot: (bindingKey) => this.resolveWorkspaceRoot(bindingKey),
+        runtimeAdapter: this.runtimeAdapter,
+        scheduleRuntimeEventWatchdog: (payload) => this.runtimeWatchdogLifecycle.scheduleRuntimeEventWatchdog(payload),
+        streamDelivery: this.streamDelivery,
+        threadStateStore: this.threadStateStore,
+      }),
+      controlHandlers: createControlCommandHandlers({
+        channelAdapter: this.channelAdapter,
+        resolveWorkspaceRoot: (bindingKey) => this.resolveWorkspaceRoot(bindingKey),
+        runtimeAdapter: this.runtimeAdapter,
+        threadStateStore: this.threadStateStore,
+      }),
+    });
+    this.runtimeTurnLifecycle = new RuntimeTurnLifecycle({
+      channelAdapter: this.channelAdapter,
+      config: this.config,
+      formatErrorMessage,
+      maybeDispatchCommand: (normalized) => this.channelCommandRouter.maybeDispatchCommand(normalized),
+      normalizeText,
+      persistIncomingWeixinAttachments,
+      queuePendingWorkspaceBootstrap: (payload) => this.runtimeWatchdogLifecycle.queuePendingWorkspaceBootstrap(payload),
+      resolveDefaultTerminalUser: () => this.resolveDefaultTerminalUser(),
+      resolveTimelineScreenshotOutput,
+      resolveWorkspaceRoot: (bindingKey) => this.resolveWorkspaceRoot(bindingKey),
+      runtimeAdapter: this.runtimeAdapter,
+      scheduleRuntimeEventWatchdog: (payload) => this.runtimeWatchdogLifecycle.scheduleRuntimeEventWatchdog(payload),
+      streamDelivery: this.streamDelivery,
+      timelineIntegration: this.timelineIntegration,
+      buildCodexInboundText,
+    });
+    this.backstageTaskLifecycle = new BackstageTaskLifecycle({
+      channelAdapter: this.channelAdapter,
+      config: this.config,
+      formatErrorMessage,
+      getSystemMessageDispatcher: () => this.systemMessageDispatcher,
+      getSystemMessageFailureRetryDelayMs,
+      handlePreparedMessage: (...args) => this.runtimeTurnLifecycle.handlePreparedMessage(...args),
+      hasRpcId,
+      normalizeText,
+      reminderQueue: this.reminderQueue,
+      runtimeAdapter: this.runtimeAdapter,
+      sendTimelineScreenshot: (payload) => this.runtimeTurnLifecycle.sendTimelineScreenshot(payload),
+      systemMessageBusyRetryMs: SYSTEM_MESSAGE_BUSY_RETRY_MS,
+      systemMessageQueue: this.systemMessageQueue,
+      threadStateStore: this.threadStateStore,
+      timelineScreenshotQueue: this.timelineScreenshotQueue,
+      buildReminderSystemTrigger,
+      resolveWorkspaceRoot: (bindingKey) => this.resolveWorkspaceRoot(bindingKey),
+    });
     this.runtimeEventChain = Promise.resolve();
     this.runtimeAdapter.onEvent((event) => {
-      this.confirmPendingWorkspaceBootstrap(event);
-      this.clearRuntimeEventWatchdog(event?.payload?.threadId);
-      this.refreshTurnSettlementWatchdog(event);
+      this.runtimeWatchdogLifecycle.observeRuntimeEvent(event);
       this.threadStateStore.applyRuntimeEvent(event);
       this.runtimeEventChain = this.runtimeEventChain
         .catch(() => {})
-        .then(() => this.handleRuntimeEvent(event))
+        .then(() => this.runtimeWatchdogLifecycle.handleRuntimeEvent(event))
         .catch((error) => {
           const message = error instanceof Error ? error.stack || error.message : String(error);
           console.error(`[codeksei] runtime event handling failed type=${event?.type || "(unknown)"} ${message}`);
@@ -245,73 +314,11 @@ class CyberbossApp {
   }
 
   async sendTimelineScreenshot({ senderId = "", args = [], outputFile = "" } = {}) {
-    const targetUserId = normalizeText(senderId) || this.resolveDefaultTerminalUser();
-    if (!targetUserId) {
-      throw new Error("无法确定时间轴截图要发送给哪个微信用户，先配置 CODEKSEI_ALLOWED_USER_IDS（或旧的 CYBERBOSS_ALLOWED_USER_IDS）");
-    }
-    const contextToken = this.channelAdapter.getKnownContextTokens()[targetUserId] || "";
-    if (!contextToken) {
-      throw new Error(`找不到用户 ${targetUserId} 的 context token，先让这个用户和 bot 聊过一次`);
-    }
-
-    const normalizedArgs = Array.isArray(args)
-      ? args.map((value) => String(value ?? "")).filter(Boolean)
-      : [];
-    const resolvedOutputFile = normalizeText(outputFile) || resolveTimelineScreenshotOutput(normalizedArgs);
-    const finalArgs = resolvedOutputFile
-      ? normalizedArgs
-      : [...normalizedArgs, "--output", path.join(os.tmpdir(), `codeksei-timeline-${Date.now()}.png`)];
-    const savedPath = resolveTimelineScreenshotOutput(finalArgs);
-
-    return this.withUserTyping({
-      userId: targetUserId,
-      contextToken,
-    }, async () => {
-      await this.timelineIntegration.runSubcommand("screenshot", finalArgs);
-      await this.channelAdapter.sendFile({
-        userId: targetUserId,
-        filePath: savedPath,
-        contextToken,
-      });
-      return { userId: targetUserId, filePath: savedPath };
-    });
+    return this.runtimeTurnLifecycle.sendTimelineScreenshot({ senderId, args, outputFile });
   }
 
   async sendLocalFileToCurrentChat({ senderId = "", filePath = "" } = {}) {
-    const targetUserId = normalizeText(senderId) || this.resolveDefaultTerminalUser();
-    if (!targetUserId) {
-      throw new Error("无法确定文件要发送给哪个微信用户，先配置 CODEKSEI_ALLOWED_USER_IDS（或旧的 CYBERBOSS_ALLOWED_USER_IDS）");
-    }
-
-    const contextToken = this.channelAdapter.getKnownContextTokens()[targetUserId] || "";
-    if (!contextToken) {
-      throw new Error(`找不到用户 ${targetUserId} 的 context token，先让这个用户和 bot 聊过一次`);
-    }
-
-    const requestedPath = normalizeText(filePath);
-    if (!requestedPath) {
-      throw new Error("缺少要发送的文件路径");
-    }
-    const resolvedPath = path.resolve(requestedPath);
-    if (!fs.existsSync(resolvedPath)) {
-      throw new Error(`文件不存在: ${resolvedPath}`);
-    }
-    const stat = fs.statSync(resolvedPath);
-    if (!stat.isFile()) {
-      throw new Error(`只能发送文件，不能发送目录: ${resolvedPath}`);
-    }
-
-    return this.withUserTyping({
-      userId: targetUserId,
-      contextToken,
-    }, async () => {
-      await this.channelAdapter.sendFile({
-        userId: targetUserId,
-        filePath: resolvedPath,
-        contextToken,
-      });
-      return { userId: targetUserId, filePath: resolvedPath };
-    });
+    return this.runtimeTurnLifecycle.sendLocalFileToCurrentChat({ senderId, filePath });
   }
 
   async handleIncomingMessage(message) {
@@ -336,371 +343,52 @@ class CyberbossApp {
     reportFailureToUser = true,
     throwOnFailure = false,
   }) {
-    const bindingKey = this.runtimeAdapter.getSessionStore().buildBindingKey({
-      workspaceId: normalized.workspaceId,
-      accountId: normalized.accountId,
-      senderId: normalized.senderId,
+    return this.runtimeTurnLifecycle.handlePreparedMessage(normalized, {
+      allowCommands,
+      reportFailureToUser,
+      throwOnFailure,
     });
-    this.streamDelivery.setReplyTarget(bindingKey, {
-      userId: normalized.senderId,
-      contextToken: normalized.contextToken,
-      provider: normalized.provider,
-    });
-
-    const command = parseChannelCommand(normalized.text);
-    if (allowCommands && command) {
-      await this.dispatchChannelCommand(normalized, command);
-      return;
-    }
-
-    const workspaceRoot = this.resolveWorkspaceRoot(bindingKey);
-    const prepared = await this.prepareIncomingMessageForRuntime(normalized, workspaceRoot);
-    if (!prepared) {
-      return { status: "skipped", reason: "not_prepared" };
-    }
-
-    const sendResult = await this.sendPreparedMessageToRuntime({
-      bindingKey,
-      workspaceRoot,
-      normalized,
-      prepared,
-    });
-    if (sendResult.status === "sent") {
-      return sendResult;
-    }
-
-    if (reportFailureToUser) {
-      const messageText = normalizeText(sendResult.reason) || "unknown error";
-      await this.channelAdapter.sendText({
-        userId: normalized.senderId,
-        text: `处理失败：${messageText}`,
-        contextToken: normalized.contextToken,
-      }).catch(() => {});
-    }
-    if (throwOnFailure) {
-      throw sendResult.error || new Error(normalizeText(sendResult.reason) || "runtime_send_failed");
-    }
-    return sendResult;
   }
 
   scheduleRuntimeEventWatchdog({ bindingKey, workspaceRoot, normalized, threadId = "" }) {
-    const sessionStore = this.runtimeAdapter.getSessionStore();
-    const candidateThreadId = normalizeCommandArgument(threadId)
-      || sessionStore.getThreadIdForWorkspace(bindingKey, workspaceRoot);
-    const normalizedThreadId = normalizeCommandArgument(candidateThreadId);
-    if (!normalizedThreadId) {
-      return;
-    }
-
-    this.clearRuntimeEventWatchdog(normalizedThreadId);
-    const noticeTimer = setTimeout(async () => {
-      const watchdog = this.pendingRuntimeEventWatchdogs.get(normalizedThreadId);
-      if (!watchdog) {
-        return;
-      }
-      const currentThreadState = this.threadStateStore.getThreadState(normalizedThreadId);
-      if (currentThreadState?.status === "running" || currentThreadState?.turnId) {
-        return;
-      }
-      watchdog.noticeSent = true;
-      await this.channelAdapter.sendText({
-        userId: normalized.senderId,
-        contextToken: normalized.contextToken,
-        preserveBlock: true,
-        text: [
-          "这条消息已经发到 bridge，但 Codex runtime 还没有返回首个事件。",
-          "如果你看到 terminal 正在 reconnecting，这一轮大概率还卡在共享线程启动阶段。",
-          "先不用一直空等；如果稍后连上，消息会继续往下跑。",
-          `workspace: ${workspaceRoot}`,
-          `thread: ${normalizedThreadId}`,
-        ].join("\n"),
-      }).catch(() => {});
-    }, FIRST_RUNTIME_EVENT_NOTICE_TIMEOUT_MS);
-    const failureTimer = setTimeout(async () => {
-      this.pendingRuntimeEventWatchdogs.delete(normalizedThreadId);
-      const currentThreadState = this.threadStateStore.getThreadState(normalizedThreadId);
-      if (currentThreadState?.status === "running" || currentThreadState?.turnId) {
-        return;
-      }
-      await this.channelAdapter.sendTyping({
-        userId: normalized.senderId,
-        status: 0,
-        contextToken: normalized.contextToken,
-      }).catch(() => {});
-      await this.channelAdapter.sendText({
-        userId: normalized.senderId,
-        contextToken: normalized.contextToken,
-        preserveBlock: true,
-        text: [
-          "这条消息已经发到 bridge，但 Codex runtime 直到现在都没有返回首个事件。",
-          "如果 terminal 里的那轮 reconnecting 已经跑完 5 次，这条共享线程基本可以判定没有真正启动成功。",
-          `workspace: ${workspaceRoot}`,
-          `thread: ${normalizedThreadId}`,
-          "优先检查：共享 app-server 是否正常、当前终端是否接在同一个 thread、runtime 是否真的开始处理这条消息。",
-          "如果你现在是在替这条线排查，直接按这套顺序做：",
-          "1. 在项目目录执行 npm run shared:status",
-          "2. 如果 bridge 不在，先执行 npm run shared:start",
-          "3. 再开一个终端执行 npm run shared:open",
-          "4. 确认 terminal 里打开的是上面这条 thread，而不是另一条私有线程",
-        ].join("\n"),
-      }).catch(() => {});
-    }, FIRST_RUNTIME_EVENT_FAILURE_TIMEOUT_MS);
-    this.pendingRuntimeEventWatchdogs.set(normalizedThreadId, {
-      noticeTimer,
-      failureTimer,
-      noticeSent: false,
+    this.runtimeWatchdogLifecycle.scheduleRuntimeEventWatchdog({
+      bindingKey,
+      workspaceRoot,
+      normalized,
+      threadId,
     });
   }
 
   clearRuntimeEventWatchdog(threadId) {
-    const normalizedThreadId = normalizeCommandArgument(threadId);
-    if (!normalizedThreadId) {
-      return;
-    }
-    const watchdog = this.pendingRuntimeEventWatchdogs.get(normalizedThreadId);
-    if (!watchdog) {
-      return;
-    }
-    clearTimeout(watchdog.noticeTimer);
-    clearTimeout(watchdog.failureTimer);
-    this.pendingRuntimeEventWatchdogs.delete(normalizedThreadId);
+    this.runtimeWatchdogLifecycle.clearRuntimeEventWatchdog(threadId);
   }
 
   refreshTurnSettlementWatchdog(event) {
-    const threadId = normalizeCommandArgument(event?.payload?.threadId);
-    const turnId = normalizeCommandArgument(event?.payload?.turnId);
-    if (!threadId || !turnId) {
-      return;
-    }
-
-    if (event.type === "runtime.turn.completed" || event.type === "runtime.turn.failed" || event.type === "runtime.approval.requested") {
-      this.clearTurnSettlementWatchdog(threadId, turnId);
-      return;
-    }
-    if (event.type !== "runtime.reply.delta" && event.type !== "runtime.reply.completed") {
-      return;
-    }
-
-    const watchdogKey = buildTurnSettlementWatchdogKey(threadId, turnId);
-    this.clearTurnSettlementWatchdog(threadId, turnId);
-    const timer = setTimeout(async () => {
-      this.pendingTurnSettlementWatchdogs.delete(watchdogKey);
-      const currentThreadState = this.threadStateStore.getThreadState(threadId);
-      if (!currentThreadState || currentThreadState.turnId !== turnId || currentThreadState.status !== "running") {
-        return;
-      }
-
-      const linked = this.runtimeAdapter.getSessionStore().findBindingForThreadId(threadId);
-      const workspaceRoot = normalizeText(linked?.workspaceRoot);
-      // Once a reply has already started streaming, hanging forever is worse
-      // than surfacing a partial answer. We only trip this guard after a long
-      // quiet period to avoid fighting normal long-running tool calls.
-      console.error(
-        `[codeksei] runtime settlement watchdog expired `
-        + `thread=${threadId} turn=${turnId} workspace=${workspaceRoot || "(unknown)"}`
-      );
-      await this.streamDelivery.finalizeAbandonedTurn({
-        threadId,
-        turnId,
-        trailingText: [
-          "【系统提示】",
-          "这一轮回复已经开始输出，但 Codex runtime 一直没有发回完成或失败事件。",
-          "我先把目前拿到的内容停在这里，避免你继续看到假 typing。",
-          "如果 runtime 稍后恢复并补发完成事件，我会自动续发剩下的内容。",
-          "只有在长时间都没有新内容时，再发一句“继续刚才那条未完回复”就行。",
-        ].join("\n"),
-      });
-      this.threadStateStore.markTurnFailed(
-        threadId,
-        turnId,
-        "这轮回复已经开始输出，但 Codex runtime 一直没有发回完成或失败事件。"
-      );
-      this.runtimeAdapter.getSessionStore().clearApprovalPrompt(threadId);
-      await this.stopTypingForThread(threadId);
-    }, STREAM_SETTLEMENT_TIMEOUT_MS);
-    this.pendingTurnSettlementWatchdogs.set(watchdogKey, { timer });
+    this.runtimeWatchdogLifecycle.refreshTurnSettlementWatchdog(event);
   }
 
   clearTurnSettlementWatchdog(threadId, turnId) {
-    const watchdogKey = buildTurnSettlementWatchdogKey(threadId, turnId);
-    if (!watchdogKey) {
-      return;
-    }
-    const watchdog = this.pendingTurnSettlementWatchdogs.get(watchdogKey);
-    if (!watchdog) {
-      return;
-    }
-    clearTimeout(watchdog.timer);
-    this.pendingTurnSettlementWatchdogs.delete(watchdogKey);
+    this.runtimeWatchdogLifecycle.clearTurnSettlementWatchdog(threadId, turnId);
   }
 
   queuePendingWorkspaceBootstrap({ bindingKey, workspaceRoot, threadId }) {
-    const normalizedBindingKey = normalizeText(bindingKey);
-    const normalizedWorkspaceRoot = normalizeText(workspaceRoot);
-    const normalizedThreadId = normalizeText(threadId);
-    if (!normalizedBindingKey || !normalizedWorkspaceRoot || !normalizedThreadId) {
-      return;
-    }
-    this.pendingWorkspaceBootstrapByThreadId.set(normalizedThreadId, {
-      bindingKey: normalizedBindingKey,
-      workspaceRoot: normalizedWorkspaceRoot,
-    });
+    this.runtimeWatchdogLifecycle.queuePendingWorkspaceBootstrap({ bindingKey, workspaceRoot, threadId });
   }
 
   confirmPendingWorkspaceBootstrap(event) {
-    if (!event || event.type === "runtime.usage.updated") {
-      return;
-    }
-    const threadId = normalizeText(event?.payload?.threadId);
-    if (!threadId) {
-      return;
-    }
-    const pending = this.pendingWorkspaceBootstrapByThreadId.get(threadId);
-    if (!pending?.bindingKey || !pending?.workspaceRoot) {
-      return;
-    }
-    // Do not mark workspace bootstrap as done when sendUserMessage merely
-    // returns. In shared mode the runtime can still stall before emitting the
-    // first real thread event, and prematurely persisting success would skip the
-    // next retry's continuity bootstrap.
-    this.runtimeAdapter.getSessionStore().rememberWorkspaceBootstrapForThread(
-      pending.bindingKey,
-      pending.workspaceRoot,
-      threadId
-    );
-    this.pendingWorkspaceBootstrapByThreadId.delete(threadId);
+    this.runtimeWatchdogLifecycle.confirmPendingWorkspaceBootstrap(event);
   }
 
   async prepareIncomingMessageForRuntime(normalized, workspaceRoot) {
-    const attachments = Array.isArray(normalized.attachments) ? normalized.attachments : [];
-    if (!attachments.length) {
-      return {
-        ...normalized,
-        originalText: normalized.text,
-        text: buildCodexInboundText(normalized, { saved: [], failed: [] }, this.config),
-        attachments: [],
-        attachmentFailures: [],
-      };
-    }
-
-    const persisted = await persistIncomingWeixinAttachments({
-      attachments,
-      stateDir: this.config.stateDir,
-      cdnBaseUrl: this.config.weixinCdnBaseUrl,
-      messageId: normalized.messageId,
-      receivedAt: normalized.receivedAt,
-    });
-
-    if (!persisted.saved.length && persisted.failed.length && !String(normalized.text || "").trim()) {
-      await this.channelAdapter.sendText({
-        userId: normalized.senderId,
-        text: `图片/附件接收失败：${persisted.failed.map((item) => item.reason).join("; ")}`,
-        contextToken: normalized.contextToken,
-        preserveBlock: true,
-      }).catch(() => {});
-      return null;
-    }
-
-    const codexInboundText = buildCodexInboundText(normalized, persisted, this.config);
-    if (!codexInboundText) {
-      await this.channelAdapter.sendText({
-        userId: normalized.senderId,
-        text: `图片/附件接收失败：${persisted.failed.map((item) => item.reason).join("; ")}`,
-        contextToken: normalized.contextToken,
-        preserveBlock: true,
-      }).catch(() => {});
-      return null;
-    }
-
-    return {
-      ...normalized,
-      originalText: normalized.text,
-      text: codexInboundText,
-      attachments: persisted.saved,
-      attachmentFailures: persisted.failed,
-    };
+    return this.runtimeTurnLifecycle.prepareIncomingMessageForRuntime(normalized, workspaceRoot);
   }
 
   async flushPendingSystemMessages() {
-    const pendingMessages = this.systemMessageDispatcher?.takeReadyPending(Date.now()) || [];
-    for (const message of pendingMessages) {
-      let dispatchResult = null;
-      try {
-        // Backstage scheduling needs an explicit result enum so busy deferrals,
-        // retryable runtime failures, and terminal dead-letters do not collapse
-        // into the same boolean/throw path.
-        dispatchResult = await this.dispatchSystemMessage(message);
-      } catch (error) {
-        dispatchResult = {
-          status: "retryable_error",
-          reason: formatErrorMessage(error),
-        };
-      }
-
-      switch (dispatchResult?.status) {
-        case "sent":
-          this.systemMessageDispatcher?.complete(message);
-          break;
-        case "deferred_busy": {
-          const deferred = this.systemMessageDispatcher?.defer(message, {
-            delayMs: SYSTEM_MESSAGE_BUSY_RETRY_MS,
-            reason: dispatchResult.reason,
-            countAttempt: false,
-          });
-          if (deferred?.status === "dead_letter") {
-            console.warn(
-              `[codeksei] backstage message dead-lettered id=${message.id} reason=${dispatchResult.reason}`
-            );
-          }
-          break;
-        }
-        case "dead_letter":
-          this.systemMessageDispatcher?.deadLetter(message, { reason: dispatchResult.reason });
-          console.warn(
-            `[codeksei] backstage message dead-lettered id=${message.id} reason=${dispatchResult.reason || "dead_letter"}`
-          );
-          break;
-        case "retryable_error":
-        default: {
-          const deferred = this.systemMessageDispatcher?.defer(message, {
-          delayMs: getSystemMessageFailureRetryDelayMs((Number(message?.attemptCount) || 0) + 1),
-          reason: normalizeText(dispatchResult?.reason) || "runtime_send_failed",
-          countAttempt: true,
-        });
-        if (deferred?.status === "dead_letter") {
-          console.warn(
-            `[codeksei] backstage message dead-lettered id=${message.id} reason=${normalizeText(dispatchResult?.reason) || "runtime_send_failed"}`
-          );
-        }
-          break;
-        }
-      }
-    }
+    await this.backstageTaskLifecycle.flushPendingSystemMessages();
   }
 
   async flushPendingTimelineScreenshots(account) {
-    const pendingJobs = this.timelineScreenshotQueue.drainForAccount(account.accountId);
-    for (const job of pendingJobs) {
-      try {
-        await this.sendTimelineScreenshot({
-          senderId: job.senderId,
-          args: job.args,
-          outputFile: job.outputFile,
-        });
-      } catch (error) {
-        const messageText = error instanceof Error ? error.message : String(error || "unknown error");
-        console.error(`[codeksei] timeline screenshot failed job=${job.id} ${messageText}`);
-        await this.channelAdapter.sendTyping({
-          userId: job.senderId,
-          status: 0,
-        }).catch(() => {});
-        await this.channelAdapter.sendText({
-          userId: job.senderId,
-          text: `时间轴截图失败：${messageText}`,
-          preserveBlock: true,
-        }).catch(() => {});
-      }
-    }
+    await this.backstageTaskLifecycle.flushPendingTimelineScreenshots(account);
   }
 
   resolveLongPollTimeoutMs() {
@@ -724,70 +412,11 @@ class CyberbossApp {
   }
 
   async flushDueReminders(account) {
-    const dueReminders = this.reminderQueue
-      .listDue(Date.now())
-      .filter((reminder) => reminder.accountId === account.accountId);
-
-    for (const reminder of dueReminders) {
-      try {
-        this.systemMessageQueue.enqueue({
-          id: `reminder:${reminder.id}`,
-          accountId: reminder.accountId,
-          senderId: reminder.senderId,
-          workspaceRoot: this.resolveReminderWorkspaceRoot(reminder),
-          text: buildReminderSystemTrigger(reminder, this.config),
-          kind: "reminder",
-          createdAt: new Date().toISOString(),
-        });
-      } catch {
-        this.reminderQueue.enqueue({
-          ...reminder,
-          dueAtMs: Date.now() + 5_000,
-        });
-      }
-    }
-  }
-
-  resolveReminderWorkspaceRoot(reminder) {
-    const bindingKey = this.runtimeAdapter.getSessionStore().buildBindingKey({
-      workspaceId: this.config.workspaceId,
-      accountId: reminder.accountId,
-      senderId: reminder.senderId,
-    });
-    return this.runtimeAdapter.getSessionStore().getActiveWorkspaceRoot(bindingKey) || this.config.workspaceRoot;
+    await this.backstageTaskLifecycle.flushDueReminders(account);
   }
 
   async dispatchSystemMessage(message) {
-    const prepared = this.systemMessageDispatcher?.buildPreparedMessage(message, this.channelAdapter.getKnownContextTokens()[message.senderId] || "");
-    if (!prepared) {
-      return { status: "dead_letter", reason: "invalid_system_message" };
-    }
-    const bindingKey = this.runtimeAdapter.getSessionStore().buildBindingKey({
-      workspaceId: prepared.workspaceId,
-      accountId: prepared.accountId,
-      senderId: prepared.senderId,
-    });
-    const workspaceRoot = prepared.workspaceRoot || this.resolveWorkspaceRoot(bindingKey);
-    const threadId = this.runtimeAdapter.getSessionStore().getThreadIdForWorkspace(bindingKey, workspaceRoot);
-    const threadState = threadId ? this.threadStateStore.getThreadState(threadId) : null;
-    if (threadState?.status === "running") {
-      return { status: "deferred_busy", reason: "thread_running" };
-    }
-    if (hasRpcId(threadState?.pendingApproval?.requestId)) {
-      return { status: "deferred_busy", reason: "waiting_approval" };
-    }
-    const sendResult = await this.handlePreparedMessage(prepared, {
-      allowCommands: false,
-      reportFailureToUser: false,
-      throwOnFailure: false,
-    });
-    if (sendResult?.status === "sent") {
-      return { status: "sent", reason: "" };
-    }
-    return {
-      status: "retryable_error",
-      reason: normalizeText(sendResult?.reason) || "runtime_send_failed",
-    };
+    return this.backstageTaskLifecycle.dispatchSystemMessage(message);
   }
 
   async handleReplyDeliveryFailure({
@@ -828,432 +457,17 @@ class CyberbossApp {
     await this.stopTypingForThread(normalizedThreadId);
   }
 
-  async dispatchChannelCommand(normalized, command) {
-    switch (command.name) {
-      case "bind":
-        await this.handleBindCommand(normalized, command);
-        return;
-      case "status":
-        await this.handleStatusCommand(normalized);
-        return;
-      case "new":
-        await this.handleNewCommand(normalized);
-        return;
-      case "reread":
-        await this.handleRereadCommand(normalized);
-        return;
-      case "switch":
-        await this.handleSwitchCommand(normalized, command);
-        return;
-      case "stop":
-        await this.handleStopCommand(normalized);
-        return;
-      case "yes":
-      case "always":
-      case "no":
-        await this.handleApprovalCommand(normalized, command);
-        return;
-      case "model":
-        await this.handleModelCommand(normalized, command);
-        return;
-      case "help":
-        await this.handleHelpCommand(normalized);
-        return;
-      default:
-        await this.channelAdapter.sendText({
-          userId: normalized.senderId,
-          text: buildWeixinHelpText(),
-          contextToken: normalized.contextToken,
-        });
-    }
-  }
-
-  async handleBindCommand(normalized, command) {
-    const workspaceRoot = resolveBindWorkspaceRoot(command.args, this.config.workspaceRoot);
-    if (!workspaceRoot) {
-      await this.channelAdapter.sendText({
-        userId: normalized.senderId,
-        text: "用法：/bind [绝对路径]",
-        contextToken: normalized.contextToken,
-      });
-      return;
-    }
-
-    if (!isAbsoluteWorkspacePath(workspaceRoot)) {
-      await this.channelAdapter.sendText({
-        userId: normalized.senderId,
-        text: "只支持绝对路径绑定。",
-        contextToken: normalized.contextToken,
-      });
-      return;
-    }
-
-    const stats = await fs.promises.stat(workspaceRoot).catch(() => null);
-    if (!stats?.isDirectory()) {
-      await this.channelAdapter.sendText({
-        userId: normalized.senderId,
-        text: `项目不存在：${workspaceRoot}`,
-        contextToken: normalized.contextToken,
-      });
-      return;
-    }
-
-    // Bind the canonical real path so junction aliases do not fork thread/model
-    // state across multiple workspace keys on Windows.
-    const canonicalWorkspaceRoot = normalizeWorkspacePath(
-      await fs.promises.realpath(workspaceRoot).catch(() => workspaceRoot)
-    ) || workspaceRoot;
-
-    const bindingKey = this.runtimeAdapter.getSessionStore().buildBindingKey({
-      workspaceId: normalized.workspaceId,
-      accountId: normalized.accountId,
-      senderId: normalized.senderId,
-    });
-    this.runtimeAdapter.getSessionStore().setActiveWorkspaceRoot(bindingKey, canonicalWorkspaceRoot);
-    await this.channelAdapter.sendText({
-      userId: normalized.senderId,
-      text: `已绑定项目。\n\nworkspace: ${canonicalWorkspaceRoot}\n下一条普通消息会按当前 workspace 检查是否需要补读稳定入口。`,
-      contextToken: normalized.contextToken,
-    });
-  }
-
-  async handleStatusCommand(normalized) {
-    const bindingKey = this.runtimeAdapter.getSessionStore().buildBindingKey({
-      workspaceId: normalized.workspaceId,
-      accountId: normalized.accountId,
-      senderId: normalized.senderId,
-    });
-    const workspaceRoot = this.resolveWorkspaceRoot(bindingKey);
-    const threadId = this.runtimeAdapter.getSessionStore().getThreadIdForWorkspace(bindingKey, workspaceRoot);
-    const threadState = threadId ? this.threadStateStore.getThreadState(threadId) : null;
-    const usage = this.threadStateStore.getLatestUsage();
-    const lines = [
-      `workspace: ${workspaceRoot}`,
-      `thread: ${threadId || "(none)"}`,
-      `status: ${threadState?.status || "idle"}`,
-      `model: ${this.runtimeAdapter.getSessionStore().getCodexParamsForWorkspace(bindingKey, workspaceRoot).model || "(default)"}`,
-    ];
-    if (threadState?.lastError) {
-      lines.push(`lastError: ${threadState.lastError}`);
-    }
-    if (usage) {
-      const usageParts = [];
-      if (usage.modelContextWindow > 0 && usage.lastTotalTokens > 0) {
-        usageParts.push(`last ${formatCompactNumber(usage.lastTotalTokens)}/${formatCompactNumber(usage.modelContextWindow)}`);
-      } else if (usage.lastTotalTokens > 0) {
-        usageParts.push(`last ${formatCompactNumber(usage.lastTotalTokens)}`);
-      }
-      if (usage.primaryUsedPercent > 0) {
-        usageParts.push(`5h ${usage.primaryUsedPercent}%`);
-      }
-      if (usage.secondaryUsedPercent > 0) {
-        usageParts.push(`7d ${usage.secondaryUsedPercent}%`);
-      }
-      if (usageParts.length) {
-        lines.push(`usage: ${usageParts.join(" | ")}`);
-      }
-    }
-    await this.channelAdapter.sendText({
-      userId: normalized.senderId,
-      text: lines.join("\n"),
-      contextToken: normalized.contextToken,
-    });
-  }
-
-  async handleNewCommand(normalized) {
-    const bindingKey = this.runtimeAdapter.getSessionStore().buildBindingKey({
-      workspaceId: normalized.workspaceId,
-      accountId: normalized.accountId,
-      senderId: normalized.senderId,
-    });
-    const workspaceRoot = this.resolveWorkspaceRoot(bindingKey);
-    this.runtimeAdapter.getSessionStore().clearThreadIdForWorkspace(bindingKey, workspaceRoot);
-    await this.channelAdapter.sendText({
-      userId: normalized.senderId,
-      text: `已切到新线程草稿。\n\nworkspace: ${workspaceRoot}\n下一条普通消息会先按当前 workspace 重建上下文入口。`,
-      contextToken: normalized.contextToken,
-    });
-  }
-
-  async handleRereadCommand(normalized) {
-    const bindingKey = this.runtimeAdapter.getSessionStore().buildBindingKey({
-      workspaceId: normalized.workspaceId,
-      accountId: normalized.accountId,
-      senderId: normalized.senderId,
-    });
-    const workspaceRoot = this.resolveWorkspaceRoot(bindingKey);
-    const sessionStore = this.runtimeAdapter.getSessionStore();
-    const threadId = sessionStore.getThreadIdForWorkspace(bindingKey, workspaceRoot);
-    if (!threadId) {
-      await this.channelAdapter.sendText({
-        userId: normalized.senderId,
-        text: "当前还没有可用线程，先发一条普通消息开始。",
-        contextToken: normalized.contextToken,
-      });
-      return;
-    }
-
-    try {
-      this.streamDelivery.queueReplyTargetForThread(threadId, {
-        userId: normalized.senderId,
-        contextToken: normalized.contextToken,
-        provider: normalized.provider,
-      });
-      this.scheduleRuntimeEventWatchdog({
-        bindingKey,
-        workspaceRoot,
-        normalized,
-        threadId,
-      });
-      await this.runtimeAdapter.refreshThreadInstructions({
-        bindingKey,
-        threadId,
-        workspaceRoot,
-        model: sessionStore.getCodexParamsForWorkspace(bindingKey, workspaceRoot).model,
-        accessMode: this.config.codexAccessMode,
-      });
-    } catch (error) {
-      await this.channelAdapter.sendText({
-        userId: normalized.senderId,
-        text: `重读失败：${error instanceof Error ? error.message : String(error || "unknown error")}`,
-        contextToken: normalized.contextToken,
-      }).catch(() => {});
-    }
-  }
-
-  async handleSwitchCommand(normalized, command) {
-    const targetThreadId = normalizeCommandArgument(command.args);
-    if (!targetThreadId) {
-      await this.channelAdapter.sendText({
-        userId: normalized.senderId,
-        text: "用法：/switch <threadId>",
-        contextToken: normalized.contextToken,
-      });
-      return;
-    }
-
-    const bindingKey = this.runtimeAdapter.getSessionStore().buildBindingKey({
-      workspaceId: normalized.workspaceId,
-      accountId: normalized.accountId,
-      senderId: normalized.senderId,
-    });
-    const sessionStore = this.runtimeAdapter.getSessionStore();
-    const currentWorkspaceRoot = this.resolveWorkspaceRoot(bindingKey);
-    // A thread carries its own workspace continuity contract. If we switch back
-    // to a known old thread but keep today's active workspace, the next message
-    // would inject the wrong workspace bootstrap and silently redirect context.
-    const knownTarget = sessionStore.findBindingForThreadId(targetThreadId);
-    const workspaceRoot = knownTarget?.workspaceRoot || currentWorkspaceRoot;
-    await this.runtimeAdapter.resumeThread({ threadId: targetThreadId });
-    sessionStore.setThreadIdForWorkspace(bindingKey, workspaceRoot, targetThreadId);
-    const switchedWorkspaceNotice = workspaceRoot !== currentWorkspaceRoot
-      ? "\n已跟随这条 thread 的已知 workspace。"
-      : "";
-    await this.channelAdapter.sendText({
-      userId: normalized.senderId,
-      text: `已切换线程。\n\nworkspace: ${workspaceRoot}\nthread: ${targetThreadId}${switchedWorkspaceNotice}\n下一条普通消息会按当前 workspace 检查是否需要补读稳定入口。`,
-      contextToken: normalized.contextToken,
-    });
-  }
-
-  async handleStopCommand(normalized) {
-    const bindingKey = this.runtimeAdapter.getSessionStore().buildBindingKey({
-      workspaceId: normalized.workspaceId,
-      accountId: normalized.accountId,
-      senderId: normalized.senderId,
-    });
-    const workspaceRoot = this.resolveWorkspaceRoot(bindingKey);
-    const threadId = this.runtimeAdapter.getSessionStore().getThreadIdForWorkspace(bindingKey, workspaceRoot);
-    const threadState = threadId ? this.threadStateStore.getThreadState(threadId) : null;
-    if (!threadId || !threadState?.turnId || threadState.status !== "running") {
-      await this.channelAdapter.sendText({
-        userId: normalized.senderId,
-        text: "当前没有正在运行的线程。",
-        contextToken: normalized.contextToken,
-      });
-      return;
-    }
-
-    await this.runtimeAdapter.cancelTurn({
-      threadId,
-      turnId: threadState.turnId,
-    });
-    await this.channelAdapter.sendText({
-      userId: normalized.senderId,
-      text: `已发送停止请求。\n\nthread: ${threadId}`,
-      contextToken: normalized.contextToken,
-    });
-  }
-
-  async handleApprovalCommand(normalized, command) {
-    const bindingKey = this.runtimeAdapter.getSessionStore().buildBindingKey({
-      workspaceId: normalized.workspaceId,
-      accountId: normalized.accountId,
-      senderId: normalized.senderId,
-    });
-    const workspaceRoot = this.resolveWorkspaceRoot(bindingKey);
-    const threadId = this.runtimeAdapter.getSessionStore().getThreadIdForWorkspace(bindingKey, workspaceRoot);
-    const threadState = threadId ? this.threadStateStore.getThreadState(threadId) : null;
-    const approval = threadState?.pendingApproval || null;
-    if (!threadId || approval?.requestId == null || String(approval.requestId).trim() === "") {
-      await this.channelAdapter.sendText({
-        userId: normalized.senderId,
-        text: "当前没有待处理的授权请求。",
-        contextToken: normalized.contextToken,
-      });
-      return;
-    }
-
-    const decision = command.name === "no" ? "decline" : "accept";
-    console.log(
-      `[codeksei] approval response requested thread=${threadId} requestId=${approval.requestId} decision=${decision} workspace=${workspaceRoot}`
-    );
-    await this.runtimeAdapter.respondApproval({
-      requestId: approval.requestId,
-      decision,
-    });
-    this.runtimeAdapter.getSessionStore().clearApprovalPrompt(threadId);
-    console.log(
-      `[codeksei] approval response delivered thread=${threadId} requestId=${approval.requestId} decision=${decision}`
-    );
-    if (command.name === "always" && decision === "accept") {
-      this.runtimeAdapter.getSessionStore().rememberApprovalPrefixForWorkspace(workspaceRoot, approval.commandTokens);
-    }
-    this.threadStateStore.resolveApproval(threadId, "running");
-    const text = command.name === "always"
-      ? "已记住该命令前缀，当前项目后续相同命令将自动放行。"
-      : (command.name === "yes" ? "已允许本次请求。" : "已拒绝本次请求。");
-    await this.channelAdapter.sendText({
-      userId: normalized.senderId,
-      text,
-      contextToken: normalized.contextToken,
-    });
-  }
-
-  async handleModelCommand(normalized, command) {
-    const bindingKey = this.runtimeAdapter.getSessionStore().buildBindingKey({
-      workspaceId: normalized.workspaceId,
-      accountId: normalized.accountId,
-      senderId: normalized.senderId,
-    });
-    const workspaceRoot = this.resolveWorkspaceRoot(bindingKey);
-    const query = normalizeCommandArgument(command.args);
-    const sessionStore = this.runtimeAdapter.getSessionStore();
-    const catalog = sessionStore.getAvailableModelCatalog();
-    const currentModel = sessionStore.getCodexParamsForWorkspace(bindingKey, workspaceRoot).model;
-
-    if (!query) {
-      const lines = [
-        `当前模型: ${currentModel || "(default)"}`,
-      ];
-      if (catalog?.models?.length) {
-        lines.push(`可用模型: ${catalog.models.map((item) => item.model).join("、")}`);
-      } else {
-        lines.push("可用模型: (未获取到模型列表)");
-      }
-      await this.channelAdapter.sendText({
-        userId: normalized.senderId,
-        text: lines.join("\n"),
-        contextToken: normalized.contextToken,
-      });
-      return;
-    }
-
-    const matched = findModelByQuery(catalog?.models || [], query);
-    if (!matched) {
-      await this.channelAdapter.sendText({
-        userId: normalized.senderId,
-        text: `未找到模型：${query}`,
-        contextToken: normalized.contextToken,
-      });
-      return;
-    }
-
-    sessionStore.setCodexParamsForWorkspace(bindingKey, workspaceRoot, {
-      model: matched.model,
-    });
-    await this.channelAdapter.sendText({
-      userId: normalized.senderId,
-      text: `已切换模型。\n\nworkspace: ${workspaceRoot}\nmodel: ${matched.model}`,
-      contextToken: normalized.contextToken,
-    });
-  }
-
-  async handleHelpCommand(normalized) {
-    await this.channelAdapter.sendText({
-      userId: normalized.senderId,
-      text: buildWeixinHelpText(),
-      contextToken: normalized.contextToken,
-    });
-  }
-
   resolveWorkspaceRoot(bindingKey) {
     const sessionStore = this.runtimeAdapter.getSessionStore();
     return sessionStore.getActiveWorkspaceRoot(bindingKey) || this.config.workspaceRoot;
   }
 
   async handleRuntimeEvent(event) {
-    await this.streamDelivery.handleRuntimeEvent(event);
-    if (!event) {
-      return;
-    }
-    if (event.type === "runtime.turn.completed" || event.type === "runtime.turn.failed") {
-      this.runtimeAdapter.getSessionStore().clearApprovalPrompt(event.payload.threadId);
-      await this.stopTypingForThread(event.payload.threadId);
-      if (event.type === "runtime.turn.failed") {
-        await this.sendFailureToThread(event.payload.threadId, event.payload.text || "执行失败");
-      }
-      return;
-    }
-    if (event.type !== "runtime.approval.requested") {
-      return;
-    }
-    const sessionStore = this.runtimeAdapter.getSessionStore();
-    const linked = sessionStore.findBindingForThreadId(event.payload.threadId);
-    if (!linked?.workspaceRoot) {
-      return;
-    }
-    const allowlist = sessionStore.getApprovalCommandAllowlistForWorkspace(linked.workspaceRoot);
-    const shouldAutoApprove = matchesBuiltInCommandPrefix(event.payload.commandTokens)
-      || matchesCommandPrefix(event.payload.commandTokens, allowlist);
-    if (!shouldAutoApprove) {
-      const promptState = sessionStore.getApprovalPromptState(event.payload.threadId);
-      const promptSignature = buildApprovalPromptSignature(event.payload);
-      if (promptState?.signature && promptState.signature === promptSignature) {
-        sessionStore.rememberApprovalPrompt(event.payload.threadId, event.payload.requestId, promptSignature);
-        console.log(
-          `[codeksei] approval prompt deduped thread=${event.payload.threadId} requestId=${event.payload.requestId}`
-        );
-        return;
-      }
-      sessionStore.rememberApprovalPrompt(event.payload.threadId, event.payload.requestId, promptSignature);
-      await this.sendApprovalPrompt({
-        bindingKey: linked.bindingKey,
-        approval: event.payload,
-      }).catch((error) => {
-        sessionStore.clearApprovalPrompt(event.payload.threadId);
-        throw error;
-      });
-      return;
-    }
-    await this.runtimeAdapter.respondApproval({
-      requestId: event.payload.requestId,
-      decision: "accept",
-    }).catch(() => {});
-    this.threadStateStore.resolveApproval(event.payload.threadId, "running");
+    await this.runtimeWatchdogLifecycle.handleRuntimeEvent(event);
   }
 
   async stopTypingForThread(threadId) {
-    const linked = this.runtimeAdapter.getSessionStore().findBindingForThreadId(threadId);
-    const target = linked?.bindingKey ? this.resolveReplyTargetForBinding(linked.bindingKey) : null;
-    if (!target) {
-      return;
-    }
-    await this.channelAdapter.sendTyping({
-      userId: target.userId,
-      status: 0,
-      contextToken: target.contextToken,
-    }).catch(() => {});
+    await this.runtimeWatchdogLifecycle.stopTypingForThread(threadId);
   }
 
   async withUserTyping({
@@ -1261,32 +475,11 @@ class CyberbossApp {
     contextToken = "",
     clearOnSuccess = true,
   }, work) {
-    const normalizedUserId = normalizeText(userId);
-    const runner = typeof work === "function" ? work : async () => undefined;
-    if (!normalizedUserId) {
-      return runner();
-    }
-
-    await this.channelAdapter.sendTyping({
-      userId: normalizedUserId,
-      status: 1,
+    return this.runtimeTurnLifecycle.withUserTyping({
+      userId,
       contextToken,
-    }).catch(() => {});
-
-    let succeeded = false;
-    try {
-      const result = await runner();
-      succeeded = true;
-      return result;
-    } finally {
-      if (clearOnSuccess || !succeeded) {
-        await this.channelAdapter.sendTyping({
-          userId: normalizedUserId,
-          status: 0,
-          contextToken,
-        }).catch(() => {});
-      }
-    }
+      clearOnSuccess,
+    }, work);
   }
 
   async sendPreparedMessageToRuntime({
@@ -1295,126 +488,24 @@ class CyberbossApp {
     normalized,
     prepared,
   }) {
-    try {
-      const turn = await this.withUserTyping({
-        userId: normalized.senderId,
-        contextToken: normalized.contextToken,
-        // A successful runtime turn keeps typing alive until the runtime event
-        // stream, watchdog, or stopTypingForThread() settles it. Only the local
-        // failure path should clear typing here.
-        clearOnSuccess: false,
-      }, async () => this.runtimeAdapter.sendTextTurn({
-        bindingKey,
-        workspaceRoot,
-        text: prepared.text,
-        model: this.runtimeAdapter.getSessionStore().getCodexParamsForWorkspace(bindingKey, workspaceRoot).model,
-        accessMode: this.config.codexAccessMode,
-        metadata: {
-          workspaceId: prepared.workspaceId,
-          accountId: prepared.accountId,
-          senderId: prepared.senderId,
-        },
-      }));
-
-      this.streamDelivery.queueReplyTargetForThread(turn.threadId, {
-        userId: prepared.senderId,
-        contextToken: prepared.contextToken,
-        provider: prepared.provider,
-      });
-      if (turn.workspaceBootstrapPending) {
-        this.queuePendingWorkspaceBootstrap({
-          bindingKey,
-          workspaceRoot,
-          threadId: turn.threadId,
-        });
-      }
-      this.scheduleRuntimeEventWatchdog({
-        bindingKey,
-        workspaceRoot,
-        normalized: prepared,
-        threadId: turn.threadId,
-      });
-      return {
-        status: "sent",
-        threadId: turn.threadId,
-      };
-    } catch (error) {
-      return {
-        status: "retryable_error",
-        reason: formatErrorMessage(error),
-        error,
-      };
-    }
+    return this.runtimeTurnLifecycle.sendPreparedMessageToRuntime({
+      bindingKey,
+      workspaceRoot,
+      normalized,
+      prepared,
+    });
   }
 
   async sendFailureToThread(threadId, text) {
-    const linked = this.runtimeAdapter.getSessionStore().findBindingForThreadId(threadId);
-    const target = linked?.bindingKey ? this.resolveReplyTargetForBinding(linked.bindingKey) : null;
-    if (!target) {
-      return;
-    }
-    await this.channelAdapter.sendText({
-      userId: target.userId,
-      text: normalizeText(text) || "执行失败",
-      contextToken: target.contextToken,
-    }).catch(() => {});
+    await this.runtimeWatchdogLifecycle.sendFailureToThread(threadId, text);
   }
 
   async sendApprovalPrompt({ bindingKey, approval }) {
-    const target = this.resolveReplyTargetForBinding(bindingKey);
-    if (!target) {
-      console.warn(
-        `[codeksei] approval prompt skipped binding=${bindingKey} requestId=${approval?.requestId || ""} reason=no_reply_target`
-      );
-      return;
-    }
-    console.log(
-      `[codeksei] approval prompt sending binding=${bindingKey} user=${target.userId} requestId=${approval?.requestId || ""}`
-    );
-    await this.channelAdapter.sendTyping({
-      userId: target.userId,
-      status: 0,
-      contextToken: target.contextToken,
-    }).catch(() => {});
-    await this.channelAdapter.sendText({
-      userId: target.userId,
-      text: buildApprovalPromptText(approval),
-      contextToken: target.contextToken,
-      preserveBlock: true,
-    });
-    console.log(
-      `[codeksei] approval prompt delivered binding=${bindingKey} user=${target.userId} requestId=${approval?.requestId || ""}`
-    );
+    await this.runtimeWatchdogLifecycle.sendApprovalPrompt({ bindingKey, approval });
   }
 
   async restoreBoundThreadSubscriptions() {
-    const sessionStore = this.runtimeAdapter.getSessionStore();
-    const bindings = sessionStore.listBindings();
-    const seenThreadIds = new Set();
-
-    for (const binding of bindings) {
-      const bindingKey = normalizeText(binding?.bindingKey);
-      if (!bindingKey) {
-        continue;
-      }
-
-      const target = this.resolveReplyTargetForBinding(bindingKey);
-      if (target) {
-        this.streamDelivery.setReplyTarget(bindingKey, target);
-      }
-
-      const threadIdByWorkspaceRoot = binding?.threadIdByWorkspaceRoot && typeof binding.threadIdByWorkspaceRoot === "object"
-        ? binding.threadIdByWorkspaceRoot
-        : {};
-      for (const threadId of Object.values(threadIdByWorkspaceRoot)) {
-        const normalizedThreadId = normalizeCommandArgument(threadId);
-        if (!normalizedThreadId || seenThreadIds.has(normalizedThreadId)) {
-          continue;
-        }
-        seenThreadIds.add(normalizedThreadId);
-        await this.runtimeAdapter.resumeThread({ threadId: normalizedThreadId }).catch(() => {});
-      }
-    }
+    await this.runtimeWatchdogLifecycle.restoreBoundThreadSubscriptions();
   }
 
   resolveReplyTargetForBinding(bindingKey) {
@@ -1433,20 +524,6 @@ class CyberbossApp {
       provider: "weixin",
     };
   }
-}
-
-function formatCompactNumber(value) {
-  const normalized = Number(value);
-  if (!Number.isFinite(normalized) || normalized <= 0) {
-    return "0";
-  }
-  if (normalized >= 1_000_000) {
-    return `${Math.round(normalized / 100_000) / 10}m`;
-  }
-  if (normalized >= 1_000) {
-    return `${Math.round(normalized / 100) / 10}k`;
-  }
-  return String(Math.round(normalized));
 }
 
 function createShutdownController(onStop) {
@@ -1530,109 +607,6 @@ function getSystemMessageFailureRetryDelayMs(attemptCount) {
 }
 
 module.exports = { CyberbossApp };
-
-function parseChannelCommand(text) {
-  const normalized = typeof text === "string" ? text.trim() : "";
-  if (!normalized.startsWith("/")) {
-    return null;
-  }
-  const [rawName, ...rest] = normalized.slice(1).split(/\s+/);
-  const name = normalizeCommandName(rawName);
-  if (!name) {
-    return null;
-  }
-  return {
-    name,
-    args: rest.join(" ").trim(),
-  };
-}
-
-function normalizeCommandName(value) {
-  return typeof value === "string" ? value.trim().toLowerCase() : "";
-}
-
-const WINDOWS_DRIVE_PATH_RE = /^[A-Za-z]:\//;
-const WINDOWS_DRIVE_ROOT_RE = /^[A-Za-z]:\/$/;
-const WINDOWS_UNC_PREFIX_RE = /^\/\/\?\//;
-
-function normalizeWorkspacePath(value) {
-  const normalized = String(value || "").trim();
-  if (!normalized) {
-    return "";
-  }
-
-  const fromFileUri = extractPathFromFileUri(normalized);
-  const rawPath = fromFileUri || normalized;
-  // WeChat + Chinese IME can turn Windows paths into mixed-width punctuation.
-  // Normalize them here so `/bind E:\foo`, `/bind E：＼foo`, and file URIs
-  // all converge before we decide whether the path is absolute.
-  const canonicalWindowsPath = rawPath
-    .replace(/[：﹕]/g, ":")
-    .replace(/[＼]/g, "\\")
-    .replace(/[／]/g, "/");
-  const withForwardSlashes = canonicalWindowsPath.replace(/\\/g, "/").replace(WINDOWS_UNC_PREFIX_RE, "");
-  const normalizedDrivePrefix = /^\/[A-Za-z]:\//.test(withForwardSlashes)
-    ? withForwardSlashes.slice(1)
-    : withForwardSlashes;
-
-  if (WINDOWS_DRIVE_ROOT_RE.test(normalizedDrivePrefix)) {
-    return normalizedDrivePrefix;
-  }
-  if (WINDOWS_DRIVE_PATH_RE.test(normalizedDrivePrefix)) {
-    return normalizedDrivePrefix.replace(/\/+$/g, "");
-  }
-  return normalizedDrivePrefix.replace(/\/+$/g, "");
-}
-
-function isAbsoluteWorkspacePath(value) {
-  const normalized = normalizeWorkspacePath(value);
-  if (!normalized) {
-    return false;
-  }
-  if (WINDOWS_DRIVE_PATH_RE.test(normalized)) {
-    return true;
-  }
-  return path.posix.isAbsolute(normalized);
-}
-
-function resolveBindWorkspaceRoot(value, defaultWorkspaceRoot) {
-  const normalizedArg = normalizeCommandArgument(value);
-  if (!normalizedArg || isDefaultWorkspaceAlias(normalizedArg)) {
-    return normalizeWorkspacePath(defaultWorkspaceRoot);
-  }
-  return normalizeWorkspacePath(value);
-}
-
-function isDefaultWorkspaceAlias(value) {
-  const normalized = normalizeCommandArgument(value);
-  return normalized === "."
-    || normalized === "here"
-    || normalized === "default"
-    || normalized === "当前项目"
-    || normalized === "本项目"
-    || normalized === "这里";
-}
-
-function extractPathFromFileUri(value) {
-  const input = String(value || "").trim();
-  if (!/^file:\/\//i.test(input)) {
-    return "";
-  }
-
-  try {
-    const parsed = new URL(input);
-    if (parsed.protocol !== "file:") {
-      return "";
-    }
-    const pathname = decodeURIComponent(parsed.pathname || "");
-    const withHost = parsed.host && parsed.host !== "localhost"
-      ? `//${parsed.host}${pathname}`
-      : pathname;
-    return withHost;
-  } catch {
-    return "";
-  }
-}
 
 function normalizeCommandArgument(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -1926,15 +900,6 @@ function hasRpcId(value) {
 function isPersistentWeixinSendFailure(error) {
   const message = String(error?.message || error || "");
   return message.includes("sendMessage ret=-2");
-}
-
-function buildTurnSettlementWatchdogKey(threadId, turnId) {
-  const normalizedThreadId = normalizeCommandArgument(threadId);
-  const normalizedTurnId = normalizeCommandArgument(turnId);
-  if (!normalizedThreadId || !normalizedTurnId) {
-    return "";
-  }
-  return `${normalizedThreadId}:${normalizedTurnId}`;
 }
 
 function resolveTimelineScreenshotOutput(args) {

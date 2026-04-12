@@ -1,6 +1,11 @@
 const fs = require("fs");
 const path = require("path");
 const { normalizeAccountId } = require("./account-store");
+const {
+  isPlainObject,
+  readManagedJsonStateFile,
+  writeManagedJsonStateFile,
+} = require("../../../core/json-state");
 
 function ensureAccountsDir(config) {
   fs.mkdirSync(config.accountsDir, { recursive: true });
@@ -12,24 +17,21 @@ function resolveContextTokenPath(config, accountId) {
 }
 
 function loadPersistedContextTokens(config, accountId) {
-  try {
-    const filePath = resolveContextTokenPath(config, accountId);
-    if (!fs.existsSync(filePath)) {
-      return {};
-    }
-    const raw = fs.readFileSync(filePath, "utf8");
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") {
-      return {};
-    }
-    return Object.fromEntries(
-      Object.entries(parsed)
-        .filter(([userId, token]) => typeof userId === "string" && userId.trim() && typeof token === "string" && token.trim())
-        .map(([userId, token]) => [userId.trim(), token.trim()])
-    );
-  } catch {
+  const filePath = resolveContextTokenPath(config, accountId);
+  const parsed = readManagedJsonStateFile({
+    filePath,
+    fallback: {},
+    label: "context token store",
+    validate: validateContextTokenMap,
+  });
+  if (!isPlainObject(parsed)) {
     return {};
   }
+  return Object.fromEntries(
+    Object.entries(parsed)
+      .filter(([userId, token]) => typeof userId === "string" && userId.trim() && typeof token === "string" && token.trim())
+      .map(([userId, token]) => [userId.trim(), token.trim()])
+  );
 }
 
 function savePersistedContextTokens(config, accountId, tokens) {
@@ -39,12 +41,7 @@ function savePersistedContextTokens(config, accountId, tokens) {
       .map(([userId, token]) => [userId.trim(), token.trim()])
   );
   const filePath = resolveContextTokenPath(config, accountId);
-  fs.writeFileSync(filePath, JSON.stringify(normalizedTokens, null, 2), "utf8");
-  try {
-    fs.chmodSync(filePath, 0o600);
-  } catch {
-    // best effort
-  }
+  writeManagedJsonStateFile(filePath, normalizedTokens, { mode: 0o600 });
   return normalizedTokens;
 }
 
@@ -73,6 +70,18 @@ function clearPersistedContextTokens(config, accountId) {
   } catch {
     // best effort
   }
+}
+
+function validateContextTokenMap(value) {
+  if (!isPlainObject(value)) {
+    return "context token store must be an object";
+  }
+  for (const [userId, token] of Object.entries(value)) {
+    if (typeof userId !== "string" || typeof token !== "string") {
+      return "context token store entries must be string:string";
+    }
+  }
+  return true;
 }
 
 module.exports = {
