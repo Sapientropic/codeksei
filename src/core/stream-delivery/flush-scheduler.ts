@@ -1,13 +1,26 @@
 // @ts-check
 
+import * as deliveryTransportModule from "./delivery-transport";
+import * as visibleTextModule from "./visible-text";
+
 const {
   hasCompletedFlushTrigger,
   hasNaturalFlushBoundary,
   prefersStreamingDelivery,
   prepareStreamingDelivery,
   shouldScheduleStreamingIdleFlush,
-} = require("./delivery-transport");
-const { normalizeText } = require("./visible-text");
+} = deliveryTransportModule as {
+  hasCompletedFlushTrigger: (trigger: unknown, runtimeEventTypes: unknown) => boolean;
+  hasNaturalFlushBoundary: (text: unknown) => boolean;
+  prefersStreamingDelivery: (state: unknown) => boolean;
+  prepareStreamingDelivery: (state: unknown, options: { completedOnly: boolean; force: boolean }) => {
+    safeText: string;
+  };
+  shouldScheduleStreamingIdleFlush: (prepared: unknown) => boolean;
+};
+const { normalizeText } = visibleTextModule as {
+  normalizeText: (value: unknown) => string;
+};
 
 /**
  * @typedef {{
@@ -152,8 +165,6 @@ function createFlushScheduler({
   };
 }
 
-module.exports = {
+export {
   createFlushScheduler,
 };
-
-export {};

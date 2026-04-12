@@ -1,6 +1,5 @@
 import { spawn } from "node:child_process";
-import WebSocket = require("ws");
-import type { RawData } from "ws";
+import { WebSocket, type RawData } from "ws";
 import * as brandingModule from "../../../core/branding";
 import * as codexSpawnModule from "../../../core/codex-spawn";
 

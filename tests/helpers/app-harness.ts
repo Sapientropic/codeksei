@@ -1,14 +1,17 @@
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
-const { CodekseiApp } = require("../../src/core/app");
+const fs: typeof import("node:fs") = require("node:fs");
+const os: typeof import("node:os") = require("node:os");
+const path: typeof import("node:path") = require("node:path");
+const { CodekseiApp }: typeof import("../../src/core/app") = require("../../src/core/app");
 import type {
   AppRuntimeConfig,
   AppServiceFactory,
+  ChannelCommandRouterLike,
   ChannelAdapterLike,
   CreateAppServicesArgs,
   ReminderQueueLike,
   RuntimeAdapterLike,
+  RuntimeTurnLifecycleLike,
+  RuntimeWatchdogLifecycleLike,
   SessionStoreLike,
   StreamDeliveryLike,
   SystemMessageDispatcherRef,
@@ -17,10 +20,15 @@ import type {
   TimelineIntegrationLike,
   TimelineScreenshotQueueLike,
 } from "../../src/core/app-service-contract";
-const { BackstageTaskLifecycle } = require("../../src/core/backstage-task-lifecycle");
-const { RuntimeTurnLifecycle } = require("../../src/core/runtime-turn-lifecycle");
-const { RuntimeWatchdogLifecycle } = require("../../src/core/runtime-watchdog-lifecycle");
-import type { DeliveryFailurePayload } from "../../src/core/runtime-types";
+const { BackstageTaskLifecycle }: typeof import("../../src/core/backstage-task-lifecycle") = require("../../src/core/backstage-task-lifecycle");
+const { RuntimeTurnLifecycle }: typeof import("../../src/core/runtime-turn-lifecycle") = require("../../src/core/runtime-turn-lifecycle");
+const { RuntimeWatchdogLifecycle }: typeof import("../../src/core/runtime-watchdog-lifecycle") = require("../../src/core/runtime-watchdog-lifecycle");
+import type {
+  DeliveryFailurePayload,
+  NormalizedIncomingMessage,
+  PreparedRuntimeMessage,
+  RuntimeTurnSendState,
+} from "../../src/core/runtime-types";
 
 interface AppHarnessOptions {
   runTimelineSubcommandImpl?: (command: string, args: string[]) => Promise<unknown>;
@@ -32,7 +40,7 @@ interface AppHarnessOptions {
     model?: string;
     accessMode?: string;
     metadata?: Record<string, unknown>;
-  }) => Promise<{ threadId: string; workspaceBootstrapPending: boolean }>;
+  }) => Promise<RuntimeTurnSendState>;
 }
 
 interface QueueEntry {
@@ -42,11 +50,36 @@ interface QueueEntry {
   args: string[];
 }
 
+interface TestAppHarness {
+  app: InstanceType<typeof CodekseiApp>;
+  baseConfig: AppRuntimeConfig;
+  callOrder: string[];
+  fileCalls: Array<{ userId: string; filePath: string; contextToken?: string }>;
+  sendTextTurnCalls: Array<{
+    bindingKey: string;
+    workspaceRoot: string;
+    text: string;
+    model?: string;
+    accessMode?: string;
+    metadata?: Record<string, unknown>;
+  }>;
+  tempRoot: string;
+  textCalls: Array<{
+    userId: string;
+    text: string;
+    contextToken?: string;
+    preserveBlock?: boolean;
+  }>;
+  typingCalls: Array<{ userId: string; status: number; contextToken?: string }>;
+  workspaceRoot: string;
+  handleReplyDeliveryFailure(payload: DeliveryFailurePayload): Promise<void>;
+}
+
 function createTestAppHarness({
   runTimelineSubcommandImpl = async () => undefined,
   sendFileImpl = async () => ({ kind: "file" }),
   sendTextTurnImpl = async () => ({ threadId: "thread-1", workspaceBootstrapPending: false }),
-}: AppHarnessOptions = {}) {
+}: AppHarnessOptions = {}): TestAppHarness {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-app-harness-"));
   const workspaceRoot = path.join(tempRoot, "workspace");
   fs.mkdirSync(workspaceRoot, { recursive: true });
@@ -268,13 +301,13 @@ function createTestAppHarness({
     sendTimelineScreenshot,
   }: CreateAppServicesArgs) => {
     const systemMessageDispatcherState: SystemMessageDispatcherRef = { current: null };
-    const channelCommandRouter = {
+    const channelCommandRouter: ChannelCommandRouterLike = {
       async maybeDispatchCommand(_normalized: unknown) {
         return false;
       },
     };
 
-    const runtimeWatchdogLifecycle = new RuntimeWatchdogLifecycle({
+    const runtimeWatchdogLifecycle: RuntimeWatchdogLifecycleLike = new RuntimeWatchdogLifecycle({
       buildApprovalPromptSignature: () => "",
       buildApprovalPromptText: () => "",
       channelAdapter,
@@ -291,12 +324,12 @@ function createTestAppHarness({
       threadStateStore,
     });
 
-    const runtimeTurnLifecycle = new RuntimeTurnLifecycle({
+    const runtimeTurnLifecycle: RuntimeTurnLifecycleLike = new RuntimeTurnLifecycle({
       buildCodexInboundText: (normalized: { text?: string }) => normalizeText(normalized.text),
       channelAdapter,
       config,
       formatErrorMessage,
-      maybeDispatchCommand: (normalized: unknown) => channelCommandRouter.maybeDispatchCommand(normalized),
+      maybeDispatchCommand: (normalized: NormalizedIncomingMessage) => channelCommandRouter.maybeDispatchCommand(normalized),
       normalizeText,
       persistIncomingWeixinAttachments: async () => ({ saved: [], failed: [] }),
       queuePendingWorkspaceBootstrap: (payload: { bindingKey: string; workspaceRoot: string; threadId: string }) => {
@@ -309,7 +342,7 @@ function createTestAppHarness({
       scheduleRuntimeEventWatchdog: (payload: {
         bindingKey: string;
         workspaceRoot: string;
-        normalized: any;
+        normalized: PreparedRuntimeMessage;
         threadId?: string;
       }) => runtimeWatchdogLifecycle.scheduleRuntimeEventWatchdog(payload),
       streamDelivery,

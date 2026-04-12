@@ -1,29 +1,88 @@
-// @ts-nocheck
-const test = require("node:test");
-const assert = require("node:assert/strict");
+const test: typeof import("node:test") = require("node:test");
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 
 const {
   createFlushScheduler,
+}: {
+  createFlushScheduler: (options: {
+    flushNow(state: RunState, options: FlushCall): Promise<void>;
+    runtimeEventTypes: typeof RUNTIME_EVENT_TYPES;
+    streamIdleFlushMs: number;
+    streamForceFlushChars: number;
+    streamBoundaryFlushChars: number;
+  }) => {
+    clearScheduledFlush(state: RunState): void;
+    flush(state: RunState, options: FlushCall): Promise<void>;
+    scheduleStreamingFlush(
+      state: RunState,
+      options?: {
+        force?: boolean;
+        trigger?: StreamingTrigger | null;
+      },
+    ): void;
+    serializeSend(state: RunState, sendOperation: () => Promise<void>): Promise<void>;
+  };
 } = require("../src/core/stream-delivery/flush-scheduler");
 const {
   createRunState,
   upsertStateItem,
+}: {
+  createRunState(args: { threadId: string; turnId?: string; weixinReplyMode: string }): RunState;
+  upsertStateItem(
+    state: RunState,
+    item: {
+      itemId: string;
+      text: string;
+      completed: boolean;
+      phase: string;
+      fragmentKind: string;
+    },
+  ): void;
 } = require("../src/core/stream-delivery/run-state");
 
 const RUNTIME_EVENT_TYPES = {
   REPLY_COMPLETED: "runtime.reply.completed",
   TURN_COMPLETED: "runtime.turn.completed",
-};
+} as const;
 
-function sleep(ms) {
+interface StreamingTrigger {
+  source?: string;
+  itemId?: string;
+  phase?: string;
+  fragmentKind?: string;
+}
+
+interface RunState {
+  replyTarget: {
+    userId: string;
+    contextToken: string;
+    provider: string;
+  } | null;
+  scheduledFlushTimer: NodeJS.Timeout | null;
+  flushPromise: Promise<void> | null;
+  sendChain: Promise<void>;
+}
+
+interface FlushCall {
+  force?: boolean;
+  trigger?: StreamingTrigger | null;
+}
+
+function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function nextTick() {
+function nextTick(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
 }
 
-function createStreamingState({ threadId = "thread-1", turnId = "turn-1" } = {}) {
+function createStreamingState({
+  threadId = "thread-1",
+  turnId = "turn-1",
+}: {
+  threadId?: string;
+  turnId?: string;
+} = {}): RunState {
   const state = createRunState({
     threadId,
     turnId,
@@ -38,9 +97,9 @@ function createStreamingState({ threadId = "thread-1", turnId = "turn-1" } = {})
 }
 
 test("flush scheduler only keeps idle timers for commentary-style streaming updates", async () => {
-  const flushCalls = [];
+  const flushCalls: FlushCall[] = [];
   const scheduler = createFlushScheduler({
-    flushNow: async (_state, options) => {
+    flushNow: async (_state: RunState, options: FlushCall) => {
       flushCalls.push(options);
     },
     runtimeEventTypes: RUNTIME_EVENT_TYPES,
@@ -87,9 +146,9 @@ test("flush scheduler only keeps idle timers for commentary-style streaming upda
 });
 
 test("flush scheduler skips idle timers for unfinished final fragments", async () => {
-  const flushCalls = [];
+  const flushCalls: FlushCall[] = [];
   const scheduler = createFlushScheduler({
-    flushNow: async (_state, options) => {
+    flushNow: async (_state: RunState, options: FlushCall) => {
       flushCalls.push(options);
     },
     runtimeEventTypes: RUNTIME_EVENT_TYPES,
@@ -122,9 +181,9 @@ test("flush scheduler skips idle timers for unfinished final fragments", async (
 });
 
 test("flush scheduler triggers immediate boundary flush without leaving an idle timer behind", async () => {
-  const flushCalls = [];
+  const flushCalls: FlushCall[] = [];
   const scheduler = createFlushScheduler({
-    flushNow: async (_state, options) => {
+    flushNow: async (_state: RunState, options: FlushCall) => {
       flushCalls.push(options);
     },
     runtimeEventTypes: RUNTIME_EVENT_TYPES,
@@ -157,9 +216,9 @@ test("flush scheduler triggers immediate boundary flush without leaving an idle 
 });
 
 test("flush scheduler clears an existing idle timer before a force flush", async () => {
-  const flushCalls = [];
+  const flushCalls: FlushCall[] = [];
   const scheduler = createFlushScheduler({
-    flushNow: async (_state, options) => {
+    flushNow: async (_state: RunState, options: FlushCall) => {
       flushCalls.push(options);
     },
     runtimeEventTypes: RUNTIME_EVENT_TYPES,
@@ -202,9 +261,9 @@ test("flush scheduler clears an existing idle timer before a force flush", async
 });
 
 test("flush scheduler serializes flush calls through flushPromise", async () => {
-  const order = [];
-  let releaseFirst;
-  const firstGate = new Promise((resolve) => {
+  const order: string[] = [];
+  let releaseFirst: () => void = () => {};
+  const firstGate = new Promise<void>((resolve) => {
     releaseFirst = resolve;
   });
   let callIndex = 0;
@@ -247,9 +306,9 @@ test("flush scheduler serializes sends and keeps later sends alive after a failu
     streamBoundaryFlushChars: 100,
   });
   const state = createStreamingState({ threadId: "thread-send-chain" });
-  const order = [];
-  let releaseFirst;
-  const firstGate = new Promise((resolve) => {
+  const order: string[] = [];
+  let releaseFirst: () => void = () => {};
+  const firstGate = new Promise<void>((resolve) => {
     releaseFirst = resolve;
   });
 
@@ -285,9 +344,9 @@ test("flush scheduler serializes sends and keeps later sends alive after a failu
 });
 
 test("flush scheduler clearScheduledFlush cancels pending idle work", async () => {
-  const flushCalls = [];
+  const flushCalls: FlushCall[] = [];
   const scheduler = createFlushScheduler({
-    flushNow: async (_state, options) => {
+    flushNow: async (_state: RunState, options: FlushCall) => {
       flushCalls.push(options);
     },
     runtimeEventTypes: RUNTIME_EVENT_TYPES,
