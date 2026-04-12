@@ -1,10 +1,6 @@
 // @ts-check
 
-import * as visibleTextModule from "./visible-text";
-
-const { normalizeText } = visibleTextModule as {
-  normalizeText: (value: unknown) => string;
-};
+import { normalizeText } from "./visible-text";
 
 /**
  * @typedef {{

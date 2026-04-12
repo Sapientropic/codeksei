@@ -1,12 +1,34 @@
 // @ts-check
 
-const {
+import {
   buildVisibleItemDedupKey,
   normalizeLineEndings,
   trimOuterBlankLines,
-} = require("./visible-text");
+} from "./visible-text";
 
-function normalizeFragmentKind(value: any) {
+export type FragmentKind = "" | "delta" | "snapshot" | "completed_snapshot";
+
+export interface MergeAuthoritativeItemTextResult {
+  text: string;
+  relation: "keep" | "append" | "replace" | "rewrite";
+}
+
+export interface VisibleDeliveryDeltaResult {
+  delta: string;
+  relation:
+    | "keep"
+    | "initial"
+    | "extend"
+    | "equivalent"
+    | "normalized_extend"
+    | "semantic_equivalent"
+    | "semantic_extend"
+    | "rewrite_without_extension";
+  deliveredVisibleBefore: string;
+  deliveredVisibleAfter: string;
+}
+
+export function normalizeFragmentKind(value: unknown): FragmentKind {
   const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
   if (normalized === "delta") {
     return "delta";
@@ -20,30 +42,26 @@ function normalizeFragmentKind(value: any) {
   return "";
 }
 
-function normalizeVisibleStreamingText(text: any) {
+export function normalizeVisibleStreamingText(text: unknown): string {
   return buildVisibleItemDedupKey(text).replace(/\s+/gu, " ").trim();
 }
 
-function normalizeStreamingSnapshotSemanticText(text: any) {
+export function normalizeStreamingSnapshotSemanticText(text: unknown): string {
   return normalizeVisibleStreamingText(text)
     .replace(/[\p{P}\p{S}]+/gu, "")
     .replace(/\s+/gu, " ")
     .trim();
 }
 
-function chooseStreamingSnapshotReplacement(base: any, incoming: any) {
-  void base;
-  void incoming;
+function chooseStreamingSnapshotReplacement(_base: unknown, _incoming: unknown): string {
   return "";
 }
 
-function chooseCompletedSnapshotReplacement(streamed: any, finalized: any) {
-  void streamed;
-  void finalized;
+function chooseCompletedSnapshotReplacement(_streamed: unknown, _finalized: unknown): string {
   return "";
 }
 
-function appendDeltaFragment(current: any, next: any) {
+export function appendDeltaFragment(current: unknown, next: unknown): string {
   const base = String(current || "");
   const incoming = String(next || "");
   if (!incoming) {
@@ -67,7 +85,7 @@ function appendDeltaFragment(current: any, next: any) {
   return `${base}${incoming}`;
 }
 
-function appendStreamingText(current: any, next: any) {
+export function appendStreamingText(current: unknown, next: unknown): string {
   const base = String(current || "");
   const incoming = String(next || "");
   if (!incoming) {
@@ -98,7 +116,7 @@ function appendStreamingText(current: any, next: any) {
   return `${base}${incoming}`;
 }
 
-function mergeCompletedItemText(current: any, completed: any) {
+export function mergeCompletedItemText(current: unknown, completed: unknown): string {
   const streamed = String(current || "");
   const finalized = String(completed || "");
   if (!finalized) {
@@ -120,7 +138,11 @@ function mergeCompletedItemText(current: any, completed: any) {
   return appendStreamingText(streamed, finalized);
 }
 
-function mergeAuthoritativeItemText(current: any, incoming: any, { fragmentKind = "", completed = false }: any = {}) {
+export function mergeAuthoritativeItemText(
+  current: unknown,
+  incoming: unknown,
+  { fragmentKind = "", completed = false }: { fragmentKind?: unknown; completed?: boolean } = {},
+): MergeAuthoritativeItemTextResult {
   const base = normalizeLineEndings(current);
   const next = normalizeLineEndings(incoming);
   const normalizedFragmentKind = normalizeFragmentKind(
@@ -183,7 +205,7 @@ function mergeAuthoritativeItemText(current: any, incoming: any, { fragmentKind 
   return { text: next, relation: "rewrite" };
 }
 
-function buildComparisonMap(text: any, { stripPunctuation = false }: any = {}) {
+export function buildComparisonMap(text: unknown, { stripPunctuation = false }: { stripPunctuation?: boolean } = {}) {
   const raw = normalizeLineEndings(String(text || ""));
   const rawToComparison = new Array(raw.length + 1);
   let comparison = "";
@@ -218,7 +240,10 @@ function buildComparisonMap(text: any, { stripPunctuation = false }: any = {}) {
   return { raw, comparison, rawToComparison };
 }
 
-function comparisonIndexToRawIndex(map: any, comparisonLength: any) {
+export function comparisonIndexToRawIndex(
+  map: { raw: string; rawToComparison: number[] } | null | undefined,
+  comparisonLength: number,
+): number {
   if (!map || !Array.isArray(map.rawToComparison) || comparisonLength <= 0) {
     return 0;
   }
@@ -230,7 +255,7 @@ function comparisonIndexToRawIndex(map: any, comparisonLength: any) {
   return map.raw.length;
 }
 
-function computeVisibleDeliveryDelta(previous: any, next: any) {
+export function computeVisibleDeliveryDelta(previous: unknown, next: unknown): VisibleDeliveryDeltaResult {
   const before = trimOuterBlankLines(normalizeLineEndings(previous));
   const after = trimOuterBlankLines(normalizeLineEndings(next));
   if (!after) {
@@ -315,18 +340,3 @@ function computeVisibleDeliveryDelta(previous: any, next: any) {
     deliveredVisibleAfter: before,
   };
 }
-
-module.exports = {
-  appendDeltaFragment,
-  appendStreamingText,
-  buildComparisonMap,
-  comparisonIndexToRawIndex,
-  computeVisibleDeliveryDelta,
-  mergeAuthoritativeItemText,
-  mergeCompletedItemText,
-  normalizeFragmentKind,
-  normalizeStreamingSnapshotSemanticText,
-  normalizeVisibleStreamingText,
-};
-
-export {};

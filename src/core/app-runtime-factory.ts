@@ -31,15 +31,21 @@ import * as timelineIntegrationModule from "../integrations/timeline";
 import * as channelCommandRouterModule from "./channel-command-router";
 import * as controlCommandHandlersModule from "./channel-command-control-handlers";
 import * as workspaceCommandHandlersModule from "./channel-command-workspace-handlers";
-import * as streamDeliveryModule from "./stream-delivery";
-import * as threadStateStoreModule from "./thread-state-store";
 import * as reminderQueueStoreModule from "../state/reminder-queue-store";
 import * as systemMessageQueueStoreModule from "../state/system-message-queue-store";
 import * as timelineScreenshotQueueStoreModule from "../state/timeline-screenshot-queue-store";
 import * as mediaReceiveModule from "../adapters/channel/weixin/media-receive";
 import * as approvalCommandPolicyModule from "./approval-command-policy";
-import * as appRuntimeHelpersModule from "./app-runtime-helpers";
-import * as appPollLoopModule from "./app-poll-loop";
+import { StreamDelivery } from "./stream-delivery";
+import { ThreadStateStore } from "./thread-state-store";
+import {
+  buildCodexInboundText,
+  buildReminderSystemTrigger,
+  getSystemMessageFailureRetryDelayMs,
+  hasRpcId,
+  resolveTimelineScreenshotOutput,
+} from "./app-runtime-helpers";
+import { formatErrorMessage } from "./app-poll-loop";
 
 const FIRST_RUNTIME_EVENT_NOTICE_TIMEOUT_MS = 8_000;
 const FIRST_RUNTIME_EVENT_FAILURE_TIMEOUT_MS = 45_000;
@@ -65,18 +71,6 @@ const { createControlCommandHandlers } = controlCommandHandlersModule as {
 };
 const { createWorkspaceCommandHandlers } = workspaceCommandHandlersModule as {
   createWorkspaceCommandHandlers: (args: Record<string, unknown>) => unknown;
-};
-const { StreamDelivery } = streamDeliveryModule as {
-  StreamDelivery: new (args: {
-    channelAdapter: ChannelAdapterLike;
-    sessionStore: unknown;
-    weixinReplyMode?: unknown;
-    deliveryTraceEnabled?: unknown;
-    onDeliveryFailure?: (payload: DeliveryFailurePayload) => Promise<void> | void;
-  }) => StreamDeliveryLike;
-};
-const { ThreadStateStore } = threadStateStoreModule as {
-  ThreadStateStore: new () => ThreadStateStoreLike;
 };
 const { ReminderQueueStore } = reminderQueueStoreModule as {
   ReminderQueueStore: new (args: { filePath: unknown }) => ReminderQueueLike;
@@ -109,26 +103,6 @@ const {
   matchesCommandPrefix: (commandTokens: unknown, allowlist: string[][]) => boolean;
   normalizeCommandArgument: (value: unknown) => string;
   normalizeText: (value: unknown) => string;
-};
-const {
-  buildCodexInboundText,
-  buildReminderSystemTrigger,
-  getSystemMessageFailureRetryDelayMs,
-  hasRpcId,
-  resolveTimelineScreenshotOutput,
-} = appRuntimeHelpersModule as {
-  buildCodexInboundText: (
-    normalized: NormalizedIncomingMessage,
-    persisted: { saved: unknown[]; failed: Array<{ reason: string }> },
-    config: AppFactoryConfig,
-  ) => string;
-  buildReminderSystemTrigger: (reminder: unknown, config: AppFactoryConfig) => string;
-  getSystemMessageFailureRetryDelayMs: (attemptCount: number) => number;
-  hasRpcId: (requestId: unknown) => boolean;
-  resolveTimelineScreenshotOutput: (args: string[]) => string;
-};
-const { formatErrorMessage } = appPollLoopModule as {
-  formatErrorMessage: (error: unknown) => string;
 };
 
 type AppFactoryConfig = AppRuntimeConfig;

@@ -1,37 +1,16 @@
 // @ts-check
 
-import * as deliveryTransportModule from "./delivery-transport";
-import * as visibleTextModule from "./visible-text";
-
-const {
+import {
   hasCompletedFlushTrigger,
   hasNaturalFlushBoundary,
   prefersStreamingDelivery,
   prepareStreamingDelivery,
   shouldScheduleStreamingIdleFlush,
-} = deliveryTransportModule as {
-  hasCompletedFlushTrigger: (trigger: unknown, runtimeEventTypes: unknown) => boolean;
-  hasNaturalFlushBoundary: (text: unknown) => boolean;
-  prefersStreamingDelivery: (state: unknown) => boolean;
-  prepareStreamingDelivery: (state: unknown, options: { completedOnly: boolean; force: boolean }) => {
-    safeText: string;
-  };
-  shouldScheduleStreamingIdleFlush: (prepared: unknown) => boolean;
-};
-const { normalizeText } = visibleTextModule as {
-  normalizeText: (value: unknown) => string;
-};
+  type FlushTrigger,
+} from "./delivery-transport";
+import { normalizeText } from "./visible-text";
 
 /**
- * @typedef {{
- *   source?: string,
- *   itemId?: string,
- *   phase?: string,
- *   fragmentKind?: string,
- *   fragmentRelation?: string,
- * } | null} FlushTrigger
- */
-
 /**
  * @typedef {{
  *   scheduledFlushTimer: NodeJS.Timeout | null,
@@ -86,7 +65,7 @@ function createFlushScheduler({
      * local to run-state instead of inventing another scheduler layer.
      *
      * @param {FlushState} state
-     * @param {{ force: boolean, trigger?: FlushTrigger }} options
+     * @param {{ force: boolean, trigger?: FlushTrigger | null }} options
      */
     async flush(state: any, { force, trigger = null }: any) {
       const previous = state.flushPromise || Promise.resolve();
@@ -104,7 +83,7 @@ function createFlushScheduler({
 
     /**
      * @param {FlushState} state
-     * @param {{ force?: boolean, trigger?: FlushTrigger }} [options]
+     * @param {{ force?: boolean, trigger?: FlushTrigger | null }} [options]
      */
     scheduleStreamingFlush(state: any, { force = false, trigger = null }: any = {}) {
       if (!prefersStreamingDelivery(state)) {

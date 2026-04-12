@@ -1,62 +1,47 @@
 // @ts-check
 
-const {
+import {
   RUNTIME_EVENT_TYPES,
+  type RuntimeEvent,
   normalizeRuntimeApprovalPayload,
   normalizeRuntimeIdentifier,
   normalizeRuntimeText,
-} = require("../contracts/runtime-events");
+} from "../contracts/runtime-events";
+import type { PendingApprovalState, UnknownRecord } from "./runtime-types";
 
-/**
- * @typedef {"idle" | "running" | "waiting_approval" | "failed"} ThreadStatus
- */
+type ThreadStatus = "idle" | "running" | "waiting_approval" | "failed";
 
-/**
- * @typedef {{
- *   requestId?: string,
- *   threadId?: string,
- *   signature?: string,
- *   promptedAt?: string,
- *   command?: string,
- *   commandTokens?: string[],
- *   reason?: string,
- *   [key: string]: unknown,
- * } | null} PendingApprovalState
- */
+interface ThreadUsage extends UnknownRecord {
+  updatedAt: string;
+  threadId?: string;
+}
 
-/**
- * @typedef {{
- *   updatedAt: string,
- *   threadId?: string,
- *   [key: string]: unknown,
- * } | null} ThreadUsage
- */
+interface ThreadState {
+  threadId: string;
+  turnId: string;
+  status: ThreadStatus;
+  lastReplyText: string;
+  lastError: string;
+  pendingApproval: PendingApprovalState | null;
+  usage: ThreadUsage | null;
+  updatedAt: string;
+}
 
-/**
- * @typedef {{
- *   threadId: string,
- *   turnId: string,
- *   status: ThreadStatus,
- *   lastReplyText: string,
- *   lastError: string,
- *   pendingApproval: PendingApprovalState,
- *   usage: ThreadUsage,
- *   updatedAt: string,
- * }} ThreadState
- */
+function normalizePendingApprovalState(value: unknown): PendingApprovalState | null {
+  const normalized = normalizeRuntimeApprovalPayload(value) as unknown as PendingApprovalState;
+  return normalized?.requestId ? normalized : null;
+}
 
-class ThreadStateStore {
-  orphanUsage: any;
-  stateByThreadId: Map<any, any>;
+export class ThreadStateStore {
+  orphanUsage: ThreadUsage | null;
+  stateByThreadId: Map<string, ThreadState>;
 
   constructor() {
-    /** @type {Map<string, ThreadState>} */
     this.stateByThreadId = new Map();
-    /** @type {ThreadUsage} */
     this.orphanUsage = null;
   }
 
-  applyRuntimeEvent(event: any) {
+  applyRuntimeEvent(event: RuntimeEvent<UnknownRecord> | null | undefined): void {
     if (!event) {
       return;
     }
@@ -71,10 +56,8 @@ class ThreadStateStore {
       return;
     }
 
-    /** @type {ThreadState} */
     const current = this.stateByThreadId.get(threadId) || createEmptyThreadState(threadId);
-    /** @type {ThreadState} */
-    const next = {
+    const next: ThreadState = {
       ...current,
       updatedAt: new Date().toISOString(),
     };
@@ -82,32 +65,28 @@ class ThreadStateStore {
     switch (event.type) {
       case RUNTIME_EVENT_TYPES.TURN_STARTED:
         next.status = "running";
-        next.turnId = event.payload.turnId || next.turnId;
+        next.turnId = normalizeRuntimeIdentifier(event.payload.turnId) || next.turnId;
         next.lastError = "";
         break;
       case RUNTIME_EVENT_TYPES.REPLY_DELTA:
-        next.status = "running";
-        next.turnId = event.payload.turnId || next.turnId;
-        next.lastReplyText = event.payload.text || next.lastReplyText;
-        break;
       case RUNTIME_EVENT_TYPES.REPLY_COMPLETED:
         next.status = "running";
-        next.turnId = event.payload.turnId || next.turnId;
-        next.lastReplyText = event.payload.text || next.lastReplyText;
+        next.turnId = normalizeRuntimeIdentifier(event.payload.turnId) || next.turnId;
+        next.lastReplyText = normalizeRuntimeText(event.payload.text) || next.lastReplyText;
         break;
       case RUNTIME_EVENT_TYPES.APPROVAL_REQUESTED:
         next.status = "waiting_approval";
-        next.pendingApproval = normalizeRuntimeApprovalPayload(event.payload);
+        next.pendingApproval = normalizePendingApprovalState(event.payload);
         break;
       case RUNTIME_EVENT_TYPES.TURN_COMPLETED:
         next.status = "idle";
-        next.turnId = event.payload.turnId || next.turnId;
+        next.turnId = normalizeRuntimeIdentifier(event.payload.turnId) || next.turnId;
         next.pendingApproval = null;
         break;
       case RUNTIME_EVENT_TYPES.TURN_FAILED:
         next.status = "failed";
-        next.turnId = event.payload.turnId || next.turnId;
-        next.lastError = event.payload.text || "执行失败";
+        next.turnId = normalizeRuntimeIdentifier(event.payload.turnId) || next.turnId;
+        next.lastError = normalizeRuntimeText(event.payload.text) || "执行失败";
         next.pendingApproval = null;
         break;
       default:
@@ -117,9 +96,8 @@ class ThreadStateStore {
     this.stateByThreadId.set(threadId, next);
   }
 
-  applyUsageEvent(event: any) {
-    /** @type {ThreadUsage} */
-    const usage = {
+  applyUsageEvent(event: RuntimeEvent<UnknownRecord>): void {
+    const usage: ThreadUsage = {
       ...event.payload,
       updatedAt: new Date().toISOString(),
     };
@@ -128,10 +106,8 @@ class ThreadStateStore {
       this.orphanUsage = usage;
       return;
     }
-    /** @type {ThreadState} */
     const current = this.stateByThreadId.get(threadId) || createEmptyThreadState(threadId);
-    /** @type {ThreadState} */
-    const next = {
+    const next: ThreadState = {
       ...current,
       usage,
       updatedAt: usage.updatedAt,
@@ -139,19 +115,17 @@ class ThreadStateStore {
     this.stateByThreadId.set(threadId, next);
   }
 
-  hydratePendingApproval(threadId: any, approval: any) {
+  hydratePendingApproval(threadId: unknown, approval: unknown): ThreadState | null {
     const normalizedThreadId = normalizeRuntimeIdentifier(threadId);
-    const normalizedApproval = normalizeRuntimeApprovalPayload({
+    const normalizedApproval = normalizePendingApprovalState({
       ...(approval || {}),
       threadId: normalizedThreadId,
     });
     if (!normalizedThreadId || !normalizedApproval?.requestId) {
       return null;
     }
-    /** @type {ThreadState} */
     const current = this.stateByThreadId.get(normalizedThreadId) || createEmptyThreadState(normalizedThreadId);
-    /** @type {ThreadState} */
-    const next = {
+    const next: ThreadState = {
       ...current,
       status: "waiting_approval",
       pendingApproval: normalizedApproval,
@@ -161,33 +135,28 @@ class ThreadStateStore {
     return next;
   }
 
-  getThreadState(threadId: any) {
+  getThreadState(threadId: unknown): ThreadState | null {
     return this.stateByThreadId.get(normalizeRuntimeIdentifier(threadId)) || null;
   }
 
-  getUsageForThread(threadId: any) {
+  getUsageForThread(threadId: unknown): ThreadUsage | null {
     const state = this.getThreadState(threadId);
     return state?.usage ? { ...state.usage } : null;
   }
 
-  getLatestUsage(threadId: string = "") {
+  getLatestUsage(threadId: string = ""): ThreadUsage | null {
     if (!normalizeRuntimeIdentifier(threadId)) {
       return null;
     }
     return this.getUsageForThread(threadId);
   }
 
-  /**
-   * @param {string} threadId
-   * @param {ThreadStatus} [status]
-   */
-  resolveApproval(threadId: any, status: string = "running") {
+  resolveApproval(threadId: unknown, status: ThreadStatus = "running"): ThreadState | null {
     const current = this.stateByThreadId.get(normalizeRuntimeIdentifier(threadId));
     if (!current) {
       return null;
     }
-    /** @type {ThreadState} */
-    const next = {
+    const next: ThreadState = {
       ...current,
       status,
       pendingApproval: null,
@@ -197,19 +166,21 @@ class ThreadStateStore {
     return next;
   }
 
-  markTurnFailed(threadId: any, turnId: any, message: string = "执行失败") {
+  markTurnFailed(threadId: unknown, turnId: unknown, message: string = "执行失败"): ThreadState | null {
     const normalizedThreadId = normalizeRuntimeIdentifier(threadId);
     const normalizedTurnId = normalizeRuntimeIdentifier(turnId);
     if (!normalizedThreadId) {
       return null;
     }
-    /** @type {ThreadState} */
     const current = this.stateByThreadId.get(normalizedThreadId) || createEmptyThreadState(normalizedThreadId);
-    if (normalizedTurnId && normalizeRuntimeText(current.turnId) && normalizeRuntimeText(current.turnId) !== normalizedTurnId) {
+    if (
+      normalizedTurnId
+      && normalizeRuntimeText(current.turnId)
+      && normalizeRuntimeText(current.turnId) !== normalizedTurnId
+    ) {
       return current;
     }
-    /** @type {ThreadState} */
-    const next = {
+    const next: ThreadState = {
       ...current,
       status: "failed",
       turnId: normalizedTurnId || current.turnId,
@@ -221,20 +192,16 @@ class ThreadStateStore {
     return next;
   }
 
-  snapshot() {
-    return Array.from(this.stateByThreadId.values()).map((entry: any) => ({ ...entry }));
+  snapshot(): ThreadState[] {
+    return Array.from(this.stateByThreadId.values()).map((entry) => ({ ...entry }));
   }
 }
 
-/**
- * @param {string} threadId
- * @returns {ThreadState}
- */
-function createEmptyThreadState(threadId: any) {
+function createEmptyThreadState(threadId: unknown): ThreadState {
   return {
-    threadId,
+    threadId: normalizeRuntimeIdentifier(threadId),
     turnId: "",
-    status: /** @type {ThreadStatus} */ ("idle"),
+    status: "idle",
     lastReplyText: "",
     lastError: "",
     pendingApproval: null,
@@ -242,7 +209,3 @@ function createEmptyThreadState(threadId: any) {
     updatedAt: new Date().toISOString(),
   };
 }
-
-module.exports = { ThreadStateStore };
-
-export {};

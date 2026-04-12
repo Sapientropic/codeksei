@@ -1,4 +1,4 @@
-const SUSPICIOUS_PATTERNS = [
+const SUSPICIOUS_PATTERNS: RegExp[] = [
   /\b(?:analysis|commentary|final|summary)\s+to=[a-z0-9_.-]+/i,
   /\bto=functions\.[a-z0-9_]+/i,
   /\bfunctions\.[a-z0-9_]+\b/i,
@@ -7,7 +7,12 @@ const SUSPICIOUS_PATTERNS = [
   /\btool_uses\b/i,
 ];
 
-function sanitizeProtocolLeakText(text: any) {
+export interface SanitizedProtocolLeakText {
+  text: string;
+  changed: boolean;
+}
+
+export function sanitizeProtocolLeakText(text: unknown): SanitizedProtocolLeakText {
   const normalizedText = normalizeLineEndings(text);
   if (!normalizedText) {
     return {
@@ -47,11 +52,11 @@ function sanitizeProtocolLeakText(text: any) {
   };
 }
 
-function normalizeLineEndings(value: any) {
+function normalizeLineEndings(value: unknown): string {
   return String(value || "").replace(/\r\n/g, "\n");
 }
 
-function findSafeProtocolCutIndex(text: any, leakStartIndex: any) {
+function findSafeProtocolCutIndex(text: string, leakStartIndex: number): number {
   if (!text || leakStartIndex <= 0) {
     return Math.max(0, leakStartIndex);
   }
@@ -71,7 +76,3 @@ function findSafeProtocolCutIndex(text: any, leakStartIndex: any) {
   }
   return leakStartIndex;
 }
-
-module.exports = { sanitizeProtocolLeakText };
-
-export {};

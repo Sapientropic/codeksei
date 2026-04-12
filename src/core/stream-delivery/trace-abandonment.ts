@@ -1,18 +1,48 @@
 // @ts-check
 
-const crypto = require("crypto");
-const {
+import * as crypto from "crypto";
+import {
   normalizeLineEndings,
   normalizeText,
-} = require("./visible-text");
-const {
+} from "./visible-text";
+import {
   prefersSettledDelivery,
   prefersStreamingDelivery,
-} = require("./delivery-transport");
+  type PreparedStreamingDelivery,
+} from "./delivery-transport";
+import type { FlushTrigger } from "./delivery-transport";
+import type { RunState } from "./run-state";
 
 const RECENT_WEIXIN_DELIVERY_TTL_MS = 30_000;
 
-function buildSettledWeixinDeliveryKey(state: any, safeText: any) {
+export interface DeliveryTracePayload {
+  traceId: string;
+  threadId: string;
+  turnId: string;
+  mode: string;
+  force: boolean;
+  trigger: string;
+  relation: string;
+  sentCharsBefore: number;
+  safeChars: number;
+  deltaChars: number;
+  deliveredVisibleBeforeChars: number;
+  deliveredVisibleAfterChars: number;
+  safeHash: string;
+  deltaHash: string;
+}
+
+interface LateRewriteDeltaResult {
+  delta: string;
+  deltaResult: {
+    delta: string;
+    relation: string;
+    deliveredVisibleBefore: string;
+    deliveredVisibleAfter: string;
+  };
+}
+
+export function buildSettledWeixinDeliveryKey(state: RunState, safeText: unknown): string {
   if (!prefersSettledDelivery(state)) {
     return "";
   }
@@ -29,7 +59,7 @@ function buildSettledWeixinDeliveryKey(state: any, safeText: any) {
   return `${threadId}|${userId}|${contextToken}|${text}`;
 }
 
-function pruneRecentDeliveries(recentSettledWeixinDeliveries: any, now: any = Date.now()) {
+function pruneRecentDeliveries(recentSettledWeixinDeliveries: Map<string, number>, now: number = Date.now()): void {
   for (const [key, deliveredAt] of recentSettledWeixinDeliveries.entries()) {
     if (!Number.isFinite(deliveredAt) || (now - deliveredAt) > RECENT_WEIXIN_DELIVERY_TTL_MS) {
       recentSettledWeixinDeliveries.delete(key);
@@ -37,18 +67,28 @@ function pruneRecentDeliveries(recentSettledWeixinDeliveries: any, now: any = Da
   }
 }
 
-function wasRecentlyDelivered(recentSettledWeixinDeliveries: any, key: any, now: any = Date.now()) {
+export function wasRecentlyDelivered(
+  recentSettledWeixinDeliveries: Map<string, number>,
+  key: string,
+  now: number = Date.now(),
+): boolean {
   pruneRecentDeliveries(recentSettledWeixinDeliveries, now);
   const deliveredAt = recentSettledWeixinDeliveries.get(key);
-  return Number.isFinite(deliveredAt) && (now - deliveredAt) <= RECENT_WEIXIN_DELIVERY_TTL_MS;
+  return typeof deliveredAt === "number"
+    && Number.isFinite(deliveredAt)
+    && (now - deliveredAt) <= RECENT_WEIXIN_DELIVERY_TTL_MS;
 }
 
-function rememberRecentDelivery(recentSettledWeixinDeliveries: any, key: any, now: any = Date.now()) {
+export function rememberRecentDelivery(
+  recentSettledWeixinDeliveries: Map<string, number>,
+  key: string,
+  now: number = Date.now(),
+): void {
   pruneRecentDeliveries(recentSettledWeixinDeliveries, now);
   recentSettledWeixinDeliveries.set(key, now);
 }
 
-function buildDeliveryMode(state: any) {
+function buildDeliveryMode(state: RunState): string {
   if (prefersSettledDelivery(state)) {
     return "settled";
   }
@@ -58,7 +98,7 @@ function buildDeliveryMode(state: any) {
   return normalizeText(state?.replyTarget?.provider) || "unknown";
 }
 
-function formatDeliveryTrigger(trigger: any) {
+function formatDeliveryTrigger(trigger: FlushTrigger | null | undefined): string {
   if (!trigger || typeof trigger !== "object") {
     return "";
   }
@@ -71,20 +111,32 @@ function formatDeliveryTrigger(trigger: any) {
   ].filter(Boolean).join("/");
 }
 
-function hashReplyText(text: any) {
+export function hashReplyText(text: unknown): string {
   return crypto.createHash("sha1").update(String(text || ""), "utf8").digest("hex").slice(0, 12);
 }
 
-function buildDeliveryTracePayload(state: any, {
-  force = false,
-  trigger = null,
-  traceId = "",
-  safeText = "",
-  delta = "",
-  relation = "",
-  deliveredVisibleBefore = "",
-  deliveredVisibleAfter = "",
-}: any = {}) {
+export function buildDeliveryTracePayload(
+  state: RunState,
+  {
+    force = false,
+    trigger = null,
+    traceId = "",
+    safeText = "",
+    delta = "",
+    relation = "",
+    deliveredVisibleBefore = "",
+    deliveredVisibleAfter = "",
+  }: {
+    force?: boolean;
+    trigger?: FlushTrigger | null;
+    traceId?: string;
+    safeText?: string;
+    delta?: string;
+    relation?: string;
+    deliveredVisibleBefore?: string;
+    deliveredVisibleAfter?: string;
+  } = {},
+): DeliveryTracePayload {
   return {
     traceId: normalizeText(traceId),
     threadId: normalizeText(state?.threadId),
@@ -103,7 +155,25 @@ function buildDeliveryTracePayload(state: any, {
   };
 }
 
-function resolveLateRewriteDelta({ state, delta, deltaResult, force, safeText, streamPrepared }: any) {
+export function resolveLateRewriteDelta({
+  state,
+  delta,
+  deltaResult,
+  force,
+  safeText,
+  streamPrepared,
+}: {
+  state: RunState;
+  delta: string;
+  deltaResult: {
+    relation: string;
+    deliveredVisibleBefore: string;
+    deliveredVisibleAfter: string;
+  };
+  force: boolean;
+  safeText: string;
+  streamPrepared?: PreparedStreamingDelivery | null;
+}): LateRewriteDeltaResult {
   if (
     delta
     || streamPrepared
@@ -114,7 +184,12 @@ function resolveLateRewriteDelta({ state, delta, deltaResult, force, safeText, s
   ) {
     return {
       delta,
-      deltaResult,
+      deltaResult: {
+        delta,
+        relation: deltaResult.relation,
+        deliveredVisibleBefore: deltaResult.deliveredVisibleBefore,
+        deliveredVisibleAfter: deltaResult.deliveredVisibleAfter,
+      },
     };
   }
   return {
@@ -130,13 +205,19 @@ function resolveLateRewriteDelta({ state, delta, deltaResult, force, safeText, s
   };
 }
 
-function disposeSupersededAbandonedRuns({
+export function disposeSupersededAbandonedRuns({
   stateByRunKey,
   ignoredRunKeys,
   threadId,
   activeTurnId = "",
   onDisposeRunKey = null,
-}: any) {
+}: {
+  stateByRunKey: Map<string, RunState>;
+  ignoredRunKeys: Set<string>;
+  threadId: unknown;
+  activeTurnId?: string;
+  onDisposeRunKey?: ((runKey: string) => void) | null;
+}): void {
   const normalizedThreadId = normalizeText(threadId);
   const normalizedActiveTurnId = normalizeText(activeTurnId);
   if (!normalizedThreadId) {
@@ -155,15 +236,3 @@ function disposeSupersededAbandonedRuns({
     }
   }
 }
-
-module.exports = {
-  buildDeliveryTracePayload,
-  buildSettledWeixinDeliveryKey,
-  disposeSupersededAbandonedRuns,
-  hashReplyText,
-  rememberRecentDelivery,
-  resolveLateRewriteDelta,
-  wasRecentlyDelivered,
-};
-
-export {};

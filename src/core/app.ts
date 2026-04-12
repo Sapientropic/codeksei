@@ -38,11 +38,15 @@ import type { SystemMessage } from "../contracts/queue-items";
 import * as systemCheckinPollerModule from "../app/system-checkin-poller";
 import * as defaultTargetsModule from "../workspace/default-targets";
 import * as systemMessageDispatcherModule from "./system-message-dispatcher";
-import * as approvalCommandPolicyModule from "./approval-command-policy";
-import * as appPollLoopModule from "./app-poll-loop";
-import * as appRuntimeHelpersModule from "./app-runtime-helpers";
 import * as sharedBridgeHeartbeatModule from "../shared/shared-bridge-heartbeat";
 import * as replyDeliveryFailureModule from "./reply-delivery-failure";
+import { normalizeText } from "./approval-command-policy";
+import {
+  formatErrorMessage,
+  resolveLongPollTimeoutMs as resolveAppLongPollTimeoutMs,
+  runAppPollLoop,
+} from "./app-poll-loop";
+import { createShutdownController } from "./app-runtime-helpers";
 
 const { runSystemCheckinPoller } = systemCheckinPollerModule as {
   runSystemCheckinPoller: (config: AppConfig) => Promise<unknown>;
@@ -60,28 +64,6 @@ const { SystemMessageDispatcher } = systemMessageDispatcherModule as {
     config: AppConfig;
     accountId: string;
   }) => SystemMessageDispatcherLike;
-};
-const { normalizeText } = approvalCommandPolicyModule as {
-  normalizeText: (value: unknown) => string;
-};
-const {
-  formatErrorMessage,
-  resolveLongPollTimeoutMs: resolveAppLongPollTimeoutMs,
-  runAppPollLoop,
-} = appPollLoopModule as {
-  formatErrorMessage: (error: unknown) => string;
-  resolveLongPollTimeoutMs: (args: {
-    systemMessageDispatcher: SystemMessageDispatcherLike | null;
-    activeAccountId: string;
-    timelineScreenshotQueue: TimelineScreenshotQueueLike;
-    reminderQueue: ReminderQueueLike;
-    defaultLongPollTimeoutMs: number;
-    minLongPollTimeoutMs: number;
-  }) => number;
-  runAppPollLoop: (args: Record<string, unknown>) => Promise<void>;
-};
-const { createShutdownController } = appRuntimeHelpersModule as {
-  createShutdownController: (shutdown: () => Promise<void>) => ShutdownController;
 };
 const { writeSharedBridgeHeartbeat } = sharedBridgeHeartbeatModule as {
   writeSharedBridgeHeartbeat: (filePath: string, patch: Record<string, unknown>) => void;

@@ -1,64 +1,80 @@
 // @ts-check
 
-const { normalizeAssistantPhase } = require("../../adapters/runtime/codex/message-utils");
-const {
+import { normalizeAssistantPhase } from "../../adapters/runtime/codex/message-utils";
+import {
   mergeAuthoritativeItemText,
   normalizeFragmentKind,
-} = require("./delta-merge");
-const {
+  type FragmentKind,
+  type MergeAuthoritativeItemTextResult,
+} from "./delta-merge";
+import {
   markdownToPlainText,
   normalizeLineEndings,
   normalizeText,
   trimOuterBlankLines,
-} = require("./visible-text");
+} from "./visible-text";
 
-/**
- * @typedef {{
- *   userId: string,
- *   contextToken: string,
- *   provider: string,
- * }} ReplyTarget
- */
-
-/**
- * @typedef {{
- *   itemId: string,
- *   authoritativeText: string,
- *   currentText: string,
- *   completedText: string,
- *   completed: boolean,
- *   phase: string,
- *   lastFragmentAt: number,
- *   lastFragmentKind: string,
- *   lastDeliveredVisibleText: string,
- *   pendingVisibleSuffix: string,
- * }} RunStateItem
- */
-
-/**
- * @typedef {{
- *   runKey: string,
- *   threadId: string,
- *   bindingKey: string,
- *   replyTarget: ReplyTarget | null,
- *   turnId: string,
- *   itemOrder: string[],
- *   items: Map<string, RunStateItem>,
- *   weixinReplyMode: string,
- *   sentText: string,
- *   lastDeliveredVisibleText: string,
- *   sendChain: Promise<void>,
- *   flushPromise: Promise<void> | null,
- *   scheduledFlushTimer: NodeJS.Timeout | null,
- *   abandonedAt: number,
- * }} RunState
- */
-
-function numberOrDefault(value: any, fallback: any) {
-  return Number.isFinite(value) ? value : fallback;
+export interface ReplyTarget {
+  userId: string;
+  contextToken: string;
+  provider: string;
 }
 
-function buildRunKey(threadId: any, turnId: string = "") {
+export interface RunStateItem {
+  itemId: string;
+  authoritativeText: string;
+  currentText: string;
+  completedText: string;
+  completed: boolean;
+  phase: string;
+  lastFragmentAt: number;
+  lastFragmentKind: FragmentKind;
+  lastDeliveredVisibleText: string;
+  pendingVisibleSuffix: string;
+}
+
+export interface RunState {
+  runKey: string;
+  threadId: string;
+  bindingKey: string;
+  replyTarget: ReplyTarget | null;
+  turnId: string;
+  itemOrder: string[];
+  items: Map<string, RunStateItem>;
+  weixinReplyMode: string;
+  sentText: string;
+  lastDeliveredVisibleText: string;
+  sendChain: Promise<void>;
+  flushPromise: Promise<void> | null;
+  scheduledFlushTimer: NodeJS.Timeout | null;
+  abandonedAt: number;
+}
+
+export interface VisibleRunStateItem {
+  itemId: string;
+  text: string;
+  completed: boolean;
+  phase: string;
+  lastDeliveredVisibleText: string;
+  lastFragmentAt: number;
+  lastFragmentKind: FragmentKind;
+}
+
+interface CreateRunStateArgs {
+  threadId: unknown;
+  turnId?: string;
+  weixinReplyMode: unknown;
+}
+
+interface UpsertStateItemArgs {
+  itemId?: unknown;
+  text?: unknown;
+  completed: boolean;
+  phase?: unknown;
+  fragmentKind?: unknown;
+}
+
+export function buildRunKey(threadId: unknown, turnId: string = ""): string {
   const normalizedThreadId = normalizeText(threadId);
   const normalizedTurnId = normalizeText(turnId);
   return normalizedTurnId
@@ -66,16 +82,17 @@ function buildRunKey(threadId: any, turnId: string = "") {
     : `${normalizedThreadId}:pending`;
 }
 
-function createRunState({ threadId, turnId = "", weixinReplyMode }: any) {
+export function createRunState({ threadId, turnId = "", weixinReplyMode }: CreateRunStateArgs): RunState {
+  const normalizedThreadId = normalizeText(threadId);
   return {
-    runKey: buildRunKey(threadId, turnId),
-    threadId,
+    runKey: buildRunKey(normalizedThreadId, turnId),
+    threadId: normalizedThreadId,
     bindingKey: "",
     replyTarget: null,
     turnId: normalizeText(turnId),
     itemOrder: [],
     items: new Map(),
-    weixinReplyMode,
+    weixinReplyMode: normalizeText(weixinReplyMode),
     sentText: "",
     lastDeliveredVisibleText: "",
     sendChain: Promise.resolve(),
@@ -85,7 +102,10 @@ function createRunState({ threadId, turnId = "", weixinReplyMode }: any) {
   };
 }
 
-function ensureRunState(stateByRunKey: any, { threadId, turnId = "", weixinReplyMode }: any) {
+export function ensureRunState(
+  stateByRunKey: Map<string, RunState>,
+  { threadId, turnId = "", weixinReplyMode }: CreateRunStateArgs,
+): RunState {
   const runKey = buildRunKey(threadId, turnId);
   const existing = stateByRunKey.get(runKey);
   if (existing) {
@@ -96,7 +116,11 @@ function ensureRunState(stateByRunKey: any, { threadId, turnId = "", weixinReply
   return created;
 }
 
-function findRunState(stateByRunKey: any, threadId: any, turnId: string = "") {
+export function findRunState(
+  stateByRunKey: Map<string, RunState>,
+  threadId: unknown,
+  turnId: string = "",
+): RunState | null {
   const normalizedThreadId = normalizeText(threadId);
   const normalizedTurnId = normalizeText(turnId);
   if (!normalizedThreadId) {
@@ -123,13 +147,13 @@ function findRunState(stateByRunKey: any, threadId: any, turnId: string = "") {
   return null;
 }
 
-function ensureStateItem(state: any, itemId: any) {
+export function ensureStateItem(state: RunState, itemId: unknown): RunStateItem {
   const normalizedItemId = normalizeText(itemId) || `item-${state.itemOrder.length + 1}`;
   const existing = state.items.get(normalizedItemId);
   if (existing) {
     return existing;
   }
-  const created = {
+  const created: RunStateItem = {
     itemId: normalizedItemId,
     authoritativeText: "",
     currentText: "",
@@ -146,7 +170,10 @@ function ensureStateItem(state: any, itemId: any) {
   return created;
 }
 
-function upsertStateItem(state: any, { itemId, text, completed, phase = "", fragmentKind = "" }: any) {
+export function upsertStateItem(
+  state: RunState,
+  { itemId, text, completed, phase = "", fragmentKind = "" }: UpsertStateItemArgs,
+): MergeAuthoritativeItemTextResult {
   const normalizedItemId = normalizeText(itemId) || `item-${state.itemOrder.length + 1}`;
   const normalizedText = normalizeLineEndings(text);
   if (!normalizedText) {
@@ -174,7 +201,7 @@ function upsertStateItem(state: any, { itemId, text, completed, phase = "", frag
   return merge;
 }
 
-function replaceStateItemText(state: any, itemId: any, text: any, completed: any) {
+export function replaceStateItemText(state: RunState, itemId: unknown, text: unknown, completed: unknown): void {
   const normalizedText = normalizeLineEndings(text);
   if (!normalizedText) {
     return;
@@ -189,16 +216,20 @@ function replaceStateItemText(state: any, itemId: any, text: any, completed: any
   current.pendingVisibleSuffix = "";
 }
 
-function removeStateItem(state: any, itemId: any) {
+export function removeStateItem(state: RunState, itemId: unknown): void {
   const normalizedItemId = normalizeText(itemId);
-  if (!normalizedItemId || !state?.items?.has(normalizedItemId)) {
+  if (!normalizedItemId || !state.items.has(normalizedItemId)) {
     return;
   }
   state.items.delete(normalizedItemId);
-  state.itemOrder = state.itemOrder.filter((candidateId: any) => candidateId !== normalizedItemId);
+  state.itemOrder = state.itemOrder.filter((candidateId) => candidateId !== normalizedItemId);
 }
 
-function readStateItemText(state: any, itemId: any, { completedOnly }: any) {
+export function readStateItemText(
+  state: RunState,
+  itemId: string,
+  { completedOnly }: { completedOnly: boolean },
+): string {
   const item = state.items.get(itemId);
   if (!item) {
     return "";
@@ -209,8 +240,11 @@ function readStateItemText(state: any, itemId: any, { completedOnly }: any) {
   return trimOuterBlankLines(sourceText);
 }
 
-function collectVisibleItems(state: any, { completedOnly, skipItemIds = null }: any) {
-  const items = [];
+export function collectVisibleItems(
+  state: RunState,
+  { completedOnly, skipItemIds = null }: { completedOnly: boolean; skipItemIds?: Set<string> | null },
+): VisibleRunStateItem[] {
+  const items: VisibleRunStateItem[] = [];
   for (const itemId of state.itemOrder) {
     if (skipItemIds?.has(itemId)) {
       continue;
@@ -237,17 +271,7 @@ function collectVisibleItems(state: any, { completedOnly, skipItemIds = null }: 
   return items;
 }
 
-module.exports = {
-  buildRunKey,
-  collectVisibleItems,
-  createRunState,
-  ensureRunState,
-  ensureStateItem,
-  findRunState,
-  readStateItemText,
-  removeStateItem,
-  replaceStateItemText,
-  upsertStateItem,
-};
-
-export {};
+function numberOrDefault(value: unknown, fallback: number): number {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}

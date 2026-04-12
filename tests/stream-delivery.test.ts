@@ -1,10 +1,32 @@
-// @ts-nocheck
-const test = require("node:test");
-const assert = require("node:assert/strict");
+const test: typeof import("node:test") = require("node:test");
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 
-const { StreamDelivery } = require("../src/core/stream-delivery");
+import type { ChannelAdapterLike, SessionStoreLike } from "../src/core/app-service-contract";
+import type { DeliveryFailurePayload } from "../src/core/runtime-types";
+const { StreamDelivery }: typeof import("../src/core/stream-delivery") = require("../src/core/stream-delivery");
 
-function sleep(ms) {
+type StreamDeliveryInstance = import("../src/core/stream-delivery").StreamDelivery;
+
+interface SentMessage {
+  text: string;
+  preserveBlock: boolean | undefined;
+}
+
+interface CreateDeliveryOptions {
+  weixinReplyMode?: "stream" | "settled";
+  streamIdleFlushMs?: number;
+  streamForceFlushChars?: number;
+  streamBoundaryFlushChars?: number;
+  sendTextImpl?: ((payload: { text: string; preserveBlock?: boolean }) => Promise<void>) | null;
+}
+
+interface DeliveryHarness {
+  delivery: StreamDeliveryInstance;
+  sent: SentMessage[];
+  attach(threadId: string): void;
+}
+
+function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
@@ -14,32 +36,89 @@ function createDelivery({
   streamForceFlushChars = 12,
   streamBoundaryFlushChars = 6,
   sendTextImpl = null,
-} = {}) {
-  const sent = [];
+}: CreateDeliveryOptions = {}): DeliveryHarness {
+  const sent: SentMessage[] = [];
+  const channelAdapter: ChannelAdapterLike = {
+    describe() {
+      return { id: "test-channel" };
+    },
+    getKnownContextTokens() {
+      return {};
+    },
+    loadSyncBuffer() {
+      return "";
+    },
+    async login() {},
+    normalizeIncomingMessage(message) {
+      return message;
+    },
+    printAccounts() {},
+    resolveAccount() {
+      return { accountId: "acct-1", baseUrl: "http://127.0.0.1" };
+    },
+    async sendFile() {
+      return undefined;
+    },
+    async sendText(payload) {
+      sent.push({
+        text: payload.text,
+        preserveBlock: payload.preserveBlock,
+      });
+      if (typeof sendTextImpl === "function") {
+        await sendTextImpl(payload);
+      }
+      return undefined;
+    },
+    async sendTyping() {
+      return undefined;
+    },
+  };
+  const sessionStore: SessionStoreLike = {
+    buildBindingKey() {
+      return "";
+    },
+    findBindingForThreadId(threadId) {
+      return { bindingKey: `binding-${threadId}`, workspaceRoot: "" };
+    },
+    getActiveWorkspaceRoot() {
+      return "";
+    },
+    getApprovalCommandAllowlistForWorkspace() {
+      return [];
+    },
+    getBinding() {
+      return null;
+    },
+    getCodexParamsForWorkspace() {
+      return { model: "" };
+    },
+    getPendingApprovalForThread() {
+      return null;
+    },
+    getThreadIdForWorkspace() {
+      return "";
+    },
+    listBindings() {
+      return [];
+    },
+    listPendingApprovals() {
+      return [];
+    },
+    rememberPendingApprovalForThread() {
+      return null;
+    },
+    rememberWorkspaceBootstrapForThread() {},
+  };
   const delivery = new StreamDelivery({
     weixinReplyMode,
     streamIdleFlushMs,
     streamForceFlushChars,
     streamBoundaryFlushChars,
-    channelAdapter: {
-      async sendText(payload) {
-        sent.push({
-          text: payload.text,
-          preserveBlock: payload.preserveBlock,
-        });
-        if (typeof sendTextImpl === "function") {
-          await sendTextImpl(payload);
-        }
-      },
-    },
-    sessionStore: {
-      findBindingForThreadId(threadId) {
-        return { bindingKey: `binding-${threadId}` };
-      },
-    },
+    channelAdapter,
+    sessionStore,
   });
 
-  function attach(threadId) {
+  function attach(threadId: string): void {
     delivery.queueReplyTargetForThread(threadId, {
       userId: `user-${threadId}`,
       contextToken: `ctx-${threadId}`,
@@ -50,41 +129,54 @@ function createDelivery({
   return { delivery, sent, attach };
 }
 
-async function startTurn(delivery, threadId, turnId) {
+async function startTurn(delivery: StreamDeliveryInstance, threadId: string, turnId: string): Promise<void> {
   await delivery.handleRuntimeEvent({
     type: "runtime.turn.started",
     payload: { threadId, turnId },
   });
 }
 
-async function sendDelta(delivery, {
+async function sendDelta(delivery: StreamDeliveryInstance, {
   threadId,
   turnId,
   itemId,
   text,
   phase = "final",
   fragmentKind = "delta",
-}) {
+}: {
+  threadId: string;
+  turnId: string;
+  itemId: string;
+  text: string;
+  phase?: string;
+  fragmentKind?: string;
+}): Promise<void> {
   await delivery.handleRuntimeEvent({
     type: "runtime.reply.delta",
     payload: { threadId, turnId, itemId, text, phase, fragmentKind },
   });
 }
 
-async function sendCompleted(delivery, {
+async function sendCompleted(delivery: StreamDeliveryInstance, {
   threadId,
   turnId,
   itemId,
   text,
   phase = "final",
-}) {
+}: {
+  threadId: string;
+  turnId: string;
+  itemId: string;
+  text: string;
+  phase?: string;
+}): Promise<void> {
   await delivery.handleRuntimeEvent({
     type: "runtime.reply.completed",
     payload: { threadId, turnId, itemId, text, phase },
   });
 }
 
-async function completeTurn(delivery, threadId, turnId) {
+async function completeTurn(delivery: StreamDeliveryInstance, threadId: string, turnId: string): Promise<void> {
   await delivery.handleRuntimeEvent({
     type: "runtime.turn.completed",
     payload: { threadId, turnId },
@@ -395,23 +487,77 @@ test("stream mode waits for a natural boundary before sending a final sentence",
 });
 
 test("persistent send failure abandons the run and reports delivery degradation", async () => {
-  const degraded = [];
+  const degraded: DeliveryFailurePayload[] = [];
   const delivery = new StreamDelivery({
     weixinReplyMode: "stream",
     streamIdleFlushMs: 5,
     streamForceFlushChars: 6,
     streamBoundaryFlushChars: 6,
     channelAdapter: {
+      describe() {
+        return { id: "test-channel" };
+      },
+      getKnownContextTokens() {
+        return {};
+      },
+      loadSyncBuffer() {
+        return "";
+      },
+      async login() {},
+      normalizeIncomingMessage(message) {
+        return message;
+      },
+      printAccounts() {},
+      resolveAccount() {
+        return { accountId: "acct-1", baseUrl: "http://127.0.0.1" };
+      },
+      async sendFile() {
+        return undefined;
+      },
       async sendText() {
         throw new Error("sendMessage ret=-2 errcode= errmsg=");
       },
-    },
-    sessionStore: {
-      findBindingForThreadId(threadId) {
-        return { bindingKey: `binding-${threadId}` };
+      async sendTyping() {
+        return undefined;
       },
     },
-    onDeliveryFailure(payload) {
+    sessionStore: {
+      buildBindingKey() {
+        return "";
+      },
+      findBindingForThreadId(threadId) {
+        return { bindingKey: `binding-${threadId}`, workspaceRoot: "" };
+      },
+      getActiveWorkspaceRoot() {
+        return "";
+      },
+      getApprovalCommandAllowlistForWorkspace() {
+        return [];
+      },
+      getBinding() {
+        return null;
+      },
+      getCodexParamsForWorkspace() {
+        return { model: "" };
+      },
+      getPendingApprovalForThread() {
+        return null;
+      },
+      getThreadIdForWorkspace() {
+        return "";
+      },
+      listBindings() {
+        return [];
+      },
+      listPendingApprovals() {
+        return [];
+      },
+      rememberPendingApprovalForThread() {
+        return null;
+      },
+      rememberWorkspaceBootstrapForThread() {},
+    },
+    onDeliveryFailure(payload: DeliveryFailurePayload) {
       degraded.push(payload);
     },
   });

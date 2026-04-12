@@ -5,13 +5,10 @@ import {
 } from "../../../contracts/runtime-events";
 import type { UnknownRecord } from "../../../core/runtime-types";
 import * as eventsModule from "./events";
-import * as messageUtilsModule from "./message-utils";
+import { extractThreadIdFromParams } from "./message-utils";
 
 const { mapCodexMessageToRuntimeEvent } = eventsModule as {
   mapCodexMessageToRuntimeEvent: (message: RpcMessage) => RuntimeEvent<UnknownRecord> | null;
-};
-const { extractThreadIdFromParams } = messageUtilsModule as {
-  extractThreadIdFromParams: (params: Record<string, unknown>) => string;
 };
 
 interface RpcMessageParams extends UnknownRecord {
