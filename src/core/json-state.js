@@ -61,6 +61,19 @@ function writeForeignJsonDocument(filePath, payload, { mode = null } = {}) {
   writeJsonFileAtomically(filePath, payload, { mode });
 }
 
+function writeManagedTextStateFile(filePath, content, { mode = null, encoding = "utf8" } = {}) {
+  // Managed runtime state is allowed to validate/quarantine on read, but its
+  // write path should still be one stable atomic primitive.
+  writeTextFileAtomically(filePath, content, { mode, encoding });
+}
+
+function writeForeignTextDocument(filePath, content, { mode = null, encoding = "utf8" } = {}) {
+  // User-facing notes/reviews/diaries are foreign documents. We preserve atomic
+  // replacement here, but intentionally avoid the managed-state quarantine
+  // semantics that would otherwise rename user documents on read failure.
+  writeTextFileAtomically(filePath, content, { mode, encoding });
+}
+
 function writeTextFileAtomically(filePath, content, {
   mode = null,
   encoding = "utf8",
@@ -146,6 +159,8 @@ module.exports = {
   readForeignJsonDocument,
   readManagedJsonStateFile,
   readJsonStateFile,
+  writeForeignTextDocument,
+  writeManagedTextStateFile,
   writeTextFileAtomically,
   writeForeignJsonDocument,
   writeManagedJsonStateFile,

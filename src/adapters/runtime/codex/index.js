@@ -1,14 +1,11 @@
 const fs = require("fs");
 const { renderInstructionTemplate } = require("../../../core/instructions-template");
+const { RUNTIME_EVENT_TYPES } = require("../../../contracts/runtime-events");
 const { CodexRpcClient } = require("./rpc-client");
 const { mapCodexMessageToRuntimeEvent } = require("./events");
 const {
-  extractAssistantText,
-  extractFailureText,
   extractThreadId,
   extractThreadIdFromParams,
-  extractTurnIdFromParams,
-  isAssistantItemCompleted,
 } = require("./message-utils");
 const { SessionStore } = require("./session-store");
 const { resolveCodexWorkspaceRoot } = require("../../../core/workspace-alias");
@@ -341,6 +338,9 @@ function loadInstructionFile(filePath, config = {}) {
 module.exports = {
   createCodexRuntimeAdapter,
   loadWechatInstructions,
+  __testing: {
+    waitForTurnCompletion,
+  },
 };
 
 async function startThreadWithWorkspaceDiagnostics({
@@ -444,7 +444,7 @@ function waitForTurnCompletion(client, threadId) {
   return new Promise((resolve, reject) => {
     let activeTurnId = "";
     const itemOrder = [];
-    const completedTextByItemId = new Map();
+    const textByItemId = new Map();
 
     const cleanup = () => {
       unsubscribe();
@@ -457,33 +457,47 @@ function waitForTurnCompletion(client, threadId) {
     }, 10 * 60_000);
 
     const unsubscribe = client.onMessage((message) => {
+      const runtimeEvent = mapCodexMessageToRuntimeEvent(message);
       const params = message?.params || {};
-      if (extractThreadIdFromParams(params) !== threadId) {
+      const messageThreadId = normalizeLogValue(runtimeEvent?.payload?.threadId)
+        || extractThreadIdFromParams(params);
+      if (messageThreadId !== threadId) {
         return;
       }
 
-      if ((message?.method === "turn/started" || message?.method === "turn/start") && !activeTurnId) {
-        activeTurnId = extractTurnIdFromParams(params);
+      if (runtimeEvent?.type === RUNTIME_EVENT_TYPES.TURN_STARTED && !activeTurnId) {
+        activeTurnId = normalizeLogValue(runtimeEvent.payload.turnId);
         return;
       }
 
-      if (isAssistantItemCompleted(message)) {
-        const itemId = typeof params?.item?.id === "string" ? params.item.id.trim() : `item-${itemOrder.length + 1}`;
-        if (!completedTextByItemId.has(itemId)) {
+      if (
+        runtimeEvent?.type === RUNTIME_EVENT_TYPES.REPLY_DELTA
+        || runtimeEvent?.type === RUNTIME_EVENT_TYPES.REPLY_COMPLETED
+      ) {
+        const itemId = normalizeLogValue(runtimeEvent.payload.itemId) || `item-${itemOrder.length + 1}`;
+        if (!textByItemId.has(itemId)) {
           itemOrder.push(itemId);
+          textByItemId.set(itemId, "");
         }
-        completedTextByItemId.set(itemId, extractAssistantText(params));
+        const nextText = normalizeLogValue(runtimeEvent.payload.text);
+        if (nextText) {
+          if (runtimeEvent.type === RUNTIME_EVENT_TYPES.REPLY_DELTA) {
+            textByItemId.set(itemId, `${textByItemId.get(itemId) || ""}${nextText}`);
+          } else {
+            textByItemId.set(itemId, nextText);
+          }
+        }
         return;
       }
 
-      if (message?.method === "turn/failed") {
+      if (runtimeEvent?.type === RUNTIME_EVENT_TYPES.TURN_FAILED) {
         cleanup();
-        reject(new Error(extractFailureText(params)));
+        reject(new Error(normalizeLogValue(runtimeEvent.payload.text) || "执行失败"));
         return;
       }
 
-      if (message?.method === "turn/completed") {
-        const completedTurnId = extractTurnIdFromParams(params);
+      if (runtimeEvent?.type === RUNTIME_EVENT_TYPES.TURN_COMPLETED) {
+        const completedTurnId = normalizeLogValue(runtimeEvent.payload.turnId);
         if (activeTurnId && completedTurnId && completedTurnId !== activeTurnId) {
           return;
         }
@@ -495,7 +509,7 @@ function waitForTurnCompletion(client, threadId) {
         const text = itemOrder
           .slice()
           .reverse()
-          .map((itemId) => completedTextByItemId.get(itemId) || "")
+          .map((itemId) => textByItemId.get(itemId) || "")
           .find((value) => String(value || "").trim()) || "";
         resolve({
           turnId: completedTurnId || activeTurnId,

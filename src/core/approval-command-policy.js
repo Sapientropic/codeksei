@@ -1,31 +1,10 @@
 // @ts-check
 
 const path = require("path");
-const { findTerminalCommandManifest } = require("../contracts/command-surface");
-
-// Keep auto-approval on an explicit action allowlist instead of trusting the
-// whole command manifest. The manifest is the command truth surface, but not
-// every valid terminal command should silently bypass approval.
-const AUTO_APPROVAL_ACTIONS = new Set([
-  "diary.append",
-  "note.auto",
-  "note.maybe",
-  "note.sync",
-  "project.radar",
-  "reminder.create",
-  "review.monthly",
-  "review.nightly",
-  "review.weekly",
-  "timeline.build",
-  "timeline.categories",
-  "timeline.dev",
-  "timeline.event",
-  "timeline.proposals",
-  "timeline.read",
-  "timeline.screenshot",
-  "timeline.serve",
-  "timeline.write",
-]);
+const {
+  findTerminalCommandManifest,
+  findTerminalManifestByScriptName,
+} = require("../contracts/command-surface");
 
 const SHELL_EXECUTABLES = new Set(["sh", "bash", "zsh"]);
 const NODE_EXECUTABLES = new Set(["node", "node.exe"]);
@@ -107,7 +86,7 @@ function matchesBuiltInCommandPrefix(commandTokens) {
   }
 
   const manifest = resolveBuiltInTerminalManifest(normalized);
-  return Boolean(manifest?.action) && AUTO_APPROVAL_ACTIONS.has(manifest.action);
+  return Boolean(manifest?.approval?.autoApprove);
 }
 
 function normalizeCommandTokensForMatching(commandTokens) {
@@ -152,15 +131,7 @@ function resolveManifestFromNpmRun(commandTokens) {
 }
 
 function findManifestForPackageScript(scriptName) {
-  const normalizedScriptName = normalizeCommandArgument(scriptName).toLowerCase();
-  if (!normalizedScriptName.includes(":")) {
-    return null;
-  }
-  const parts = normalizedScriptName.split(":");
-  if (parts.length !== 2 || !parts[0] || !parts[1]) {
-    return null;
-  }
-  return findTerminalCommandManifest(parts[0], parts[1]);
+  return findTerminalManifestByScriptName(scriptName);
 }
 
 function findManifestForTerminalCommand(commandTokens) {

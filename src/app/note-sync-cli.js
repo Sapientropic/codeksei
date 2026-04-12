@@ -1,5 +1,6 @@
 const { getCommandArgsSchema } = require("../contracts/command-args");
 const { parseCliArgs } = require("../core/cli-args");
+const { buildTerminalLeafHelp } = require("../core/command-registry");
 const {
   resolveNoteSyncTarget,
   syncNoteFile,
@@ -8,7 +9,7 @@ const {
 async function runNoteSyncCommand(config, args = []) {
   const options = parseNoteSyncArgs(args);
   if (options.help) {
-    printNoteSyncHelp();
+    console.log(buildTerminalLeafHelp("note.sync"));
     return;
   }
 
@@ -56,22 +57,6 @@ function readStdin() {
     process.stdin.on("end", () => resolve(buffer.trim()));
     process.stdin.on("error", reject);
   });
-}
-
-function printNoteSyncHelp() {
-  console.log([
-    "用法: npm run note:sync -- (--project <slug> | --path <path>) --section <标题> [--text \"内容\" | --stdin] [--style bullet|paragraph] [--slot <id>] [--max-items N]",
-    "",
-    "说明：",
-    "  轻量把一条 durable 摘要写回指定 note 的指定 section。",
-    "  默认 style 是 bullet；传 --slot 时会用受控 block 替换同一槽位的旧内容。",
-    "  不传 --slot 时会做轻量追加，并对相同内容去重。",
-    "",
-    "示例：",
-    "  npm run note:sync -- --project <slug> --section \"最近动作\" --text \"把微信 prompt 收口为更温柔的 chief-of-staff 风格\" --max-items 6",
-    "  npm run note:sync -- --project <slug> --section \"当前状态\" --slot current-status --style paragraph --text \"当前 shared bridge 正常运行，默认入口稳定。\"",
-    "  npm run note:sync -- --path \"/absolute/path/to/note.md\" --section \"当前定位\" --text \"默认先接住，再定向，再推进。\"",
-  ].join("\n"));
 }
 
 module.exports = {

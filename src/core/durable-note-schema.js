@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { normalizeDurableNoteSchemaConfig } = require("../contracts/config-files");
 const { loadJsonConfig } = require("./config-loader");
-const { writeTextFileAtomically } = require("./json-state");
+const { writeForeignTextDocument } = require("./json-state");
 
 const { listTrackedProjects } = require("./project-radar");
 const { appendSection, findSectionRange, resolveNoteSyncTarget } = require("./note-sync");
@@ -148,7 +148,7 @@ function ensureDurableNoteSections(filePath, sections = []) {
   }
 
   if (changed) {
-    writeTextFileAtomically(normalizedPath, ensureTrailingNewline(content), { encoding: "utf8" });
+    writeForeignTextDocument(normalizedPath, ensureTrailingNewline(content), { encoding: "utf8" });
   }
   return {
     changed,

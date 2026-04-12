@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const {
+  normalizeReminderQueueEntry,
   normalizeSystemMessage,
   normalizeTimelineScreenshotJob,
 } = require("../src/contracts/queue-items");
@@ -53,6 +54,28 @@ test("timeline screenshot queue contract normalizes args and output file", () =>
     senderId: "user-1",
     outputFile: "C:/tmp/shot.png",
     args: ["--selector", "timeline"],
+    createdAt: "2026-04-12T00:00:00.000Z",
+  });
+});
+
+test("reminder queue contract normalizes due time and created timestamp", () => {
+  const normalized = normalizeReminderQueueEntry({
+    id: "reminder-1",
+    accountId: "acct-1",
+    senderId: "user-1",
+    contextToken: "ctx-1",
+    text: "起身喝水",
+    dueAtMs: "1712908800000",
+    createdAt: "2026-04-12T00:00:00.000Z",
+  });
+
+  assert.deepEqual(normalized, {
+    id: "reminder-1",
+    accountId: "acct-1",
+    senderId: "user-1",
+    contextToken: "ctx-1",
+    text: "起身喝水",
+    dueAtMs: 1712908800000,
     createdAt: "2026-04-12T00:00:00.000Z",
   });
 });

@@ -29,7 +29,7 @@ const {
   buildTerminalTopicHelp,
   isPlannedTerminalTopic,
 } = require("./core/command-registry");
-const { writeTextFileAtomically } = require("./core/json-state");
+const { writeForeignTextDocument } = require("./core/json-state");
 const { resolveConfiguredPersonName } = require("./core/person-reference");
 
 function ensureDefaultStateDirectory() {
@@ -73,7 +73,7 @@ function ensureInstructionsTemplate(config) {
     userName,
   }).trimEnd() + "\n";
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  writeTextFileAtomically(filePath, content, { encoding: "utf8" });
+  writeForeignTextDocument(filePath, content, { encoding: "utf8" });
 }
 
 function printHelp() {
@@ -106,10 +106,14 @@ async function main() {
   installRuntimeErrorHooks();
   const argv = process.argv.slice(2);
   const leafArgs = sliceLeafCommandArgs(process.argv, 4);
-  const config = readConfig();
-  ensureBootstrapFiles(config);
-  const command = config.mode || "help";
+  const baseConfig = readConfig();
+  const command = argv[0] || "help";
   const subcommand = argv[1] || "";
+  const config = {
+    ...baseConfig,
+    startWithCheckin: baseConfig.startWithCheckin || hasArgFlag(argv, "--checkin"),
+  };
+  ensureBootstrapFiles(config);
   let app = null;
   const getApp = () => {
     if (!app) {
@@ -142,26 +146,6 @@ async function main() {
     return;
   }
 
-  if (command === "doctor") {
-    getApp().printDoctor();
-    return;
-  }
-
-  if (command === "login") {
-    await getApp().login();
-    return;
-  }
-
-  if (command === "accounts") {
-    getApp().printAccounts();
-    return;
-  }
-
-  if (command === "start") {
-    await getApp().start();
-    return;
-  }
-
   throw new Error(`未知命令: ${command}`);
 }
 
@@ -173,66 +157,72 @@ async function runTerminalManifestCommand(manifest, {
   getApp,
   leafArgs,
 }) {
-  switch (manifest.runner) {
-    case "help":
+  const handlers = {
+    help: async () => {
       printHelp();
-      return;
-    case "login":
+    },
+    login: async () => {
       await getApp().login();
-      return;
-    case "accounts":
+    },
+    accounts: async () => {
       getApp().printAccounts();
-      return;
-    case "start":
+    },
+    start: async () => {
       await getApp().start();
-      return;
-    case "doctor":
+    },
+    doctor: async () => {
       getApp().printDoctor();
-      return;
-    case "channel.send-file":
+    },
+    "channel.send-file": async () => {
       await runChannelSendFileCommand(getApp(), leafArgs);
-      return;
-    case "note.sync":
+    },
+    "note.sync": async () => {
       await runNoteSyncCommand(config, leafArgs);
-      return;
-    case "note.auto":
+    },
+    "note.auto": async () => {
       await runNoteAutoCommand(config, leafArgs);
-      return;
-    case "note.maybe":
+    },
+    "note.maybe": async () => {
       runNoteMaybeCommand(config, leafArgs);
-      return;
-    case "project.radar":
+    },
+    "project.radar": async () => {
       await runProjectRadarCommand(config, leafArgs);
-      return;
-    case "review.command":
+    },
+    "review.command": async () => {
       await runReviewCommand(config, manifest.kind, leafArgs);
-      return;
-    case "reminder.write":
+    },
+    "reminder.write": async () => {
       await runReminderWriteCommand(config, leafArgs);
-      return;
-    case "diary.write":
+    },
+    "diary.write": async () => {
       await runDiaryWriteCommand(config, leafArgs);
-      return;
-    case "system.send":
+    },
+    "system.send": async () => {
       await runSystemSendCommand(config, leafArgs);
-      return;
-    case "system.checkin-poller":
+    },
+    "system.checkin-poller": async () => {
       await runSystemCheckinPoller(config);
-      return;
-    case "timeline.event": {
+    },
+    "timeline.event": async () => {
       const timelineIntegration = createTimelineIntegration(config);
       await runTimelineEventCommand(timelineIntegration, config, argv.slice(2));
-      return;
-    }
-    case "timeline.screenshot":
+    },
+    "timeline.screenshot": async () => {
       await runTimelineScreenshotCommand(config, argv.slice(2));
-      return;
-    case "timeline.subcommand": {
+    },
+    "timeline.subcommand": async () => {
       const timelineIntegration = createTimelineIntegration(config);
       await timelineIntegration.runSubcommand(manifest.timelineSubcommand, argv.slice(2));
-      return;
-    }
-    default:
-      throw new Error(`未知命令: ${manifest.command}${manifest.subcommand ? ` ${manifest.subcommand}` : ""}`);
+    },
+  };
+
+  const handler = handlers[manifest.runner];
+  if (!handler) {
+    throw new Error(`未知命令: ${manifest.command}${manifest.subcommand ? ` ${manifest.subcommand}` : ""}`);
   }
+  await handler();
+}
+
+function hasArgFlag(argv, flag) {
+  return Array.isArray(argv) && argv.some((item) => String(item || "").trim() === flag);
 }

@@ -135,6 +135,10 @@ test("note:auto ensures missing project sections before writing a status snapsho
   assert.match(content, /## 当前状态/u);
   assert.match(content, /current-status:start -->\nshared bridge 正常，durable note schema 已接入。\n<!-- codeksei-note-sync:current-status:end -->/u);
   assert.match(content, /## 决策与约束/u);
+  assert.deepEqual(
+    fs.readdirSync(path.dirname(fixture.projectNotePath)).filter((entry) => entry.endsWith(".tmp")),
+    []
+  );
 });
 
 test("note:maybe can inspect inspiration scope and list kinds without writing", () => {

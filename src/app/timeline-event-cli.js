@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const { getCommandArgsSchema } = require("../contracts/command-args");
 const { parseCliArgs } = require("../core/cli-args");
+const { buildTerminalLeafHelp } = require("../core/command-registry");
 const {
   LEGACY_TIMELINE_TIMEZONE,
   coerceLocalDateTimeToIso,
@@ -11,7 +12,7 @@ async function runTimelineEventCommand(timelineIntegration, configOrArgs = {}, a
   const args = Array.isArray(configOrArgs) ? configOrArgs : argsMaybe;
   const options = parseTimelineEventArgs(args);
   if (options.help) {
-    printTimelineEventHelp(config.timezone);
+    console.log(buildTerminalLeafHelp("timeline.event", { timezone: config.timezone }));
     return;
   }
 
@@ -152,38 +153,6 @@ function readStdin() {
 
 function normalizeText(value) {
   return String(value || "").replace(/\r\n/g, "\n").trim();
-}
-
-function printTimelineEventHelp(timezone = LEGACY_TIMELINE_TIMEZONE) {
-  const resolvedTimezone = normalizeTimezoneConfigValue(timezone) || LEGACY_TIMELINE_TIMEZONE;
-  console.log(`
-用法: npm run timeline:event -- --date YYYY-MM-DD --start HH:mm --end HH:mm --title "标题" (--event-node <id> | --subcategory <id>) [其他参数]
-
-用途:
-  - 写单条时间轴事件，不必手写 raw JSON
-  - 适合把一个明确的时间块快速追加进当天 timeline
-  - 如果要一次写多条事件，或直接替换整批 events，继续用 timeline:write
-  - 不带 offset 的本地时间默认按 ${resolvedTimezone} 解释
-
-常用参数:
-  --date YYYY-MM-DD
-  --start HH:mm | 完整时间戳
-  --end HH:mm | 完整时间戳
-  --title "事件标题"
-  --note "详细备注"        可选；也可用 --stdin 从标准输入读 note
-  --event-node <id>        与 taxonomy 里的 eventNode 对应
-  --subcategory <id>       不传 event-node 时至少提供它
-  --category <id>          subcategory 无法自动反推时建议一起传
-  --tag <text>             可重复传多次
-  --mode merge|replace     默认 merge
-  --finalize               按 timeline-for-agent 的 finalize 语义写入
-
-示例:
-  npm run timeline:event -- --date 2026-04-10 --start 09:30 --end 10:15 --title "看 Codeksei 提交历史" --subcategory work.dev --category work --note "为了补日记和时间线先核对最近改动。"
-  @'
-补充背景和为什么要记录这段。
-'@ | npm run timeline:event -- --date 2026-04-10 --start 10:20 --end 10:45 --title "整理营养师笔记结构" --subcategory study.reading --stdin
-`);
 }
 
 module.exports = {

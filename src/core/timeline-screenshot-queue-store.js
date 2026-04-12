@@ -7,8 +7,8 @@ const {
 } = require("../contracts/queue-items");
 const {
   ensureParentDirectory,
-  readJsonStateFile,
-  writeJsonStateFile,
+  readManagedJsonStateFile,
+  writeManagedJsonStateFile,
 } = require("./json-state");
 
 class TimelineScreenshotQueueStore {
@@ -24,7 +24,7 @@ class TimelineScreenshotQueueStore {
   }
 
   load() {
-    const parsed = readJsonStateFile({
+    const parsed = readManagedJsonStateFile({
       filePath: this.filePath,
       fallback: { jobs: [] },
       label: "timeline screenshot queue",
@@ -40,7 +40,7 @@ class TimelineScreenshotQueueStore {
   }
 
   save() {
-    writeJsonStateFile(this.filePath, this.state);
+    writeManagedJsonStateFile(this.filePath, this.state);
   }
 
   enqueue(job) {

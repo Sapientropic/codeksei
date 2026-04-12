@@ -1,11 +1,12 @@
 const { getCommandArgsSchema } = require("../contracts/command-args");
 const { parseCliArgs } = require("../core/cli-args");
+const { buildTerminalLeafHelp } = require("../core/command-registry");
 const { collectProjectRadars, listTrackedProjects, loadProjectRadarConfig } = require("../core/project-radar");
 
 async function runProjectRadarCommand(config, args = []) {
   const options = parseProjectRadarArgs(args);
   if (options.help) {
-    printProjectRadarHelp(config);
+    console.log(buildTerminalLeafHelp("project.radar", { config }));
     return;
   }
 
@@ -34,21 +35,6 @@ async function runProjectRadarCommand(config, args = []) {
 
 function parseProjectRadarArgs(args) {
   return parseCliArgs(args, getCommandArgsSchema("projectRadar"));
-}
-
-function printProjectRadarHelp(config = {}) {
-  console.log([
-    "用法: npm run project:radar -- [--list] [--project <slug>] [--json] [--commits 5] [--changes 20]",
-    "",
-    "说明：",
-    "  默认从当前 workspace 的 .codex/code-projects.json 读取已跟踪代码项目。",
-    `  当前配置文件: ${config.projectRadarConfigFile || "(auto)"}`,
-    "",
-    "示例：",
-    "  npm run project:radar -- --list",
-    "  npm run project:radar -- --project <slug> --json",
-    "  npm run project:radar -- --project engineering-issues --commits 8 --changes 30",
-  ].join("\n"));
 }
 
 function printProjectList(radarConfig, trackedProjects) {

@@ -12,8 +12,6 @@ const { resolveCrossPlatformPathFromRoot } = require("./path-utils");
 const { resolveTimezoneConfig } = require("./timezone");
 
 function readConfig() {
-  const argv = process.argv.slice(2);
-  const mode = argv[0] || "";
   const stateDir = resolveStateDir({ env: process.env });
   const workspaceRoot = readPrefixedEnv(process.env, "WORKSPACE_ROOT") || process.cwd();
   const timelineStateDir = readPrefixedEnv(process.env, "TIMELINE_STATE_DIR") || stateDir;
@@ -27,8 +25,6 @@ function readConfig() {
   }) || path.resolve(__dirname, "..", "..");
 
   return {
-    mode,
-    argv,
     stateDir,
     codekseiHome: appHome,
     cyberbossHome: appHome,
@@ -86,16 +82,12 @@ function readConfig() {
     reviewSemanticTimeoutMs: readPrefixedIntEnv(process.env, "REVIEW_SEMANTIC_TIMEOUT_MS") || 120000,
     sharedBridgeHeartbeatFile: path.join(stateDir, "logs", "shared-wechat-heartbeat.json"),
     sharedWatchdogStateFile: path.join(stateDir, "logs", "shared-watchdog-state.json"),
-    startWithCheckin: (mode === "start" && hasArgFlag(argv, "--checkin")) || readPrefixedBoolEnv(process.env, "ENABLE_CHECKIN"),
+    startWithCheckin: readPrefixedBoolEnv(process.env, "ENABLE_CHECKIN"),
   };
 }
 
 function normalizeWeixinReplyMode(value) {
   return String(value || "").trim().toLowerCase() === "settled" ? "settled" : "stream";
-}
-
-function hasArgFlag(argv, flag) {
-  return Array.isArray(argv) && argv.some((item) => String(item || "").trim() === flag);
 }
 
 module.exports = { readConfig };
