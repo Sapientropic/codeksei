@@ -1,3 +1,8 @@
+import type {
+  GetUploadUrlV2Args,
+  SendMessageV2Args,
+} from "./api-v2";
+
 export type WeixinMediaKind = "image" | "video" | "file";
 
 export interface IncomingWeixinMediaRef {
@@ -46,8 +51,8 @@ export interface PersistIncomingWeixinAttachmentsResult {
 }
 
 export interface WeixinMediaApi {
-  getUploadUrlImpl: (args: Record<string, unknown>) => Promise<Record<string, unknown>>;
-  sendMessageImpl: (args: Record<string, unknown>) => Promise<unknown>;
+  getUploadUrlImpl: (args: GetUploadUrlV2Args) => Promise<Record<string, unknown>>;
+  sendMessageImpl: (args: SendMessageV2Args) => Promise<unknown>;
 }
 
 export interface SendWeixinMediaFileArgs {

@@ -1,15 +1,13 @@
 import * as crypto from "node:crypto";
-import * as apiV2Module from "./api-v2";
-
-const {
+import {
   getConfigV2,
   sendTextV2,
   sendTypingV2,
-} = apiV2Module as {
-  getConfigV2: (args: Record<string, unknown>) => Promise<Record<string, unknown>>;
-  sendTextV2: (args: Record<string, unknown>) => Promise<unknown>;
-  sendTypingV2: (args: Record<string, unknown>) => Promise<unknown>;
-};
+  type GetConfigV2Response,
+  type SendTextV2Args,
+  type SendTypingV2Args,
+  type WeixinApiResponse,
+} from "./api-v2";
 
 const MAX_WEIXIN_CHUNK = 3800;
 const SEND_MESSAGE_CHUNK_INTERVAL_MS = 350;
@@ -64,7 +62,7 @@ interface SendTypingArgs {
 }
 
 interface SendV2TextChunkArgs {
-  sendTextImpl?: (args: Record<string, unknown>) => Promise<unknown>;
+  sendTextImpl?: (args: SendTextV2Args) => Promise<WeixinApiResponse>;
   baseUrl: string;
   token: string;
   routeTag?: string;
@@ -164,7 +162,7 @@ export function createWeixinDeliveryFacade({
       clientVersion: normalizeText(config.weixinProtocolClientVersion),
       ilinkUserId: userId,
       contextToken: resolvedToken,
-    }).catch(() => null);
+    }).catch((): GetConfigV2Response | null => null);
     const typingTicket = normalizeText(isRecord(configResponse) ? configResponse.typing_ticket : "");
     if (!typingTicket) {
       return;
@@ -226,7 +224,7 @@ export function sendV2TextChunk({
   contextToken,
   clientId = "",
   trace = null,
-}: SendV2TextChunkArgs): Promise<unknown> {
+}: SendV2TextChunkArgs): Promise<WeixinApiResponse> {
   const stableClientId = normalizeText(clientId) || `cb-${crypto.randomUUID()}`;
   return sendTextChunkWithRetry(
     () => sendTextImpl({

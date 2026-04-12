@@ -1,8 +1,64 @@
 import * as approvalCommandPolicyModule from "./approval-command-policy";
+import type { ChannelAccount, ChannelAdapterLike } from "./app-service-contract";
 
 const { normalizeText } = approvalCommandPolicyModule as {
   normalizeText: (value: unknown) => string;
 };
+
+interface LongPollSystemMessageDispatcher {
+  hasPending(): boolean;
+}
+
+interface LongPollTimelineScreenshotQueue {
+  hasPendingForAccount?(accountId: string): boolean;
+}
+
+interface LongPollReminderQueue {
+  peekNextDueAtMs?(): number;
+}
+
+interface ResolveLongPollTimeoutMsArgs {
+  systemMessageDispatcher?: LongPollSystemMessageDispatcher | null;
+  activeAccountId?: string;
+  timelineScreenshotQueue?: LongPollTimelineScreenshotQueue | null;
+  reminderQueue?: LongPollReminderQueue | null;
+  defaultLongPollTimeoutMs?: number;
+  minLongPollTimeoutMs?: number;
+  now?: () => number;
+}
+
+interface RuntimeStateSnapshot {
+  endpoint: string;
+  workspaceRoot: string;
+}
+
+interface ShutdownState {
+  stopped: boolean;
+}
+
+interface WeixinUpdateResponse extends Record<string, unknown> {
+  ret?: unknown;
+  errcode?: unknown;
+  errmsg?: unknown;
+  msgs?: unknown[];
+}
+
+interface RunAppPollLoopArgs {
+  account: Pick<ChannelAccount, "accountId">;
+  runtimeState: RuntimeStateSnapshot;
+  shutdown: ShutdownState;
+  channelAdapter: Pick<ChannelAdapterLike, "getUpdates" | "loadSyncBuffer">;
+  flushDueReminders: (account: Pick<ChannelAccount, "accountId">) => Promise<void>;
+  flushPendingSystemMessages: () => Promise<void>;
+  flushPendingTimelineScreenshots: (account: Pick<ChannelAccount, "accountId">) => Promise<void>;
+  resolveLongPollTimeoutMs: () => number;
+  handleIncomingMessage: (message: unknown) => Promise<void>;
+  updateBridgeHeartbeat: (patch: Record<string, unknown>) => void;
+  retryDelayMs: number;
+  backoffDelayMs: number;
+  maxConsecutiveFailures: number;
+  sleep?: (ms: number) => Promise<void>;
+}
 
 export function resolveLongPollTimeoutMs({
   systemMessageDispatcher = null,
@@ -12,11 +68,11 @@ export function resolveLongPollTimeoutMs({
   defaultLongPollTimeoutMs = 35_000,
   minLongPollTimeoutMs = 2_000,
   now = () => Date.now(),
-}: any) {
+}: ResolveLongPollTimeoutMsArgs): number {
   if (systemMessageDispatcher?.hasPending()) {
     return minLongPollTimeoutMs;
   }
-  if (activeAccountId && timelineScreenshotQueue?.hasPendingForAccount(activeAccountId)) {
+  if (activeAccountId && timelineScreenshotQueue?.hasPendingForAccount?.(activeAccountId)) {
     return minLongPollTimeoutMs;
   }
 
@@ -47,7 +103,7 @@ export async function runAppPollLoop({
   backoffDelayMs,
   maxConsecutiveFailures,
   sleep = defaultSleep,
-}: any) {
+}: RunAppPollLoopArgs): Promise<void> {
   let consecutiveFailures = 0;
   while (!shutdown.stopped) {
     try {
@@ -115,7 +171,7 @@ export async function runAppPollLoop({
   }
 }
 
-function assertWeixinUpdateResponse(response: any) {
+function assertWeixinUpdateResponse(response: WeixinUpdateResponse): asserts response is WeixinUpdateResponse {
   const ret = normalizeErrorCode(response?.ret);
   const errcode = normalizeErrorCode(response?.errcode);
   if ((ret !== 0 && ret !== null) || (errcode !== 0 && errcode !== null)) {
@@ -128,25 +184,28 @@ function assertWeixinUpdateResponse(response: any) {
   }
 }
 
-function isSessionExpiredError(error: any) {
-  const candidate = error as Error & { ret?: number | null; errcode?: number | null };
+function isSessionExpiredError(error: unknown): boolean {
+  const candidate = isRecord(error)
+    ? error as Record<string, unknown>
+    : null;
   const ret = normalizeErrorCode(candidate?.ret);
   const errcode = normalizeErrorCode(candidate?.errcode);
+  const message = extractErrorMessage(error);
   return ret === -14
     || errcode === -14
-    || String(error?.message || "").includes("session expired")
-    || String(error?.message || "").includes("会话已失效");
+    || message.includes("session expired")
+    || message.includes("会话已失效");
 }
 
-export function formatErrorMessage(error: any) {
-  const raw = error instanceof Error ? error.message : String(error || "unknown error");
+export function formatErrorMessage(error: unknown): string {
+  const raw = extractErrorMessage(error);
   if (isSessionExpiredError(error)) {
     return "微信会话已失效，请重新执行 `npm run login`";
   }
   return raw;
 }
 
-function normalizeErrorCode(value: any) {
+function normalizeErrorCode(value: unknown): number | null {
   if (value === undefined || value === null || value === "") {
     return null;
   }
@@ -154,8 +213,22 @@ function normalizeErrorCode(value: any) {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
-function defaultSleep(ms: any) {
-  return new Promise((resolve: any) => setTimeout(resolve, ms));
+function extractErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (isRecord(error) && typeof error.message === "string") {
+    return error.message;
+  }
+  return String(error || "unknown error");
+}
+
+function defaultSleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
 }
 
 export {

@@ -18,7 +18,6 @@
     "src/core/env-loader.ts",
     "src/adapters/channel/weixin/account-store.ts",
     "src/core/codex-spawn.ts",
-    "src/adapters/channel/weixin/api-v2.ts",
     "src/adapters/channel/weixin/context-token-store.ts",
     "src/core/project-radar.ts",
     "src/core/reply-delivery-failure.ts",
