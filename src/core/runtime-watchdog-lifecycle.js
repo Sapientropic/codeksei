@@ -1,3 +1,37 @@
+// @ts-check
+
+const {
+  RUNTIME_EVENT_TYPES,
+} = require("../contracts/runtime-events");
+
+/**
+ * @typedef {{
+ *   userId: string,
+ *   contextToken: string,
+ * }} DeliveryTarget
+ */
+
+/**
+ * @typedef {{
+ *   noticeTimer: NodeJS.Timeout,
+ *   failureTimer: NodeJS.Timeout,
+ *   noticeSent: boolean,
+ * }} RuntimeEventWatchdogEntry
+ */
+
+/**
+ * @typedef {{
+ *   timer: NodeJS.Timeout,
+ * }} TurnSettlementWatchdogEntry
+ */
+
+/**
+ * @typedef {{
+ *   bindingKey: string,
+ *   workspaceRoot: string,
+ * }} WorkspaceBootstrapEntry
+ */
+
 class RuntimeWatchdogLifecycle {
   constructor({
     buildApprovalPromptSignature,
@@ -29,8 +63,11 @@ class RuntimeWatchdogLifecycle {
     this.threadStateStore = threadStateStore;
     this.firstRuntimeEventFailureTimeoutMs = firstRuntimeEventFailureTimeoutMs;
     this.firstRuntimeEventNoticeTimeoutMs = firstRuntimeEventNoticeTimeoutMs;
+    /** @type {Map<string, RuntimeEventWatchdogEntry>} */
     this.pendingRuntimeEventWatchdogs = new Map();
+    /** @type {Map<string, TurnSettlementWatchdogEntry>} */
     this.pendingTurnSettlementWatchdogs = new Map();
+    /** @type {Map<string, WorkspaceBootstrapEntry>} */
     this.pendingWorkspaceBootstrapByThreadId = new Map();
   }
 
@@ -130,11 +167,18 @@ class RuntimeWatchdogLifecycle {
       return;
     }
 
-    if (event.type === "runtime.turn.completed" || event.type === "runtime.turn.failed" || event.type === "runtime.approval.requested") {
+    if (
+      event.type === RUNTIME_EVENT_TYPES.TURN_COMPLETED
+      || event.type === RUNTIME_EVENT_TYPES.TURN_FAILED
+      || event.type === RUNTIME_EVENT_TYPES.APPROVAL_REQUESTED
+    ) {
       this.clearTurnSettlementWatchdog(threadId, turnId);
       return;
     }
-    if (event.type !== "runtime.reply.delta" && event.type !== "runtime.reply.completed") {
+    if (
+      event.type !== RUNTIME_EVENT_TYPES.REPLY_DELTA
+      && event.type !== RUNTIME_EVENT_TYPES.REPLY_COMPLETED
+    ) {
       return;
     }
 
@@ -172,7 +216,7 @@ class RuntimeWatchdogLifecycle {
         turnId,
         "这轮回复已经开始输出，但 Codex runtime 一直没有发回完成或失败事件。"
       );
-      this.runtimeAdapter.getSessionStore().clearApprovalPrompt(threadId);
+      clearPendingApproval(this.runtimeAdapter.getSessionStore(), threadId);
       await this.stopTypingForThread(threadId);
     }, this.streamSettlementTimeoutMs);
     this.pendingTurnSettlementWatchdogs.set(watchdogKey, { timer });
@@ -205,7 +249,7 @@ class RuntimeWatchdogLifecycle {
   }
 
   confirmPendingWorkspaceBootstrap(event) {
-    if (!event || event.type === "runtime.usage.updated") {
+    if (!event || event.type === RUNTIME_EVENT_TYPES.USAGE_UPDATED) {
       return;
     }
     const threadId = this.normalizeText(event?.payload?.threadId);
@@ -233,15 +277,15 @@ class RuntimeWatchdogLifecycle {
     if (!event) {
       return;
     }
-    if (event.type === "runtime.turn.completed" || event.type === "runtime.turn.failed") {
-      this.runtimeAdapter.getSessionStore().clearApprovalPrompt(event.payload.threadId);
+    if (event.type === RUNTIME_EVENT_TYPES.TURN_COMPLETED || event.type === RUNTIME_EVENT_TYPES.TURN_FAILED) {
+      clearPendingApproval(this.runtimeAdapter.getSessionStore(), event.payload.threadId);
       await this.stopTypingForThread(event.payload.threadId);
-      if (event.type === "runtime.turn.failed") {
+      if (event.type === RUNTIME_EVENT_TYPES.TURN_FAILED) {
         await this.sendFailureToThread(event.payload.threadId, event.payload.text || "执行失败");
       }
       return;
     }
-    if (event.type !== "runtime.approval.requested") {
+    if (event.type !== RUNTIME_EVENT_TYPES.APPROVAL_REQUESTED) {
       return;
     }
     const sessionStore = this.runtimeAdapter.getSessionStore();
@@ -253,25 +297,28 @@ class RuntimeWatchdogLifecycle {
     const shouldAutoApprove = this.matchesBuiltInCommandPrefix(event.payload.commandTokens)
       || this.matchesCommandPrefix(event.payload.commandTokens, allowlist);
     if (!shouldAutoApprove) {
-      const promptState = sessionStore.getApprovalPromptState(event.payload.threadId);
+      const promptState = sessionStore.getPendingApprovalForThread(event.payload.threadId);
       const promptSignature = this.buildApprovalPromptSignature(event.payload);
       if (promptState?.signature && promptState.signature === promptSignature) {
-        sessionStore.rememberApprovalPrompt(event.payload.threadId, event.payload.requestId, promptSignature);
+        sessionStore.rememberPendingApprovalForThread(event.payload.threadId, event.payload, {
+          signature: promptSignature,
+          promptedAt: promptState.promptedAt || new Date().toISOString(),
+        });
         console.log(
           `[codeksei] approval prompt deduped thread=${event.payload.threadId} requestId=${event.payload.requestId}`
         );
         return;
       }
-      sessionStore.rememberApprovalPrompt(event.payload.threadId, event.payload.requestId, promptSignature);
+      sessionStore.rememberPendingApprovalForThread(event.payload.threadId, event.payload, {
+        signature: promptSignature,
+      });
       await this.sendApprovalPrompt({
         bindingKey: linked.bindingKey,
         approval: event.payload,
-      }).catch((error) => {
-        sessionStore.clearApprovalPrompt(event.payload.threadId);
-        throw error;
       });
       return;
     }
+    clearPendingApproval(sessionStore, event.payload.threadId);
     await this.runtimeAdapter.respondApproval({
       requestId: event.payload.requestId,
       decision: "accept",
@@ -360,6 +407,20 @@ class RuntimeWatchdogLifecycle {
         await this.runtimeAdapter.resumeThread({ threadId: normalizedThreadId }).catch(() => {});
       }
     }
+
+    for (const entry of sessionStore.listPendingApprovals()) {
+      this.threadStateStore.hydratePendingApproval(entry.threadId, entry.approval);
+    }
+  }
+}
+
+function clearPendingApproval(sessionStore, threadId) {
+  if (typeof sessionStore?.clearPendingApprovalForThread === "function") {
+    sessionStore.clearPendingApprovalForThread(threadId);
+    return;
+  }
+  if (typeof sessionStore?.clearApprovalPrompt === "function") {
+    sessionStore.clearApprovalPrompt(threadId);
   }
 }
 

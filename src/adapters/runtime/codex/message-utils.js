@@ -1,3 +1,36 @@
+// @ts-check
+
+/**
+ * @typedef {{
+ *   type?: unknown,
+ *   text?: unknown,
+ *   phase?: unknown,
+ *   content?: unknown,
+ *   metadata?: { phase?: unknown },
+ * }} AssistantItemPayload
+ */
+
+/**
+ * @typedef {{
+ *   delta?: unknown,
+ *   phase?: unknown,
+ *   content?: unknown,
+ *   item?: AssistantItemPayload & { metadata?: { phase?: unknown } },
+ *   metadata?: { phase?: unknown },
+ *   turn?: { id?: unknown, error?: { message?: unknown } },
+ *   error?: { message?: unknown },
+ *   threadId?: unknown,
+ *   turnId?: unknown,
+ * }} RuntimeMessageParams
+ */
+
+/**
+ * @typedef {{
+ *   method?: unknown,
+ *   params?: RuntimeMessageParams,
+ * }} RuntimeMessage
+ */
+
 function extractThreadId(response) {
   return response?.result?.thread?.id || null;
 }

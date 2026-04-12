@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "skipLibCheck": true,
+    "strict": false,
+    "noImplicitAny": false
+  },
+  "include": [
+    "src/contracts/**/*.js",
+    "src/core/config-loader.js",
+    "src/core/json-state.js",
+    "src/adapters/runtime/codex/events.js",
+    "src/adapters/runtime/codex/message-utils.js",
+    "src/adapters/runtime/codex/model-catalog.js",
+    "src/adapters/runtime/codex/session-store.js",
+    "src/core/runtime-watchdog-lifecycle.js",
+    "src/core/stream-delivery.js",
+    "src/core/stream-delivery/*.js",
+    "src/core/thread-state-store.js",
+    "src/core/system-message-queue-store.js",
+    "src/core/timeline-screenshot-queue-store.js",
+    "src/core/cli-args.js"
+  ]
+}
