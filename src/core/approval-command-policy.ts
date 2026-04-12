@@ -12,9 +12,6 @@ const TERMINAL_BIN_EXECUTABLES = new Set([
   "codeksei",
   "codeksei.cmd",
   "codeksei.js",
-  "cyberboss",
-  "cyberboss.cmd",
-  "cyberboss.js",
 ]);
 
 function buildApprovalPromptText(approval: any) {

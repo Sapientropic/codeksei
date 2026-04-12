@@ -12,7 +12,7 @@ const {
 const { syncNoteFile } = require("../src/core/note-sync");
 
 function setupWorkspaceFixture() {
-  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cyberboss-note-auto-"));
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-note-auto-"));
   const codexDir = path.join(workspaceRoot, ".codex");
   const projectNotePath = path.join(workspaceRoot, "项目", "代码工程", "Codeksei.md");
   const companionNotePath = path.join(workspaceRoot, "项目", "Codeksei 生活助理", "README.md");
@@ -30,7 +30,7 @@ function setupWorkspaceFixture() {
   fs.writeFileSync(path.join(codexDir, "code-projects.json"), JSON.stringify({
     projects: [
       {
-        slug: "cyberboss",
+        slug: "codeksei",
         title: "Codeksei",
         aliases: ["生活助理"],
         repoRoot: workspaceRoot,
@@ -113,7 +113,7 @@ test("note:auto still accepts the legacy assistant scope and maps it to companio
 test("note:auto ensures missing project sections before writing a status snapshot", () => {
   const fixture = setupWorkspaceFixture();
   const route = resolveDurableNoteRoute(fixture.config, {
-    project: "cyberboss",
+    project: "codeksei",
     kind: "status",
   });
 

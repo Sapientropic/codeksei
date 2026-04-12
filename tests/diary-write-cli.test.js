@@ -154,9 +154,9 @@ test("todo done cutover writes timeline fact in the same command batch", () => {
   const payloads = buildDiaryWriteEntryPayloads({
     section: "todo",
     timeString: "23:04",
-    body: "明天继续观察并收口 Cyberboss 微信回复重复 / 截断问题",
+    body: "明天继续观察并收口 Codeksei 微信回复重复 / 截断问题",
     todoState: "done",
-    timelineText: "22:39-23:04 连续压测 Cyberboss 微信回复与 timeline 截图发送链路；这条问题今晚可以先收尾。",
+    timelineText: "22:39-23:04 连续压测 Codeksei 微信回复与 timeline 截图发送链路；这条问题今晚可以先收尾。",
   });
 
   const content = payloads.reduce(
@@ -164,8 +164,8 @@ test("todo done cutover writes timeline fact in the same command batch", () => {
     buildSkeleton()
   );
 
-  assert.match(content, /## Todo\n\n- \[x\] 明天继续观察并收口 Cyberboss 微信回复重复 \/ 截断问题/);
-  assert.match(content, /## 时间线事实[\s\S]*- 22:39-23:04 连续压测 Cyberboss 微信回复与 timeline 截图发送链路；这条问题今晚可以先收尾。/);
+  assert.match(content, /## Todo\n\n- \[x\] 明天继续观察并收口 Codeksei 微信回复重复 \/ 截断问题/);
+  assert.match(content, /## 时间线事实[\s\S]*- 22:39-23:04 连续压测 Codeksei 微信回复与 timeline 截图发送链路；这条问题今晚可以先收尾。/);
 });
 
 test("todo done cutover reuses the captured Todo start time when --timeline-text is omitted", () => {
@@ -174,7 +174,7 @@ test("todo done cutover reuses the captured Todo start time when --timeline-text
     buildDiaryEntryPayload({
       section: "todo",
       timeString: "22:39",
-      body: "明天继续观察并收口 Cyberboss 微信回复重复 / 截断问题",
+      body: "明天继续观察并收口 Codeksei 微信回复重复 / 截断问题",
       todoState: "open",
     }),
     "2026-04-10"
@@ -184,7 +184,7 @@ test("todo done cutover reuses the captured Todo start time when --timeline-text
     existingContent: opened,
     section: "todo",
     timeString: "23:04",
-    body: "明天继续观察并收口 Cyberboss 微信回复重复 / 截断问题",
+    body: "明天继续观察并收口 Codeksei 微信回复重复 / 截断问题",
     todoState: "done",
   });
 
@@ -193,15 +193,15 @@ test("todo done cutover reuses the captured Todo start time when --timeline-text
     buildSkeleton()
   );
 
-  assert.match(content, /## Todo\n\n- \[x\] 明天继续观察并收口 Cyberboss 微信回复重复 \/ 截断问题/);
-  assert.match(content, /## 时间线事实[\s\S]*- 22:39-23:04 明天继续观察并收口 Cyberboss 微信回复重复 \/ 截断问题/);
+  assert.match(content, /## Todo\n\n- \[x\] 明天继续观察并收口 Codeksei 微信回复重复 \/ 截断问题/);
+  assert.match(content, /## 时间线事实[\s\S]*- 22:39-23:04 明天继续观察并收口 Codeksei 微信回复重复 \/ 截断问题/);
 });
 
 test("todo done cutover still synthesizes a point-in-time fact when no Todo start was captured", () => {
   const payloads = buildDiaryWriteEntryPayloads({
     section: "todo",
     timeString: "23:04",
-    body: "明天继续观察并收口 Cyberboss 微信回复重复 / 截断问题",
+    body: "明天继续观察并收口 Codeksei 微信回复重复 / 截断问题",
     todoState: "done",
   });
 
@@ -210,8 +210,8 @@ test("todo done cutover still synthesizes a point-in-time fact when no Todo star
     buildSkeleton()
   );
 
-  assert.match(content, /## Todo\n\n- \[x\] 明天继续观察并收口 Cyberboss 微信回复重复 \/ 截断问题/);
-  assert.match(content, /## 时间线事实[\s\S]*- 23:04 明天继续观察并收口 Cyberboss 微信回复重复 \/ 截断问题/);
+  assert.match(content, /## Todo\n\n- \[x\] 明天继续观察并收口 Codeksei 微信回复重复 \/ 截断问题/);
+  assert.match(content, /## 时间线事实[\s\S]*- 23:04 明天继续观察并收口 Codeksei 微信回复重复 \/ 截断问题/);
 });
 
 test("todo reopen with the same text resets the captured start time for the new block", () => {

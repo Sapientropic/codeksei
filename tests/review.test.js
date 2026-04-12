@@ -11,7 +11,7 @@ const {
 const { clearJsonConfigCache } = require("../src/core/config-loader");
 
 function setupReviewFixture() {
-  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cyberboss-review-"));
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-review-"));
   const diaryDir = path.join(workspaceRoot, "日记");
   const codexDir = path.join(workspaceRoot, ".codex");
   fs.mkdirSync(diaryDir, { recursive: true });
@@ -25,11 +25,11 @@ function setupReviewFixture() {
     "---",
     "## Todo",
     "- [ ] 明天验证一条 Apple Watch 提醒链路 <!-- codeksei-todo:start=08:40 -->",
-    "- [x] 收住 Cyberboss 回复重复发送问题 <!-- codeksei-todo:start=21:49 -->",
+    "- [x] 收住 Codeksei 回复重复发送问题 <!-- codeksei-todo:start=21:49 -->",
     "",
     "## 时间线事实",
     "- 18:59-20:46 回到注册营养师 Part 1 Intake，继续做配套图表并把今天第一轮真正收住。",
-    "- 21:49-22:43 继续压测 Cyberboss workflow；截断基本收住，重复发送还在观察。",
+    "- 21:49-22:43 继续压测 Codeksei workflow；截断基本收住，重复发送还在观察。",
     "",
     "## 今日碎片",
     "- Apple Watch 这条线更像生活助理触达链路实验，不是单纯折腾设备",
@@ -56,22 +56,22 @@ function setupReviewFixture() {
       [workspaceRoot.replace(/\\/g, "/")]: {
         reviews: {
           nightly: {
-            folder: "项目/Cyberboss 生活助理/复盘/Nightly",
+            folder: "项目/Codeksei 生活助理/复盘/Nightly",
             titleSuffix: "睡前收口",
             carryLabel: "明天第一步",
-            intro: "Cyberboss 睡前收口",
+            intro: "Codeksei 睡前收口",
           },
           weekly: {
-            folder: "项目/Cyberboss 生活助理/复盘/Weekly",
+            folder: "项目/Codeksei 生活助理/复盘/Weekly",
             titleSuffix: "周复盘",
             carryLabel: "下周第一步",
-            intro: "Cyberboss 周复盘",
+            intro: "Codeksei 周复盘",
           },
           monthly: {
-            folder: "项目/Cyberboss 生活助理/复盘/Monthly",
+            folder: "项目/Codeksei 生活助理/复盘/Monthly",
             titleSuffix: "月复盘",
             carryLabel: "下月第一步",
-            intro: "Cyberboss 月复盘",
+            intro: "Codeksei 月复盘",
           },
         },
       },
@@ -140,7 +140,7 @@ test("review:monthly rewrites managed blocks idempotently", async () => {
   assert.equal(first.changed, true);
   assert.equal(second.changed, false);
 
-  const notePath = path.join(fixture.workspaceRoot, "项目", "Cyberboss 生活助理", "复盘", "Monthly", "2026-04.md");
+  const notePath = path.join(fixture.workspaceRoot, "项目", "Codeksei 生活助理", "复盘", "Monthly", "2026-04.md");
   const content = fs.readFileSync(notePath, "utf8");
   assert.match(content, /# 2026-04 月复盘/u);
   assert.match(content, /明天验证一条 Apple Watch 提醒链路/u);
@@ -155,7 +155,7 @@ test("review hybrid v2 lets semantic pass replace noisy deterministic lines", as
       return {
         progress: [
           "Apple Watch 提醒实验先完成最小验证，不把设备折腾当成主线。",
-          "Cyberboss 共享桥接与 timeline 命令链路继续收口。",
+          "Codeksei 共享桥接与 timeline 命令链路继续收口。",
         ],
         friction: [
           "注册营养师模板对低能量 C 档仍偏重，启动成本偏高。",
@@ -194,17 +194,17 @@ test("review hybrid v2 lets semantic pass replace noisy deterministic lines", as
   assert.equal(review.semantic.source, "injected");
   assert.deepEqual(review.draft.insights.progress, [
     "Apple Watch 提醒实验先完成最小验证，不把设备折腾当成主线。",
-    "Cyberboss 共享桥接与 timeline 命令链路继续收口。",
+    "Codeksei 共享桥接与 timeline 命令链路继续收口。",
   ]);
   assert.doesNotMatch(review.draft.content.progress, /00:21 本来想刷牙/u);
   assert.match(review.draft.content.supplements, /本周值得带走的模式/u);
 });
 
-test("review can upgrade legacy managed markers to codeksei markers", async () => {
+test("review refreshes existing codeksei managed markers", async () => {
   const fixture = setupReviewFixture();
-  const legacyNotePath = path.join(fixture.workspaceRoot, "项目", "Cyberboss 生活助理", "复盘", "Monthly", "2026-04.md");
-  fs.mkdirSync(path.dirname(legacyNotePath), { recursive: true });
-  fs.writeFileSync(legacyNotePath, [
+  const notePath = path.join(fixture.workspaceRoot, "项目", "Codeksei 生活助理", "复盘", "Monthly", "2026-04.md");
+  fs.mkdirSync(path.dirname(notePath), { recursive: true });
+  fs.writeFileSync(notePath, [
     "---",
     "created: 2026-04-11T00:00",
     "updated: 2026-04-11",
@@ -217,22 +217,22 @@ test("review can upgrade legacy managed markers to codeksei markers", async () =
     "source_nightly_days: 0",
     "status: working",
     "tags:",
-    "  - cyberboss",
+    "  - codeksei",
     "---",
     "# 2026-04 月复盘",
     "",
     "## 每天收口摘录",
-    "<!-- cyberboss-review:daily-summaries:start -->",
+    "<!-- codeksei-review:daily-summaries:start -->",
     "- 旧内容",
-    "<!-- cyberboss-review:daily-summaries:end -->",
+    "<!-- codeksei-review:daily-summaries:end -->",
     "",
   ].join("\n"), "utf8");
 
   const result = await writeReview(fixture.config, "monthly", { month: "2026-04" });
   assert.equal(result.changed, true);
-  const content = fs.readFileSync(legacyNotePath, "utf8");
+  const content = fs.readFileSync(notePath, "utf8");
   assert.match(content, /codeksei-review:daily-summaries:start/u);
-  assert.doesNotMatch(content, /cyberboss-review:daily-summaries:start/u);
+  assert.doesNotMatch(content, /- 旧内容/u);
 });
 
 test("review falls back to deterministic draft when semantic generator errors", async () => {

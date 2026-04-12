@@ -68,10 +68,10 @@ function resolvePollerTarget({ config, account, sessionStore }: any) {
   });
 
   if (!senderId) {
-    throw new Error("无法确定 checkin poller 的微信用户，先配置 CODEKSEI_CHECKIN_USER_ID（或旧的 CYBERBOSS_CHECKIN_USER_ID）或让唯一活跃用户先和 bot 聊过一次");
+    throw new Error("无法确定 checkin poller 的微信用户，先配置 CODEKSEI_CHECKIN_USER_ID，或让唯一活跃用户先和 bot 聊过一次");
   }
   if (!workspaceRoot) {
-    throw new Error("无法确定 checkin poller 的 workspace，先设置 CODEKSEI_WORKSPACE_ROOT（或旧的 CYBERBOSS_WORKSPACE_ROOT）");
+    throw new Error("无法确定 checkin poller 的 workspace，先设置 CODEKSEI_WORKSPACE_ROOT");
   }
 
   return { senderId, workspaceRoot };

@@ -109,7 +109,7 @@ codeksei help
 
 1. 先保留当前进程里已经存在的环境变量
 2. 读取当前项目目录下的 `.env`
-3. 再根据这一步已经生效的 `CODEKSEI_STATE_DIR` / `CYBERBOSS_STATE_DIR` 重新计算状态目录，并读取该状态目录下的 `.env`
+3. 再根据这一步已经生效的 `CODEKSEI_STATE_DIR` 重新计算状态目录，并读取该状态目录下的 `.env`
 
 前面的值优先，后面的 `.env` 只补缺省，不会覆盖已经存在的 key。也就是说，如果 repo `.env` 里才定义了 `CODEKSEI_STATE_DIR`，运行时会在读完 repo `.env` 之后，重新定位 state-dir `.env`。
 
@@ -148,7 +148,6 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 
 说明：
 
-- 旧的 `CYBERBOSS_*` 仍可用，但新项目建议统一切到 `CODEKSEI_*`
 - `CODEKSEI_WEIXIN_REPLY_MODE=stream` 现在表示“半实时增量流”：会按小窗口持续发送用户可见增量，保留段落结构，可读性优先于减少气泡数量
 - `CODEKSEI_WEIXIN_REPLY_MODE=settled` 仍表示“等整轮收口后再发”：只发送最新的可见最终回复
 - `CODEKSEI_USER_NAME` 决定对话里怎么称呼你，不参与消息路由
@@ -239,23 +238,12 @@ npm run help
 - [docs/commands.md](./docs/commands.md)
 - [docs/architecture.md](./docs/architecture.md)
 
-## 如果你是从 cyberboss 过来
-
-新安装与公开示例统一使用 `Codeksei / codeksei / CODEKSEI_*`。
-为了不打断已有本地状态，运行时仍继续接受旧的 `cyberboss` CLI、`CYBERBOSS_*` 和 `~/.cyberboss`。
-
 ## 本地数据与公开边界
 
 当前默认状态目录是：
 
 ```text
 ~/.codeksei
-```
-
-如果你是从旧版本升级，且只有旧目录存在，运行时会继续沿用：
-
-```text
-~/.cyberboss
 ```
 
 常见运行态内容包括：
@@ -298,11 +286,6 @@ Codeksei 从那里长出来，也感谢这份开源起点。
 
 可以。
 如果你只想先拿到基础 CLI，这是最短路径；如果你要按本 README 跑完整共享模式、调试共享桥接脚本或直接改仓库源码，clone 仓库会更顺手。
-
-### 现在到底该用 `codeksei` 还是 `cyberboss`？
-
-公开文档和新安装统一使用 `Codeksei / codeksei / CODEKSEI_*`。
-旧的 `cyberboss` 只作为迁移兼容入口保留。
 
 ### 共享模式和 `npm run start` 有什么区别？
 

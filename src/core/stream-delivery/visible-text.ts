@@ -70,16 +70,16 @@ function normalizeSilentSentinelText(value: any) {
 
 function isSilentSentinelToken(value: any) {
   const normalized = normalizeSilentSentinelText(value);
-  return normalized === "CB_SILENT" || normalized === "__SILENT__" || normalized === "SILENT";
+  return normalized === "SILENT";
 }
 
 function containsStructuredSilentSignal(value: any) {
-  return /\{\s*"cyberboss_action"\s*:\s*"silent"\s*\}/i.test(String(value || ""));
+  return /\{\s*"codeksei_action"\s*:\s*"silent"\s*\}/i.test(String(value || ""));
 }
 
 function stripSilentSentinelArtifacts(value: any) {
   return normalizeLineEndings(String(value || ""))
-    .replace(/\{\s*"cyberboss_action"\s*:\s*"silent"\s*\}/gi, "")
+    .replace(/\{\s*"codeksei_action"\s*:\s*"silent"\s*\}/gi, "")
     .split("\n")
     .map((line: any) => {
       const parts = line.split(/\s+/);
@@ -229,27 +229,16 @@ function shouldSuppressSystemReply(replyTarget: any, plainReplyText: any) {
   if (!compact) {
     return false;
   }
-  const sentinelNormalized = normalizeSilentSentinelText(compact);
-  if (compact === "CB_SILENT" || compact === "__SILENT__" || compact === "SILENT") {
+  if (normalizeSilentSentinelText(compact) === "SILENT") {
     return true;
   }
   if (containsStructuredSilentSignal(normalized)) {
     return true;
   }
-  if (compact.toUpperCase().includes("CB_SILENT") || compact.toUpperCase().includes("__SILENT__")) {
-    return true;
-  }
-  if (
-    sentinelNormalized.includes("CB_SILENT")
-    || sentinelNormalized.includes("__SILENT__")
-    || sentinelNormalized.includes("SILENT")
-  ) {
-    return true;
-  }
   return normalized
     .split("\n")
     .map((line: any) => normalizeSilentSentinelText(line.trim()))
-    .some((line: any) => line === "CB_SILENT" || line === "__SILENT__" || line === "SILENT");
+    .some((line: any) => line === "SILENT");
 }
 
 function sanitizeReplyText(replyTarget: any, plainReplyText: any) {

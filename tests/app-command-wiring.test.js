@@ -191,9 +191,9 @@ function createAppHarness({
 
   originals.set(appModulePath, require.cache[appModulePath]);
   delete require.cache[appModulePath];
-  const { CyberbossApp } = require(appModulePath);
+  const { CodekseiApp } = require(appModulePath);
 
-  const app = new CyberbossApp({
+  const app = new CodekseiApp({
     stateDir: tempRoot,
     workspaceRoot: path.join(tempRoot, "workspace"),
     workspaceId: "workspace-1",

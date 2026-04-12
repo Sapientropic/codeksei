@@ -26,7 +26,7 @@ async function runTimelineScreenshotCommand(config: any, args: any[] = []) {
   });
 
   if (!senderId) {
-    throw new Error("缺少发送目标，传 --user 或配置 CODEKSEI_ALLOWED_USER_IDS（或旧的 CYBERBOSS_ALLOWED_USER_IDS）");
+    throw new Error("缺少发送目标，传 --user 或配置 CODEKSEI_ALLOWED_USER_IDS");
   }
 
   const queue = new TimelineScreenshotQueueStore({ filePath: config.timelineScreenshotQueueFile });

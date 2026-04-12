@@ -19,7 +19,7 @@ const MIN_LONG_POLL_TIMEOUT_MS = 2_000;
 const RETRY_DELAY_MS = 2_000;
 const BACKOFF_DELAY_MS = 30_000;
 const MAX_CONSECUTIVE_FAILURES = 3;
-class CyberbossApp {
+class CodekseiApp {
   activeAccountId: any;
   backstageTaskLifecycle: any;
   channelAdapter: any;
@@ -390,6 +390,6 @@ class CyberbossApp {
   }
 }
 
-module.exports = { CyberbossApp };
+module.exports = { CodekseiApp };
 
 export {};

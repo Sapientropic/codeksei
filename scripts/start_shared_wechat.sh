@@ -2,11 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PORT="${CODEKSEI_SHARED_PORT:-${CYBERBOSS_SHARED_PORT:-8765}}"
-STATE_DIR="${CODEKSEI_STATE_DIR:-${CYBERBOSS_STATE_DIR:-$HOME/.codeksei}}"
-if [[ ! -d "${STATE_DIR}" && -d "$HOME/.cyberboss" ]]; then
-  STATE_DIR="$HOME/.cyberboss"
-fi
+PORT="${CODEKSEI_SHARED_PORT:-8765}"
+STATE_DIR="${CODEKSEI_STATE_DIR:-$HOME/.codeksei}"
 LOG_DIR="${STATE_DIR}/logs"
 PID_FILE="${LOG_DIR}/shared-wechat.pid"
 
@@ -101,7 +98,6 @@ function shutdown_bridge() {
 trap shutdown_bridge EXIT INT TERM
 cd "${ROOT_DIR}"
 export CODEKSEI_CODEX_ENDPOINT="ws://127.0.0.1:${PORT}"
-export CYBERBOSS_CODEX_ENDPOINT="ws://127.0.0.1:${PORT}"
 node ./dist/src/index.js start --checkin &
 BRIDGE_PID="$!"
 echo "${BRIDGE_PID}" > "${PID_FILE}"

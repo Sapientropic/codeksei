@@ -22,9 +22,7 @@ function renderInstructionTemplate(template: any, config: any = {}) {
   const personEn = resolvePromptPersonEn(config);
   const codekseiHome = String(
     config?.codekseiHome
-    || config?.cyberbossHome
     || process.env.CODEKSEI_HOME
-    || process.env.CYBERBOSS_HOME
     || ""
   ).trim();
   return String(template || "")
@@ -32,7 +30,6 @@ function renderInstructionTemplate(template: any, config: any = {}) {
     .replaceAll("{{PERSON_ZH}}", personZh)
     .replaceAll("{{PERSON_EN}}", personEn)
     .replaceAll("{{CODEKSEI_HOME}}", codekseiHome)
-    .replaceAll("{{CYBERBOSS_HOME}}", codekseiHome)
     .replaceAll("她", pronoun);
 }
 

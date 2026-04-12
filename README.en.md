@@ -105,7 +105,7 @@ Runtime env is filled in two stages:
 
 1. Existing process environment stays in place first
 2. Load `.env` from the current project directory
-3. Recompute the state directory from the now-active `CODEKSEI_STATE_DIR` / `CYBERBOSS_STATE_DIR`, then load `.env` from that state directory
+3. Recompute the state directory from the now-active `CODEKSEI_STATE_DIR`, then load `.env` from that state directory
 
 Earlier values win. Later `.env` files only fill missing keys and do not overwrite values that already exist. That means a repo `.env` is allowed to define `CODEKSEI_STATE_DIR`, and the state-dir `.env` path is recalculated only after the repo `.env` has been loaded.
 
@@ -144,7 +144,6 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 
 Notes:
 
-- Legacy `CYBERBOSS_*` variables still work, but new setups should use `CODEKSEI_*`
 - `CODEKSEI_USER_NAME` is a display/persona field for chat, not a routing id
 - `CODEKSEI_ALLOWED_USER_IDS` must use the exact sender ids observed by the bridge; the easiest way to find them is `npm run accounts`
 - WeChat persona / continuity instructions now default to the repo template at `templates/weixin-instructions.md`; use `weixin-instructions.local.md` in the state directory only when you need a local overlay
@@ -231,23 +230,12 @@ More detailed references:
 - [docs/commands.md](./docs/commands.md)
 - [docs/architecture.md](./docs/architecture.md)
 
-## If You Are Coming From `cyberboss`
-
-New setups and public examples use `Codeksei / codeksei / CODEKSEI_*`.
-To avoid breaking existing local state, the runtime still accepts the legacy `cyberboss` CLI, `CYBERBOSS_*`, and `~/.cyberboss`.
-
 ## Local State and Public Boundary
 
 Primary state directory:
 
 ```text
 ~/.codeksei
-```
-
-Legacy state directory that is still reused when needed:
-
-```text
-~/.cyberboss
 ```
 
 Typical runtime contents:
@@ -290,11 +278,6 @@ Codeksei grew from that starting point, and the project is grateful for it.
 
 You can.
 Use that path when you want the base CLI quickly; clone the repository when you want the full shared-mode flow from this README, source-level customization, or shared-script debugging.
-
-### Should I use `codeksei` or `cyberboss`?
-
-Public docs and new installs should use `Codeksei / codeksei / CODEKSEI_*`.
-`cyberboss` only remains as a migration-compatible legacy entrypoint.
 
 ### How is shared mode different from `npm run start`?
 

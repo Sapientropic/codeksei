@@ -116,7 +116,7 @@ function resolveSelectedAccount(config: any) {
   }
   if (accounts.length > 1) {
     const accountIds = accounts.map((account: any) => account.accountId).join(", ");
-    throw new Error(`检测到多个微信账号，请设置 CODEKSEI_ACCOUNT_ID（或旧的 CYBERBOSS_ACCOUNT_ID）。可选值: ${accountIds}`);
+    throw new Error(`检测到多个微信账号，请设置 CODEKSEI_ACCOUNT_ID。可选值: ${accountIds}`);
   }
   if (!accounts[0].token) {
     throw new Error(`微信账号缺少 token: ${accounts[0].accountId}，请重新执行 login`);

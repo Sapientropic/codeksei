@@ -16,19 +16,13 @@ $taskNames = @{
   resume = "Codeksei Shared Resume"
   watchdog = "Codeksei Shared Watchdog"
 }
-$legacyTaskNames = @(
-  "Cyberboss Shared Start",
-  "Cyberboss Shared Unlock",
-  "Cyberboss Shared Resume",
-  "Cyberboss Shared Watchdog"
-)
 
 function Escape-XmlText {
   param([string]$Value)
   [System.Security.SecurityElement]::Escape($Value)
 }
 
-function Register-CyberbossTaskXml {
+function Register-CodekseiTaskXml {
   param(
     [string]$TaskName,
     [string]$TriggerXml,
@@ -88,7 +82,7 @@ $TriggerXml
   Register-ScheduledTask -TaskName $TaskName -Xml $taskXml -Force | Out-Null
 }
 
-foreach ($taskName in @($taskNames.start, $taskNames.unlock, $taskNames.resume, $taskNames.watchdog) + $legacyTaskNames) {
+foreach ($taskName in @($taskNames.start, $taskNames.unlock, $taskNames.resume, $taskNames.watchdog)) {
   try {
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction Stop | Out-Null
   } catch {
@@ -122,9 +116,9 @@ $resumeTriggerXml = @"
 # The detached supervisor keeps idle checks quiet, while logon/unlock/resume
 # pokes recover quickly after session lifecycle changes without relaunching a
 # watchdog shell every few minutes.
-Register-CyberbossTaskXml -TaskName $taskNames.start -TriggerXml $logonTriggerXml -ArgumentsXml $bootstrapArguments
-Register-CyberbossTaskXml -TaskName $taskNames.unlock -TriggerXml $unlockTriggerXml -ArgumentsXml $bootstrapArguments
-Register-CyberbossTaskXml -TaskName $taskNames.resume -TriggerXml $resumeTriggerXml -ArgumentsXml $bootstrapArguments
+Register-CodekseiTaskXml -TaskName $taskNames.start -TriggerXml $logonTriggerXml -ArgumentsXml $bootstrapArguments
+Register-CodekseiTaskXml -TaskName $taskNames.unlock -TriggerXml $unlockTriggerXml -ArgumentsXml $bootstrapArguments
+Register-CodekseiTaskXml -TaskName $taskNames.resume -TriggerXml $resumeTriggerXml -ArgumentsXml $bootstrapArguments
 
 Start-ScheduledTask -TaskName $taskNames.start
 

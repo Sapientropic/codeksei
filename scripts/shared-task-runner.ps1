@@ -11,16 +11,8 @@ Set-Location -LiteralPath $repoRoot
 
 $stateDir = if ($env:CODEKSEI_STATE_DIR) {
   $env:CODEKSEI_STATE_DIR
-} elseif ($env:CYBERBOSS_STATE_DIR) {
-  $env:CYBERBOSS_STATE_DIR
 } else {
-  $newStateDir = Join-Path $env:USERPROFILE ".codeksei"
-  $legacyStateDir = Join-Path $env:USERPROFILE ".cyberboss"
-  if ((Test-Path -LiteralPath $newStateDir) -or -not (Test-Path -LiteralPath $legacyStateDir)) {
-    $newStateDir
-  } else {
-    $legacyStateDir
-  }
+  Join-Path $env:USERPROFILE ".codeksei"
 }
 $logDir = Join-Path $stateDir "logs"
 $null = New-Item -ItemType Directory -Force -Path $logDir

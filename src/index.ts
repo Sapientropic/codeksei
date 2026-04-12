@@ -5,13 +5,13 @@ const path = require("path");
 
 const {
   PACKAGE_NAME,
-  ensureCompatHomeEnv,
+  ensureCodekseiHomeEnv,
   ensureStateDirectory,
 } = require("./core/branding");
 const { loadEnvStack } = require("./core/env-loader");
 const { readConfig } = require("./core/config");
 const { renderInstructionTemplate } = require("./core/instructions-template");
-const { CyberbossApp } = require("./core/app");
+const { CodekseiApp } = require("./core/app");
 const { createTimelineIntegration } = require("./integrations/timeline");
 const { runDiaryWriteCommand } = require("./app/diary-write-cli");
 const { runReminderWriteCommand } = require("./app/reminder-write-cli");
@@ -45,7 +45,7 @@ function loadEnv() {
 }
 
 function ensureRuntimeEnv() {
-  ensureCompatHomeEnv({ fallbackRoot: resolvePackageRoot(__dirname) });
+  ensureCodekseiHomeEnv({ fallbackRoot: resolvePackageRoot(__dirname) });
 }
 
 function ensureBootstrapFiles(config: any) {
@@ -120,7 +120,7 @@ async function main() {
   let app: any = null;
   const getApp = () => {
     if (!app) {
-      app = new CyberbossApp(config);
+      app = new CodekseiApp(config);
     }
     return app;
   };

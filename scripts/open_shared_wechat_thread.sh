@@ -2,12 +2,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PORT="${CODEKSEI_SHARED_PORT:-${CYBERBOSS_SHARED_PORT:-8765}}"
+PORT="${CODEKSEI_SHARED_PORT:-8765}"
 REMOTE_URL="ws://127.0.0.1:${PORT}"
-STATE_DIR="${CODEKSEI_STATE_DIR:-${CYBERBOSS_STATE_DIR:-$HOME/.codeksei}}"
-if [[ ! -d "${STATE_DIR}" && -d "$HOME/.cyberboss" ]]; then
-  STATE_DIR="$HOME/.cyberboss"
-fi
+STATE_DIR="${CODEKSEI_STATE_DIR:-$HOME/.codeksei}"
 LOG_DIR="${STATE_DIR}/logs"
 PID_FILE="${LOG_DIR}/shared-wechat.pid"
 
@@ -90,5 +87,4 @@ echo "${EXISTING_PID}" > "${PID_FILE}"
 echo "shared codeksei running pid=${EXISTING_PID} endpoint=${REMOTE_URL}"
 
 export CODEKSEI_CODEX_ENDPOINT="${REMOTE_URL}"
-export CYBERBOSS_CODEX_ENDPOINT="${REMOTE_URL}"
 exec "${ROOT_DIR}/scripts/open_wechat_thread.sh" "$@"

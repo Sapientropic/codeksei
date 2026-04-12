@@ -15,8 +15,7 @@
     "url": "https://github.com/Sapientropic/codeksei/issues"
   },
   "bin": {
-    "codeksei": "dist/src/index.js",
-    "cyberboss": "dist/src/index.js"
+    "codeksei": "dist/src/index.js"
   },
   "files": [
     "dist",
@@ -77,7 +76,7 @@
     "timeline:serve": "node ./dist/src/index.js timeline serve",
     "timeline:dev": "node ./dist/src/index.js timeline dev",
     "timeline:screenshot": "node ./dist/src/index.js timeline screenshot",
-    "lint": "node ./dist/src/release/check-covered-js-entrypoints.js",
+    "lint": "node ./dist/src/release/check-covered-js-entrypoints.js && node ./dist/src/release/assert-no-legacy-branding.js",
     "typecheck": "tsc -p ./tsconfig.json --noEmit --pretty false",
     "typecheck:tests": "tsc -p ./tsconfig.tests.json --noEmit --pretty false",
     "typecheck:strict": "npm run typecheck",

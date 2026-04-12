@@ -7,7 +7,7 @@ const path = require("node:path");
 const { sendWeixinMediaFile } = require("../src/adapters/channel/weixin/media-send");
 
 test("image upload falls back to generic file delivery when image upload_param is missing", async () => {
-  const tempFile = path.join(os.tmpdir(), `cyberboss-media-fallback-${Date.now()}.png`);
+  const tempFile = path.join(os.tmpdir(), `codeksei-media-fallback-${Date.now()}.png`);
   await fs.writeFile(tempFile, Buffer.from("fake-png"));
 
   const uploadMediaTypes = [];
@@ -62,7 +62,7 @@ test("image upload falls back to generic file delivery when image upload_param i
 });
 
 test("media upload falls back to alternate media api when primary stack still has no upload_param", async () => {
-  const tempFile = path.join(os.tmpdir(), `cyberboss-media-api-fallback-${Date.now()}.png`);
+  const tempFile = path.join(os.tmpdir(), `codeksei-media-api-fallback-${Date.now()}.png`);
   await fs.writeFile(tempFile, Buffer.from("fake-png"));
 
   const primaryMediaTypes = [];
