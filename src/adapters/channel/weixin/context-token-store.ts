@@ -5,7 +5,7 @@ const {
   isPlainObject,
   readManagedJsonStateFile,
   writeManagedJsonStateFile,
-} = require("../../../core/json-state");
+} = require("../../../state/json-state");
 
 function ensureAccountsDir(config: any) {
   fs.mkdirSync(config.accountsDir, { recursive: true });

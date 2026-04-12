@@ -4,7 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-const { resolveCodexWorkspaceRoot } = require("../src/core/workspace-alias");
+const { resolveCodexWorkspaceRoot } = require("../src/workspace/workspace-alias");
 
 test("resolveCodexWorkspaceRoot falls back to the real workspace when alias path is stale", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-alias-"));

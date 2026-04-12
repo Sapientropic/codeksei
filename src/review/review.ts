@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { normalizeReviewSchemaConfig } = require("../contracts/config-files");
 const { loadJsonConfig } = require("../core/config-loader");
-const { writeForeignTextDocument } = require("../core/json-state");
+const { writeForeignTextDocument } = require("../state/json-state");
 const { maybeGenerateSemanticReview } = require("./review-semantic");
 const { LEGACY_TIMELINE_TIMEZONE } = require("../core/timezone");
 const {

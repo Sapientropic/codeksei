@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { normalizeWorkspaceBootstrapConfig } = require("../contracts/config-files");
-const { loadJsonConfig } = require("./config-loader");
+const { loadJsonConfig } = require("../core/config-loader");
 
 const DEFAULT_BOOTSTRAP_PROFILE = Object.freeze({
   primaryFiles: [

@@ -5,15 +5,27 @@ const path = require("path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
+const { SessionStore } = require("../src/adapters/runtime/codex/session-store");
 const { loadWeixinAccount, saveWeixinAccount } = require("../src/adapters/channel/weixin/account-store");
 const {
   loadPersistedContextTokens,
   persistContextToken,
 } = require("../src/adapters/channel/weixin/context-token-store");
+const { loadSyncBuffer, saveSyncBuffer } = require("../src/adapters/channel/weixin/sync-buffer-store");
+const {
+  reminderQueueStateSchema,
+  systemMessageDeadLetterStateSchema,
+  systemMessageQueueStateSchema,
+  timelineScreenshotQueueStateSchema,
+} = require("../src/contracts/queue-items");
+const { sessionStoreStateSchema } = require("../src/contracts/session-state");
+const { ReminderQueueStore } = require("../src/state/reminder-queue-store");
+const { SystemMessageQueueStore } = require("../src/state/system-message-queue-store");
+const { TimelineScreenshotQueueStore } = require("../src/state/timeline-screenshot-queue-store");
 const {
   readSharedBridgeHeartbeat,
   writeSharedBridgeHeartbeat,
-} = require("../src/core/shared-bridge-heartbeat");
+} = require("../src/shared/shared-bridge-heartbeat");
 
 function createWeixinConfig(tempRoot) {
   return {
@@ -22,6 +34,57 @@ function createWeixinConfig(tempRoot) {
     weixinRouteTag: "default",
   };
 }
+
+test("managed state ownership matrix stays single-owner and executable", () => {
+  const ownershipMatrix = [
+    {
+      file: "sessions.json",
+      schemaExports: [sessionStoreStateSchema],
+      storeExports: [SessionStore],
+    },
+    {
+      file: "system-message-queue.json",
+      schemaExports: [systemMessageQueueStateSchema, systemMessageDeadLetterStateSchema],
+      storeExports: [SystemMessageQueueStore],
+    },
+    {
+      file: "timeline-screenshot-queue.json",
+      schemaExports: [timelineScreenshotQueueStateSchema],
+      storeExports: [TimelineScreenshotQueueStore],
+    },
+    {
+      file: "reminder-queue.json",
+      schemaExports: [reminderQueueStateSchema],
+      storeExports: [ReminderQueueStore],
+    },
+    {
+      file: "shared bridge heartbeat",
+      schemaExports: [readSharedBridgeHeartbeat, writeSharedBridgeHeartbeat],
+      storeExports: [readSharedBridgeHeartbeat, writeSharedBridgeHeartbeat],
+    },
+    {
+      file: "weixin account state",
+      schemaExports: [loadWeixinAccount, saveWeixinAccount],
+      storeExports: [loadWeixinAccount, saveWeixinAccount],
+    },
+    {
+      file: "weixin context tokens",
+      schemaExports: [loadPersistedContextTokens, persistContextToken],
+      storeExports: [loadPersistedContextTokens, persistContextToken],
+    },
+    {
+      file: "weixin sync buffer",
+      schemaExports: [loadSyncBuffer, saveSyncBuffer],
+      storeExports: [loadSyncBuffer, saveSyncBuffer],
+    },
+  ];
+
+  assert.equal(new Set(ownershipMatrix.map((entry) => entry.file)).size, ownershipMatrix.length);
+  for (const entry of ownershipMatrix) {
+    assert.ok(entry.schemaExports.every(Boolean), `${entry.file} should expose one schema ingress/validator owner`);
+    assert.ok(entry.storeExports.every(Boolean), `${entry.file} should expose one store owner`);
+  }
+});
 
 test("loadWeixinAccount quarantines schema-invalid managed state", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-account-state-"));
@@ -84,6 +147,18 @@ test("persistContextToken round-trips through managed state", () => {
   assert.deepEqual(loadPersistedContextTokens(config, "acct-1"), {
     "wx-user": "ctx-1",
   });
+});
+
+test("sync buffer store round-trips through its single state owner", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-sync-buffer-save-"));
+  const config = {
+    ...createWeixinConfig(tempRoot),
+    syncBufferDir: path.join(tempRoot, "sync-buffers"),
+  };
+
+  saveSyncBuffer(config, "acct-1", "buf-1");
+
+  assert.equal(loadSyncBuffer(config, "acct-1"), "buf-1");
 });
 
 test("readSharedBridgeHeartbeat quarantines schema-invalid managed state", () => {

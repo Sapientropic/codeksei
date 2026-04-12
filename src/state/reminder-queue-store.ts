@@ -2,12 +2,12 @@ const {
   ensureParentDirectory,
   readManagedJsonStateFile,
   writeManagedJsonStateFile,
-} = require("../../../core/json-state");
+} = require("./json-state");
 const {
   compareReminderQueueEntries,
   normalizeReminderQueueEntry,
   reminderQueueStateSchema,
-} = require("../../../contracts/queue-items");
+} = require("../contracts/queue-items");
 
 class ReminderQueueStore {
   filePath: any;

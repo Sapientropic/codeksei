@@ -156,7 +156,7 @@ function createAppHarness({
       }
     },
   }, originals);
-  stubModule("src/core/system-message-queue-store.js", {
+  stubModule("src/state/system-message-queue-store.js", {
     SystemMessageQueueStore: class SystemMessageQueueStore {
       constructor() {}
       hasPendingForAccount() {
@@ -167,7 +167,7 @@ function createAppHarness({
   stubModule("src/core/system-message-dispatcher.js", {
     SystemMessageDispatcher: class SystemMessageDispatcher {},
   }, originals);
-  stubModule("src/core/timeline-screenshot-queue-store.js", {
+  stubModule("src/state/timeline-screenshot-queue-store.js", {
     TimelineScreenshotQueueStore: class TimelineScreenshotQueueStore {
       constructor() {}
       hasPendingForAccount() {
@@ -175,10 +175,10 @@ function createAppHarness({
       }
     },
   }, originals);
-  stubModule("src/core/shared-bridge-heartbeat.js", {
+  stubModule("src/shared/shared-bridge-heartbeat.js", {
     writeSharedBridgeHeartbeat() {},
   }, originals);
-  stubModule("src/adapters/channel/weixin/reminder-queue-store.js", {
+  stubModule("src/state/reminder-queue-store.js", {
     ReminderQueueStore: class ReminderQueueStore {
       constructor() {}
       peekNextDueAtMs() {

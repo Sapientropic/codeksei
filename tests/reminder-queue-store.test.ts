@@ -5,7 +5,7 @@ const path = require("path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { ReminderQueueStore } = require("../src/adapters/channel/weixin/reminder-queue-store");
+const { ReminderQueueStore } = require("../src/state/reminder-queue-store");
 
 function createStore() {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-reminder-queue-"));

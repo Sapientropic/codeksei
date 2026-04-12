@@ -11,7 +11,7 @@ const {
   writeForeignTextDocument,
   writeManagedTextStateFile,
   writeJsonStateFile,
-} = require("../src/core/json-state");
+} = require("../src/state/json-state");
 
 test("readJsonStateFile returns a cloned fallback when the file is missing", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-json-state-"));

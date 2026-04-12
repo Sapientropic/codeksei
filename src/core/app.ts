@@ -19,13 +19,13 @@ import type {
 import type { RuntimeEvent } from "../contracts/runtime-events";
 import type { SystemMessage } from "../contracts/queue-items";
 import * as systemCheckinPollerModule from "../app/system-checkin-poller";
-import * as defaultTargetsModule from "./default-targets";
+import * as defaultTargetsModule from "../workspace/default-targets";
 import * as systemMessageDispatcherModule from "./system-message-dispatcher";
 import * as approvalCommandPolicyModule from "./approval-command-policy";
 import * as appPollLoopModule from "./app-poll-loop";
 import * as appRuntimeFactoryModule from "./app-runtime-factory";
 import * as appRuntimeHelpersModule from "./app-runtime-helpers";
-import * as sharedBridgeHeartbeatModule from "./shared-bridge-heartbeat";
+import * as sharedBridgeHeartbeatModule from "../shared/shared-bridge-heartbeat";
 import * as replyDeliveryFailureModule from "./reply-delivery-failure";
 
 const { runSystemCheckinPoller } = systemCheckinPollerModule as {

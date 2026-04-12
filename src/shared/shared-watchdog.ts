@@ -30,7 +30,7 @@ const { resolveSelectedAccount } = require("../adapters/channel/weixin/account-s
 const { loadPersistedContextTokens } = require("../adapters/channel/weixin/context-token-store");
 const { SessionStore } = require("../adapters/runtime/codex/session-store");
 const { readConfig } = require("../core/config");
-const { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } = require("../core/default-targets");
+const { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } = require("../workspace/default-targets");
 const {
   appServerLogFile,
   appServerPidFile,

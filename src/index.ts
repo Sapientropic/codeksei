@@ -31,7 +31,7 @@ const {
   buildTerminalTopicHelp,
   isPlannedTerminalTopic,
 } = require("./core/command-registry");
-const { writeForeignTextDocument } = require("./core/json-state");
+const { writeForeignTextDocument } = require("./state/json-state");
 const { resolvePackageRoot } = require("./core/path-utils");
 const { resolveConfiguredPersonName } = require("./core/person-reference");
 

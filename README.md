@@ -265,6 +265,8 @@ npm run help
 - [docs/commands.md](./docs/commands.md)
 - [docs/architecture.md](./docs/architecture.md)
 
+如果你是第一次读这个仓库的代码结构，先看 `docs/architecture.md`，再进具体目录会更快。
+
 ## 本地数据与公开边界
 
 当前默认状态目录是：

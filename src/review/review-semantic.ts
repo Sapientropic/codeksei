@@ -5,7 +5,7 @@ const {
   extractThreadIdFromParams,
 } = require("../adapters/runtime/codex/message-utils");
 const { RUNTIME_EVENT_TYPES } = require("../contracts/runtime-events");
-const { resolveCodexWorkspaceRoot } = require("../core/workspace-alias");
+const { resolveCodexWorkspaceRoot } = require("../workspace/workspace-alias");
 
 const DEFAULT_TIMEOUT_MS = 120_000;
 

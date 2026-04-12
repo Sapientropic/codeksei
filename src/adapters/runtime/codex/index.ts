@@ -1,38 +1,33 @@
-import * as fs from "node:fs";
-import {
-  RUNTIME_EVENT_TYPES,
-  type RuntimeEvent,
-} from "../../../contracts/runtime-events";
+import type { RuntimeEvent } from "../../../contracts/runtime-events";
 import type { RuntimeTurnSendState, UnknownRecord } from "../../../core/runtime-types";
-import { SessionStore } from "./session-store";
-import * as instructionsTemplateModule from "../../../core/instructions-template";
-import * as workspaceAliasModule from "../../../core/workspace-alias";
-import * as workspaceBootstrapModule from "../../../core/workspace-bootstrap";
-import * as rpcClientModule from "./rpc-client";
+import * as workspaceAliasModule from "../../../workspace/workspace-alias";
 import * as eventsModule from "./events";
 import * as messageUtilsModule from "./message-utils";
+import { SessionStore } from "./session-store";
+import {
+  buildInstructionRefreshText,
+  buildOpeningTurnText,
+  buildWorkspaceBootstrapTurnText,
+  loadWechatInstructions,
+} from "./bootstrap";
+import {
+  type RuntimeClientLike,
+  type WaitForTurnCompletionResult,
+  normalizeText,
+  sendUserMessageWithWorkspaceDiagnostics,
+  startThreadWithWorkspaceDiagnostics,
+  waitForTurnCompletion,
+} from "./diagnostics";
+import { createRuntimeLifecycle } from "./lifecycle";
 
-const { renderInstructionTemplate } = instructionsTemplateModule as {
-  renderInstructionTemplate: (source: string, context: Record<string, unknown>) => string;
-};
 const { resolveCodexWorkspaceRoot } = workspaceAliasModule as {
   resolveCodexWorkspaceRoot: (workspaceRoot: string) => string;
 };
-const { buildWorkspaceContinuityInstructions } = workspaceBootstrapModule as {
-  buildWorkspaceContinuityInstructions: (workspaceRoot: string, config: Record<string, unknown>) => string;
-};
-const { CodexRpcClient } = rpcClientModule as {
-  CodexRpcClient: new (options: Record<string, unknown>) => RuntimeClientLike;
-};
 const { mapCodexMessageToRuntimeEvent } = eventsModule as {
-  mapCodexMessageToRuntimeEvent: (message: RpcMessage) => RuntimeEvent<UnknownRecord> | null;
+  mapCodexMessageToRuntimeEvent: (message: UnknownRecord) => RuntimeEvent<UnknownRecord> | null;
 };
-const {
-  extractThreadId,
-  extractThreadIdFromParams,
-} = messageUtilsModule as {
+const { extractThreadId } = messageUtilsModule as {
   extractThreadId: (value: unknown) => string;
-  extractThreadIdFromParams: (params: Record<string, unknown>) => string;
 };
 
 interface CodexRuntimeConfig extends Record<string, unknown> {
@@ -44,39 +39,6 @@ interface CodexRuntimeConfig extends Record<string, unknown> {
   weixinOperationsFile?: string;
   weixinInstructionsOverlayFile?: string;
   weixinOperationsOverlayFile?: string;
-}
-
-interface RpcMessageParams extends UnknownRecord {
-  threadId?: unknown;
-}
-
-interface RpcMessage extends UnknownRecord {
-  params?: RpcMessageParams;
-}
-
-interface RpcModelListResponse extends UnknownRecord {
-  result?: {
-    data?: unknown[];
-  };
-}
-
-interface RuntimeClientLike {
-  listModels(): Promise<RpcModelListResponse | null>;
-  connect(): Promise<void>;
-  initialize(): Promise<void>;
-  close(): Promise<void>;
-  isConnected(): boolean;
-  onMessage(listener: (message: RpcMessage) => void): () => void;
-  sendResponse(id: string | number, result: Record<string, unknown>): Promise<void>;
-  cancelTurn(args: { threadId: string; turnId: string }): Promise<void>;
-  resumeThread(args: { threadId: string }): Promise<unknown>;
-  sendUserMessage(params: Record<string, unknown>): Promise<unknown>;
-  startThread(args: { cwd?: string }): Promise<unknown>;
-}
-
-interface ReadyState {
-  endpoint: string;
-  models: unknown[];
 }
 
 interface RespondApprovalArgs {
@@ -110,37 +72,9 @@ interface SendTextTurnArgs {
   accessMode?: string;
 }
 
-interface SendUserMessageWithDiagnosticsArgs {
-  runtimeClient: RuntimeClientLike;
-  params: Record<string, unknown>;
-  operation: string;
-  bindingKey?: string;
-  threadId?: string;
-  workspaceRoot?: string;
-  runtimeWorkspaceRoot?: string;
-}
-
-interface StartThreadWithDiagnosticsArgs {
-  runtimeClient: RuntimeClientLike;
-  cwd: string;
-  bindingKey?: string;
-  workspaceRoot?: string;
-  runtimeWorkspaceRoot?: string;
-  threadId?: string;
-}
-
-interface LogInvalidWorkspaceErrorArgs {
-  operation: string;
-  bindingKey?: string;
-  threadId?: string;
-  workspaceRoot?: string;
-  runtimeWorkspaceRoot?: string;
-  error: unknown;
-}
-
-interface WaitForTurnCompletionResult {
-  turnId: string;
-  text: string;
+interface ReadyState {
+  endpoint: string;
+  models: unknown[];
 }
 
 interface CodexRuntimeAdapter {
@@ -151,7 +85,7 @@ interface CodexRuntimeAdapter {
     sessionsFile: string;
   };
   createClient(): RuntimeClientLike;
-  onEvent(listener: (event: RuntimeEvent<UnknownRecord>, message: RpcMessage) => void): () => void;
+  onEvent(listener: (event: RuntimeEvent<UnknownRecord>, message: UnknownRecord) => void): () => void;
   getSessionStore(): SessionStore;
   initialize(): Promise<ReadyState>;
   close(): Promise<void>;
@@ -164,92 +98,20 @@ interface CodexRuntimeAdapter {
 
 export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRuntimeAdapter {
   const sessionStore = new SessionStore({ filePath: config.sessionsFile });
-  let client: RuntimeClientLike | null = null;
-  let readyState: ReadyState | null = null;
-
-  function ensureClient(): RuntimeClientLike {
-    if (!client) {
-      client = new CodexRpcClient({
-        endpoint: normalizeText(config.codexEndpoint),
-        codexCommand: normalizeText(config.codexCommand),
-        env: process.env,
-        extraWritableRoots: [config.stateDir],
-      }) as unknown as RuntimeClientLike;
-    }
-    return client;
-  }
-
-  function isReconnectableRuntimeError(error: unknown): boolean {
-    const message = error instanceof Error ? error.message : String(error || "");
-    return message.includes("Codex websocket is not connected")
-      || message.includes("Codex websocket closed")
-      || message.includes("Codex websocket errored")
-      || message.includes("Codex process stdin is not writable")
-      || message.includes("Codex RPC client closed");
-  }
-
-  async function refreshReadyState(runtimeClient: RuntimeClientLike): Promise<ReadyState> {
-    const modelResponse = await runtimeClient.listModels().catch(() => null);
-    const models = Array.isArray(modelResponse?.result?.data)
-      ? modelResponse.result.data
-      : [];
-    if (models.length) {
-      sessionStore.setAvailableModelCatalog(models);
-    }
-    readyState = {
-      endpoint: normalizeText(config.codexEndpoint) || "(spawn)",
-      models,
-    };
-    return readyState;
-  }
-
-  async function ensureInitialized({ forceReconnect = false }: { forceReconnect?: boolean } = {}): Promise<ReadyState> {
-    const runtimeClient = ensureClient();
-    if (forceReconnect) {
-      readyState = null;
-      await runtimeClient.close();
-    }
-    if (readyState && runtimeClient.isConnected()) {
-      return readyState;
-    }
-    await runtimeClient.connect();
-    await runtimeClient.initialize();
-    return refreshReadyState(runtimeClient);
-  }
-
-  async function withRuntimeReconnect<T>(action: (runtimeClient: RuntimeClientLike) => Promise<T>): Promise<T> {
-    const runtimeClient = ensureClient();
-    try {
-      await ensureInitialized();
-      return await action(runtimeClient);
-    } catch (error) {
-      if (!isReconnectableRuntimeError(error)) {
-        throw error;
-      }
-      await ensureInitialized({ forceReconnect: true });
-      return action(runtimeClient);
-    }
-  }
+  const runtimeLifecycle = createRuntimeLifecycle({ config, sessionStore });
 
   return {
-    describe() {
-      return {
-        id: "codex",
-        kind: "runtime",
-        endpoint: normalizeText(config.codexEndpoint) || "(spawn)",
-        sessionsFile: config.sessionsFile,
-      };
-    },
+    describe: runtimeLifecycle.describe,
     createClient() {
-      return ensureClient();
+      return runtimeLifecycle.createClient();
     },
     onEvent(listener) {
       if (typeof listener !== "function") {
         return () => {};
       }
-      const runtimeClient = ensureClient();
+      const runtimeClient = runtimeLifecycle.createClient();
       return runtimeClient.onMessage((message) => {
-        const event = mapCodexMessageToRuntimeEvent(message) as RuntimeEvent<UnknownRecord> | null;
+        const event = mapCodexMessageToRuntimeEvent(message);
         if (event) {
           listener(event, message);
         }
@@ -259,17 +121,13 @@ export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRunt
       return sessionStore;
     },
     async initialize() {
-      return ensureInitialized();
+      return runtimeLifecycle.ensureInitialized();
     },
     async close() {
-      if (client) {
-        await client.close();
-      }
-      readyState = null;
-      client = null;
+      await runtimeLifecycle.close();
     },
     async respondApproval({ requestId, decision }) {
-      return withRuntimeReconnect(async (runtimeClient) => {
+      return runtimeLifecycle.withRuntimeReconnect(async (runtimeClient) => {
         const normalizedDecision = decision === "accept" ? "accept" : "decline";
         if (requestId == null || String(requestId).trim() === "") {
           throw new Error("approval response requires a requestId");
@@ -282,13 +140,13 @@ export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRunt
       });
     },
     async cancelTurn({ threadId, turnId }) {
-      return withRuntimeReconnect(async (runtimeClient) => {
+      return runtimeLifecycle.withRuntimeReconnect(async (runtimeClient) => {
         await runtimeClient.cancelTurn({ threadId, turnId });
         return { threadId, turnId };
       });
     },
     async resumeThread({ threadId }) {
-      return withRuntimeReconnect((runtimeClient) => runtimeClient.resumeThread({ threadId }));
+      return runtimeLifecycle.withRuntimeReconnect((runtimeClient) => runtimeClient.resumeThread({ threadId }));
     },
     async refreshThreadInstructions({
       bindingKey = "",
@@ -297,7 +155,7 @@ export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRunt
       model = "",
       accessMode = "",
     }) {
-      return withRuntimeReconnect(async (runtimeClient) => {
+      return runtimeLifecycle.withRuntimeReconnect(async (runtimeClient) => {
         const refreshText = buildInstructionRefreshText(config, workspaceRoot);
         const runtimeWorkspaceRoot = resolveCodexWorkspaceRoot(workspaceRoot);
         await runtimeClient.resumeThread({ threadId });
@@ -332,7 +190,7 @@ export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRunt
       model = "",
       accessMode = "",
     }) {
-      return withRuntimeReconnect(async (runtimeClient) => {
+      return runtimeLifecycle.withRuntimeReconnect(async (runtimeClient) => {
         // Codex websocket metadata currently breaks on non-ASCII workspace keys.
         // Keep session truth keyed by the canonical workspace root, but route the
         // actual runtime cwd through the existing machine-level ASCII alias map.
@@ -407,283 +265,8 @@ export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRunt
   };
 }
 
-function buildOpeningTurnText(config: CodexRuntimeConfig, workspaceRoot: string, userText: unknown): string {
-  const instructionBlocks = buildInstructionBlocks(config, workspaceRoot);
-  const normalizedText = String(userText || "").trim();
-  if (!instructionBlocks.length) {
-    return normalizedText;
-  }
-  return [
-    ...instructionBlocks,
-    "",
-    "Current user message:",
-    normalizedText,
-  ].join("\n").trim();
-}
-
-function buildWorkspaceBootstrapTurnText(config: CodexRuntimeConfig, workspaceRoot: string, userText: unknown): string {
-  const instructionBlocks = buildInstructionBlocks(config, workspaceRoot);
-  const normalizedText = String(userText || "").trim();
-  if (!instructionBlocks.length) {
-    return normalizedText;
-  }
-  return [
-    "WECHAT THREAD CONTINUITY REFRESH",
-    "This existing thread needs the current WeChat and workspace continuity context before you answer.",
-    "Keep the ongoing conversation state, but adopt the guidance below before replying.",
-    "Do not quote or summarize these instructions back to the user unless explicitly asked.",
-    "",
-    ...instructionBlocks,
-    "",
-    "Current user message:",
-    normalizedText,
-  ].join("\n").trim();
-}
-
-function buildInstructionRefreshText(config: CodexRuntimeConfig, workspaceRoot: string): string {
-  const instructionBlocks = buildInstructionBlocks(config, workspaceRoot);
-  if (!instructionBlocks.length) {
-    return "Refresh your WeChat behavior for this existing thread. Reply in one short Chinese sentence confirming that you have updated your behavior for this thread.";
-  }
-  return [
-    "WECHAT SESSION INSTRUCTIONS REFRESH",
-    "Re-read and adopt the updated WeChat and workspace continuity instructions below for the rest of this existing thread.",
-    "This is an internal refresh command, not a user-facing task.",
-    "Do not summarize the instructions back in detail.",
-    "Reply in one short Chinese sentence confirming that you have updated your behavior for this thread.",
-    "",
-    ...instructionBlocks,
-  ].join("\n").trim();
-}
-
-function buildInstructionBlocks(config: CodexRuntimeConfig, workspaceRoot: string): string[] {
-  const instructions = loadWechatInstructions(config);
-  const workspaceContinuity = buildWorkspaceContinuityInstructions(workspaceRoot, config);
-  const sections: string[] = [];
-  if (instructions) {
-    sections.push([
-      "WECHAT SESSION INSTRUCTIONS",
-      "These instructions define the stable behavior for this WeChat thread.",
-      "Do not quote or summarize them back to the user unless explicitly asked.",
-      "",
-      instructions,
-    ].join("\n"));
-  }
-  if (workspaceContinuity) {
-    sections.push([
-      "WORKSPACE CONTINUITY",
-      workspaceContinuity,
-    ].join("\n"));
-  }
-  return sections;
-}
-
-export function loadWechatInstructions(config: CodexRuntimeConfig): string {
-  const persona = loadInstructionFile(config.weixinInstructionsFile, config);
-  const operations = loadInstructionFile(config.weixinOperationsFile, config);
-  const personaOverlay = loadInstructionFile(config.weixinInstructionsOverlayFile, config);
-  const operationsOverlay = loadInstructionFile(config.weixinOperationsOverlayFile, config);
-  return [persona, operations, personaOverlay, operationsOverlay].filter(Boolean).join("\n\n").trim();
-}
-
-function loadInstructionFile(filePath: unknown, config: CodexRuntimeConfig): string {
-  const normalizedPath = normalizeText(filePath);
-  if (!normalizedPath) {
-    return "";
-  }
-  try {
-    const raw = fs.readFileSync(normalizedPath, "utf8");
-    return renderInstructionTemplate(raw, config).trim();
-  } catch {
-    return "";
-  }
-}
-
-async function startThreadWithWorkspaceDiagnostics({
-  runtimeClient,
-  cwd,
-  bindingKey = "",
-  workspaceRoot = "",
-  runtimeWorkspaceRoot = "",
-  threadId = "",
-}: StartThreadWithDiagnosticsArgs): Promise<unknown> {
-  try {
-    return await runtimeClient.startThread({ cwd });
-  } catch (error) {
-    logInvalidWorkspaceError({
-      operation: "thread/start",
-      bindingKey,
-      threadId,
-      workspaceRoot,
-      runtimeWorkspaceRoot,
-      error,
-    });
-    throw error;
-  }
-}
-
-async function sendUserMessageWithWorkspaceDiagnostics({
-  runtimeClient,
-  params,
-  operation,
-  bindingKey = "",
-  threadId = "",
-  workspaceRoot = "",
-  runtimeWorkspaceRoot = "",
-}: SendUserMessageWithDiagnosticsArgs): Promise<unknown> {
-  try {
-    return await runtimeClient.sendUserMessage(params);
-  } catch (error) {
-    logInvalidWorkspaceError({
-      operation,
-      bindingKey,
-      threadId: threadId || normalizeText(params.threadId),
-      workspaceRoot,
-      runtimeWorkspaceRoot,
-      error,
-    });
-    throw error;
-  }
-}
-
-function logInvalidWorkspaceError({
-  operation,
-  bindingKey = "",
-  threadId = "",
-  workspaceRoot = "",
-  runtimeWorkspaceRoot = "",
-  error,
-}: LogInvalidWorkspaceErrorArgs): void {
-  if (!isInvalidWorkspaceError(error)) {
-    return;
-  }
-  console.error(
-    `[codeksei] codex ${operation} invalid workspace cwd `
-    + `thread=${normalizeLogValue(threadId) || "(new)"} `
-    + `binding=${normalizeLogValue(bindingKey) || "(none)"} `
-    + `workspaceRoot=${normalizeLogValue(workspaceRoot) || "(empty)"} `
-    + `workspaceState=${describeWorkspaceState(workspaceRoot)} `
-    + `runtimeWorkspaceRoot=${normalizeLogValue(runtimeWorkspaceRoot) || "(empty)"} `
-    + `runtimeWorkspaceState=${describeWorkspaceState(runtimeWorkspaceRoot)} `
-    + `error=${formatErrorMessage(error)}`
-  );
-}
-
-function isInvalidWorkspaceError(error: unknown): boolean {
-  const message = formatErrorMessage(error).toLowerCase();
-  return message.includes("os error 267")
-    || message.includes("notadirectory")
-    || message.includes("目录名称无效");
-}
-
-function describeWorkspaceState(workspaceRoot: unknown): string {
-  const normalized = normalizeLogValue(workspaceRoot);
-  if (!normalized) {
-    return "empty";
-  }
-  try {
-    return fs.statSync(normalized).isDirectory() ? "directory" : "not-directory";
-  } catch {
-    return "missing";
-  }
-}
-
-function normalizeLogValue(value: unknown): string {
-  return typeof value === "string" ? value.trim().replace(/\\/g, "/") : "";
-}
-
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function formatErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error || "unknown error");
-}
-
-function waitForTurnCompletion(client: RuntimeClientLike, threadId: string): Promise<WaitForTurnCompletionResult> {
-  return new Promise((resolve, reject) => {
-    let activeTurnId = "";
-    const itemOrder: string[] = [];
-    const textByItemId = new Map<string, string>();
-
-    const cleanup = () => {
-      unsubscribe();
-      clearTimeout(timer);
-    };
-
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new Error("codex turn timed out"));
-    }, 10 * 60_000);
-
-    const unsubscribe = client.onMessage((message) => {
-      const runtimeEvent = mapCodexMessageToRuntimeEvent(message) as RuntimeEvent<UnknownRecord> | null;
-      const params = isRecord(message?.params) ? message.params : {};
-      const messageThreadId = normalizeLogValue(runtimeEvent?.payload?.threadId)
-        || normalizeText(extractThreadIdFromParams(params));
-      if (messageThreadId !== threadId) {
-        return;
-      }
-
-      if (runtimeEvent?.type === RUNTIME_EVENT_TYPES.TURN_STARTED && !activeTurnId) {
-        activeTurnId = normalizeLogValue(runtimeEvent.payload.turnId);
-        return;
-      }
-
-      if (
-        runtimeEvent?.type === RUNTIME_EVENT_TYPES.REPLY_DELTA
-        || runtimeEvent?.type === RUNTIME_EVENT_TYPES.REPLY_COMPLETED
-      ) {
-        const itemId = normalizeLogValue(runtimeEvent.payload.itemId) || `item-${itemOrder.length + 1}`;
-        if (!textByItemId.has(itemId)) {
-          itemOrder.push(itemId);
-          textByItemId.set(itemId, "");
-        }
-        const nextText = normalizeLogValue(runtimeEvent.payload.text);
-        if (nextText) {
-          if (runtimeEvent.type === RUNTIME_EVENT_TYPES.REPLY_DELTA) {
-            textByItemId.set(itemId, `${textByItemId.get(itemId) || ""}${nextText}`);
-          } else {
-            textByItemId.set(itemId, nextText);
-          }
-        }
-        return;
-      }
-
-      if (runtimeEvent?.type === RUNTIME_EVENT_TYPES.TURN_FAILED) {
-        cleanup();
-        reject(new Error(normalizeLogValue(runtimeEvent.payload.text) || "执行失败"));
-        return;
-      }
-
-      if (runtimeEvent?.type === RUNTIME_EVENT_TYPES.TURN_COMPLETED) {
-        const completedTurnId = normalizeLogValue(runtimeEvent.payload.turnId);
-        if (activeTurnId && completedTurnId && completedTurnId !== activeTurnId) {
-          return;
-        }
-        cleanup();
-        // A single Codex turn can emit many assistant messages: progress notes,
-        // compacted-context check-ins, then the final reply. Callers waiting for
-        // turn completion expect the latest user-facing answer, not the whole
-        // turn history concatenated together.
-        const text = itemOrder
-          .slice()
-          .reverse()
-          .map((itemId) => textByItemId.get(itemId) || "")
-          .find((value) => String(value || "").trim()) || "";
-        resolve({
-          turnId: completedTurnId || activeTurnId,
-          text: String(text || "").trim() || "已完成。",
-        });
-      }
-    });
-  });
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object";
-}
-
 export const __testing = {
   waitForTurnCompletion,
 };
+
+export { loadWechatInstructions };

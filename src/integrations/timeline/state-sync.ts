@@ -1,5 +1,5 @@
 const fs = require("fs");
-const { writeForeignJsonDocument } = require("../../core/json-state");
+const { writeForeignJsonDocument } = require("../../state/json-state");
 
 const {
   LEGACY_TIMELINE_TIMEZONE,

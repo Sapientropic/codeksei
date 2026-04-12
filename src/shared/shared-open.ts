@@ -1,6 +1,6 @@
 const { spawn } = require("child_process");
 const { readPrefixedEnv } = require("../core/branding");
-const { resolveCodexWorkspaceRoot } = require("../core/workspace-alias");
+const { resolveCodexWorkspaceRoot } = require("../workspace/workspace-alias");
 const {
   listenUrl,
   buildSpawnInvocation,

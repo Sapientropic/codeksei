@@ -8,8 +8,8 @@ const { SessionStore } = require("../adapters/runtime/codex/session-store");
 const { getCommandArgsSchema } = require("../contracts/command-args");
 const { parseCliArgs } = require("../core/cli-args");
 const { buildTerminalLeafHelp } = require("../core/command-registry");
-const { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } = require("../core/default-targets");
-const { SystemMessageQueueStore } = require("../core/system-message-queue-store");
+const { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } = require("../workspace/default-targets");
+const { SystemMessageQueueStore } = require("../state/system-message-queue-store");
 
 async function runSystemSendCommand(config: any, args: any[] = []) {
   const options = parseSystemSendArgs(args);

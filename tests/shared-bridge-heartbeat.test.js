@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { classifySharedBridgeHeartbeat } = require("../src/core/shared-bridge-heartbeat");
+const { classifySharedBridgeHeartbeat } = require("../src/shared/shared-bridge-heartbeat");
 
 test("shared bridge heartbeat does not report ok without a live managed pid", () => {
   const state = classifySharedBridgeHeartbeat({
