@@ -1,3 +1,31 @@
+// @ts-check
+
+/**
+ * @typedef {{
+ *   id?: unknown,
+ *   model?: unknown,
+ *   displayName?: unknown,
+ *   display_name?: unknown,
+ *   supportedReasoningEfforts?: unknown,
+ *   supported_reasoning_efforts?: unknown,
+ *   defaultReasoningEffort?: unknown,
+ *   default_reasoning_effort?: unknown,
+ *   isDefault?: unknown,
+ *   is_default?: unknown,
+ * }} RawModelEntry
+ */
+
+/**
+ * @typedef {{
+ *   id: string,
+ *   model: string,
+ *   displayName: string,
+ *   supportedReasoningEfforts: string[],
+ *   defaultReasoningEffort: string,
+ *   isDefault: boolean,
+ * }} NormalizedModelEntry
+ */
+
 function extractModelCatalogFromListResponse(response) {
   const candidates = Array.isArray(response?.result?.data)
     ? response.result.data
@@ -36,6 +64,7 @@ function normalizeModelCatalog(models) {
   if (!Array.isArray(models)) {
     return [];
   }
+  /** @type {NormalizedModelEntry[]} */
   const normalized = [];
   const seen = new Set();
   for (const model of models) {
