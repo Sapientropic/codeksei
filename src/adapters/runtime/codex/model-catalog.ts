@@ -125,12 +125,10 @@ function normalizeText(value: any) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-module.exports = {
+export {
   extractModelCatalogFromListResponse,
   findModelByQuery,
   normalizeModelCatalog,
   normalizeText,
   resolveEffectiveModelForEffort,
 };
-
-export {};
