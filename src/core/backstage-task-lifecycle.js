@@ -1,0 +1,195 @@
+class BackstageTaskLifecycle {
+  constructor({
+    channelAdapter,
+    config,
+    formatErrorMessage,
+    getSystemMessageDispatcher,
+    getSystemMessageFailureRetryDelayMs,
+    handlePreparedMessage,
+    hasRpcId,
+    normalizeText,
+    reminderQueue,
+    runtimeAdapter,
+    sendTimelineScreenshot,
+    systemMessageBusyRetryMs,
+    systemMessageQueue,
+    threadStateStore,
+    timelineScreenshotQueue,
+    buildReminderSystemTrigger,
+    resolveWorkspaceRoot,
+  }) {
+    this.channelAdapter = channelAdapter;
+    this.config = config;
+    this.formatErrorMessage = formatErrorMessage;
+    this.getSystemMessageDispatcher = getSystemMessageDispatcher;
+    this.getSystemMessageFailureRetryDelayMs = getSystemMessageFailureRetryDelayMs;
+    this.handlePreparedMessage = handlePreparedMessage;
+    this.hasRpcId = hasRpcId;
+    this.normalizeText = normalizeText;
+    this.reminderQueue = reminderQueue;
+    this.runtimeAdapter = runtimeAdapter;
+    this.sendTimelineScreenshot = sendTimelineScreenshot;
+    this.systemMessageBusyRetryMs = systemMessageBusyRetryMs;
+    this.systemMessageQueue = systemMessageQueue;
+    this.threadStateStore = threadStateStore;
+    this.timelineScreenshotQueue = timelineScreenshotQueue;
+    this.buildReminderSystemTrigger = buildReminderSystemTrigger;
+    this.resolveWorkspaceRoot = resolveWorkspaceRoot;
+  }
+
+  async flushPendingSystemMessages() {
+    const dispatcher = this.getSystemMessageDispatcher();
+    const pendingMessages = dispatcher?.takeReadyPending(Date.now()) || [];
+    for (const message of pendingMessages) {
+      let dispatchResult = null;
+      try {
+        // Backstage scheduling needs an explicit result enum so busy deferrals,
+        // retryable runtime failures, and terminal dead-letters do not collapse
+        // into the same boolean/throw path.
+        dispatchResult = await this.dispatchSystemMessage(message);
+      } catch (error) {
+        dispatchResult = {
+          status: "retryable_error",
+          reason: this.formatErrorMessage(error),
+        };
+      }
+
+      switch (dispatchResult?.status) {
+        case "sent":
+          dispatcher?.complete(message);
+          break;
+        case "deferred_busy": {
+          const deferred = dispatcher?.defer(message, {
+            delayMs: this.systemMessageBusyRetryMs,
+            reason: dispatchResult.reason,
+            countAttempt: false,
+          });
+          if (deferred?.status === "dead_letter") {
+            console.warn(
+              `[codeksei] backstage message dead-lettered id=${message.id} reason=${dispatchResult.reason}`
+            );
+          }
+          break;
+        }
+        case "dead_letter":
+          dispatcher?.deadLetter(message, { reason: dispatchResult.reason });
+          console.warn(
+            `[codeksei] backstage message dead-lettered id=${message.id} reason=${dispatchResult.reason || "dead_letter"}`
+          );
+          break;
+        case "retryable_error":
+        default: {
+          const deferred = dispatcher?.defer(message, {
+            delayMs: this.getSystemMessageFailureRetryDelayMs((Number(message?.attemptCount) || 0) + 1),
+            reason: this.normalizeText(dispatchResult?.reason) || "runtime_send_failed",
+            countAttempt: true,
+          });
+          if (deferred?.status === "dead_letter") {
+            console.warn(
+              `[codeksei] backstage message dead-lettered id=${message.id} reason=${this.normalizeText(dispatchResult?.reason) || "runtime_send_failed"}`
+            );
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  async flushPendingTimelineScreenshots(account) {
+    const pendingJobs = this.timelineScreenshotQueue.drainForAccount(account.accountId);
+    for (const job of pendingJobs) {
+      try {
+        await this.sendTimelineScreenshot({
+          senderId: job.senderId,
+          args: job.args,
+          outputFile: job.outputFile,
+        });
+      } catch (error) {
+        const messageText = error instanceof Error ? error.message : String(error || "unknown error");
+        console.error(`[codeksei] timeline screenshot failed job=${job.id} ${messageText}`);
+        await this.channelAdapter.sendTyping({
+          userId: job.senderId,
+          status: 0,
+        }).catch(() => {});
+        await this.channelAdapter.sendText({
+          userId: job.senderId,
+          text: `时间轴截图失败：${messageText}`,
+          preserveBlock: true,
+        }).catch(() => {});
+      }
+    }
+  }
+
+  async flushDueReminders(account) {
+    const dueReminders = this.reminderQueue
+      .listDue(Date.now())
+      .filter((reminder) => reminder.accountId === account.accountId);
+
+    for (const reminder of dueReminders) {
+      try {
+        this.systemMessageQueue.enqueue({
+          id: `reminder:${reminder.id}`,
+          accountId: reminder.accountId,
+          senderId: reminder.senderId,
+          workspaceRoot: this.resolveReminderWorkspaceRoot(reminder),
+          text: this.buildReminderSystemTrigger(reminder, this.config),
+          kind: "reminder",
+          createdAt: new Date().toISOString(),
+        });
+      } catch {
+        this.reminderQueue.enqueue({
+          ...reminder,
+          dueAtMs: Date.now() + 5_000,
+        });
+      }
+    }
+  }
+
+  resolveReminderWorkspaceRoot(reminder) {
+    const bindingKey = this.runtimeAdapter.getSessionStore().buildBindingKey({
+      workspaceId: this.config.workspaceId,
+      accountId: reminder.accountId,
+      senderId: reminder.senderId,
+    });
+    return this.runtimeAdapter.getSessionStore().getActiveWorkspaceRoot(bindingKey) || this.config.workspaceRoot;
+  }
+
+  async dispatchSystemMessage(message) {
+    const dispatcher = this.getSystemMessageDispatcher();
+    const prepared = dispatcher?.buildPreparedMessage(
+      message,
+      this.channelAdapter.getKnownContextTokens()[message.senderId] || ""
+    );
+    if (!prepared) {
+      return { status: "dead_letter", reason: "invalid_system_message" };
+    }
+    const bindingKey = this.runtimeAdapter.getSessionStore().buildBindingKey({
+      workspaceId: prepared.workspaceId,
+      accountId: prepared.accountId,
+      senderId: prepared.senderId,
+    });
+    const workspaceRoot = prepared.workspaceRoot || this.resolveWorkspaceRoot(bindingKey);
+    const threadId = this.runtimeAdapter.getSessionStore().getThreadIdForWorkspace(bindingKey, workspaceRoot);
+    const threadState = threadId ? this.threadStateStore.getThreadState(threadId) : null;
+    if (threadState?.status === "running") {
+      return { status: "deferred_busy", reason: "thread_running" };
+    }
+    if (this.hasRpcId(threadState?.pendingApproval?.requestId)) {
+      return { status: "deferred_busy", reason: "waiting_approval" };
+    }
+    const sendResult = await this.handlePreparedMessage(prepared, {
+      allowCommands: false,
+      reportFailureToUser: false,
+      throwOnFailure: false,
+    });
+    if (sendResult?.status === "sent") {
+      return { status: "sent", reason: "" };
+    }
+    return {
+      status: "retryable_error",
+      reason: this.normalizeText(sendResult?.reason) || "runtime_send_failed",
+    };
+  }
+}
+
+module.exports = { BackstageTaskLifecycle };

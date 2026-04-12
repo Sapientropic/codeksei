@@ -12,7 +12,7 @@ function cloneJsonValue(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function readJsonStateFile({
+function readManagedJsonStateFile({
   filePath,
   fallback,
   label = "json state",
@@ -39,12 +39,24 @@ function readJsonStateFile({
   }
 }
 
-function writeJsonStateFile(filePath, payload) {
-  ensureParentDirectory(filePath);
-  const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-  const content = JSON.stringify(payload, null, 2);
-  fs.writeFileSync(tempPath, content, "utf8");
-  fs.renameSync(tempPath, filePath);
+function readForeignJsonDocument(filePath, { fallback = null } = {}) {
+  try {
+    const raw = fs.readFileSync(filePath, "utf8");
+    return JSON.parse(raw);
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return cloneFallback(fallback);
+    }
+    return cloneFallback(fallback);
+  }
+}
+
+function writeManagedJsonStateFile(filePath, payload, { mode = null } = {}) {
+  writeJsonFileAtomically(filePath, payload, { mode });
+}
+
+function writeForeignJsonDocument(filePath, payload, { mode = null } = {}) {
+  writeJsonFileAtomically(filePath, payload, { mode });
 }
 
 function isolateCorruptStateFile(filePath) {
@@ -70,6 +82,13 @@ function formatErrorMessage(error) {
   return error instanceof Error ? error.message : String(error || "unknown error");
 }
 
+function cloneFallback(fallback) {
+  if (typeof fallback === "undefined") {
+    return null;
+  }
+  return cloneJsonValue(fallback);
+}
+
 function validateJsonState(value, validate) {
   if (typeof validate !== "function") {
     return;
@@ -92,10 +111,32 @@ function isPlainObject(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+function writeJsonFileAtomically(filePath, payload, { mode = null } = {}) {
+  ensureParentDirectory(filePath);
+  const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  const content = JSON.stringify(payload, null, 2);
+  fs.writeFileSync(tempPath, content, "utf8");
+  fs.renameSync(tempPath, filePath);
+  if (mode !== null && mode !== undefined) {
+    try {
+      fs.chmodSync(filePath, mode);
+    } catch {
+      // best effort
+    }
+  }
+}
+
+const readJsonStateFile = readManagedJsonStateFile;
+const writeJsonStateFile = writeManagedJsonStateFile;
+
 module.exports = {
   cloneJsonValue,
   ensureParentDirectory,
   isPlainObject,
+  readForeignJsonDocument,
+  readManagedJsonStateFile,
   readJsonStateFile,
+  writeForeignJsonDocument,
+  writeManagedJsonStateFile,
   writeJsonStateFile,
 };
