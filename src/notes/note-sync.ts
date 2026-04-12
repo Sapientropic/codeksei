@@ -172,17 +172,13 @@ function upsertSectionEntry(sectionBody: any, parentLevel: any, options: any = {
 
 function splitSectionBody(sectionBody: any, parentLevel: any) {
   const normalizedBody = normalizeFileEnding(sectionBody);
-  const headingPattern = /^(#{1,6})\s+/gmu;
-  let match = headingPattern.exec(normalizedBody);
-  while (match) {
-    const level = match[1].length;
-    if (level > parentLevel) {
+  for (const heading of parseHeadings(normalizedBody)) {
+    if (heading.level > parentLevel) {
       return {
-        main: normalizedBody.slice(0, match.index).trimEnd(),
-        suffix: normalizedBody.slice(match.index).trim(),
+        main: normalizedBody.slice(0, heading.index).trimEnd(),
+        suffix: normalizedBody.slice(heading.index).trim(),
       };
     }
-    match = headingPattern.exec(normalizedBody);
   }
   return {
     main: normalizedBody.trimEnd(),
@@ -293,7 +289,7 @@ function replaceSectionBody(content: any, range: any, newBody: any) {
   const before = content.slice(0, range.contentStart).replace(/\s*$/u, "");
   const after = content.slice(range.end).replace(/^\s*/u, "");
   const parts = [before];
-  const normalizedBody = normalizeFileEnding(newBody).trimEnd();
+  const normalizedBody = trimBlock(newBody);
   if (normalizedBody) {
     parts.push(normalizedBody);
   }
@@ -323,21 +319,48 @@ function findSectionRange(content: any, sectionTitle: any) {
 
 function parseHeadings(content: any) {
   const normalized = normalizeFileEnding(content);
-  const pattern = /^(#{1,6})\s+(.+?)\s*$/gmu;
   const headings = [];
-  let match = pattern.exec(normalized);
-  while (match) {
-    let lineEnd = pattern.lastIndex;
-    if (normalized[lineEnd] === "\n") {
-      lineEnd += 1;
+  let index = 0;
+  let activeFenceMarker = "";
+
+  while (index < normalized.length) {
+    const nextBreak = normalized.indexOf("\n", index);
+    const lineBreakIndex = nextBreak === -1 ? normalized.length : nextBreak;
+    const hasTrailingNewline = nextBreak !== -1;
+    const line = normalized.slice(index, lineBreakIndex);
+    const lineEnd = hasTrailingNewline ? lineBreakIndex + 1 : lineBreakIndex;
+    const trimmed = line.trim();
+    const fenceMatch = /^\s*(```+|~~~+)/u.exec(line);
+
+    if (activeFenceMarker) {
+      if (fenceMatch && fenceMatch[1][0] === activeFenceMarker) {
+        activeFenceMarker = "";
+      }
+      index = lineEnd;
+      continue;
     }
-    headings.push({
-      level: match[1].length,
-      title: match[2],
-      index: match.index,
-      lineEnd,
-    });
-    match = pattern.exec(normalized);
+
+    if (fenceMatch) {
+      activeFenceMarker = fenceMatch[1][0];
+      index = lineEnd;
+      continue;
+    }
+
+    if (!trimmed || /^\s*>/u.test(line)) {
+      index = lineEnd;
+      continue;
+    }
+
+    const headingMatch = /^(#{1,6})\s+(.+?)\s*$/u.exec(line);
+    if (headingMatch) {
+      headings.push({
+        level: headingMatch[1].length,
+        title: headingMatch[2],
+        index,
+        lineEnd,
+      });
+    }
+    index = lineEnd;
   }
   return headings;
 }

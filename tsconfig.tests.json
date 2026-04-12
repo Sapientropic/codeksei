@@ -1,7 +1,5 @@
 {
   "compilerOptions": {
-    "allowJs": true,
-    "checkJs": false,
     "noEmit": true,
     "module": "commonjs",
     "moduleResolution": "node",
@@ -16,8 +14,7 @@
   "include": [
     "src/**/*",
     "tests/**/*.test.ts",
-    "tests/helpers/**/*.ts",
-    "tests/helpers/**/*.js"
+    "tests/helpers/**/*.ts"
   ],
   "exclude": [
     "dist",

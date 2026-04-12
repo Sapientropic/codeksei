@@ -96,3 +96,29 @@ test("note sync keeps Windows absolute note paths stable across platforms", () =
 
   assert.equal(target.filePath, "E:/workspace/Website/项目/代码工程/Codeksei.md");
 });
+
+test("note sync ignores headings inside fenced code blocks when locating a section", () => {
+  const source = [
+    "# Codeksei",
+    "",
+    "## 最近动作",
+    "```md",
+    "## 示例标题",
+    "```",
+    "- 老动作",
+    "",
+    "## 其他",
+    "后文",
+    "",
+  ].join("\n");
+
+  const result = syncNoteContent(source, {
+    section: "最近动作",
+    text: "新动作",
+    style: "bullet",
+    maxItems: 2,
+  });
+
+  assert.match(result.content, /## 最近动作\n\n```md\n## 示例标题\n```\n- 新动作\n- 老动作/u);
+  assert.match(result.content, /## 其他\n后文/u);
+});

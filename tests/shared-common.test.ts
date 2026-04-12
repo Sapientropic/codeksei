@@ -89,7 +89,7 @@ test("resolveBoundThread prefers exact workspace binding and falls back to newes
   const exact = loadResolveBoundThread({
     bindings: [
       {
-        accountId: "acct-1",
+        accountId: "acct-2",
         activeWorkspaceRoot: "E:/repo/other",
         threadIdByWorkspaceRoot: {
           "E:/repo/current": "thread-current",
@@ -98,13 +98,14 @@ test("resolveBoundThread prefers exact workspace binding and falls back to newes
         updatedAt: "2026-04-12T09:00:00.000Z",
       },
     ],
-    latestAccountBySavedAt: {
-      "acct-1": "2026-04-12T10:00:00.000Z",
+    selectedAccountId: "acct-2",
+    realpathMap: {
+      "E:/alias/current": "E:/repo/current",
     },
   });
 
   try {
-    assert.deepEqual(exact.resolveBoundThread("E:/repo/current"), {
+    assert.deepEqual(exact.resolveBoundThread("E:/alias/current"), {
       threadId: "thread-current",
       workspaceRoot: "E:/repo/current",
     });
@@ -116,6 +117,14 @@ test("resolveBoundThread prefers exact workspace binding and falls back to newes
     bindings: [
       {
         accountId: "acct-1",
+        activeWorkspaceRoot: "E:/repo/ignored",
+        threadIdByWorkspaceRoot: {
+          "E:/repo/ignored": "thread-ignored",
+        },
+        updatedAt: "2026-04-13T09:00:00.000Z",
+      },
+      {
+        accountId: "acct-2",
         activeWorkspaceRoot: "E:/repo/stale",
         threadIdByWorkspaceRoot: {
           "E:/repo/stale": "thread-stale",
@@ -123,7 +132,7 @@ test("resolveBoundThread prefers exact workspace binding and falls back to newes
         updatedAt: "2026-04-10T09:00:00.000Z",
       },
       {
-        accountId: "acct-1",
+        accountId: "acct-2",
         activeWorkspaceRoot: "E:/repo/active",
         threadIdByWorkspaceRoot: {
           "E:/repo/active": "thread-active",
@@ -131,9 +140,7 @@ test("resolveBoundThread prefers exact workspace binding and falls back to newes
         updatedAt: "2026-04-12T09:00:00.000Z",
       },
     ],
-    latestAccountBySavedAt: {
-      "acct-1": "2026-04-12T10:00:00.000Z",
-    },
+    selectedAccountId: "acct-2",
   });
 
   try {
@@ -148,10 +155,12 @@ test("resolveBoundThread prefers exact workspace binding and falls back to newes
 
 function loadResolveBoundThread({
   bindings,
-  latestAccountBySavedAt,
+  selectedAccountId = "",
+  realpathMap = {},
 }: {
   bindings: Array<Record<string, unknown>>;
-  latestAccountBySavedAt: Record<string, string>;
+  selectedAccountId?: string;
+  realpathMap?: Record<string, string>;
 }): {
   resolveBoundThread: typeof import("../src/shared/shared-thread-binding").resolveBoundThread;
   restore: () => void;
@@ -159,25 +168,34 @@ function loadResolveBoundThread({
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-shared-thread-"));
   const accountsDir = path.join(tempRoot, "accounts");
   fs.mkdirSync(accountsDir, { recursive: true });
-  for (const accountId of Object.keys(latestAccountBySavedAt)) {
-    fs.writeFileSync(path.join(accountsDir, `${accountId}.json`), "{}", "utf8");
+  if (selectedAccountId) {
+    fs.writeFileSync(path.join(accountsDir, `${selectedAccountId}.json`), JSON.stringify({
+      accountId: selectedAccountId,
+      rawAccountId: selectedAccountId,
+      token: "token-1",
+      baseUrl: "http://127.0.0.1",
+      userId: "user-1",
+      routeTag: "",
+      savedAt: "2026-04-12T10:00:00.000Z",
+    }), "utf8");
   }
-
   const previousStateDir = process.env.CODEKSEI_STATE_DIR;
   const previousSessionsFile = process.env.SESSIONS_FILE;
+  const previousAccountId = process.env.CODEKSEI_ACCOUNT_ID;
+  const originalRealpathSync = fs.realpathSync;
+  const originalRealpathSyncNative = fs.realpathSync.native;
   process.env.CODEKSEI_STATE_DIR = tempRoot;
   process.env.SESSIONS_FILE = path.join(tempRoot, "sessions.json");
+  process.env.CODEKSEI_ACCOUNT_ID = selectedAccountId;
 
   const sharedThreadBindingPath = require.resolve("../src/shared/shared-thread-binding");
   const sharedProcessPath = require.resolve("../src/shared/shared-process");
   const sessionStorePath = require.resolve("../src/adapters/runtime/codex/session-store");
-  const accountStorePath = require.resolve("../src/adapters/channel/weixin/account-store");
 
   const originals = new Map<string, NodeJS.Module | undefined>();
   originals.set(sharedThreadBindingPath, require.cache[sharedThreadBindingPath]);
   originals.set(sharedProcessPath, require.cache[sharedProcessPath]);
   originals.set(sessionStorePath, require.cache[sessionStorePath]);
-  originals.set(accountStorePath, require.cache[accountStorePath]);
 
   require.cache[sessionStorePath] = {
     id: sessionStorePath,
@@ -191,19 +209,14 @@ function loadResolveBoundThread({
       },
     },
   } as NodeJS.Module;
-  require.cache[accountStorePath] = {
-    id: accountStorePath,
-    filename: accountStorePath,
-    loaded: true,
-    exports: {
-      loadWeixinAccount(_config: Record<string, unknown>, accountId: string) {
-        return {
-          accountId,
-          savedAt: latestAccountBySavedAt[accountId] || "",
-        };
-      },
-    },
-  } as NodeJS.Module;
+  const realpathStub = ((targetPath: import("node:fs").PathLike) => {
+    const normalizedPath = String(targetPath).replace(/\\/g, "/");
+    return realpathMap[normalizedPath] || normalizedPath;
+  }) as typeof fs.realpathSync;
+  fs.realpathSync = realpathStub;
+  if (typeof fs.realpathSync.native === "function") {
+    fs.realpathSync.native = realpathStub;
+  }
   delete require.cache[sharedThreadBindingPath];
   delete require.cache[sharedProcessPath];
 
@@ -221,6 +234,15 @@ function loadResolveBoundThread({
         delete process.env.SESSIONS_FILE;
       } else {
         process.env.SESSIONS_FILE = previousSessionsFile;
+      }
+      if (previousAccountId === undefined) {
+        delete process.env.CODEKSEI_ACCOUNT_ID;
+      } else {
+        process.env.CODEKSEI_ACCOUNT_ID = previousAccountId;
+      }
+      fs.realpathSync = originalRealpathSync;
+      if (typeof originalRealpathSyncNative === "function") {
+        fs.realpathSync.native = originalRealpathSyncNative;
       }
 
       for (const [modulePath, original] of originals.entries()) {
