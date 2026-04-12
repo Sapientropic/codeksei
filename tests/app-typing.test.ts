@@ -1,10 +1,46 @@
-const fs = require("node:fs");
-const path = require("node:path");
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const { createTestAppHarness } = require("./helpers/app-harness.ts");
+const fs: typeof import("node:fs") = require("node:fs");
+const path: typeof import("node:path") = require("node:path");
+const test: typeof import("node:test") = require("node:test");
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 
-function buildIncomingMessage() {
+import type {
+  NormalizedIncomingMessage,
+  PreparedRuntimeMessage,
+} from "../src/core/runtime-types";
+
+interface TestHarness {
+  app: {
+    runtimeTurnLifecycle: {
+      prepareIncomingMessageForRuntime(
+        normalized: NormalizedIncomingMessage,
+        workspaceRoot: string,
+      ): Promise<PreparedRuntimeMessage | null>;
+    };
+    handlePreparedMessage(
+      normalized: NormalizedIncomingMessage,
+      options: { allowCommands: boolean },
+    ): Promise<{ status: string } | void>;
+    sendTimelineScreenshot(payload: { senderId: string; args: string[]; outputFile: string }): Promise<unknown>;
+    sendLocalFileToCurrentChat(payload: { senderId: string; filePath: string }): Promise<unknown>;
+  };
+  callOrder: string[];
+  tempRoot: string;
+  textCalls: Array<{ text: string }>;
+  typingCalls: Array<{ status: number }>;
+  workspaceRoot: string;
+}
+
+interface TestHarnessFactoryOptions {
+  runTimelineSubcommandImpl?: (command: string, args: string[]) => Promise<unknown>;
+  sendFileImpl?: () => Promise<unknown>;
+  sendTextTurnImpl?: () => Promise<unknown>;
+}
+
+const { createTestAppHarness }: {
+  createTestAppHarness: (options?: TestHarnessFactoryOptions) => TestHarness;
+} = require("./helpers/app-harness.ts");
+
+function buildIncomingMessage(): NormalizedIncomingMessage {
   return {
     provider: "wechat",
     workspaceId: "workspace-1",
@@ -64,7 +100,9 @@ test("handlePreparedMessage clears typing before sending the visible error when 
       throw new Error("runtime boom");
     },
   });
-  harness.app.runtimeTurnLifecycle.prepareIncomingMessageForRuntime = async (normalized: any) => ({
+  harness.app.runtimeTurnLifecycle.prepareIncomingMessageForRuntime = async (
+    normalized: NormalizedIncomingMessage,
+  ): Promise<PreparedRuntimeMessage> => ({
     ...normalized,
     originalText: normalized.text,
     text: "prepared message",
@@ -90,7 +128,9 @@ test("handlePreparedMessage clears typing before sending the visible error when 
 
 test("handlePreparedMessage keeps typing open on the successful sendTextTurn path", async () => {
   const harness = createTestAppHarness();
-  harness.app.runtimeTurnLifecycle.prepareIncomingMessageForRuntime = async (normalized: any) => ({
+  harness.app.runtimeTurnLifecycle.prepareIncomingMessageForRuntime = async (
+    normalized: NormalizedIncomingMessage,
+  ): Promise<PreparedRuntimeMessage> => ({
     ...normalized,
     originalText: normalized.text,
     text: "prepared message",

@@ -1,6 +1,10 @@
 // @ts-check
 
-const { normalizeText } = require("./visible-text");
+import * as visibleTextModule from "./visible-text";
+
+const { normalizeText } = visibleTextModule as {
+  normalizeText: (value: unknown) => string;
+};
 
 /**
  * @typedef {{
@@ -121,8 +125,6 @@ function createReplyTargetRegistry({ sessionStore }: any) {
   };
 }
 
-module.exports = {
+export {
   createReplyTargetRegistry,
 };
-
-export {};

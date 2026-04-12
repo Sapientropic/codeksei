@@ -1,10 +1,31 @@
-// @ts-nocheck
-const test = require("node:test");
-const assert = require("node:assert/strict");
+const test: typeof import("node:test") = require("node:test");
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 
 const {
   createReplyTargetRegistry,
+}: {
+  createReplyTargetRegistry: (options: {
+    sessionStore: {
+      findBindingForThreadId(threadId: string): { bindingKey?: string } | null;
+    };
+  }) => {
+    attachReplyTarget(state: ReplyTargetState): ReplyTarget | null;
+    queueReplyTargetForThread(threadId: string, target: ReplyTarget): void;
+    setReplyTarget(bindingKey: string, target: ReplyTarget): void;
+  };
 } = require("../src/core/stream-delivery/reply-target-registry");
+
+interface ReplyTarget {
+  userId: string;
+  contextToken: string;
+  provider: string;
+}
+
+interface ReplyTargetState {
+  threadId: string;
+  bindingKey: string;
+  replyTarget: ReplyTarget | null;
+}
 
 test("reply target registry consumes queued thread targets in FIFO order", () => {
   const registry = createReplyTargetRegistry({
@@ -26,9 +47,9 @@ test("reply target registry consumes queued thread targets in FIFO order", () =>
     provider: "weixin",
   });
 
-  const first = { threadId: "thread-1", bindingKey: "", replyTarget: null };
-  const second = { threadId: "thread-1", bindingKey: "", replyTarget: null };
-  const third = { threadId: "thread-1", bindingKey: "", replyTarget: null };
+  const first: ReplyTargetState = { threadId: "thread-1", bindingKey: "", replyTarget: null };
+  const second: ReplyTargetState = { threadId: "thread-1", bindingKey: "", replyTarget: null };
+  const third: ReplyTargetState = { threadId: "thread-1", bindingKey: "", replyTarget: null };
 
   registry.attachReplyTarget(first);
   registry.attachReplyTarget(second);
@@ -50,7 +71,7 @@ test("reply target registry consumes queued thread targets in FIFO order", () =>
 test("reply target registry restores binding key and falls back to binding target after queue drain", () => {
   const registry = createReplyTargetRegistry({
     sessionStore: {
-      findBindingForThreadId(threadId) {
+      findBindingForThreadId(threadId: string) {
         return threadId === "thread-2" ? { bindingKey: "binding-2" } : null;
       },
     },
@@ -67,7 +88,7 @@ test("reply target registry restores binding key and falls back to binding targe
     provider: "weixin",
   });
 
-  const queuedState = { threadId: "thread-2", bindingKey: "", replyTarget: null };
+  const queuedState: ReplyTargetState = { threadId: "thread-2", bindingKey: "", replyTarget: null };
   registry.attachReplyTarget(queuedState);
 
   assert.equal(queuedState.bindingKey, "binding-2");
@@ -77,7 +98,7 @@ test("reply target registry restores binding key and falls back to binding targe
     provider: "weixin",
   });
 
-  const reboundState = { threadId: "thread-2", bindingKey: "", replyTarget: null };
+  const reboundState: ReplyTargetState = { threadId: "thread-2", bindingKey: "", replyTarget: null };
   registry.attachReplyTarget(reboundState);
 
   assert.equal(reboundState.bindingKey, "binding-2");

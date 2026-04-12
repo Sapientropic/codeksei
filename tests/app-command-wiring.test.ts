@@ -1,8 +1,36 @@
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const { createTestAppHarness } = require("./helpers/app-harness.ts");
+const test: typeof import("node:test") = require("node:test");
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 
-function buildIncomingMessage(text: string) {
+import type {
+  NormalizedIncomingMessage,
+  PreparedRuntimeMessage,
+} from "../src/core/runtime-types";
+
+interface TestHarness {
+  app: {
+    channelCommandRouter: {
+      maybeDispatchCommand(normalized: NormalizedIncomingMessage): Promise<boolean>;
+    };
+    runtimeTurnLifecycle: {
+      prepareIncomingMessageForRuntime(
+        normalized: NormalizedIncomingMessage,
+        workspaceRoot: string,
+      ): Promise<PreparedRuntimeMessage | null>;
+    };
+    handlePreparedMessage(
+      normalized: NormalizedIncomingMessage,
+      options: { allowCommands: boolean },
+    ): Promise<{ status: string } | void>;
+  };
+  sendTextTurnCalls: unknown[];
+  workspaceRoot: string;
+}
+
+const { createTestAppHarness }: {
+  createTestAppHarness: () => TestHarness;
+} = require("./helpers/app-harness.ts");
+
+function buildIncomingMessage(text: string): NormalizedIncomingMessage {
   return {
     provider: "wechat",
     workspaceId: "workspace-1",
@@ -46,7 +74,9 @@ test("handlePreparedMessage still sends ordinary messages through the runtime wh
     routerCalls += 1;
     return false;
   };
-  harness.app.runtimeTurnLifecycle.prepareIncomingMessageForRuntime = async (normalized: any) => ({
+  harness.app.runtimeTurnLifecycle.prepareIncomingMessageForRuntime = async (
+    normalized: NormalizedIncomingMessage,
+  ): Promise<PreparedRuntimeMessage> => ({
     ...normalized,
     originalText: normalized.text,
     text: "prepared message",
