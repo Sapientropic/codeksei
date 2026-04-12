@@ -1,10 +1,14 @@
 import * as fs from "node:fs";
 import * as accountStoreModule from "../adapters/channel/weixin/account-store";
 import { SessionStore } from "../adapters/runtime/codex/session-store";
+import {
+  normalizeDisplayPath,
+  resolveCrossPlatformPath,
+} from "../core/path-utils";
 import { accountsDir, sessionFile } from "./shared-process";
 
-const { loadWeixinAccount } = accountStoreModule as unknown as {
-  loadWeixinAccount: (config: Record<string, unknown>, accountId: string) => Record<string, unknown>;
+const { resolveSelectedAccount } = accountStoreModule as unknown as {
+  resolveSelectedAccount: (config: Record<string, unknown>) => { accountId?: string };
 };
 
 interface BoundThreadResult {
@@ -12,31 +16,17 @@ interface BoundThreadResult {
   workspaceRoot: string;
 }
 
-function resolveCurrentAccountId(): string {
-  if (!fs.existsSync(accountsDir)) {
-    return "";
-  }
-  const accountsConfig = {
+function resolveSelectedAccountId(): string {
+  return normalizeText(resolveSelectedAccount({
     accountsDir,
-    weixinBaseUrl: "",
-    weixinRouteTag: "",
-  };
-  const entries = fs.readdirSync(accountsDir)
-    .filter((name) => name.endsWith(".json") && !name.endsWith(".context-tokens.json"))
-    .map((name) => loadWeixinAccount(accountsConfig, name.slice(0, -5)))
-    .map((account) => account ? {
-      accountId: normalizeText(account.accountId),
-      savedAt: parseTimestamp(account.savedAt),
-    } : null)
-    .filter((entry): entry is { accountId: string; savedAt: number } => Boolean(entry?.accountId));
-  entries.sort((left, right) => right.savedAt - left.savedAt);
-  return entries[0]?.accountId || "";
+    accountId: process.env.CODEKSEI_ACCOUNT_ID || "",
+  }).accountId);
 }
 
 function resolveBoundThread(workspaceRoot: unknown): BoundThreadResult {
-  const normalizedWorkspaceRoot = normalizeText(workspaceRoot) || process.cwd();
+  const normalizedWorkspaceRoot = normalizeWorkspaceLookupRoot(workspaceRoot || process.cwd());
   const sessionStore = new SessionStore({ filePath: sessionFile });
-  const currentAccountId = resolveCurrentAccountId();
+  const currentAccountId = resolveSelectedAccountId();
   const bindings = sessionStore
     .listBindings()
     .filter((binding) => !currentAccountId || normalizeText(binding?.accountId) === currentAccountId)
@@ -64,6 +54,21 @@ function resolveBoundThread(workspaceRoot: unknown): BoundThreadResult {
   }
 
   throw new Error(`没有找到与 workspace 绑定的共享 thread: ${normalizedWorkspaceRoot}`);
+}
+
+function normalizeWorkspaceLookupRoot(workspaceRoot: unknown): string {
+  const normalizedWorkspaceRoot = resolveCrossPlatformPath(workspaceRoot);
+  if (!normalizedWorkspaceRoot) {
+    return "";
+  }
+  try {
+    const realpath = typeof fs.realpathSync.native === "function"
+      ? fs.realpathSync.native(normalizedWorkspaceRoot)
+      : fs.realpathSync(normalizedWorkspaceRoot);
+    return normalizeDisplayPath(realpath);
+  } catch {
+    return normalizeDisplayPath(normalizedWorkspaceRoot);
+  }
 }
 
 function getThreadId(binding: unknown, workspaceRoot: unknown): string {

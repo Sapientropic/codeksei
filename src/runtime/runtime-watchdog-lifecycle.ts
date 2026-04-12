@@ -155,7 +155,7 @@ export class RuntimeWatchdogLifecycle {
         return;
       }
       const currentThreadState = this.threadStateStore.getThreadState(normalizedThreadId);
-      if (currentThreadState?.status === "running" || currentThreadState?.turnId) {
+      if (hasObservedInitialRuntimeProgress(currentThreadState)) {
         return;
       }
       watchdog.noticeSent = true;
@@ -175,7 +175,7 @@ export class RuntimeWatchdogLifecycle {
     const failureTimer = setTimeout(async () => {
       this.pendingRuntimeEventWatchdogs.delete(normalizedThreadId);
       const currentThreadState = this.threadStateStore.getThreadState(normalizedThreadId);
-      if (currentThreadState?.status === "running" || currentThreadState?.turnId) {
+      if (hasObservedInitialRuntimeProgress(currentThreadState)) {
         return;
       }
       await this.channelAdapter.sendTyping({
@@ -516,6 +516,17 @@ function buildTurnSettlementWatchdogKey(
     return "";
   }
   return `${normalizedThreadId}:${normalizedTurnId}`;
+}
+
+function hasObservedInitialRuntimeProgress(
+  threadState: ThreadStateSnapshot | null | undefined,
+): boolean {
+  // The "first runtime event" watchdog is only meant to answer one question:
+  // did this new send receive any live runtime progress yet? Old terminal turn
+  // ids linger in thread state after completion/failure, so using a non-empty
+  // historical turnId here suppresses the watchdog on every later send for the
+  // same thread. Only live, non-terminal states should short-circuit it.
+  return threadState?.status === "running" || threadState?.status === "waiting_approval";
 }
 
 function normalizePendingApprovalState(

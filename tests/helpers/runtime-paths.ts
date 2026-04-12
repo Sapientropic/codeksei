@@ -1,3 +1,4 @@
+const fs = require("node:fs");
 const path = require("node:path");
 
 const repoRoot: string = path.resolve(__dirname, "..", "..");
@@ -40,7 +41,18 @@ function remapSourceAbsolutePath(absolutePath: string): string {
   ) {
     return "";
   }
-  return path.join(distRoot, path.relative(repoRoot, absolutePath));
+  const distCandidate = path.join(distRoot, path.relative(repoRoot, absolutePath));
+  const resolvedDistPath = resolveBuiltModulePath(distCandidate);
+  return resolvedDistPath || distCandidate;
+}
+
+function resolveBuiltModulePath(distCandidate: string): string {
+  const candidates = [
+    distCandidate,
+    `${distCandidate}.js`,
+    path.join(distCandidate, "index.js"),
+  ];
+  return candidates.find((candidate) => fs.existsSync(candidate)) || "";
 }
 
 function normalizeForCompare(targetPath: string): string {
