@@ -1,3 +1,4 @@
+// @ts-nocheck
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
@@ -90,7 +91,7 @@ async function completeTurn(delivery, threadId, turnId) {
   });
 }
 
-test("stream mode flushes pending final deltas after the idle window", async () => {
+test("stream mode does not idle-flush unfinished final fragments", async () => {
   const { delivery, sent, attach } = createDelivery({
     streamIdleFlushMs: 5,
     streamForceFlushChars: 100,
@@ -109,9 +110,7 @@ test("stream mode flushes pending final deltas after the idle window", async () 
   assert.equal(sent.length, 0);
 
   await sleep(20);
-  assert.deepEqual(sent, [
-    { text: "还在查", preserveBlock: false },
-  ]);
+  assert.deepEqual(sent, []);
 });
 
 test("stream mode streams final items incrementally and turn completion only sends the tail", async () => {
@@ -138,8 +137,8 @@ test("stream mode streams final items incrementally and turn completion only sen
   await completeTurn(delivery, "thread-final", "turn-final");
 
   assert.deepEqual(sent, [
-    { text: "第一句。", preserveBlock: false },
-    { text: "第二句。", preserveBlock: false },
+    { text: "第一句。", preserveBlock: true },
+    { text: "第二句。", preserveBlock: true },
   ]);
 });
 
@@ -167,8 +166,8 @@ test("snapshot deltas replace the current item instead of concatenating duplicat
   await sleep(20);
 
   assert.deepEqual(sent, [
-    { text: "先给你一个开头。", preserveBlock: false },
-    { text: "再补完整结论。", preserveBlock: false },
+    { text: "先给你一个开头。", preserveBlock: true },
+    { text: "再补完整结论。", preserveBlock: true },
   ]);
 });
 
@@ -202,8 +201,8 @@ test("completed snapshots continue from the unseen tail after a snapshot rewrite
   await sleep(20);
 
   assert.deepEqual(sent, [
-    { text: "第一段。", preserveBlock: false },
-    { text: "第二段。\n\n第三段。", preserveBlock: false },
+    { text: "第一段。", preserveBlock: true },
+    { text: "第二段。\n\n第三段。", preserveBlock: true },
   ]);
 });
 
@@ -231,8 +230,8 @@ test("short snapshot rewrites below the old 40-char gate still replace without d
   await sleep(20);
 
   assert.deepEqual(sent, [
-    { text: "先说。", preserveBlock: false },
-    { text: "完整。", preserveBlock: false },
+    { text: "先说。", preserveBlock: true },
+    { text: "完整。", preserveBlock: true },
   ]);
 });
 
@@ -264,7 +263,7 @@ test("stream mode only emits brief natural-language commentary in real time", as
   });
 
   assert.deepEqual(sent, [
-    { text: "我先去抓日志。", preserveBlock: false },
+    { text: "我先去抓日志。", preserveBlock: true },
   ]);
 });
 
@@ -284,7 +283,7 @@ test("stream mode keeps paragraph boundaries in final output", async () => {
   });
 
   assert.deepEqual(sent, [
-    { text: "第一段。\n\n第二段。\n\n第三段。", preserveBlock: false },
+    { text: "第一段。\n\n第二段。\n\n第三段。", preserveBlock: true },
   ]);
 });
 
@@ -324,9 +323,9 @@ test("watchdog late completion only sends the unseen tail in stream mode", async
   await completeTurn(delivery, "thread-watchdog", "turn-watchdog");
 
   assert.deepEqual(sent, [
-    { text: "我先把已确认的范围告诉你。", preserveBlock: false },
+    { text: "我先把已确认的范围告诉你。", preserveBlock: true },
     { text: "这一段还在等工具结果，\n\n【系统提示】\n这一轮回复没有正常收尾。", preserveBlock: false },
-    { text: "现在结果已经回来，可以继续给你完整结论。", preserveBlock: false },
+    { text: "现在结果已经回来，可以继续给你完整结论。", preserveBlock: true },
   ]);
 });
 
@@ -356,6 +355,42 @@ test("settled mode waits for turn completion and only sends the latest visible r
   await completeTurn(delivery, "thread-settled", "turn-settled");
   assert.deepEqual(sent, [
     { text: "结论已经确认。", preserveBlock: true },
+  ]);
+});
+
+test("stream mode waits for a natural boundary before sending a final sentence", async () => {
+  const { delivery, sent, attach } = createDelivery({
+    streamIdleFlushMs: 5,
+    streamForceFlushChars: 100,
+    streamBoundaryFlushChars: 6,
+  });
+  attach("thread-boundary");
+  await startTurn(delivery, "thread-boundary", "turn-boundary");
+
+  await sendDelta(delivery, {
+    threadId: "thread-boundary",
+    turnId: "turn-boundary",
+    itemId: "final-1",
+    text: "我先把今天 tracked repos 的提交时间线和你今天的日记对起来，再直接帮你收成一版能回看的时间",
+    phase: "final",
+  });
+  await sleep(20);
+  assert.deepEqual(sent, []);
+
+  await sendDelta(delivery, {
+    threadId: "thread-boundary",
+    turnId: "turn-boundary",
+    itemId: "final-1",
+    text: "我先把今天 tracked repos 的提交时间线和你今天的日记对起来，再直接帮你收成一版能回看的时间线，不靠你自己回忆。",
+    phase: "final",
+  });
+  await sleep(20);
+
+  assert.deepEqual(sent, [
+    {
+      text: "我先把今天 tracked repos 的提交时间线和你今天的日记对起来，再直接帮你收成一版能回看的时间线，不靠你自己回忆。",
+      preserveBlock: true,
+    },
   ]);
 });
 

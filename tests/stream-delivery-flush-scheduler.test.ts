@@ -1,3 +1,4 @@
+// @ts-nocheck
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
@@ -36,7 +37,7 @@ function createStreamingState({ threadId = "thread-1", turnId = "turn-1" } = {})
   return state;
 }
 
-test("flush scheduler schedules one idle flush timer for short streaming deltas", async () => {
+test("flush scheduler only keeps idle timers for commentary-style streaming updates", async () => {
   const flushCalls = [];
   const scheduler = createFlushScheduler({
     flushNow: async (_state, options) => {
@@ -48,6 +49,55 @@ test("flush scheduler schedules one idle flush timer for short streaming deltas"
     streamBoundaryFlushChars: 100,
   });
   const state = createStreamingState();
+  upsertStateItem(state, {
+    itemId: "commentary-1",
+    text: "我先去抓日志",
+    completed: false,
+    phase: "commentary",
+    fragmentKind: "delta",
+  });
+
+  scheduler.scheduleStreamingFlush(state, {
+    trigger: {
+      source: "runtime.reply.delta",
+      itemId: "commentary-1",
+      phase: "commentary",
+      fragmentKind: "delta",
+    },
+  });
+  const firstTimer = state.scheduledFlushTimer;
+  scheduler.scheduleStreamingFlush(state, {
+    trigger: {
+      source: "runtime.reply.delta",
+      itemId: "commentary-1",
+      phase: "commentary",
+      fragmentKind: "delta",
+    },
+  });
+
+  assert.equal(flushCalls.length, 0);
+  assert.ok(firstTimer);
+  assert.equal(state.scheduledFlushTimer, firstTimer);
+
+  await sleep(20);
+
+  assert.equal(flushCalls.length, 1);
+  assert.equal(flushCalls[0].trigger?.source, "scheduled_stream_flush");
+  assert.equal(state.scheduledFlushTimer, null);
+});
+
+test("flush scheduler skips idle timers for unfinished final fragments", async () => {
+  const flushCalls = [];
+  const scheduler = createFlushScheduler({
+    flushNow: async (_state, options) => {
+      flushCalls.push(options);
+    },
+    runtimeEventTypes: RUNTIME_EVENT_TYPES,
+    streamIdleFlushMs: 5,
+    streamForceFlushChars: 100,
+    streamBoundaryFlushChars: 100,
+  });
+  const state = createStreamingState({ threadId: "thread-no-idle-final" });
   upsertStateItem(state, {
     itemId: "final-1",
     text: "还在查",
@@ -64,24 +114,10 @@ test("flush scheduler schedules one idle flush timer for short streaming deltas"
       fragmentKind: "delta",
     },
   });
-  const firstTimer = state.scheduledFlushTimer;
-  scheduler.scheduleStreamingFlush(state, {
-    trigger: {
-      source: "runtime.reply.delta",
-      itemId: "final-1",
-      phase: "final",
-      fragmentKind: "delta",
-    },
-  });
-
-  assert.equal(flushCalls.length, 0);
-  assert.ok(firstTimer);
-  assert.equal(state.scheduledFlushTimer, firstTimer);
 
   await sleep(20);
 
-  assert.equal(flushCalls.length, 1);
-  assert.equal(flushCalls[0].trigger?.source, "scheduled_stream_flush");
+  assert.equal(flushCalls.length, 0);
   assert.equal(state.scheduledFlushTimer, null);
 });
 
@@ -133,18 +169,18 @@ test("flush scheduler clears an existing idle timer before a force flush", async
   });
   const state = createStreamingState({ threadId: "thread-force" });
   upsertStateItem(state, {
-    itemId: "final-1",
-    text: "还在查",
+    itemId: "commentary-1",
+    text: "我先去抓日志",
     completed: false,
-    phase: "final",
+    phase: "commentary",
     fragmentKind: "delta",
   });
 
   scheduler.scheduleStreamingFlush(state, {
     trigger: {
       source: "runtime.reply.delta",
-      itemId: "final-1",
-      phase: "final",
+      itemId: "commentary-1",
+      phase: "commentary",
       fragmentKind: "delta",
     },
   });
@@ -261,18 +297,18 @@ test("flush scheduler clearScheduledFlush cancels pending idle work", async () =
   });
   const state = createStreamingState({ threadId: "thread-clear" });
   upsertStateItem(state, {
-    itemId: "final-1",
-    text: "还在查",
+    itemId: "commentary-1",
+    text: "我先去抓日志",
     completed: false,
-    phase: "final",
+    phase: "commentary",
     fragmentKind: "delta",
   });
 
   scheduler.scheduleStreamingFlush(state, {
     trigger: {
       source: "runtime.reply.delta",
-      itemId: "final-1",
-      phase: "final",
+      itemId: "commentary-1",
+      phase: "commentary",
       fragmentKind: "delta",
     },
   });

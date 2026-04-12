@@ -5,6 +5,7 @@ const {
   hasNaturalFlushBoundary,
   prefersStreamingDelivery,
   prepareStreamingDelivery,
+  shouldScheduleStreamingIdleFlush,
 } = require("./delivery-transport");
 const { normalizeText } = require("./visible-text");
 
@@ -102,7 +103,6 @@ function createFlushScheduler({
       }
       const flushImmediately = force
         || hasCompletedFlushTrigger(trigger, runtimeEventTypes)
-        || prepared.safeText.length >= streamForceFlushChars
         || (
           prepared.safeText.length >= streamBoundaryFlushChars
           && hasNaturalFlushBoundary(prepared.safeText)
@@ -110,6 +110,9 @@ function createFlushScheduler({
       if (flushImmediately) {
         clearScheduledFlush(state);
         void this.flush(state, { force, trigger });
+        return;
+      }
+      if (!shouldScheduleStreamingIdleFlush(prepared)) {
         return;
       }
       if (state.scheduledFlushTimer) {

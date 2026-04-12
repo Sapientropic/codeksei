@@ -170,6 +170,8 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 
 Notes:
 
+- `CODEKSEI_WEIXIN_REPLY_MODE=stream` now behaves more like a hybrid stream: it prefers natural sentence boundaries or completed blocks, so unfinished final sentences do not get split into multiple WeChat bubbles
+- `CODEKSEI_WEIXIN_REPLY_MODE=settled` still means “wait until the whole turn settles”: only the latest visible final reply is sent
 - `CODEKSEI_USER_NAME` is a display/persona field for chat, not a routing id
 - `CODEKSEI_ALLOWED_USER_IDS` must use the exact sender ids observed by the bridge; the easiest way to find them is `npm run accounts`
 - WeChat persona / continuity instructions now default to the repo template at `templates/weixin-instructions.md`; use `weixin-instructions.local.md` in the state directory only when you need a local overlay

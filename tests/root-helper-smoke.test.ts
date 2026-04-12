@@ -1,5 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -46,4 +47,14 @@ test("root helper scripts no longer execute deleted repo-root JS wrappers", () =
     const source = readScript(relativePath);
     assert.doesNotMatch(source, legacyWrapperPattern, `${relativePath} should not execute deleted JS wrappers`);
   }
+});
+
+test("dist runtime entrypoint executes main when invoked directly", () => {
+  const entrypoint = path.join(__dirname, "..", "dist", "src", "index.js");
+  const result = spawnSync(process.execPath, [entrypoint, "help"], {
+    encoding: "utf8",
+  });
+
+  assert.equal(result.status, 0, result.stderr || "expected help command to succeed");
+  assert.match(result.stdout, /用法: npm run/u);
 });

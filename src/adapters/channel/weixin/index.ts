@@ -1,17 +1,60 @@
-const crypto = require("crypto");
-const { listWeixinAccounts, resolveSelectedAccount } = require("./account-store");
-const { loadPersistedContextTokens, persistContextToken } = require("./context-token-store");
-const { runV2LoginFlow } = require("./login-v2");
+import * as crypto from "node:crypto";
+import type { NormalizedIncomingMessage, UnknownRecord } from "../../../core/runtime-types";
+import * as accountStoreModule from "./account-store";
+import * as contextTokenStoreModule from "./context-token-store";
+import * as loginV2Module from "./login-v2";
+import * as apiV2Module from "./api-v2";
+import * as legacyModule from "./legacy";
+import * as messageUtilsV2Module from "./message-utils-v2";
+import * as mediaSendModule from "./media-send";
+import * as syncBufferStoreModule from "./sync-buffer-store";
+
+const { listWeixinAccounts, resolveSelectedAccount } = accountStoreModule as {
+  listWeixinAccounts: (config: WeixinConfig) => WeixinAccount[];
+  resolveSelectedAccount: (config: WeixinConfig) => WeixinAccount;
+};
+const { loadPersistedContextTokens, persistContextToken } = contextTokenStoreModule as {
+  loadPersistedContextTokens: (config: WeixinConfig, accountId: string) => Record<string, string>;
+  persistContextToken: (
+    config: WeixinConfig,
+    accountId: string,
+    userId: string,
+    contextToken: string,
+  ) => Record<string, string>;
+};
+const { runV2LoginFlow } = loginV2Module as {
+  runV2LoginFlow: (config: WeixinConfig) => Promise<unknown>;
+};
 const {
   getConfigV2,
   getUpdatesV2,
   sendTextV2,
   sendTypingV2,
-} = require("./api-v2");
-const { createLegacyWeixinChannelAdapter } = require("./legacy");
-const { createInboundFilter } = require("./message-utils-v2");
-const { sendWeixinMediaFile } = require("./media-send");
-const { loadSyncBuffer, saveSyncBuffer } = require("./sync-buffer-store");
+} = apiV2Module as {
+  getConfigV2: (args: Record<string, unknown>) => Promise<UnknownRecord>;
+  getUpdatesV2: (args: Record<string, unknown>) => Promise<UnknownRecord>;
+  sendTextV2: (args: Record<string, unknown>) => Promise<unknown>;
+  sendTypingV2: (args: Record<string, unknown>) => Promise<unknown>;
+};
+const { createLegacyWeixinChannelAdapter } = legacyModule as {
+  createLegacyWeixinChannelAdapter: (config: WeixinConfig) => WeixinChannelAdapter;
+};
+const { createInboundFilter } = messageUtilsV2Module as {
+  createInboundFilter: () => {
+    normalize: (
+      message: unknown,
+      config: WeixinConfig,
+      accountId: string,
+    ) => NormalizedIncomingMessage | null;
+  };
+};
+const { sendWeixinMediaFile } = mediaSendModule as {
+  sendWeixinMediaFile: (args: Record<string, unknown>) => Promise<unknown>;
+};
+const { loadSyncBuffer, saveSyncBuffer } = syncBufferStoreModule as {
+  loadSyncBuffer: (config: WeixinConfig, accountId: string) => string;
+  saveSyncBuffer: (config: WeixinConfig, accountId: string, buffer: string) => void;
+};
 
 const LONG_POLL_TIMEOUT_MS = 35_000;
 const MAX_WEIXIN_CHUNK = 3800;
@@ -21,17 +64,118 @@ const WEIXIN_MAX_DELIVERY_MESSAGES = 10;
 const SEND_RETRY_DELAYS_MS = [900, 1800];
 const AMBIGUOUS_SEND_RETRY_DELAYS_MS = [1200];
 
-function createWeixinChannelAdapter(config: any) {
+interface WeixinConfig extends Record<string, unknown> {
+  stateDir: string;
+  accountsDir?: string;
+  syncBufferDir?: string;
+  weixinBaseUrl?: string;
+  weixinRouteTag?: string;
+  weixinProtocolClientVersion?: string;
+  weixinCdnBaseUrl?: string;
+  weixinAdapterVariant?: string;
+  weixinDeliveryTrace?: boolean;
+  workspaceId?: string;
+}
+
+interface WeixinAccount {
+  accountId: string;
+  baseUrl: string;
+  token: string;
+  routeTag?: string;
+  userId?: string;
+  savedAt?: string;
+}
+
+interface GetUpdatesResponse extends UnknownRecord {
+  get_updates_buf?: unknown;
+  msgs?: unknown[];
+}
+
+interface TraceContext extends Record<string, unknown> {
+  enabled?: boolean;
+  traceId?: string;
+  origin?: string;
+  variant?: string;
+  threadId?: string;
+  turnId?: string;
+  mode?: string;
+  trigger?: string;
+  chunkIndex?: number;
+  chunkTotal?: number;
+  preserveBlock?: boolean;
+  attempt?: number;
+  retryable?: boolean;
+  clientId?: string;
+  chars?: number;
+  textHash?: string;
+  error?: string;
+}
+
+interface SendTextChunksArgs {
+  userId: string;
+  text: string;
+  contextToken?: string;
+  preserveBlock?: boolean;
+  trace?: TraceContext | null;
+}
+
+interface SendTypingArgs {
+  userId: string;
+  status?: number;
+  contextToken?: string;
+}
+
+interface SendFileArgs {
+  userId: string;
+  filePath: string;
+  contextToken?: string;
+}
+
+interface GetUpdatesArgs {
+  syncBuffer?: string;
+  timeoutMs?: number;
+}
+
+interface SendV2TextChunkArgs {
+  sendTextImpl?: (args: Record<string, unknown>) => Promise<unknown>;
+  baseUrl: string;
+  token: string;
+  routeTag?: string;
+  clientVersion?: string;
+  toUserId: string;
+  text: string;
+  contextToken: string;
+  clientId?: string;
+  trace?: TraceContext | null;
+}
+
+interface WeixinChannelAdapter {
+  describe(): Record<string, unknown>;
+  login(): Promise<void>;
+  printAccounts(): void;
+  resolveAccount(): WeixinAccount;
+  getKnownContextTokens(): Record<string, string>;
+  loadSyncBuffer(): string;
+  saveSyncBuffer(buffer: string): void;
+  rememberContextToken(userId: unknown, contextToken: unknown): string;
+  getUpdates(args?: GetUpdatesArgs): Promise<GetUpdatesResponse>;
+  normalizeIncomingMessage(message: unknown): NormalizedIncomingMessage | null;
+  sendText(args: SendTextChunksArgs): Promise<void>;
+  sendTyping(args: SendTypingArgs): Promise<void>;
+  sendFile(args: SendFileArgs): Promise<unknown>;
+}
+
+export function createWeixinChannelAdapter(config: WeixinConfig): WeixinChannelAdapter {
   const variant = normalizeAdapterVariant(config.weixinAdapterVariant);
   if (variant === "legacy") {
     return createLegacyWeixinChannelAdapter(config);
   }
 
-  let selectedAccount: any = null;
+  let selectedAccount: WeixinAccount | null = null;
   let contextTokenCache: Record<string, string> | null = null;
   const inboundFilter = createInboundFilter();
 
-  function ensureAccount() {
+  function ensureAccount(): WeixinAccount {
     if (!selectedAccount) {
       selectedAccount = resolveSelectedAccount(config);
       contextTokenCache = loadPersistedContextTokens(config, selectedAccount.accountId);
@@ -39,7 +183,7 @@ function createWeixinChannelAdapter(config: any) {
     return selectedAccount;
   }
 
-  function ensureContextTokenCache() {
+  function ensureContextTokenCache(): Record<string, string> {
     if (!contextTokenCache) {
       const account = ensureAccount();
       contextTokenCache = loadPersistedContextTokens(config, account.accountId);
@@ -47,10 +191,10 @@ function createWeixinChannelAdapter(config: any) {
     return contextTokenCache;
   }
 
-  function rememberContextToken(userId: any, contextToken: any) {
+  function rememberContextToken(userId: unknown, contextToken: unknown): string {
     const account = ensureAccount();
-    const normalizedUserId = typeof userId === "string" ? userId.trim() : "";
-    const normalizedToken = typeof contextToken === "string" ? contextToken.trim() : "";
+    const normalizedUserId = normalizeText(userId);
+    const normalizedToken = normalizeText(contextToken);
     if (!normalizedUserId || !normalizedToken) {
       return "";
     }
@@ -58,19 +202,25 @@ function createWeixinChannelAdapter(config: any) {
     return normalizedToken;
   }
 
-  function resolveContextToken(userId: any, explicitToken: string = "") {
-    const normalizedExplicitToken = typeof explicitToken === "string" ? explicitToken.trim() : "";
+  function resolveContextToken(userId: unknown, explicitToken = ""): string {
+    const normalizedExplicitToken = normalizeText(explicitToken);
     if (normalizedExplicitToken) {
       return normalizedExplicitToken;
     }
-    const normalizedUserId = typeof userId === "string" ? userId.trim() : "";
+    const normalizedUserId = normalizeText(userId);
     if (!normalizedUserId) {
       return "";
     }
-    return (ensureContextTokenCache() || {})[normalizedUserId] || "";
+    return ensureContextTokenCache()[normalizedUserId] || "";
   }
 
-  function sendTextChunks({ userId, text, contextToken = "", preserveBlock = false, trace = null }: any) {
+  function sendTextChunks({
+    userId,
+    text,
+    contextToken = "",
+    preserveBlock = false,
+    trace = null,
+  }: SendTextChunksArgs): Promise<void> {
     const account = ensureAccount();
     const resolvedToken = resolveContextToken(userId, contextToken);
     if (!resolvedToken) {
@@ -87,16 +237,16 @@ function createWeixinChannelAdapter(config: any) {
     const sendChunks = packChunksForWeixinDelivery(
       chunkCandidates.length ? chunkCandidates : [normalizedContent],
       WEIXIN_MAX_DELIVERY_MESSAGES,
-      MAX_WEIXIN_CHUNK
+      MAX_WEIXIN_CHUNK,
     );
     const traceContext = buildWeixinTraceContext(trace, {
-      enabled: config.weixinDeliveryTrace,
+      enabled: Boolean(config.weixinDeliveryTrace),
       origin: "adapter.sendText",
       variant: "v2",
       preserveBlock,
       chunkTotal: sendChunks.length,
     });
-    return sendChunks.reduce((promise: any, chunk: any, index: any) => promise
+    return sendChunks.reduce<Promise<void>>((promise, chunk, index) => promise
       .then(() => {
         const compactChunk = normalizePlainTextForWeixin(chunk) || "已完成。";
         const clientId = `cb-${crypto.randomUUID()}`;
@@ -104,7 +254,7 @@ function createWeixinChannelAdapter(config: any) {
           baseUrl: account.baseUrl,
           token: account.token,
           routeTag: account.routeTag,
-          clientVersion: config.weixinProtocolClientVersion,
+          clientVersion: normalizeText(config.weixinProtocolClientVersion),
           toUserId: userId,
           text: compactChunk,
           contextToken: resolvedToken,
@@ -116,13 +266,13 @@ function createWeixinChannelAdapter(config: any) {
             textHash: hashTraceText(compactChunk),
             clientId,
           },
-        });
+        }).then(() => undefined);
       })
       .then(() => {
         if (index < sendChunks.length - 1) {
           return sleep(SEND_MESSAGE_CHUNK_INTERVAL_MS);
         }
-        return null;
+        return undefined;
       }), Promise.resolve());
   }
 
@@ -170,12 +320,12 @@ function createWeixinChannelAdapter(config: any) {
       const account = ensureAccount();
       return loadSyncBuffer(config, account.accountId);
     },
-    saveSyncBuffer(buffer: any) {
+    saveSyncBuffer(buffer: string) {
       const account = ensureAccount();
       saveSyncBuffer(config, account.accountId, buffer);
     },
     rememberContextToken,
-    async getUpdates({ syncBuffer = "", timeoutMs = LONG_POLL_TIMEOUT_MS }: any = {}) {
+    async getUpdates({ syncBuffer = "", timeoutMs = LONG_POLL_TIMEOUT_MS }: GetUpdatesArgs = {}) {
       const account = ensureAccount();
       const response = await getUpdatesV2({
         baseUrl: account.baseUrl,
@@ -183,29 +333,29 @@ function createWeixinChannelAdapter(config: any) {
         getUpdatesBuf: syncBuffer,
         timeoutMs,
         routeTag: account.routeTag,
-        clientVersion: config.weixinProtocolClientVersion,
-      });
+        clientVersion: normalizeText(config.weixinProtocolClientVersion),
+      }) as GetUpdatesResponse;
       if (typeof response?.get_updates_buf === "string" && response.get_updates_buf.trim()) {
         this.saveSyncBuffer(response.get_updates_buf.trim());
       }
       const messages = Array.isArray(response?.msgs) ? response.msgs : [];
       for (const message of messages) {
-        const userId = typeof message?.from_user_id === "string" ? message.from_user_id.trim() : "";
-        const contextToken = typeof message?.context_token === "string" ? message.context_token.trim() : "";
+        const userId = isRecord(message) ? normalizeText(message.from_user_id) : "";
+        const contextToken = isRecord(message) ? normalizeText(message.context_token) : "";
         if (userId && contextToken) {
           rememberContextToken(userId, contextToken);
         }
       }
       return response;
     },
-    normalizeIncomingMessage(message: any) {
+    normalizeIncomingMessage(message: unknown) {
       const account = ensureAccount();
       return inboundFilter.normalize(message, config, account.accountId);
     },
-    async sendText({ userId, text, contextToken = "", preserveBlock = false, trace = null }: any) {
+    async sendText({ userId, text, contextToken = "", preserveBlock = false, trace = null }: SendTextChunksArgs) {
       await sendTextChunks({ userId, text, contextToken, preserveBlock, trace });
     },
-    async sendTyping({ userId, status = 1, contextToken = "" }: any) {
+    async sendTyping({ userId, status = 1, contextToken = "" }: SendTypingArgs) {
       const account = ensureAccount();
       const resolvedToken = resolveContextToken(userId, contextToken);
       if (!resolvedToken) {
@@ -215,13 +365,11 @@ function createWeixinChannelAdapter(config: any) {
         baseUrl: account.baseUrl,
         token: account.token,
         routeTag: account.routeTag,
-        clientVersion: config.weixinProtocolClientVersion,
+        clientVersion: normalizeText(config.weixinProtocolClientVersion),
         ilinkUserId: userId,
         contextToken: resolvedToken,
       }).catch(() => null);
-      const typingTicket = typeof configResponse?.typing_ticket === "string"
-        ? configResponse.typing_ticket.trim()
-        : "";
+      const typingTicket = normalizeText(isRecord(configResponse) ? configResponse.typing_ticket : "");
       if (!typingTicket) {
         return;
       }
@@ -229,7 +377,7 @@ function createWeixinChannelAdapter(config: any) {
         baseUrl: account.baseUrl,
         token: account.token,
         routeTag: account.routeTag,
-        clientVersion: config.weixinProtocolClientVersion,
+        clientVersion: normalizeText(config.weixinProtocolClientVersion),
         body: {
           ilink_user_id: userId,
           typing_ticket: typingTicket,
@@ -237,7 +385,7 @@ function createWeixinChannelAdapter(config: any) {
         },
       });
     },
-    async sendFile({ userId, filePath, contextToken = "" }: any) {
+    async sendFile({ userId, filePath, contextToken = "" }: SendFileArgs) {
       const account = ensureAccount();
       const resolvedToken = resolveContextToken(userId, contextToken);
       if (!resolvedToken) {
@@ -258,45 +406,45 @@ function createWeixinChannelAdapter(config: any) {
         cdnBaseUrl: config.weixinCdnBaseUrl,
         apiVariant: "legacy",
         routeTag: account.routeTag,
-        clientVersion: config.weixinProtocolClientVersion,
+        clientVersion: normalizeText(config.weixinProtocolClientVersion),
       });
     },
   };
 }
 
-function normalizeAdapterVariant(value: any) {
-  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+function normalizeAdapterVariant(value: unknown): "legacy" | "v2" {
+  const normalized = normalizeText(value).toLowerCase();
   return normalized === "legacy" ? "legacy" : "v2";
 }
 
-function splitUtf8(text: any, maxRunes: any) {
+function splitUtf8(text: unknown, maxRunes: number): string[] {
   const runes = Array.from(String(text || ""));
   if (!runes.length || runes.length <= maxRunes) {
     return [String(text || "")];
   }
-  const chunks = [];
+  const chunks: string[] = [];
   while (runes.length) {
     chunks.push(runes.splice(0, maxRunes).join(""));
   }
   return chunks;
 }
 
-function normalizePlainTextForWeixin(text: any) {
+function normalizePlainTextForWeixin(text: unknown): string {
   const normalized = String(text || "").replace(/\r\n/g, "\n");
   return trimOuterBlankLines(normalized.replace(/\n\s*\n(?:\s*\n)+/g, "\n\n"));
 }
 
-function compactPlainTextForLegacySingleLine(text: any) {
+function compactPlainTextForLegacySingleLine(text: unknown): string {
   return trimOuterBlankLines(normalizePlainTextForWeixin(text).replace(/\n\s*\n+/g, "\n"));
 }
 
-function chunkReplyText(text: any, limit: number = 3500) {
+function chunkReplyText(text: unknown, limit = 3500): string[] {
   const normalized = trimOuterBlankLines(String(text || "").replace(/\r\n/g, "\n"));
   if (!normalized.trim()) {
     return [];
   }
 
-  const chunks = [];
+  const chunks: string[] = [];
   let remaining = normalized;
   while (remaining.length > limit) {
     const candidate = remaining.slice(0, limit);
@@ -305,7 +453,7 @@ function chunkReplyText(text: any, limit: number = 3500) {
       candidate.lastIndexOf("\n"),
       candidate.lastIndexOf("。"),
       candidate.lastIndexOf(". "),
-      candidate.lastIndexOf(" ")
+      candidate.lastIndexOf(" "),
     );
     const cut = splitIndex > limit * 0.4 ? splitIndex + (candidate[splitIndex] === "\n" ? 0 : 1) : limit;
     const chunk = trimOuterBlankLines(remaining.slice(0, cut));
@@ -320,7 +468,7 @@ function chunkReplyText(text: any, limit: number = 3500) {
   return chunks.filter(Boolean);
 }
 
-function chunkReplyTextForWeixin(text: any, limit: number = 80) {
+function chunkReplyTextForWeixin(text: unknown, limit = 80): string[] {
   const normalized = trimOuterBlankLines(String(text || "").replace(/\r\n/g, "\n"));
   if (!normalized.trim()) {
     return [];
@@ -364,9 +512,13 @@ function chunkReplyTextForWeixin(text: any, limit: number = 80) {
   return chunks.filter(Boolean);
 }
 
-function packChunksForWeixinDelivery(chunks: any, maxMessages: number = 10, maxChunkChars: number = 3800) {
+export function packChunksForWeixinDelivery(
+  chunks: unknown,
+  maxMessages = 10,
+  maxChunkChars = 3800,
+): string[] {
   const normalizedChunks = Array.isArray(chunks)
-    ? chunks.map((chunk: any) => normalizePlainTextForWeixin(chunk)).filter(Boolean)
+    ? chunks.map((chunk) => normalizePlainTextForWeixin(chunk)).filter(Boolean)
     : [];
   if (!normalizedChunks.length) {
     return normalizedChunks;
@@ -387,8 +539,8 @@ function packChunksForWeixinDelivery(chunks: any, maxMessages: number = 10, maxC
   return packed;
 }
 
-function collectStreamingBoundaries(text: any) {
-  const boundaries: Set<number> = new Set();
+function collectStreamingBoundaries(text: string): number[] {
+  const boundaries = new Set<number>();
 
   const regex = /\n\s*\n+/g;
   let match = regex.exec(text);
@@ -420,11 +572,14 @@ function collectStreamingBoundaries(text: any) {
     boundaries.add(end);
   }
 
-  return Array.from(boundaries).sort((left: any, right: any) => left - right);
+  return Array.from(boundaries).sort((left, right) => left - right);
 }
 
-async function sendTextChunkWithRetry(send: any, { trace = null }: any = {}) {
-  let lastError = null;
+async function sendTextChunkWithRetry<T>(
+  send: () => Promise<T>,
+  { trace = null }: { trace?: TraceContext | null } = {},
+): Promise<T> {
+  let lastError: unknown = null;
   for (let attempt = 0; ; attempt += 1) {
     const attemptNumber = attempt + 1;
     try {
@@ -446,7 +601,7 @@ async function sendTextChunkWithRetry(send: any, { trace = null }: any = {}) {
         ...buildWeixinTraceContext(trace),
         attempt: attemptNumber,
         retryable,
-        error: String((error as any)?.message || error || ""),
+        error: formatUnknownError(error),
       });
       if (!retryable) {
         throw error;
@@ -457,7 +612,7 @@ async function sendTextChunkWithRetry(send: any, { trace = null }: any = {}) {
   throw lastError || new Error("sendText chunk failed");
 }
 
-function sendV2TextChunk({
+export function sendV2TextChunk({
   sendTextImpl = sendTextV2,
   baseUrl,
   token,
@@ -468,8 +623,8 @@ function sendV2TextChunk({
   contextToken,
   clientId = "",
   trace = null,
-}: any) {
-  const stableClientId = String(clientId || "").trim() || `cb-${crypto.randomUUID()}`;
+}: SendV2TextChunkArgs): Promise<unknown> {
+  const stableClientId = normalizeText(clientId) || `cb-${crypto.randomUUID()}`;
   return sendTextChunkWithRetry(
     () => sendTextImpl({
       baseUrl,
@@ -488,12 +643,12 @@ function sendV2TextChunk({
         chars: String(text || "").length,
         textHash: hashTraceText(text),
       }),
-    }
+    },
   );
 }
 
-function getSendRetryDelaysMs(error: any) {
-  const message = String(error?.message || error || "");
+function getSendRetryDelaysMs(error: unknown): number[] {
+  const message = formatUnknownError(error);
   // `ret=-2` is ambiguous: the first attempt may already have landed, or it may
   // have died before the user ever saw it. Retrying with the same client_id once
   // keeps the call idempotent enough to avoid visible truncation without turning
@@ -512,7 +667,7 @@ function getSendRetryDelaysMs(error: any) {
   return [];
 }
 
-function buildWeixinTraceContext(trace: any, defaults: any = {}) {
+function buildWeixinTraceContext(trace: unknown, defaults: TraceContext = {}): TraceContext {
   const normalizedTrace = normalizeTraceContext(trace);
   return {
     ...defaults,
@@ -524,18 +679,18 @@ function buildWeixinTraceContext(trace: any, defaults: any = {}) {
   };
 }
 
-function normalizeTraceContext(trace: any) {
-  if (!trace || typeof trace !== "object") {
+function normalizeTraceContext(trace: unknown): TraceContext {
+  if (!isRecord(trace)) {
     return {};
   }
-  return { ...(trace as Record<string, unknown>) };
+  return { ...trace };
 }
 
-function normalizeTraceText(value: any) {
+function normalizeTraceText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function logWeixinSendTrace(stage: any, trace: any) {
+function logWeixinSendTrace(stage: string, trace: TraceContext): void {
   if (!Boolean(trace?.enabled)) {
     return;
   }
@@ -565,24 +720,31 @@ function logWeixinSendTrace(stage: any, trace: any) {
   console.log(parts.join(" "));
 }
 
-function hashTraceText(text: any) {
+function hashTraceText(text: unknown): string {
   return crypto.createHash("sha1").update(String(text || ""), "utf8").digest("hex").slice(0, 12);
 }
 
-function trimOuterBlankLines(text: any) {
+function trimOuterBlankLines(text: unknown): string {
   return String(text || "")
     .replace(/^\s*\n+/g, "")
     .replace(/\n+\s*$/g, "");
 }
 
-function sleep(ms: any) {
-  return new Promise((resolve: any) => setTimeout(resolve, ms));
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-module.exports = {
-  createWeixinChannelAdapter,
-  packChunksForWeixinDelivery,
-  sendV2TextChunk,
-};
+function normalizeText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
 
-export {};
+function formatUnknownError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error || "");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
+
+void splitUtf8;
+void compactPlainTextForLegacySingleLine;

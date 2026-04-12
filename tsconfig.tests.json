@@ -15,17 +15,9 @@
   },
   "include": [
     "src/**/*",
-    "tests/helpers/**/*.js",
-    "tests/app-approval-policy.test.ts",
-    "tests/check-coverage-contract.test.ts",
-    "tests/cli-arg-parser.test.ts",
-    "tests/command-registry.test.ts",
-    "tests/command-surface-contract.test.ts",
-    "tests/config-loader.test.ts",
-    "tests/queue-item-contract.test.ts",
-    "tests/root-helper-smoke.test.ts",
-    "tests/system-message-queue-store.test.ts",
-    "tests/workspace-bootstrap.test.ts"
+    "tests/**/*.test.ts",
+    "tests/helpers/**/*.ts",
+    "tests/helpers/**/*.js"
   ],
   "exclude": [
     "dist",

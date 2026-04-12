@@ -1,34 +1,185 @@
-const fs = require("fs");
-const { renderInstructionTemplate } = require("../../../core/instructions-template");
-const { RUNTIME_EVENT_TYPES } = require("../../../contracts/runtime-events");
-const { CodexRpcClient } = require("./rpc-client");
-const { mapCodexMessageToRuntimeEvent } = require("./events");
+import * as fs from "node:fs";
+import {
+  RUNTIME_EVENT_TYPES,
+  type RuntimeEvent,
+} from "../../../contracts/runtime-events";
+import type { RuntimeTurnSendState, UnknownRecord } from "../../../core/runtime-types";
+import { SessionStore } from "./session-store";
+import * as instructionsTemplateModule from "../../../core/instructions-template";
+import * as workspaceAliasModule from "../../../core/workspace-alias";
+import * as workspaceBootstrapModule from "../../../core/workspace-bootstrap";
+import * as rpcClientModule from "./rpc-client";
+import * as eventsModule from "./events";
+import * as messageUtilsModule from "./message-utils";
+
+const { renderInstructionTemplate } = instructionsTemplateModule as {
+  renderInstructionTemplate: (source: string, context: Record<string, unknown>) => string;
+};
+const { resolveCodexWorkspaceRoot } = workspaceAliasModule as {
+  resolveCodexWorkspaceRoot: (workspaceRoot: string) => string;
+};
+const { buildWorkspaceContinuityInstructions } = workspaceBootstrapModule as {
+  buildWorkspaceContinuityInstructions: (workspaceRoot: string, config: Record<string, unknown>) => string;
+};
+const { CodexRpcClient } = rpcClientModule as {
+  CodexRpcClient: new (options: Record<string, unknown>) => RuntimeClientLike;
+};
+const { mapCodexMessageToRuntimeEvent } = eventsModule as {
+  mapCodexMessageToRuntimeEvent: (message: RpcMessage) => RuntimeEvent<UnknownRecord> | null;
+};
 const {
   extractThreadId,
   extractThreadIdFromParams,
-} = require("./message-utils");
-const { SessionStore } = require("./session-store");
-const { resolveCodexWorkspaceRoot } = require("../../../core/workspace-alias");
-const { buildWorkspaceContinuityInstructions } = require("../../../core/workspace-bootstrap");
+} = messageUtilsModule as {
+  extractThreadId: (value: unknown) => string;
+  extractThreadIdFromParams: (params: Record<string, unknown>) => string;
+};
 
-function createCodexRuntimeAdapter(config: any) {
+interface CodexRuntimeConfig extends Record<string, unknown> {
+  sessionsFile: string;
+  stateDir: string;
+  codexEndpoint?: string;
+  codexCommand?: string;
+  weixinInstructionsFile?: string;
+  weixinOperationsFile?: string;
+  weixinInstructionsOverlayFile?: string;
+  weixinOperationsOverlayFile?: string;
+}
+
+interface RpcMessageParams extends UnknownRecord {
+  threadId?: unknown;
+}
+
+interface RpcMessage extends UnknownRecord {
+  params?: RpcMessageParams;
+}
+
+interface RpcModelListResponse extends UnknownRecord {
+  result?: {
+    data?: unknown[];
+  };
+}
+
+interface RuntimeClientLike {
+  listModels(): Promise<RpcModelListResponse | null>;
+  connect(): Promise<void>;
+  initialize(): Promise<void>;
+  close(): Promise<void>;
+  isConnected(): boolean;
+  onMessage(listener: (message: RpcMessage) => void): () => void;
+  sendResponse(id: string | number, result: Record<string, unknown>): Promise<void>;
+  cancelTurn(args: { threadId: string; turnId: string }): Promise<void>;
+  resumeThread(args: { threadId: string }): Promise<unknown>;
+  sendUserMessage(params: Record<string, unknown>): Promise<unknown>;
+  startThread(args: { cwd?: string }): Promise<unknown>;
+}
+
+interface ReadyState {
+  endpoint: string;
+  models: unknown[];
+}
+
+interface RespondApprovalArgs {
+  requestId: string | number;
+  decision: string;
+}
+
+interface CancelTurnArgs {
+  threadId: string;
+  turnId: string;
+}
+
+interface ResumeThreadArgs {
+  threadId: string;
+}
+
+interface RefreshThreadInstructionsArgs {
+  bindingKey?: string;
+  threadId: string;
+  workspaceRoot: string;
+  model?: string;
+  accessMode?: string;
+}
+
+interface SendTextTurnArgs {
+  bindingKey: string;
+  workspaceRoot: string;
+  text: string;
+  metadata?: Record<string, unknown>;
+  model?: string;
+  accessMode?: string;
+}
+
+interface SendUserMessageWithDiagnosticsArgs {
+  runtimeClient: RuntimeClientLike;
+  params: Record<string, unknown>;
+  operation: string;
+  bindingKey?: string;
+  threadId?: string;
+  workspaceRoot?: string;
+  runtimeWorkspaceRoot?: string;
+}
+
+interface StartThreadWithDiagnosticsArgs {
+  runtimeClient: RuntimeClientLike;
+  cwd: string;
+  bindingKey?: string;
+  workspaceRoot?: string;
+  runtimeWorkspaceRoot?: string;
+  threadId?: string;
+}
+
+interface LogInvalidWorkspaceErrorArgs {
+  operation: string;
+  bindingKey?: string;
+  threadId?: string;
+  workspaceRoot?: string;
+  runtimeWorkspaceRoot?: string;
+  error: unknown;
+}
+
+interface WaitForTurnCompletionResult {
+  turnId: string;
+  text: string;
+}
+
+interface CodexRuntimeAdapter {
+  describe(): {
+    id: "codex";
+    kind: "runtime";
+    endpoint: string;
+    sessionsFile: string;
+  };
+  createClient(): RuntimeClientLike;
+  onEvent(listener: (event: RuntimeEvent<UnknownRecord>, message: RpcMessage) => void): () => void;
+  getSessionStore(): SessionStore;
+  initialize(): Promise<ReadyState>;
+  close(): Promise<void>;
+  respondApproval(args: RespondApprovalArgs): Promise<{ requestId: string | number; decision: "accept" | "decline" }>;
+  cancelTurn(args: CancelTurnArgs): Promise<CancelTurnArgs>;
+  resumeThread(args: ResumeThreadArgs): Promise<unknown>;
+  refreshThreadInstructions(args: RefreshThreadInstructionsArgs): Promise<WaitForTurnCompletionResult & { threadId: string }>;
+  sendTextTurn(args: SendTextTurnArgs): Promise<RuntimeTurnSendState>;
+}
+
+export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRuntimeAdapter {
   const sessionStore = new SessionStore({ filePath: config.sessionsFile });
-  let client: any = null;
-  let readyState: any = null;
+  let client: RuntimeClientLike | null = null;
+  let readyState: ReadyState | null = null;
 
-  function ensureClient() {
+  function ensureClient(): RuntimeClientLike {
     if (!client) {
       client = new CodexRpcClient({
-        endpoint: config.codexEndpoint,
-        codexCommand: config.codexCommand,
+        endpoint: normalizeText(config.codexEndpoint),
+        codexCommand: normalizeText(config.codexCommand),
         env: process.env,
         extraWritableRoots: [config.stateDir],
-      });
+      }) as unknown as RuntimeClientLike;
     }
     return client;
   }
 
-  function isReconnectableRuntimeError(error: any) {
+  function isReconnectableRuntimeError(error: unknown): boolean {
     const message = error instanceof Error ? error.message : String(error || "");
     return message.includes("Codex websocket is not connected")
       || message.includes("Codex websocket closed")
@@ -37,7 +188,7 @@ function createCodexRuntimeAdapter(config: any) {
       || message.includes("Codex RPC client closed");
   }
 
-  async function refreshReadyState(runtimeClient: any) {
+  async function refreshReadyState(runtimeClient: RuntimeClientLike): Promise<ReadyState> {
     const modelResponse = await runtimeClient.listModels().catch(() => null);
     const models = Array.isArray(modelResponse?.result?.data)
       ? modelResponse.result.data
@@ -46,13 +197,13 @@ function createCodexRuntimeAdapter(config: any) {
       sessionStore.setAvailableModelCatalog(models);
     }
     readyState = {
-      endpoint: config.codexEndpoint || "(spawn)",
+      endpoint: normalizeText(config.codexEndpoint) || "(spawn)",
       models,
     };
     return readyState;
   }
 
-  async function ensureInitialized({ forceReconnect = false }: any = {}) {
+  async function ensureInitialized({ forceReconnect = false }: { forceReconnect?: boolean } = {}): Promise<ReadyState> {
     const runtimeClient = ensureClient();
     if (forceReconnect) {
       readyState = null;
@@ -66,7 +217,7 @@ function createCodexRuntimeAdapter(config: any) {
     return refreshReadyState(runtimeClient);
   }
 
-  async function withRuntimeReconnect(action: any) {
+  async function withRuntimeReconnect<T>(action: (runtimeClient: RuntimeClientLike) => Promise<T>): Promise<T> {
     const runtimeClient = ensureClient();
     try {
       await ensureInitialized();
@@ -85,20 +236,20 @@ function createCodexRuntimeAdapter(config: any) {
       return {
         id: "codex",
         kind: "runtime",
-        endpoint: config.codexEndpoint || "(spawn)",
+        endpoint: normalizeText(config.codexEndpoint) || "(spawn)",
         sessionsFile: config.sessionsFile,
       };
     },
     createClient() {
       return ensureClient();
     },
-    onEvent(listener: any) {
+    onEvent(listener) {
       if (typeof listener !== "function") {
         return () => {};
       }
       const runtimeClient = ensureClient();
-      return runtimeClient.onMessage((message: any) => {
-        const event = mapCodexMessageToRuntimeEvent(message);
+      return runtimeClient.onMessage((message) => {
+        const event = mapCodexMessageToRuntimeEvent(message) as RuntimeEvent<UnknownRecord> | null;
         if (event) {
           listener(event, message);
         }
@@ -117,8 +268,8 @@ function createCodexRuntimeAdapter(config: any) {
       readyState = null;
       client = null;
     },
-    async respondApproval({ requestId, decision }: any) {
-      return withRuntimeReconnect(async (runtimeClient: any) => {
+    async respondApproval({ requestId, decision }) {
+      return withRuntimeReconnect(async (runtimeClient) => {
         const normalizedDecision = decision === "accept" ? "accept" : "decline";
         if (requestId == null || String(requestId).trim() === "") {
           throw new Error("approval response requires a requestId");
@@ -130,17 +281,23 @@ function createCodexRuntimeAdapter(config: any) {
         };
       });
     },
-    async cancelTurn({ threadId, turnId }: any) {
-      return withRuntimeReconnect(async (runtimeClient: any) => {
+    async cancelTurn({ threadId, turnId }) {
+      return withRuntimeReconnect(async (runtimeClient) => {
         await runtimeClient.cancelTurn({ threadId, turnId });
         return { threadId, turnId };
       });
     },
-    async resumeThread({ threadId }: any) {
-      return withRuntimeReconnect((runtimeClient: any) => runtimeClient.resumeThread({ threadId }));
+    async resumeThread({ threadId }) {
+      return withRuntimeReconnect((runtimeClient) => runtimeClient.resumeThread({ threadId }));
     },
-    async refreshThreadInstructions({ bindingKey = "", threadId, workspaceRoot, model = "", accessMode = "" }: any) {
-      return withRuntimeReconnect(async (runtimeClient: any) => {
+    async refreshThreadInstructions({
+      bindingKey = "",
+      threadId,
+      workspaceRoot,
+      model = "",
+      accessMode = "",
+    }) {
+      return withRuntimeReconnect(async (runtimeClient) => {
         const refreshText = buildInstructionRefreshText(config, workspaceRoot);
         const runtimeWorkspaceRoot = resolveCodexWorkspaceRoot(workspaceRoot);
         await runtimeClient.resumeThread({ threadId });
@@ -164,11 +321,18 @@ function createCodexRuntimeAdapter(config: any) {
         if (bindingKey) {
           sessionStore.rememberWorkspaceBootstrapForThread(bindingKey, workspaceRoot, threadId);
         }
-        return { threadId, ...((result && typeof result === "object") ? result : {}) };
+        return { threadId, ...result };
       });
     },
-    async sendTextTurn({ bindingKey, workspaceRoot, text, metadata = {}, model = "", accessMode = "" }: any) {
-      return withRuntimeReconnect(async (runtimeClient: any) => {
+    async sendTextTurn({
+      bindingKey,
+      workspaceRoot,
+      text,
+      metadata = {},
+      model = "",
+      accessMode = "",
+    }) {
+      return withRuntimeReconnect(async (runtimeClient) => {
         // Codex websocket metadata currently breaks on non-ASCII workspace keys.
         // Keep session truth keyed by the canonical workspace root, but route the
         // actual runtime cwd through the existing machine-level ASCII alias map.
@@ -185,7 +349,7 @@ function createCodexRuntimeAdapter(config: any) {
             workspaceRoot,
             runtimeWorkspaceRoot,
           });
-          threadId = extractThreadId(response);
+          threadId = normalizeText(extractThreadId(response));
           if (!threadId) {
             throw new Error("thread/start did not return a thread id");
           }
@@ -202,7 +366,7 @@ function createCodexRuntimeAdapter(config: any) {
               runtimeWorkspaceRoot,
               threadId,
             });
-            threadId = extractThreadId(recreated);
+            threadId = normalizeText(extractThreadId(recreated));
             if (!threadId) {
               throw new Error("thread/start did not return a thread id");
             }
@@ -243,7 +407,7 @@ function createCodexRuntimeAdapter(config: any) {
   };
 }
 
-function buildOpeningTurnText(config: any, workspaceRoot: any, userText: any) {
+function buildOpeningTurnText(config: CodexRuntimeConfig, workspaceRoot: string, userText: unknown): string {
   const instructionBlocks = buildInstructionBlocks(config, workspaceRoot);
   const normalizedText = String(userText || "").trim();
   if (!instructionBlocks.length) {
@@ -257,7 +421,7 @@ function buildOpeningTurnText(config: any, workspaceRoot: any, userText: any) {
   ].join("\n").trim();
 }
 
-function buildWorkspaceBootstrapTurnText(config: any, workspaceRoot: any, userText: any) {
+function buildWorkspaceBootstrapTurnText(config: CodexRuntimeConfig, workspaceRoot: string, userText: unknown): string {
   const instructionBlocks = buildInstructionBlocks(config, workspaceRoot);
   const normalizedText = String(userText || "").trim();
   if (!instructionBlocks.length) {
@@ -276,7 +440,7 @@ function buildWorkspaceBootstrapTurnText(config: any, workspaceRoot: any, userTe
   ].join("\n").trim();
 }
 
-function buildInstructionRefreshText(config: any, workspaceRoot: any) {
+function buildInstructionRefreshText(config: CodexRuntimeConfig, workspaceRoot: string): string {
   const instructionBlocks = buildInstructionBlocks(config, workspaceRoot);
   if (!instructionBlocks.length) {
     return "Refresh your WeChat behavior for this existing thread. Reply in one short Chinese sentence confirming that you have updated your behavior for this thread.";
@@ -292,10 +456,10 @@ function buildInstructionRefreshText(config: any, workspaceRoot: any) {
   ].join("\n").trim();
 }
 
-function buildInstructionBlocks(config: any = {}, workspaceRoot: string = "") {
+function buildInstructionBlocks(config: CodexRuntimeConfig, workspaceRoot: string): string[] {
   const instructions = loadWechatInstructions(config);
   const workspaceContinuity = buildWorkspaceContinuityInstructions(workspaceRoot, config);
-  const sections = [];
+  const sections: string[] = [];
   if (instructions) {
     sections.push([
       "WECHAT SESSION INSTRUCTIONS",
@@ -314,7 +478,7 @@ function buildInstructionBlocks(config: any = {}, workspaceRoot: string = "") {
   return sections;
 }
 
-function loadWechatInstructions(config: any = {}) {
+export function loadWechatInstructions(config: CodexRuntimeConfig): string {
   const persona = loadInstructionFile(config.weixinInstructionsFile, config);
   const operations = loadInstructionFile(config.weixinOperationsFile, config);
   const personaOverlay = loadInstructionFile(config.weixinInstructionsOverlayFile, config);
@@ -322,8 +486,8 @@ function loadWechatInstructions(config: any = {}) {
   return [persona, operations, personaOverlay, operationsOverlay].filter(Boolean).join("\n\n").trim();
 }
 
-function loadInstructionFile(filePath: any, config: any = {}) {
-  const normalizedPath = typeof filePath === "string" ? filePath.trim() : "";
+function loadInstructionFile(filePath: unknown, config: CodexRuntimeConfig): string {
+  const normalizedPath = normalizeText(filePath);
   if (!normalizedPath) {
     return "";
   }
@@ -335,14 +499,6 @@ function loadInstructionFile(filePath: any, config: any = {}) {
   }
 }
 
-module.exports = {
-  createCodexRuntimeAdapter,
-  loadWechatInstructions,
-  __testing: {
-    waitForTurnCompletion,
-  },
-};
-
 async function startThreadWithWorkspaceDiagnostics({
   runtimeClient,
   cwd,
@@ -350,7 +506,7 @@ async function startThreadWithWorkspaceDiagnostics({
   workspaceRoot = "",
   runtimeWorkspaceRoot = "",
   threadId = "",
-}: any) {
+}: StartThreadWithDiagnosticsArgs): Promise<unknown> {
   try {
     return await runtimeClient.startThread({ cwd });
   } catch (error) {
@@ -374,14 +530,14 @@ async function sendUserMessageWithWorkspaceDiagnostics({
   threadId = "",
   workspaceRoot = "",
   runtimeWorkspaceRoot = "",
-}: any) {
+}: SendUserMessageWithDiagnosticsArgs): Promise<unknown> {
   try {
     return await runtimeClient.sendUserMessage(params);
   } catch (error) {
     logInvalidWorkspaceError({
       operation,
       bindingKey,
-      threadId: threadId || params?.threadId || "",
+      threadId: threadId || normalizeText(params.threadId),
       workspaceRoot,
       runtimeWorkspaceRoot,
       error,
@@ -397,7 +553,7 @@ function logInvalidWorkspaceError({
   workspaceRoot = "",
   runtimeWorkspaceRoot = "",
   error,
-}: any) {
+}: LogInvalidWorkspaceErrorArgs): void {
   if (!isInvalidWorkspaceError(error)) {
     return;
   }
@@ -413,14 +569,14 @@ function logInvalidWorkspaceError({
   );
 }
 
-function isInvalidWorkspaceError(error: any) {
+function isInvalidWorkspaceError(error: unknown): boolean {
   const message = formatErrorMessage(error).toLowerCase();
   return message.includes("os error 267")
     || message.includes("notadirectory")
     || message.includes("目录名称无效");
 }
 
-function describeWorkspaceState(workspaceRoot: any) {
+function describeWorkspaceState(workspaceRoot: unknown): string {
   const normalized = normalizeLogValue(workspaceRoot);
   if (!normalized) {
     return "empty";
@@ -432,19 +588,23 @@ function describeWorkspaceState(workspaceRoot: any) {
   }
 }
 
-function normalizeLogValue(value: any) {
+function normalizeLogValue(value: unknown): string {
   return typeof value === "string" ? value.trim().replace(/\\/g, "/") : "";
 }
 
-function formatErrorMessage(error: any) {
+function normalizeText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function formatErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error || "unknown error");
 }
 
-function waitForTurnCompletion(client: any, threadId: any) {
-  return new Promise((resolve: any, reject: any) => {
+function waitForTurnCompletion(client: RuntimeClientLike, threadId: string): Promise<WaitForTurnCompletionResult> {
+  return new Promise((resolve, reject) => {
     let activeTurnId = "";
     const itemOrder: string[] = [];
-    const textByItemId = new Map();
+    const textByItemId = new Map<string, string>();
 
     const cleanup = () => {
       unsubscribe();
@@ -456,11 +616,11 @@ function waitForTurnCompletion(client: any, threadId: any) {
       reject(new Error("codex turn timed out"));
     }, 10 * 60_000);
 
-    const unsubscribe = client.onMessage((message: any) => {
-      const runtimeEvent = mapCodexMessageToRuntimeEvent(message);
-      const params = message?.params || {};
+    const unsubscribe = client.onMessage((message) => {
+      const runtimeEvent = mapCodexMessageToRuntimeEvent(message) as RuntimeEvent<UnknownRecord> | null;
+      const params = isRecord(message?.params) ? message.params : {};
       const messageThreadId = normalizeLogValue(runtimeEvent?.payload?.threadId)
-        || extractThreadIdFromParams(params);
+        || normalizeText(extractThreadIdFromParams(params));
       if (messageThreadId !== threadId) {
         return;
       }
@@ -509,8 +669,8 @@ function waitForTurnCompletion(client: any, threadId: any) {
         const text = itemOrder
           .slice()
           .reverse()
-          .map((itemId: any) => textByItemId.get(itemId) || "")
-          .find((value: any) => String(value || "").trim()) || "";
+          .map((itemId) => textByItemId.get(itemId) || "")
+          .find((value) => String(value || "").trim()) || "";
         resolve({
           turnId: completedTurnId || activeTurnId,
           text: String(text || "").trim() || "已完成。",
@@ -520,4 +680,10 @@ function waitForTurnCompletion(client: any, threadId: any) {
   });
 }
 
-export {};
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
+
+export const __testing = {
+  waitForTurnCompletion,
+};
