@@ -3,17 +3,35 @@
 const {
   LEGACY_TIMELINE_TIMEZONE,
   formatDateTimeInTimezone,
+}: {
+  LEGACY_TIMELINE_TIMEZONE: string;
+  formatDateTimeInTimezone(date: Date, timezone?: unknown): string;
 } = require("./timezone");
 const {
   resolveConfiguredPersonName,
   resolvePromptPersonEn,
+}: {
+  resolveConfiguredPersonName(config?: Record<string, unknown>): string;
+  resolvePromptPersonEn(config?: Record<string, unknown>): string;
 } = require("./person-reference");
 
 const SYSTEM_MESSAGE_FAILURE_RETRY_DELAYS_MS = [30_000, 2 * 60_000, 5 * 60_000];
 
-function createShutdownController(onStop: any) {
+interface PersistedAttachmentResult {
+  saved?: unknown[];
+  failed?: Array<{ reason: string } & Record<string, unknown>>;
+}
+
+interface InboundMessageRef {
+  text?: unknown;
+  receivedAt?: unknown;
+}
+
+type ShutdownStopHandler = () => Promise<unknown> | unknown;
+
+export function createShutdownController(onStop: ShutdownStopHandler) {
   let stopped = false;
-  let stoppingPromise: Promise<any> | null = null;
+  let stoppingPromise: Promise<unknown> | null = null;
 
   const stop = async () => {
     if (stopped) {
@@ -44,12 +62,15 @@ function createShutdownController(onStop: any) {
   };
 }
 
-function getSystemMessageFailureRetryDelayMs(attemptCount: any) {
+export function getSystemMessageFailureRetryDelayMs(attemptCount: unknown): number {
   const index = Math.max(0, Math.min(SYSTEM_MESSAGE_FAILURE_RETRY_DELAYS_MS.length - 1, Number(attemptCount) - 1));
   return SYSTEM_MESSAGE_FAILURE_RETRY_DELAYS_MS[index];
 }
 
-function buildReminderSystemTrigger(reminder: any, config: any = {}) {
+export function buildReminderSystemTrigger(
+  reminder: { text?: unknown } | null | undefined,
+  config: Record<string, unknown> = {},
+): string {
   const reminderText = String(reminder?.text || "").trim();
   const person = resolvePromptPersonEn(config);
   return [
@@ -62,7 +83,11 @@ function buildReminderSystemTrigger(reminder: any, config: any = {}) {
   ].join("\n");
 }
 
-function buildCodexInboundText(normalized: any, persisted: any = {}, config: any = {}) {
+export function buildCodexInboundText(
+  normalized: InboundMessageRef,
+  persisted: PersistedAttachmentResult = {},
+  config: Record<string, unknown> = {},
+): string {
   const text = String(normalized?.text || "").trim();
   const saved = Array.isArray(persisted?.saved) ? persisted.saved : [];
   const failed = Array.isArray(persisted?.failed) ? persisted.failed : [];
@@ -90,8 +115,12 @@ function buildCodexInboundText(normalized: any, persisted: any = {}, config: any
       lines.push("The person in this thread sent image/file attachments. They were saved under the local data directory:");
     }
     for (const item of saved) {
-      const suffix = item.sourceFileName ? ` (original name: ${item.sourceFileName})` : "";
-      lines.push(`- [${item.kind}] ${item.absolutePath}${suffix}`);
+      const attachment = item && typeof item === "object" ? item as Record<string, unknown> : {};
+      const sourceFileName = typeof attachment.sourceFileName === "string" ? attachment.sourceFileName : "";
+      const kind = typeof attachment.kind === "string" ? attachment.kind : "attachment";
+      const absolutePath = typeof attachment.absolutePath === "string" ? attachment.absolutePath : "";
+      const suffix = sourceFileName ? ` (original name: ${sourceFileName})` : "";
+      lines.push(`- [${kind}] ${absolutePath}${suffix}`);
     }
     lines.push(`You must read these files before replying to ${person}. Do not skip the read step.`);
     lines.push(`If the required local tool is missing, tell ${person} exactly what is missing and that you cannot read the file yet. Do not pretend you already read it.`);
@@ -111,7 +140,7 @@ function buildCodexInboundText(normalized: any, persisted: any = {}, config: any
   return lines.join("\n").trim();
 }
 
-function formatWechatLocalTime(receivedAt: any, timezone: any = LEGACY_TIMELINE_TIMEZONE) {
+function formatWechatLocalTime(receivedAt: unknown, timezone: unknown = LEGACY_TIMELINE_TIMEZONE): string {
   const value = typeof receivedAt === "string" ? receivedAt.trim() : "";
   if (!value) {
     return "";
@@ -123,18 +152,18 @@ function formatWechatLocalTime(receivedAt: any, timezone: any = LEGACY_TIMELINE_
   return formatDateTimeInTimezone(parsed, timezone).replace("T", " ");
 }
 
-function stringifyRpcId(value: any) {
+function stringifyRpcId(value: unknown): string {
   if (value == null) {
     return "";
   }
   return String(value).trim();
 }
 
-function hasRpcId(value: any) {
+export function hasRpcId(value: unknown): boolean {
   return stringifyRpcId(value) !== "";
 }
 
-function resolveTimelineScreenshotOutput(args: any) {
+export function resolveTimelineScreenshotOutput(args: unknown): string {
   const normalizedArgs = Array.isArray(args) ? args : [];
   for (let index = 0; index < normalizedArgs.length; index += 1) {
     if (String(normalizedArgs[index] || "").trim() !== "--output") {
@@ -144,14 +173,3 @@ function resolveTimelineScreenshotOutput(args: any) {
   }
   return "";
 }
-
-module.exports = {
-  buildCodexInboundText,
-  buildReminderSystemTrigger,
-  createShutdownController,
-  getSystemMessageFailureRetryDelayMs,
-  hasRpcId,
-  resolveTimelineScreenshotOutput,
-};
-
-export {};

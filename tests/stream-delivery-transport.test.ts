@@ -1,23 +1,23 @@
-// @ts-nocheck
-const test = require("node:test");
-const assert = require("node:assert/strict");
+const test: typeof import("node:test") = require("node:test");
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 
+import type { RunState } from "../src/core/stream-delivery/run-state";
 const {
   buildReplyText,
   normalizeDeliveryDelta,
   prepareStreamingDelivery,
-} = require("../src/core/stream-delivery/delivery-transport");
+}: typeof import("../src/core/stream-delivery/delivery-transport") = require("../src/core/stream-delivery/delivery-transport");
 const {
   createRunState,
   upsertStateItem,
-} = require("../src/core/stream-delivery/run-state");
+}: typeof import("../src/core/stream-delivery/run-state") = require("../src/core/stream-delivery/run-state");
+
+function createWeixinRunState(threadId: string, turnId: string, weixinReplyMode: string): RunState {
+  return createRunState({ threadId, turnId, weixinReplyMode });
+}
 
 test("stream delivery transport only prepares streamable items until watchdog force flush", () => {
-  const state = createRunState({
-    threadId: "thread-1",
-    turnId: "turn-1",
-    weixinReplyMode: "stream",
-  });
+  const state = createWeixinRunState("thread-1", "turn-1", "stream");
   state.replyTarget = {
     provider: "weixin",
     userId: "user-1",
@@ -61,11 +61,7 @@ test("stream delivery transport only prepares streamable items until watchdog fo
 });
 
 test("settled reply assembly keeps only the latest visible reply plus watchdog tail", () => {
-  const state = createRunState({
-    threadId: "thread-2",
-    turnId: "turn-2",
-    weixinReplyMode: "settled",
-  });
+  const state = createWeixinRunState("thread-2", "turn-2", "settled");
   state.replyTarget = {
     provider: "weixin",
     userId: "user-2",

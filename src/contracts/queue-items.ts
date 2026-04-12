@@ -2,7 +2,7 @@ import { z } from "zod";
 
 type PlainObject = Record<string, unknown>;
 
-export interface SystemMessage {
+interface NormalizedSystemMessageShape {
   id: string;
   accountId: string;
   senderId: string;
@@ -19,10 +19,38 @@ export interface SystemMessage {
   createdAt: string;
 }
 
-export interface SystemMessageDeadLetterEntry extends SystemMessage {
+const systemMessageIngressSchema = z.object({
+  id: z.unknown().optional(),
+  accountId: z.unknown().optional(),
+  senderId: z.unknown().optional(),
+  workspaceRoot: z.unknown().optional(),
+  text: z.unknown().optional(),
+  kind: z.unknown().optional(),
+  attemptCount: z.unknown().optional(),
+  lastAttemptAt: z.unknown().optional(),
+  nextAttemptAt: z.unknown().optional(),
+  expiresAt: z.unknown().optional(),
+  lastFailureReason: z.unknown().optional(),
+  deliveryState: z.unknown().optional(),
+  inFlightAt: z.unknown().optional(),
+  createdAt: z.unknown().optional(),
+}).passthrough();
+
+export const systemMessageSchema = systemMessageIngressSchema.transform((value, ctx) => {
+  const normalized = normalizeSystemMessageRecord(value);
+  if (!normalized) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "invalid system message" });
+    return z.NEVER;
+  }
+  return normalized;
+});
+
+export type SystemMessage = z.infer<typeof systemMessageSchema>;
+
+export type SystemMessageDeadLetterEntry = SystemMessage & {
   deadLetterReason: string;
   deadLetterAt: string;
-}
+};
 
 export interface TimelineScreenshotJob {
   id: string;
@@ -62,7 +90,10 @@ export function normalizeSystemMessage(message: unknown): SystemMessage | null {
   if (!isPlainObject(message)) {
     return null;
   }
+  return normalizeSystemMessageRecord(message);
+}
 
+function normalizeSystemMessageRecord(message: z.input<typeof systemMessageIngressSchema> & PlainObject): NormalizedSystemMessageShape | null {
   const id = normalizeText(message.id);
   const accountId = normalizeText(message.accountId);
   const senderId = normalizeText(message.senderId);
@@ -126,18 +157,10 @@ export function normalizeSystemMessageDeadLetterEntry(entry: unknown): SystemMes
 }
 
 export function validateSystemMessageQueueState(state: unknown): true | string {
-  if (!isPlainObject(state)) {
-    return "system message queue top-level state must be an object";
-  }
-  if (!Array.isArray(state.messages)) {
-    return "system message queue messages must be an array";
-  }
-  for (let index = 0; index < state.messages.length; index += 1) {
-    if (!normalizeSystemMessage(state.messages[index])) {
-      return `system message queue messages[${index}] is invalid`;
-    }
-  }
-  return true;
+  const parsed = systemMessageQueueStateSchema.safeParse(state);
+  return parsed.success
+    ? true
+    : (parsed.error.issues[0]?.message || "system message queue is invalid");
 }
 
 export function validateSystemMessageDeadLetterState(state: unknown): true | string {
@@ -241,18 +264,9 @@ export function validateReminderQueueState(state: unknown): true | string {
   return true;
 }
 
-export const systemMessageQueueStateSchema = z.unknown().transform((value: any, ctx: any) => {
-  const validation = validateSystemMessageQueueState(value);
-  if (validation !== true) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: validation });
-    return z.NEVER;
-  }
-  const source = value as { messages: unknown[] } & PlainObject;
-  return {
-    ...source,
-    messages: source.messages.map((message: any) => normalizeSystemMessage(message)!),
-  };
-});
+export const systemMessageQueueStateSchema = z.object({
+  messages: z.array(systemMessageSchema),
+}).passthrough();
 
 export const systemMessageDeadLetterStateSchema = z.unknown().transform((value: any, ctx: any) => {
   const validation = validateSystemMessageDeadLetterState(value);

@@ -2,7 +2,7 @@ import type { RuntimeEvent } from "../../../contracts/runtime-events";
 import type { RuntimeTurnSendState, UnknownRecord } from "../../../core/runtime-types";
 import * as workspaceAliasModule from "../../../workspace/workspace-alias";
 import * as eventsModule from "./events";
-import * as messageUtilsModule from "./message-utils";
+import { extractThreadId, type RuntimeMessage } from "./message-utils";
 import { SessionStore } from "./session-store";
 import {
   buildInstructionRefreshText,
@@ -25,9 +25,6 @@ const { resolveCodexWorkspaceRoot } = workspaceAliasModule as {
 };
 const { mapCodexMessageToRuntimeEvent } = eventsModule as {
   mapCodexMessageToRuntimeEvent: (message: UnknownRecord) => RuntimeEvent<UnknownRecord> | null;
-};
-const { extractThreadId } = messageUtilsModule as {
-  extractThreadId: (value: unknown) => string;
 };
 
 interface CodexRuntimeConfig extends Record<string, unknown> {
@@ -207,7 +204,7 @@ export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRunt
             workspaceRoot,
             runtimeWorkspaceRoot,
           });
-          threadId = normalizeText(extractThreadId(response));
+          threadId = normalizeText(extractThreadId(response as RuntimeMessage));
           if (!threadId) {
             throw new Error("thread/start did not return a thread id");
           }
@@ -224,7 +221,7 @@ export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRunt
               runtimeWorkspaceRoot,
               threadId,
             });
-            threadId = normalizeText(extractThreadId(recreated));
+            threadId = normalizeText(extractThreadId(recreated as RuntimeMessage));
             if (!threadId) {
               throw new Error("thread/start did not return a thread id");
             }

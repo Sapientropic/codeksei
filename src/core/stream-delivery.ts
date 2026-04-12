@@ -1,9 +1,21 @@
 // @ts-check
 
-const crypto = require("crypto");
-const { RUNTIME_EVENT_TYPES } = require("../contracts/runtime-events");
-const { computeVisibleDeliveryDelta } = require("./stream-delivery/delta-merge");
-const {
+import * as crypto from "crypto";
+import {
+  RUNTIME_EVENT_TYPES,
+  type RuntimeEvent,
+} from "../contracts/runtime-events";
+import type {
+  ChannelAdapterLike,
+  SessionStoreLike,
+} from "./app-service-contract";
+import type {
+  DeliveryFailurePayload,
+  ReplyTarget,
+  UnknownRecord,
+} from "./runtime-types";
+import { computeVisibleDeliveryDelta } from "./stream-delivery/delta-merge";
+import {
   buildCurrentSafeReplyText,
   buildReplyText,
   commitPreparedStreamingDelivery,
@@ -12,16 +24,19 @@ const {
   prefersSettledDelivery,
   prefersStreamingDelivery,
   prepareStreamingDelivery,
-} = require("./stream-delivery/delivery-transport");
-const {
+  type FlushTrigger,
+  type PreparedStreamingDelivery,
+} from "./stream-delivery/delivery-transport";
+import {
   buildRunKey,
   ensureRunState,
   findRunState,
   removeStateItem,
   replaceStateItemText,
   upsertStateItem,
-} = require("./stream-delivery/run-state");
-const {
+  type RunState,
+} from "./stream-delivery/run-state";
+import {
   buildDeliveryTracePayload,
   buildSettledWeixinDeliveryKey,
   disposeSupersededAbandonedRuns,
@@ -29,70 +44,48 @@ const {
   rememberRecentDelivery,
   resolveLateRewriteDelta,
   wasRecentlyDelivered,
-} = require("./stream-delivery/trace-abandonment");
-const { createFlushScheduler } = require("./stream-delivery/flush-scheduler");
-const { createReplyTargetRegistry } = require("./stream-delivery/reply-target-registry");
-const {
+  type DeliveryTracePayload,
+} from "./stream-delivery/trace-abandonment";
+import { createFlushScheduler } from "./stream-delivery/flush-scheduler";
+import { createReplyTargetRegistry } from "./stream-delivery/reply-target-registry";
+import {
   normalizeLineEndings,
   normalizeText,
   sanitizeReplyText,
-} = require("./stream-delivery/visible-text");
+} from "./stream-delivery/visible-text";
 
 const STREAM_IDLE_FLUSH_MS = 500;
 const STREAM_FORCE_FLUSH_CHARS = 100;
 const STREAM_BOUNDARY_FLUSH_CHARS = 30;
 
-/**
- * @typedef {{
- *   userId: string,
- *   contextToken: string,
- *   provider: string,
- * }} ReplyTarget
- */
+interface StreamDeliveryOptions {
+  channelAdapter: ChannelAdapterLike;
+  sessionStore: SessionStoreLike;
+  weixinReplyMode?: unknown;
+  deliveryTraceEnabled?: unknown;
+  onDeliveryFailure?: ((payload: DeliveryFailurePayload) => Promise<void> | void) | null;
+  streamIdleFlushMs?: unknown;
+  streamForceFlushChars?: unknown;
+  streamBoundaryFlushChars?: unknown;
+}
 
-/**
- * @typedef {{
- *   source?: string,
- *   itemId?: string,
- *   phase?: string,
- *   fragmentKind?: string,
- *   fragmentRelation?: string,
- * } | null} FlushTrigger
- */
+type FlushScheduler = ReturnType<typeof createFlushScheduler>;
+type ReplyTargetRegistry = ReturnType<typeof createReplyTargetRegistry>;
 
-/**
- * @typedef {{
- *   runKey: string,
- *   threadId: string,
- *   bindingKey: string,
- *   replyTarget: ReplyTarget | null,
- *   turnId: string,
- *   itemOrder: string[],
- *   items: Map<string, unknown>,
- *   weixinReplyMode: string,
- *   sentText: string,
- *   lastDeliveredVisibleText: string,
- *   sendChain: Promise<void>,
- *   flushPromise: Promise<void> | null,
- *   scheduledFlushTimer: NodeJS.Timeout | null,
- *   abandonedAt: number,
- * }} RunState
- */
-
-class StreamDelivery {
-  channelAdapter: any;
-  deliveryTraceEnabled: any;
-  flushScheduler: any;
-  ignoredRunKeys: Set<any>;
-  onDeliveryFailure: any;
-  recentSettledWeixinDeliveries: Map<any, any>;
-  replyTargetRegistry: any;
-  sessionStore: any;
-  stateByRunKey: Map<any, any>;
-  streamBoundaryFlushChars: any;
-  streamForceFlushChars: any;
-  streamIdleFlushMs: any;
-  weixinReplyMode: any;
+export class StreamDelivery {
+  channelAdapter: ChannelAdapterLike;
+  deliveryTraceEnabled: boolean;
+  flushScheduler: FlushScheduler;
+  ignoredRunKeys: Set<string>;
+  onDeliveryFailure: ((payload: DeliveryFailurePayload) => Promise<void> | void) | null;
+  recentSettledWeixinDeliveries: Map<string, number>;
+  replyTargetRegistry: ReplyTargetRegistry;
+  sessionStore: SessionStoreLike;
+  stateByRunKey: Map<string, RunState>;
+  streamBoundaryFlushChars: number;
+  streamForceFlushChars: number;
+  streamIdleFlushMs: number;
+  weixinReplyMode: "settled" | "stream";
 
   constructor({
     channelAdapter,
@@ -103,7 +96,7 @@ class StreamDelivery {
     streamIdleFlushMs = STREAM_IDLE_FLUSH_MS,
     streamForceFlushChars = STREAM_FORCE_FLUSH_CHARS,
     streamBoundaryFlushChars = STREAM_BOUNDARY_FLUSH_CHARS,
-  }: any) {
+  }: StreamDeliveryOptions) {
     this.channelAdapter = channelAdapter;
     this.sessionStore = sessionStore;
     this.weixinReplyMode = normalizeWeixinReplyMode(weixinReplyMode);
@@ -116,7 +109,10 @@ class StreamDelivery {
       sessionStore: this.sessionStore,
     });
     this.flushScheduler = createFlushScheduler({
-      flushNow: (state: any, options: any) => this.flushNow(state, options),
+      flushNow: (
+        state: RunState,
+        options: { force: boolean; trigger?: FlushTrigger | null },
+      ) => this.flushNow(state, options),
       runtimeEventTypes: RUNTIME_EVENT_TYPES,
       streamIdleFlushMs: this.streamIdleFlushMs,
       streamForceFlushChars: this.streamForceFlushChars,
@@ -127,15 +123,15 @@ class StreamDelivery {
     this.recentSettledWeixinDeliveries = new Map();
   }
 
-  setReplyTarget(bindingKey: any, target: any) {
+  setReplyTarget(bindingKey: string, target: ReplyTarget): void {
     this.replyTargetRegistry.setReplyTarget(bindingKey, target);
   }
 
-  queueReplyTargetForThread(threadId: any, target: any) {
+  queueReplyTargetForThread(threadId: string, target: ReplyTarget): void {
     this.replyTargetRegistry.queueReplyTargetForThread(threadId, target);
   }
 
-  async handleRuntimeEvent(event: any) {
+  async handleRuntimeEvent(event: RuntimeEvent<UnknownRecord>): Promise<void> {
     const threadId = normalizeText(event?.payload?.threadId);
     const turnId = normalizeText(event?.payload?.turnId);
     if (!threadId) {
@@ -156,7 +152,7 @@ class StreamDelivery {
           ignoredRunKeys: this.ignoredRunKeys,
           threadId,
           activeTurnId: turnId,
-          onDisposeRunKey: (runKey: any) => this.disposeRunState(runKey),
+          onDisposeRunKey: (runKey) => this.disposeRunState(runKey),
         });
         const state = ensureRunState(this.stateByRunKey, {
           threadId,
@@ -247,7 +243,7 @@ class StreamDelivery {
     }
   }
 
-  async finishTurn({ threadId, finalText }: any) {
+  async finishTurn({ threadId, finalText }: { threadId: unknown; finalText: unknown }): Promise<void> {
     const normalizedThreadId = normalizeText(threadId);
     const normalizedFinalText = normalizeLineEndings(finalText);
     if (!normalizedThreadId || !normalizedFinalText) {
@@ -292,7 +288,15 @@ class StreamDelivery {
     this.disposeRunState(state.runKey);
   }
 
-  async finalizeAbandonedTurn({ threadId, turnId = "", trailingText = "" }: any) {
+  async finalizeAbandonedTurn({
+    threadId,
+    turnId = "",
+    trailingText = "",
+  }: {
+    threadId: unknown;
+    turnId?: string;
+    trailingText?: string;
+  }): Promise<void> {
     const normalizedThreadId = normalizeText(threadId);
     const normalizedTurnId = normalizeText(turnId);
     const normalizedTrailingText = normalizeLineEndings(trailingText).trim();
@@ -341,15 +345,21 @@ class StreamDelivery {
     state.abandonedAt = Date.now();
   }
 
-  attachReplyTarget(state: any) {
+  attachReplyTarget(state: RunState): ReplyTarget | null {
     return this.replyTargetRegistry.attachReplyTarget(state);
   }
 
-  async flush(state: any, { force, trigger = null }: any) {
+  async flush(
+    state: RunState,
+    { force, trigger = null }: { force: boolean; trigger?: FlushTrigger | null },
+  ): Promise<void> {
     await this.flushScheduler.flush(state, { force, trigger });
   }
 
-  async flushNow(state: any, { force, trigger = null }: any) {
+  async flushNow(
+    state: RunState,
+    { force, trigger = null }: { force: boolean; trigger?: FlushTrigger | null },
+  ): Promise<void> {
     this.attachReplyTarget(state);
     if (!state.replyTarget) {
       return;
@@ -440,6 +450,10 @@ class StreamDelivery {
 
     const settledWechatDelivery = prefersSettledDelivery(state);
     const streamingPreserveBlock = Boolean(streamPrepared?.preserveBlock);
+    const replyTarget = state.replyTarget;
+    if (!replyTarget) {
+      return;
+    }
     const tracePayload = buildDeliveryTracePayload(state, {
       force,
       trigger,
@@ -454,9 +468,9 @@ class StreamDelivery {
       this.logDeliveryTrace("attempt", tracePayload);
       try {
         await this.channelAdapter.sendText({
-          userId: state.replyTarget.userId,
+          userId: replyTarget.userId,
           text: delta,
-          contextToken: state.replyTarget.contextToken,
+          contextToken: replyTarget.contextToken,
           preserveBlock: settledWechatDelivery || streamingPreserveBlock,
           trace: this.deliveryTraceEnabled
             ? {
@@ -487,13 +501,14 @@ class StreamDelivery {
           commitPreparedStreamingDelivery(streamPrepared, { delivered: false });
         }
         this.logDeliveryTrace("failed", tracePayload, error);
-        console.error(`[codeksei] failed to deliver reply thread=${state.threadId}: ${String((error as any)?.message || error)}`);
+        const errorMessage = error instanceof Error ? error.message : String(error || "");
+        console.error(`[codeksei] failed to deliver reply thread=${state.threadId}: ${errorMessage}`);
         this.handleDeliveryFailure(state, error);
       }
     });
   }
 
-  handleDeliveryFailure(state: any, error: any) {
+  handleDeliveryFailure(state: RunState, error: unknown): void {
     if (!state?.runKey) {
       return;
     }
@@ -511,12 +526,15 @@ class StreamDelivery {
       error,
       sentText: state.sentText,
       replyTarget: state.replyTarget ? { ...state.replyTarget } : null,
-    })).catch((callbackError: any) => {
-      console.error(`[codeksei] delivery failure callback crashed thread=${state.threadId}: ${callbackError.message}`);
+    })).catch((callbackError: unknown) => {
+      const callbackErrorMessage = callbackError instanceof Error
+        ? callbackError.message
+        : String(callbackError || "");
+      console.error(`[codeksei] delivery failure callback crashed thread=${state.threadId}: ${callbackErrorMessage}`);
     });
   }
 
-  disposeRunState(runKey: any) {
+  disposeRunState(runKey: unknown): void {
     const normalizedRunKey = normalizeText(runKey);
     if (!normalizedRunKey) {
       return;
@@ -528,15 +546,18 @@ class StreamDelivery {
     this.stateByRunKey.delete(normalizedRunKey);
   }
 
-  scheduleStreamingFlush(state: any, { force = false, trigger = null }: any = {}) {
+  scheduleStreamingFlush(
+    state: RunState,
+    { force = false, trigger = null }: { force?: boolean; trigger?: FlushTrigger | null } = {},
+  ): void {
     this.flushScheduler.scheduleStreamingFlush(state, { force, trigger });
   }
 
-  clearScheduledFlush(state: any) {
+  clearScheduledFlush(state: RunState): void {
     this.flushScheduler.clearScheduledFlush(state);
   }
 
-  logDeliveryTrace(stage: any, payload: any, error: any = null) {
+  logDeliveryTrace(stage: unknown, payload: DeliveryTracePayload | null, error: unknown = null): void {
     if (!this.deliveryTraceEnabled || !payload) {
       return;
     }
@@ -559,7 +580,8 @@ class StreamDelivery {
       `deltaHash=${payload.deltaHash}`,
     ].filter(Boolean);
     if (error) {
-      parts.push(`error=${JSON.stringify(String(error?.message || error || ""))}`);
+      const errorMessage = error instanceof Error ? error.message : String(error || "");
+      parts.push(`error=${JSON.stringify(errorMessage)}`);
       console.error(parts.join(" "));
       return;
     }
@@ -567,10 +589,7 @@ class StreamDelivery {
   }
 }
 
-function numberOrDefault(value: any, fallback: any) {
-  return Number.isFinite(value) ? value : fallback;
+function numberOrDefault(value: unknown, fallback: number): number {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
 }
-
-module.exports = { StreamDelivery };
-
-export {};

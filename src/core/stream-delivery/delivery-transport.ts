@@ -1,11 +1,12 @@
 // @ts-check
 
-const {
+import type { RunState, VisibleRunStateItem } from "./run-state";
+import {
   collectVisibleItems,
   readStateItemText,
-} = require("./run-state");
-const { computeVisibleDeliveryDelta } = require("./delta-merge");
-const {
+} from "./run-state";
+import { computeVisibleDeliveryDelta } from "./delta-merge";
+import {
   isBriefStreamingProgressText,
   markdownToPlainText,
   normalizeLineEndings,
@@ -14,32 +15,71 @@ const {
   sanitizeReplyText,
   shouldStreamImmediately,
   trimOuterBlankLines,
-} = require("./visible-text");
+} from "./visible-text";
 
-function normalizeWeixinReplyMode(value: any) {
+export interface FlushTrigger {
+  source?: string;
+  itemId?: string;
+  phase?: string;
+  fragmentKind?: string;
+  fragmentRelation?: string;
+}
+
+export interface DeliveredStreamingItem {
+  itemId: string;
+  visibleText: string;
+  deltaText: string;
+  relation: string;
+  phase: string;
+  fragmentKind: string;
+}
+
+export interface PreparedStreamingDelivery {
+  state: RunState;
+  safeText: string;
+  relation: string;
+  deliveredItems: DeliveredStreamingItem[];
+  deliveredVisibleAfter: string;
+  preserveBlock: boolean;
+  idleFlushEligible: boolean;
+}
+
+function normalizeWeixinReplyModeValue(value: unknown): "settled" | "stream" {
   return normalizeText(value).toLowerCase() === "settled" ? "settled" : "stream";
 }
 
-function prefersSettledDelivery(state: any) {
-  return normalizeText(state?.replyTarget?.provider) === "weixin"
-    && normalizeWeixinReplyMode(state?.weixinReplyMode) === "settled";
+export function normalizeWeixinReplyMode(value: unknown): "settled" | "stream" {
+  return normalizeWeixinReplyModeValue(value);
 }
 
-function prefersStreamingDelivery(state: any) {
+export function prefersSettledDelivery(state: RunState | null | undefined): boolean {
   return normalizeText(state?.replyTarget?.provider) === "weixin"
-    && normalizeWeixinReplyMode(state?.weixinReplyMode) === "stream";
+    && normalizeWeixinReplyModeValue(state?.weixinReplyMode) === "settled";
 }
 
-function hasWatchdogTail(state: any, { completedOnly }: any) {
+export function prefersStreamingDelivery(state: RunState | null | undefined): boolean {
+  return normalizeText(state?.replyTarget?.provider) === "weixin"
+    && normalizeWeixinReplyModeValue(state?.weixinReplyMode) === "stream";
+}
+
+function hasWatchdogTail(state: RunState, { completedOnly }: { completedOnly: boolean }): boolean {
   return Boolean(readStateItemText(state, "__watchdog__", { completedOnly }));
 }
 
-function buildAllVisibleReplyText(
-  state: any,
-  { completedOnly, skipItemIds = null, collapseDuplicateVisibleItems = false }: any
-) {
+export function buildAllVisibleReplyText(
+  state: RunState,
+  {
+    completedOnly,
+    skipItemIds = null,
+    collapseDuplicateVisibleItems = false,
+  }: {
+    completedOnly: boolean;
+    skipItemIds?: Set<string> | null;
+    collapseDuplicateVisibleItems?: boolean;
+  },
+): string {
   const parts: string[] = [];
-  const seenVisibleParts = collapseDuplicateVisibleItems ? new Set() : null;
+  const seenVisibleParts = collapseDuplicateVisibleItems ? new Set<string>() : null;
   for (const item of collectVisibleItems(state, { completedOnly, skipItemIds })) {
     if (!seenVisibleParts) {
       parts.push(item.text);
@@ -50,7 +90,7 @@ function buildAllVisibleReplyText(
   return parts.join("\n\n");
 }
 
-function findLatestVisibleReplyText(state: any, { completedOnly }: any) {
+export function findLatestVisibleReplyText(state: RunState, { completedOnly }: { completedOnly: boolean }): string {
   const visibleItems = collectVisibleItems(state, { completedOnly });
   for (let index = visibleItems.length - 1; index >= 0; index -= 1) {
     if (visibleItems[index].itemId !== "__watchdog__") {
@@ -60,7 +100,9 @@ function findLatestVisibleReplyText(state: any, { completedOnly }: any) {
   return "";
 }
 
-function findLatestWatchdogVisibleReply(visibleItems: any) {
+export function findLatestWatchdogVisibleReply(
+  visibleItems: VisibleRunStateItem[],
+): VisibleRunStateItem | null {
   for (let index = visibleItems.length - 1; index >= 0; index -= 1) {
     const item = visibleItems[index];
     if (!item || item.itemId === "__watchdog__") {
@@ -85,7 +127,10 @@ function findLatestWatchdogVisibleReply(visibleItems: any) {
   return null;
 }
 
-function findLatestWatchdogVisibleReplyText(state: any, { completedOnly }: any) {
+export function findLatestWatchdogVisibleReplyText(
+  state: RunState,
+  { completedOnly }: { completedOnly: boolean },
+): string {
   const visibleItems = collectVisibleItems(state, {
     completedOnly,
     skipItemIds: new Set(["__watchdog__"]),
@@ -94,7 +139,7 @@ function findLatestWatchdogVisibleReplyText(state: any, { completedOnly }: any) 
   return candidate?.text || "";
 }
 
-function findLastVisibleReplyIndex(visibleItems: any) {
+function findLastVisibleReplyIndex(visibleItems: VisibleRunStateItem[]): number {
   for (let index = visibleItems.length - 1; index >= 0; index -= 1) {
     if (visibleItems[index]?.itemId !== "__watchdog__") {
       return index;
@@ -103,7 +148,7 @@ function findLastVisibleReplyIndex(visibleItems: any) {
   return -1;
 }
 
-function findStreamingTerminalReplyText(visibleItems: any) {
+export function findStreamingTerminalReplyText(visibleItems: VisibleRunStateItem[]): VisibleRunStateItem | null {
   const lastVisibleReplyIndex = findLastVisibleReplyIndex(visibleItems);
   if (lastVisibleReplyIndex < 0) {
     return null;
@@ -120,9 +165,9 @@ function findStreamingTerminalReplyText(visibleItems: any) {
   return visibleItems[lastVisibleReplyIndex] || null;
 }
 
-function buildStreamingReplyText(state: any, { completedOnly }: any) {
+export function buildStreamingReplyText(state: RunState, { completedOnly }: { completedOnly: boolean }): string {
   const parts: string[] = [];
-  const seenParts = new Set();
+  const seenParts = new Set<string>();
   for (const item of collectVisibleItems(state, { completedOnly })) {
     if (!shouldStreamImmediately(item)) {
       continue;
@@ -132,14 +177,14 @@ function buildStreamingReplyText(state: any, { completedOnly }: any) {
   return parts.join("\n\n");
 }
 
-function buildStreamingWatchdogReplyText(state: any, { completedOnly }: any) {
+function buildStreamingWatchdogReplyText(state: RunState, { completedOnly }: { completedOnly: boolean }): string {
   const visible = buildStreamingReplyText(state, { completedOnly });
   const tail = readStateItemText(state, "__watchdog__", { completedOnly });
   const watchdogText = tail ? markdownToPlainText(tail) : "";
   return [visible, watchdogText].filter(Boolean).join("\n\n");
 }
 
-function buildSettledReplyText(state: any, { completedOnly }: any) {
+export function buildSettledReplyText(state: RunState, { completedOnly }: { completedOnly: boolean }): string {
   const tail = readStateItemText(state, "__watchdog__", { completedOnly });
   if (!tail) {
     // Codex can emit several assistant messages inside one turn. In settled
@@ -156,7 +201,18 @@ function buildSettledReplyText(state: any, { completedOnly }: any) {
   return [visible, markdownToPlainText(tail)].filter(Boolean).join("\n\n");
 }
 
-function buildReplyText(state: any, { completedOnly, preferLatestMessage = false, force = false }: any) {
+export function buildReplyText(
+  state: RunState,
+  {
+    completedOnly,
+    preferLatestMessage = false,
+    force = false,
+  }: {
+    completedOnly: boolean;
+    preferLatestMessage?: boolean;
+    force?: boolean;
+  },
+): string {
   if (prefersStreamingDelivery(state) && !preferLatestMessage) {
     return force && hasWatchdogTail(state, { completedOnly })
       ? buildStreamingWatchdogReplyText(state, { completedOnly })
@@ -174,7 +230,10 @@ function buildReplyText(state: any, { completedOnly, preferLatestMessage = false
   return buildAllVisibleReplyText(state, { completedOnly });
 }
 
-function buildCurrentSafeReplyText(state: any, { force = false, completedOnly = false }: any = {}) {
+export function buildCurrentSafeReplyText(
+  state: RunState,
+  { force = false, completedOnly = false }: { force?: boolean; completedOnly?: boolean } = {},
+): string {
   const plainText = buildReplyText(state, {
     completedOnly,
     preferLatestMessage: prefersSettledDelivery(state),
@@ -183,7 +242,10 @@ function buildCurrentSafeReplyText(state: any, { force = false, completedOnly = 
   return sanitizeReplyText(state.replyTarget, plainText).text;
 }
 
-function normalizeDeliveryDelta(delta: any, { streaming = false }: any = {}) {
+export function normalizeDeliveryDelta(
+  delta: unknown,
+  { streaming = false }: { streaming?: boolean } = {},
+): string {
   const normalized = String(delta || "");
   if (!streaming) {
     return normalized;
@@ -194,7 +256,7 @@ function normalizeDeliveryDelta(delta: any, { streaming = false }: any = {}) {
   return normalized.replace(/^\n+/u, "");
 }
 
-function shouldPreserveStreamingBlock(prepared: any) {
+export function shouldPreserveStreamingBlock(prepared: { deliveredItems?: unknown[] } | null | undefined): boolean {
   const deliveredItems = Array.isArray(prepared?.deliveredItems) ? prepared.deliveredItems : [];
   if (deliveredItems.length !== 1) {
     return false;
@@ -209,7 +271,9 @@ function shouldPreserveStreamingBlock(prepared: any) {
   return true;
 }
 
-function shouldScheduleStreamingIdleFlush(prepared: any) {
+export function shouldScheduleStreamingIdleFlush(
+  prepared: { deliveredItems?: Array<{ phase?: unknown }> } | null | undefined,
+): boolean {
   const deliveredItems = Array.isArray(prepared?.deliveredItems) ? prepared.deliveredItems : [];
   if (!deliveredItems.length) {
     return false;
@@ -217,13 +281,16 @@ function shouldScheduleStreamingIdleFlush(prepared: any) {
   // Idle flush is only for lightweight commentary. Letting unfinished final
   // text flush on idle is what produced half-sentences like "...时间" followed
   // by "线，不靠你自己回忆。" in separate WeChat bubbles.
-  return deliveredItems.every((item: any) => normalizeText(item?.phase) === "commentary");
+  return deliveredItems.every((item) => normalizeText(item?.phase) === "commentary");
 }
 
-function prepareStreamingDelivery(state: any, { completedOnly, force }: any) {
+export function prepareStreamingDelivery(
+  state: RunState,
+  { completedOnly, force }: { completedOnly: boolean; force: boolean },
+): PreparedStreamingDelivery {
   const visibleItems = collectVisibleItems(state, { completedOnly });
-  const deliveredItems = [];
-  const deltaParts = [];
+  const deliveredItems: DeliveredStreamingItem[] = [];
+  const deltaParts: string[] = [];
 
   for (const item of visibleItems) {
     const isWatchdog = item.itemId === "__watchdog__";
@@ -274,14 +341,25 @@ function prepareStreamingDelivery(state: any, { completedOnly, force }: any) {
   };
 }
 
-function buildStreamingDeliveredVisibleText(state: any, { completedOnly, deliveredItems, force }: any) {
-  const deliveredById = new Map();
+function buildStreamingDeliveredVisibleText(
+  state: RunState,
+  {
+    completedOnly,
+    deliveredItems,
+    force,
+  }: {
+    completedOnly: boolean;
+    deliveredItems: DeliveredStreamingItem[];
+    force: boolean;
+  },
+): string {
+  const deliveredById = new Map<string, string>();
   for (const item of Array.isArray(deliveredItems) ? deliveredItems : []) {
     deliveredById.set(item.itemId, item.visibleText);
   }
 
   const parts: string[] = [];
-  const seenParts = new Set();
+  const seenParts = new Set<string>();
   for (const item of collectVisibleItems(state, { completedOnly })) {
     if (item.itemId === "__watchdog__" && !force) {
       continue;
@@ -300,7 +378,10 @@ function buildStreamingDeliveredVisibleText(state: any, { completedOnly, deliver
   return parts.join("\n\n");
 }
 
-function commitPreparedStreamingDelivery(prepared: any, { delivered }: any) {
+export function commitPreparedStreamingDelivery(
+  prepared: PreparedStreamingDelivery | null | undefined,
+  { delivered }: { delivered: boolean },
+): void {
   if (!prepared?.state || !Array.isArray(prepared.deliveredItems)) {
     return;
   }
@@ -318,7 +399,10 @@ function commitPreparedStreamingDelivery(prepared: any, { delivered }: any) {
   }
 }
 
-function hasCompletedFlushTrigger(trigger: any, runtimeEventTypes: any) {
+export function hasCompletedFlushTrigger(
+  trigger: FlushTrigger | null | undefined,
+  runtimeEventTypes: { REPLY_COMPLETED: string; TURN_COMPLETED: string },
+): boolean {
   const source = normalizeText(trigger?.source);
   return source === runtimeEventTypes.REPLY_COMPLETED
     || source === runtimeEventTypes.TURN_COMPLETED
@@ -326,7 +410,7 @@ function hasCompletedFlushTrigger(trigger: any, runtimeEventTypes: any) {
     || source === "finalizeAbandonedTurn";
 }
 
-function hasNaturalFlushBoundary(text: any) {
+export function hasNaturalFlushBoundary(text: unknown): boolean {
   const normalized = trimOuterBlankLines(normalizeLineEndings(text));
   if (!normalized) {
     return false;
@@ -335,27 +419,3 @@ function hasNaturalFlushBoundary(text: any) {
     || /\n$/.test(normalized)
     || /(?:[。！？!?]|[.!?]["'”’）)\]」』】]?)$/.test(normalized);
 }
-
-module.exports = {
-  buildAllVisibleReplyText,
-  buildCurrentSafeReplyText,
-  buildReplyText,
-  buildSettledReplyText,
-  buildStreamingReplyText,
-  commitPreparedStreamingDelivery,
-  findLatestVisibleReplyText,
-  findLatestWatchdogVisibleReply,
-  findLatestWatchdogVisibleReplyText,
-  findStreamingTerminalReplyText,
-  hasCompletedFlushTrigger,
-  hasNaturalFlushBoundary,
-  normalizeDeliveryDelta,
-  normalizeWeixinReplyMode,
-  prefersSettledDelivery,
-  prefersStreamingDelivery,
-  prepareStreamingDelivery,
-  shouldPreserveStreamingBlock,
-  shouldScheduleStreamingIdleFlush,
-};
-
-export {};

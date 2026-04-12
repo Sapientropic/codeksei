@@ -1,43 +1,54 @@
 // @ts-check
 
-const { sanitizeProtocolLeakText } = require("../../adapters/runtime/codex/protocol-leak-monitor");
-const { normalizeAssistantPhase } = require("../../adapters/runtime/codex/message-utils");
+import { sanitizeProtocolLeakText } from "../../adapters/runtime/codex/protocol-leak-monitor";
+import { normalizeAssistantPhase } from "../../adapters/runtime/codex/message-utils";
 
 const STREAM_PROGRESS_MAX_CHARS = 120;
 const STREAM_PROGRESS_MAX_LINES = 2;
 const WEIXIN_DUPLICATE_BLOCK_MIN_CHARS = 120;
 const WEIXIN_DUPLICATE_BLOCK_MIN_SEGMENTS = 2;
 
-function normalizeText(value: any) {
+export interface VisibleDeliveryItem {
+  itemId?: string;
+  text?: string;
+  phase?: string;
+}
+
+export interface SanitizedReplyText {
+  suppress: boolean;
+  text: string;
+}
+
+export function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function normalizeLineEndings(value: any) {
+export function normalizeLineEndings(value: unknown): string {
   return String(value || "").replace(/\r\n/g, "\n");
 }
 
-function trimOuterBlankLines(text: any) {
+export function trimOuterBlankLines(text: unknown): string {
   return String(text || "")
     .replace(/^\s*\n+/g, "")
     .replace(/\n+\s*$/g, "");
 }
 
-function indentBlock(text: any) {
+function indentBlock(text: unknown): string {
   const normalized = trimOuterBlankLines(normalizeLineEndings(text));
   if (!normalized) {
     return "";
   }
-  return normalized.split("\n").map((line: any) => `    ${line}`).join("\n");
+  return normalized.split("\n").map((line) => `    ${line}`).join("\n");
 }
 
-function markdownToPlainText(text: any) {
+export function markdownToPlainText(text: unknown): string {
   let result = normalizeLineEndings(text);
-  result = result.replace(/```([^\n]*)\n?([\s\S]*?)```/g, (_: any, language: any, code: any) => {
+  result = result.replace(/```([^\n]*)\n?([\s\S]*?)```/g, (_match, language: string, code: string) => {
     const label = String(language || "").trim();
     const body = indentBlock(String(code || ""));
     return label ? `\n${label}:\n${body}\n` : `\n代码:\n${body}\n`;
   });
-  result = result.replace(/```([^\n]*)\n?([\s\S]*)$/g, (_: any, language: any, code: any) => {
+  result = result.replace(/```([^\n]*)\n?([\s\S]*)$/g, (_match, language: string, code: string) => {
     const label = String(language || "").trim();
     const body = indentBlock(String(code || ""));
     return label ? `\n${label}:\n${body}\n` : `\n代码:\n${body}\n`;
@@ -50,48 +61,48 @@ function markdownToPlainText(text: any) {
   result = result.replace(/\*([^*]+)\*/g, "$1");
   result = result.replace(/^>\s?/gm, "> ");
   result = result.replace(/^\|[\s:|-]+\|$/gm, "");
-  result = result.replace(/^\|(.+)\|$/gm, (_: any, inner: any) =>
-    String(inner || "").split("|").map((cell: any) => cell.trim()).join("  ")
+  result = result.replace(/^\|(.+)\|$/gm, (_match, inner: string) =>
+    String(inner || "").split("|").map((cell) => cell.trim()).join("  ")
   );
   result = result.replace(/\n{3,}/g, "\n\n");
   return trimOuterBlankLines(result);
 }
 
-function buildVisibleItemDedupKey(text: any) {
+export function buildVisibleItemDedupKey(text: unknown): string {
   return trimOuterBlankLines(markdownToPlainText(normalizeLineEndings(text)));
 }
 
-function normalizeSilentSentinelText(value: any) {
+function normalizeSilentSentinelText(value: unknown): string {
   return String(value || "")
     .normalize("NFKC")
     .toUpperCase()
     .replace(/[^A-Z_]/g, "");
 }
 
-function isSilentSentinelToken(value: any) {
+function isSilentSentinelToken(value: unknown): boolean {
   const normalized = normalizeSilentSentinelText(value);
   return normalized === "SILENT";
 }
 
-function containsStructuredSilentSignal(value: any) {
+function containsStructuredSilentSignal(value: unknown): boolean {
   return /\{\s*"codeksei_action"\s*:\s*"silent"\s*\}/i.test(String(value || ""));
 }
 
-function stripSilentSentinelArtifacts(value: any) {
+function stripSilentSentinelArtifacts(value: unknown): string {
   return normalizeLineEndings(String(value || ""))
     .replace(/\{\s*"codeksei_action"\s*:\s*"silent"\s*\}/gi, "")
     .split("\n")
-    .map((line: any) => {
+    .map((line) => {
       const parts = line.split(/\s+/);
-      const kept = parts.filter((part: any) => !isSilentSentinelToken(part));
+      const kept = parts.filter((part) => !isSilentSentinelToken(part));
       return kept.join(" ").trim();
     })
-    .filter((line: any, index: any, lines: any) => line || (index > 0 && index < lines.length - 1))
+    .filter((line, index, lines) => line || (index > 0 && index < lines.length - 1))
     .join("\n")
     .replace(/\n{3,}/g, "\n\n");
 }
 
-function arraysEqual(left: any, right: any) {
+function arraysEqual(left: unknown, right: unknown): boolean {
   if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
     return false;
   }
@@ -103,16 +114,19 @@ function arraysEqual(left: any, right: any) {
   return true;
 }
 
-function collapseAdjacentRepeatedSegments(text: any, { pattern, joiner }: any) {
+function collapseAdjacentRepeatedSegments(
+  text: unknown,
+  { pattern, joiner }: { pattern: RegExp; joiner: string },
+): string {
   const segments = String(text || "")
     .split(pattern)
-    .map((segment: any) => trimOuterBlankLines(segment))
+    .map((segment) => trimOuterBlankLines(segment))
     .filter(Boolean);
   if (segments.length < WEIXIN_DUPLICATE_BLOCK_MIN_SEGMENTS * 2) {
     return trimOuterBlankLines(text);
   }
 
-  const normalizedSegments = segments.map((segment: any) =>
+  const normalizedSegments = segments.map((segment) =>
     buildVisibleItemDedupKey(segment).replace(/\s+/gu, " ").trim()
   );
   for (let span = Math.floor(segments.length / 2); span >= 1; span -= 1) {
@@ -142,7 +156,7 @@ function collapseAdjacentRepeatedSegments(text: any, { pattern, joiner }: any) {
   return trimOuterBlankLines(text);
 }
 
-function collapseRepeatedWechatReplyText(text: any) {
+function collapseRepeatedWechatReplyText(text: unknown): string {
   let collapsed = trimOuterBlankLines(normalizeLineEndings(text));
   if (!collapsed || collapsed.length < WEIXIN_DUPLICATE_BLOCK_MIN_CHARS * 2) {
     return collapsed;
@@ -168,7 +182,7 @@ function collapseRepeatedWechatReplyText(text: any) {
   return collapsed;
 }
 
-function isBriefStreamingProgressText(text: any) {
+export function isBriefStreamingProgressText(text: unknown): boolean {
   const raw = trimOuterBlankLines(normalizeLineEndings(text));
   if (!raw) {
     return false;
@@ -192,7 +206,7 @@ function isBriefStreamingProgressText(text: any) {
   return lineCount > 0 && lineCount <= STREAM_PROGRESS_MAX_LINES;
 }
 
-function shouldStreamImmediately(item: any) {
+export function shouldStreamImmediately(item: VisibleDeliveryItem | null | undefined): boolean {
   if (!item?.text || item.itemId === "__watchdog__") {
     return false;
   }
@@ -209,7 +223,7 @@ function shouldStreamImmediately(item: any) {
   return true;
 }
 
-function rememberVisiblePart(parts: any, seenParts: any, text: any) {
+export function rememberVisiblePart(parts: string[], seenParts: Set<string>, text: unknown): void {
   const dedupeKey = buildVisibleItemDedupKey(text);
   if (dedupeKey && seenParts.has(dedupeKey)) {
     return;
@@ -217,10 +231,10 @@ function rememberVisiblePart(parts: any, seenParts: any, text: any) {
   if (dedupeKey) {
     seenParts.add(dedupeKey);
   }
-  parts.push(text);
+  parts.push(String(text || ""));
 }
 
-function shouldSuppressSystemReply(replyTarget: any, plainReplyText: any) {
+function shouldSuppressSystemReply(replyTarget: { provider?: unknown } | null | undefined, plainReplyText: unknown): boolean {
   if (replyTarget?.provider !== "system") {
     return false;
   }
@@ -237,11 +251,14 @@ function shouldSuppressSystemReply(replyTarget: any, plainReplyText: any) {
   }
   return normalized
     .split("\n")
-    .map((line: any) => normalizeSilentSentinelText(line.trim()))
-    .some((line: any) => line === "SILENT");
+    .map((line) => normalizeSilentSentinelText(line.trim()))
+    .some((line) => line === "SILENT");
 }
 
-function sanitizeReplyText(replyTarget: any, plainReplyText: any) {
+export function sanitizeReplyText(
+  replyTarget: { provider?: unknown } | null | undefined,
+  plainReplyText: unknown,
+): SanitizedReplyText {
   const normalized = normalizeLineEndings(String(plainReplyText || ""));
   if (!normalized) {
     return { suppress: false, text: "" };
@@ -260,17 +277,3 @@ function sanitizeReplyText(replyTarget: any, plainReplyText: any) {
     text: trimOuterBlankLines(deduped),
   };
 }
-
-module.exports = {
-  buildVisibleItemDedupKey,
-  isBriefStreamingProgressText,
-  markdownToPlainText,
-  normalizeLineEndings,
-  normalizeText,
-  rememberVisiblePart,
-  sanitizeReplyText,
-  shouldStreamImmediately,
-  trimOuterBlankLines,
-};
-
-export {};

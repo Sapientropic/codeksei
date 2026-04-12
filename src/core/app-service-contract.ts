@@ -95,6 +95,7 @@ export interface ChannelAdapterLike {
     text: string;
     contextToken?: string;
     preserveBlock?: boolean;
+    trace?: Record<string, unknown> | null;
   }): Promise<unknown>;
   sendTyping(payload: {
     userId: string;

@@ -1,64 +1,75 @@
 // @ts-check
 
-/**
- * @typedef {{
- *   type?: unknown,
- *   text?: unknown,
- *   phase?: unknown,
- *   content?: unknown,
- *   metadata?: { phase?: unknown },
- * }} AssistantItemPayload
- */
-
-/**
- * @typedef {{
- *   delta?: unknown,
- *   phase?: unknown,
- *   content?: unknown,
- *   item?: AssistantItemPayload & { metadata?: { phase?: unknown } },
- *   metadata?: { phase?: unknown },
- *   turn?: { id?: unknown, error?: { message?: unknown } },
- *   error?: { message?: unknown },
- *   threadId?: unknown,
- *   turnId?: unknown,
- * }} RuntimeMessageParams
- */
-
-/**
- * @typedef {{
- *   method?: unknown,
- *   params?: RuntimeMessageParams,
- * }} RuntimeMessage
- */
-
-function extractThreadId(response: any) {
-  return response?.result?.thread?.id || null;
+export interface AssistantItemPayload {
+  id?: unknown;
+  type?: unknown;
+  text?: unknown;
+  phase?: unknown;
+  content?: unknown;
+  metadata?: {
+    phase?: unknown;
+  };
 }
 
-function extractThreadIdFromParams(params: any) {
+export interface RuntimeMessageParams {
+  delta?: unknown;
+  phase?: unknown;
+  content?: unknown;
+  item?: AssistantItemPayload;
+  metadata?: {
+    phase?: unknown;
+  };
+  turn?: {
+    id?: unknown;
+    error?: {
+      message?: unknown;
+    };
+  };
+  error?: {
+    message?: unknown;
+  };
+  threadId?: unknown;
+  turnId?: unknown;
+}
+
+export interface RuntimeMessage {
+  method?: unknown;
+  params?: RuntimeMessageParams;
+  result?: {
+    thread?: {
+      id?: unknown;
+    };
+  };
+}
+
+export function extractThreadId(response: RuntimeMessage | null | undefined): string | null {
+  return normalizeIdentifier(response?.result?.thread?.id) || null;
+}
+
+export function extractThreadIdFromParams(params: RuntimeMessageParams | null | undefined): string {
   return normalizeIdentifier(params?.threadId);
 }
 
-function extractTurnIdFromParams(params: any) {
+export function extractTurnIdFromParams(params: RuntimeMessageParams | null | undefined): string {
   return normalizeIdentifier(params?.turnId || params?.turn?.id);
 }
 
-function isAssistantItemCompleted(message: any) {
+export function isAssistantItemCompleted(message: RuntimeMessage | null | undefined): boolean {
   return message?.method === "item/completed"
     && normalizeIdentifier(message?.params?.item?.type).toLowerCase() === "agentmessage";
 }
 
-function extractAssistantText(params: any) {
+export function extractAssistantText(params: RuntimeMessageParams | null | undefined): string {
   return extractAssistantDeltaText(params) || extractAssistantSnapshotText(params);
 }
 
-function extractAssistantDeltaText(params: any) {
+export function extractAssistantDeltaText(params: RuntimeMessageParams | null | undefined): string {
   return typeof params?.delta === "string" && params.delta.length > 0
     ? normalizeLineEndings(params.delta)
     : "";
 }
 
-function extractAssistantSnapshotText(params: any) {
+export function extractAssistantSnapshotText(params: RuntimeMessageParams | null | undefined): string {
   const snapshotCandidates = [
     params?.item?.text,
   ];
@@ -82,7 +93,9 @@ function extractAssistantSnapshotText(params: any) {
   return "";
 }
 
-function extractAssistantDeltaFragment(params: any) {
+export function extractAssistantDeltaFragment(
+  params: RuntimeMessageParams | null | undefined,
+): { text: string; fragmentKind: string } {
   const deltaText = extractAssistantDeltaText(params);
   if (deltaText) {
     return {
@@ -103,11 +116,11 @@ function extractAssistantDeltaFragment(params: any) {
   };
 }
 
-function extractCompletedAssistantText(params: any) {
+export function extractCompletedAssistantText(params: RuntimeMessageParams | null | undefined): string {
   return extractAssistantSnapshotText(params);
 }
 
-function extractAssistantPhase(params: any) {
+export function extractAssistantPhase(params: RuntimeMessageParams | null | undefined): string {
   const candidates = [
     params?.phase,
     params?.item?.phase,
@@ -123,20 +136,20 @@ function extractAssistantPhase(params: any) {
   return "";
 }
 
-function extractFailureText(params: any) {
+export function extractFailureText(params: RuntimeMessageParams | null | undefined): string {
   const rawMessage = normalizeIdentifier(params?.turn?.error?.message || params?.error?.message);
   return rawMessage ? `执行失败：${rawMessage}` : "执行失败";
 }
 
-function normalizeIdentifier(value: any) {
+function normalizeIdentifier(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function normalizeLineEndings(value: any) {
+function normalizeLineEndings(value: unknown): string {
   return String(value || "").replace(/\r\n/g, "\n");
 }
 
-function normalizeAssistantPhase(value: any) {
+export function normalizeAssistantPhase(value: unknown): string {
   const normalized = normalizeIdentifier(value).toLowerCase();
   if (normalized === "commentary") {
     return "commentary";
@@ -150,7 +163,7 @@ function normalizeAssistantPhase(value: any) {
   return "";
 }
 
-function extractRawTextFromContent(content: any) {
+function extractRawTextFromContent(content: unknown): string {
   if (typeof content === "string" && content.length > 0) {
     return normalizeLineEndings(content);
   }
@@ -160,7 +173,7 @@ function extractRawTextFromContent(content: any) {
   }
 
   if (Array.isArray(content)) {
-    const parts = [];
+    const parts: string[] = [];
     for (const entry of content) {
       if (typeof entry === "string" && entry.length > 0) {
         parts.push(normalizeLineEndings(entry));
@@ -169,17 +182,18 @@ function extractRawTextFromContent(content: any) {
       if (!entry || typeof entry !== "object") {
         continue;
       }
-      const entryType = String(entry.type || "").toLowerCase();
-      if (entryType === "text" && typeof entry.text === "string" && entry.text.length > 0) {
-        parts.push(normalizeLineEndings(entry.text));
+      const record = entry as Record<string, unknown>;
+      const entryType = String(record.type || "").toLowerCase();
+      if (entryType === "text" && typeof record.text === "string" && record.text.length > 0) {
+        parts.push(normalizeLineEndings(record.text));
         continue;
       }
-      if (typeof entry.text === "string" && entry.text.length > 0) {
-        parts.push(normalizeLineEndings(entry.text));
+      if (typeof record.text === "string" && record.text.length > 0) {
+        parts.push(normalizeLineEndings(record.text));
         continue;
       }
-      if (typeof entry.value === "string" && entry.value.length > 0) {
-        parts.push(normalizeLineEndings(entry.value));
+      if (typeof record.value === "string" && record.value.length > 0) {
+        parts.push(normalizeLineEndings(record.value));
       }
     }
     return parts.join("");
@@ -189,26 +203,10 @@ function extractRawTextFromContent(content: any) {
     return "";
   }
 
-  if (typeof content.text === "string" && content.text.length > 0) {
-    return normalizeLineEndings(content.text);
+  const record = content as Record<string, unknown>;
+  if (typeof record.text === "string" && record.text.length > 0) {
+    return normalizeLineEndings(record.text);
   }
 
   return "";
 }
-
-module.exports = {
-  extractAssistantDeltaFragment,
-  extractAssistantDeltaText,
-  extractAssistantPhase,
-  extractAssistantSnapshotText,
-  extractAssistantText,
-  extractCompletedAssistantText,
-  extractFailureText,
-  extractThreadId,
-  extractThreadIdFromParams,
-  extractTurnIdFromParams,
-  isAssistantItemCompleted,
-  normalizeAssistantPhase,
-};
-
-export {};
