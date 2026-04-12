@@ -3,7 +3,6 @@
 const { normalizeModelCatalog } = require("./model-catalog");
 const {
   createEmptySessionState,
-  listPendingApprovalEntries,
   normalizePendingApprovalRecord,
   normalizeSessionBinding,
   normalizeSessionState,
@@ -31,13 +30,15 @@ class SessionStore {
   }
 
   load() {
-    const parsed = readManagedJsonStateFile({
+    // sessionStoreStateSchema already canonicalizes persisted session JSON.
+    // Keep compatibility logic at that ingress so reads do not silently apply
+    // a second round of shape repair in every store call site.
+    this.state = readManagedJsonStateFile({
       filePath: this.filePath,
       fallback: createEmptySessionState(),
       label: "session store",
       schema: sessionStoreStateSchema,
     });
-    this.state = normalizeSessionState(parsed);
   }
 
   save() {
@@ -57,7 +58,8 @@ class SessionStore {
   }
 
   getActiveWorkspaceRoot(bindingKey: any) {
-    return normalizeValue(this.state.bindings[normalizeValue(bindingKey)]?.activeWorkspaceRoot);
+    const activeWorkspaceRoot = this.state.bindings[normalizeValue(bindingKey)]?.activeWorkspaceRoot;
+    return typeof activeWorkspaceRoot === "string" ? activeWorkspaceRoot : "";
   }
 
   updateBinding(bindingKey: any, nextBinding: any) {
@@ -84,7 +86,8 @@ class SessionStore {
     if (!normalizedWorkspaceRoot) {
       return "";
     }
-    return this.state.bindings[normalizeValue(bindingKey)]?.threadIdByWorkspaceRoot?.[normalizedWorkspaceRoot] || "";
+    const threadId = this.state.bindings[normalizeValue(bindingKey)]?.threadIdByWorkspaceRoot?.[normalizedWorkspaceRoot];
+    return typeof threadId === "string" ? threadId : "";
   }
 
   setThreadIdForWorkspace(bindingKey: any, workspaceRoot: any, threadId: any, extra: any = {}) {
@@ -125,7 +128,7 @@ class SessionStore {
     const codexParamsByWorkspaceRoot = getCodexParamsMap(current);
     const entry = codexParamsByWorkspaceRoot[normalizedWorkspaceRoot];
     return {
-      model: normalizeValue(entry?.model),
+      model: typeof entry?.model === "string" ? entry.model : "",
     };
   }
 
@@ -190,10 +193,10 @@ class SessionStore {
     }
     for (const [bindingKey, binding] of Object.entries(this.state.bindings || {})) {
       for (const [workspaceRoot, candidateThreadId] of Object.entries(getThreadMap(binding))) {
-        if (normalizeValue(candidateThreadId) === normalizedThreadId) {
+        if (candidateThreadId === normalizedThreadId) {
           return {
             bindingKey,
-            workspaceRoot: normalizeValue(workspaceRoot),
+            workspaceRoot,
           };
         }
       }
@@ -238,8 +241,8 @@ class SessionStore {
       return [];
     }
     return raw
-      .filter((entry: any) => Array.isArray(entry))
-      .map((entry: any) => entry.map((part: any) => normalizeValue(part)).filter(Boolean))
+      .filter((entry: any) => Array.isArray(entry) && entry.every((part: any) => typeof part === "string" && part))
+      .map((entry: any) => entry.slice())
       .filter((entry: any) => entry.length);
   }
 
@@ -266,15 +269,17 @@ class SessionStore {
     if (!normalizedThreadId) {
       return null;
     }
-    const raw = this.state.approvalPromptStateByThreadId?.[normalizedThreadId];
-    const normalized = normalizePendingApprovalRecord(raw);
-    return normalized ? { ...normalized } : null;
+    const approval = this.state.approvalPromptStateByThreadId?.[normalizedThreadId];
+    if (!approval || typeof approval !== "object") {
+      return null;
+    }
+    return { ...approval };
   }
 
   listPendingApprovals() {
-    return listPendingApprovalEntries(this.state).map((entry: any) => ({
-      threadId: entry.threadId,
-      approval: { ...entry.approval },
+    return Object.entries(this.state.approvalPromptStateByThreadId || {}).map(([threadId, approval]: any) => ({
+      threadId,
+      approval: { ...approval },
     }));
   }
 
@@ -351,7 +356,7 @@ class SessionStore {
     if (!models.length) {
       return null;
     }
-    const updatedAt = normalizeValue(raw.updatedAt);
+    const updatedAt = typeof raw.updatedAt === "string" ? raw.updatedAt : "";
     return { models, updatedAt };
   }
 

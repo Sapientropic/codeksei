@@ -1,11 +1,11 @@
 // @ts-check
 
-const { PRIMARY_REVIEW_MARKER_PREFIX } = require("./branding");
+const { PRIMARY_REVIEW_MARKER_PREFIX } = require("../core/branding");
 const {
   LEGACY_TIMELINE_TIMEZONE,
   formatDateInTimezone,
   formatDateTimeInTimezone,
-} = require("./timezone");
+} = require("../core/timezone");
 
 const REVIEW_MARKER_PREFIX = PRIMARY_REVIEW_MARKER_PREFIX;
 

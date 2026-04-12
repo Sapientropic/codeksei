@@ -1,16 +1,16 @@
 const fs = require("fs");
 const path = require("path");
 const { normalizeDurableNoteSchemaConfig } = require("../contracts/config-files");
-const { loadJsonConfig } = require("./config-loader");
-const { writeForeignTextDocument } = require("./json-state");
+const { loadJsonConfig } = require("../core/config-loader");
+const { writeForeignTextDocument } = require("../core/json-state");
 
-const { listTrackedProjects } = require("./project-radar");
+const { listTrackedProjects } = require("../core/project-radar");
 const { appendSection, findSectionRange, resolveNoteSyncTarget } = require("./note-sync");
 const {
   normalizeDisplayPath,
   resolveCrossPlatformPath,
   resolveCrossPlatformPathFromRoot,
-} = require("./path-utils");
+} = require("../core/path-utils");
 
 const DURABLE_NOTE_SCOPE_ALIASES = {
   assistant: "companion",

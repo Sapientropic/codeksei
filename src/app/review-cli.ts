@@ -1,7 +1,7 @@
 const { getCommandArgsSchema } = require("../contracts/command-args");
 const { parseCliArgs } = require("../core/cli-args");
 const { buildTerminalLeafHelp } = require("../core/command-registry");
-const { buildReview, writeReview } = require("../core/review");
+const { buildReview, writeReview } = require("../review/review");
 
 async function runReviewCommand(config: any, kind: any, args: any[] = []) {
   const options = parseReviewArgs(args, kind);

@@ -7,7 +7,7 @@ const path = require("path");
 const {
   resolveNoteSyncTarget,
   syncNoteContent,
-} = require("../src/core/note-sync");
+} = require("../src/notes/note-sync");
 
 test("note sync prepends bullet entries and dedupes existing text", () => {
   const source = [

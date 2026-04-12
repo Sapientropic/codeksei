@@ -6,7 +6,7 @@ const {
   buildReviewSections,
   parseManagedBulletList,
   syncReviewContent,
-} = require("../src/core/review-document");
+} = require("../src/review/review-document");
 
 function createReviewFixture() {
   const sections = buildReviewSections("monthly", "下月第一步");

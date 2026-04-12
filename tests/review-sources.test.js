@@ -7,7 +7,7 @@ const assert = require("node:assert/strict");
 const {
   collectDiaryEntries,
   collectNightlyEntries,
-} = require("../src/core/review-sources");
+} = require("../src/review/review-sources");
 
 test("review sources tolerate missing diary and nightly folders", () => {
   assert.deepEqual(collectDiaryEntries("", "2026-04-01", "2026-04-30"), []);

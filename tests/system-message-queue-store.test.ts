@@ -186,3 +186,30 @@ test("SystemMessageQueueStore records dead-letter before removing the live queue
 
   store.persistMessages = originalPersistMessages;
 });
+
+test("SystemMessageQueueStore quarantines schema-invalid queue state on load", () => {
+  const { queueFile, tempRoot, store } = createStore();
+  void store;
+  fs.writeFileSync(queueFile, JSON.stringify({
+    messages: [
+      {
+        id: "broken",
+        accountId: "acct-1",
+        senderId: "user-1",
+        workspaceRoot: [],
+      },
+    ],
+  }, null, 2), "utf8");
+
+  const reloaded = new SystemMessageQueueStore({
+    filePath: queueFile,
+    deadLetterFilePath: path.join(tempRoot, "system-message-dead-letter.json"),
+  });
+
+  assert.equal(reloaded.hasPendingForAccount("acct-1"), false);
+  assert.equal(fs.existsSync(queueFile), false);
+  assert.equal(
+    fs.readdirSync(tempRoot).some((entry: any) => /^system-message-queue\.corrupt-.*\.json$/.test(entry)),
+    true
+  );
+});

@@ -5,8 +5,8 @@ const {
   ensureDurableNoteSections,
   inspectDurableNoteRouting,
   resolveDurableNoteRoute,
-} = require("../core/durable-note-schema");
-const { syncNoteFile } = require("../core/note-sync");
+} = require("../notes/durable-note-schema");
+const { syncNoteFile } = require("../notes/note-sync");
 
 async function runNoteAutoCommand(config: any, args: any[] = []) {
   const options = parseNoteAutoArgs(args);

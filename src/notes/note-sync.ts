@@ -1,14 +1,14 @@
 const fs = require("fs");
 const path = require("path");
-const { writeForeignTextDocument } = require("./json-state");
-const { PRIMARY_NOTE_SYNC_MARKER_PREFIX } = require("./branding");
+const { writeForeignTextDocument } = require("../core/json-state");
+const { PRIMARY_NOTE_SYNC_MARKER_PREFIX } = require("../core/branding");
 const {
   normalizeDisplayPath,
   resolveCrossPlatformPath,
   resolveCrossPlatformPathFromRoot,
-} = require("./path-utils");
+} = require("../core/path-utils");
 
-const { listTrackedProjects } = require("./project-radar");
+const { listTrackedProjects } = require("../core/project-radar");
 
 const SLOT_MARKER_PREFIX = PRIMARY_NOTE_SYNC_MARKER_PREFIX;
 
