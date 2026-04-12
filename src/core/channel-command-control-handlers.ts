@@ -1,6 +1,6 @@
-const { findModelByQuery } = require("../adapters/runtime/codex/model-catalog");
-const { buildWeixinHelpText } = require("./command-registry");
-const { buildChannelCommandContext } = require("./channel-command-context");
+import { findModelByQuery } from "../adapters/runtime/codex/model-catalog";
+import { buildWeixinHelpText } from "./command-registry";
+import { buildChannelCommandContext } from "./channel-command-context";
 
 function createControlCommandHandlers({
   channelAdapter,
@@ -123,7 +123,7 @@ function normalizeCommandArgument(value: any) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-module.exports = {
+export {
   createControlCommandHandlers,
 };
 
@@ -136,5 +136,3 @@ function clearPendingApproval(sessionStore: any, threadId: any) {
     sessionStore.clearApprovalPrompt(threadId);
   }
 }
-
-export {};

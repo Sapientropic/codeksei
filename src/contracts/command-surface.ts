@@ -679,7 +679,7 @@ function normalizeText(value: any) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
-module.exports = {
+export {
   findCommandAction,
   findTerminalCommandManifest,
   findTerminalManifestByScriptName,
@@ -687,5 +687,3 @@ module.exports = {
   listCommandGroups,
   listTerminalCommandManifest,
 };
-
-export {};

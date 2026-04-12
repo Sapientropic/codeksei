@@ -66,8 +66,6 @@ function resolveThreadUsage(threadStateStore: any, threadId: any) {
   return null;
 }
 
-module.exports = {
+export {
   buildChannelCommandContext,
 };
-
-export {};

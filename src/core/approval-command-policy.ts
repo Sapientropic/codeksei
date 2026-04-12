@@ -1,10 +1,10 @@
 // @ts-check
 
-const path = require("path");
-const {
+import * as path from "node:path";
+import {
   findTerminalCommandManifest,
   findTerminalManifestByScriptName,
-} = require("../contracts/command-surface");
+} from "../contracts/command-surface";
 
 const SHELL_EXECUTABLES = new Set(["sh", "bash", "zsh"]);
 const NODE_EXECUTABLES = new Set(["node", "node.exe"]);
@@ -212,7 +212,7 @@ function normalizeText(value: any) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-module.exports = {
+export {
   buildApprovalPromptSignature,
   buildApprovalPromptText,
   matchesBuiltInCommandPrefix,
@@ -221,5 +221,3 @@ module.exports = {
   normalizeText,
   splitCommandLine,
 };
-
-export {};

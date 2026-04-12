@@ -1,6 +1,6 @@
-const fs = require("fs");
-const path = require("path");
-const { buildChannelCommandContext } = require("./channel-command-context");
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { buildChannelCommandContext } from "./channel-command-context";
 
 const WINDOWS_DRIVE_PATH_RE = /^[A-Za-z]:\//;
 const WINDOWS_DRIVE_ROOT_RE = /^[A-Za-z]:\/$/;
@@ -344,12 +344,10 @@ function extractPathFromFileUri(value: any) {
   }
 }
 
-module.exports = {
+export {
   createWorkspaceCommandHandlers,
   extractPathFromFileUri,
   isAbsoluteWorkspacePath,
   normalizeWorkspacePath,
   resolveBindWorkspaceRoot,
 };
-
-export {};

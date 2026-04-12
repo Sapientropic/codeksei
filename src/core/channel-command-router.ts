@@ -82,11 +82,9 @@ function normalizeCommandName(value: any) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
-module.exports = {
+export {
   ChannelCommandRouter,
   normalizeCommandName,
   parseChannelCommand,
   resolveRouteName,
 };
-
-export {};
