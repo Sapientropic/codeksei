@@ -7,7 +7,7 @@ import {
   normalizeRuntimeIdentifier,
   normalizeRuntimeText,
 } from "../contracts/runtime-events";
-import type { PendingApprovalState, UnknownRecord } from "./runtime-types";
+import type { PendingApprovalState, UnknownRecord } from "../core/runtime-types";
 
 type ThreadStatus = "idle" | "running" | "waiting_approval" | "failed";
 

@@ -18,7 +18,6 @@ import type {
   TimelineIntegrationLike,
   TimelineScreenshotQueueLike,
 } from "./app-service-contract";
-import type { BackstageTaskLifecycle } from "./backstage-task-lifecycle";
 import type {
   DeliveryFailurePayload,
   HandlePreparedMessageOptions,

@@ -22,7 +22,7 @@ const {
     ): void;
     serializeSend(state: RunState, sendOperation: () => Promise<void>): Promise<void>;
   };
-} = require("../src/core/stream-delivery/flush-scheduler");
+} = require("../src/runtime/stream-delivery/flush-scheduler");
 const {
   createRunState,
   upsertStateItem,
@@ -38,7 +38,7 @@ const {
       fragmentKind: string;
     },
   ): void;
-} = require("../src/core/stream-delivery/run-state");
+} = require("../src/runtime/stream-delivery/run-state");
 
 const RUNTIME_EVENT_TYPES = {
   REPLY_COMPLETED: "runtime.reply.completed",

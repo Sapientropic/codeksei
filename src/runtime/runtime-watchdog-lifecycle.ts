@@ -9,14 +9,14 @@ import type {
   SessionStoreLike,
   StreamDeliveryLike,
   ThreadStateStoreLike,
-} from "./app-service-contract";
+} from "../core/app-service-contract";
 import type {
   PendingApprovalState,
   PreparedRuntimeMessage,
   ReplyTarget,
   ThreadBindingRef,
   UnknownRecord,
-} from "./runtime-types";
+} from "../core/runtime-types";
 
 interface DeliveryTarget {
   userId: string;

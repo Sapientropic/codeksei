@@ -20,9 +20,9 @@ import type {
   TimelineIntegrationLike,
   TimelineScreenshotQueueLike,
 } from "../../src/core/app-service-contract";
-const { BackstageTaskLifecycle }: typeof import("../../src/core/backstage-task-lifecycle") = require("../../src/core/backstage-task-lifecycle");
-const { RuntimeTurnLifecycle }: typeof import("../../src/core/runtime-turn-lifecycle") = require("../../src/core/runtime-turn-lifecycle");
-const { RuntimeWatchdogLifecycle }: typeof import("../../src/core/runtime-watchdog-lifecycle") = require("../../src/core/runtime-watchdog-lifecycle");
+const { BackstageTaskLifecycle }: typeof import("../../src/runtime/backstage-task-lifecycle") = require("../../src/runtime/backstage-task-lifecycle");
+const { RuntimeTurnLifecycle }: typeof import("../../src/runtime/runtime-turn-lifecycle") = require("../../src/runtime/runtime-turn-lifecycle");
+const { RuntimeWatchdogLifecycle }: typeof import("../../src/runtime/runtime-watchdog-lifecycle") = require("../../src/runtime/runtime-watchdog-lifecycle");
 import type {
   DeliveryFailurePayload,
   NormalizedIncomingMessage,

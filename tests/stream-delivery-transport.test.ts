@@ -1,16 +1,16 @@
 const test: typeof import("node:test") = require("node:test");
 const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 
-import type { RunState } from "../src/core/stream-delivery/run-state";
+import type { RunState } from "../src/runtime/stream-delivery/run-state";
 const {
   buildReplyText,
   normalizeDeliveryDelta,
   prepareStreamingDelivery,
-}: typeof import("../src/core/stream-delivery/delivery-transport") = require("../src/core/stream-delivery/delivery-transport");
+}: typeof import("../src/runtime/stream-delivery/delivery-transport") = require("../src/runtime/stream-delivery/delivery-transport");
 const {
   createRunState,
   upsertStateItem,
-}: typeof import("../src/core/stream-delivery/run-state") = require("../src/core/stream-delivery/run-state");
+}: typeof import("../src/runtime/stream-delivery/run-state") = require("../src/runtime/stream-delivery/run-state");
 
 function createWeixinRunState(threadId: string, turnId: string, weixinReplyMode: string): RunState {
   return createRunState({ threadId, turnId, weixinReplyMode });

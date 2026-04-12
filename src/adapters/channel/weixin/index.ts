@@ -2,6 +2,7 @@ import * as legacyModule from "./legacy";
 import * as loginV2Module from "./login-v2";
 import * as mediaSendModule from "./media-send";
 import { createWeixinDeliveryFacade, packChunksForWeixinDelivery, sendV2TextChunk } from "./delivery";
+import type { SendWeixinMediaFileArgs, SendWeixinMediaFileResult } from "./media-types";
 import { createWeixinUpdateState, type GetUpdatesResponse, type WeixinAccount, type WeixinConfig } from "./updates";
 
 const { createLegacyWeixinChannelAdapter } = legacyModule as {
@@ -11,7 +12,7 @@ const { runV2LoginFlow } = loginV2Module as {
   runV2LoginFlow: (config: WeixinConfig) => Promise<unknown>;
 };
 const { sendWeixinMediaFile } = mediaSendModule as {
-  sendWeixinMediaFile: (args: Record<string, unknown>) => Promise<unknown>;
+  sendWeixinMediaFile: (args: SendWeixinMediaFileArgs) => Promise<SendWeixinMediaFileResult>;
 };
 
 interface SendTextChunksArgs {
@@ -52,7 +53,7 @@ interface WeixinChannelAdapter {
   normalizeIncomingMessage(message: unknown): unknown;
   sendText(args: SendTextChunksArgs): Promise<void>;
   sendTyping(args: SendTypingArgs): Promise<void>;
-  sendFile(args: SendFileArgs): Promise<unknown>;
+  sendFile(args: SendFileArgs): Promise<SendWeixinMediaFileResult>;
 }
 
 export function createWeixinChannelAdapter(config: WeixinConfig): WeixinChannelAdapter {
@@ -133,7 +134,7 @@ export function createWeixinChannelAdapter(config: WeixinConfig): WeixinChannelA
         contextToken: resolvedToken,
         baseUrl: account.baseUrl,
         token: account.token,
-        cdnBaseUrl: config.weixinCdnBaseUrl,
+        cdnBaseUrl: normalizeText(config.weixinCdnBaseUrl),
         apiVariant: "legacy",
         routeTag: account.routeTag,
         clientVersion: normalizeText(config.weixinProtocolClientVersion),

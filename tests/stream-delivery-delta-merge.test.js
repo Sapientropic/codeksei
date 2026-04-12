@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const {
   computeVisibleDeliveryDelta,
   mergeAuthoritativeItemText,
-} = require("../src/core/stream-delivery/delta-merge");
+} = require("../src/runtime/stream-delivery/delta-merge");
 
 test("delta merge appends overlapping fragments without duplicating prefixes", () => {
   assert.deepEqual(

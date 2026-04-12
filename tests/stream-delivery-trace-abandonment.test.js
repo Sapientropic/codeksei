@@ -7,7 +7,7 @@ const {
   rememberRecentDelivery,
   resolveLateRewriteDelta,
   wasRecentlyDelivered,
-} = require("../src/core/stream-delivery/trace-abandonment");
+} = require("../src/runtime/stream-delivery/trace-abandonment");
 
 test("trace dedupe keys stay scoped to settled weixin deliveries and expire by ttl", () => {
   const state = {

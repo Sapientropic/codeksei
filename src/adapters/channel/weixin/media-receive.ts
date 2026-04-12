@@ -1,9 +1,22 @@
-const crypto = require("crypto");
-const fs = require("fs/promises");
-const path = require("path");
+import * as crypto from "node:crypto";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
+import type {
+  IncomingWeixinAttachment,
+  PersistIncomingWeixinAttachmentsArgs,
+  PersistIncomingWeixinAttachmentsResult,
+  PersistedIncomingWeixinAttachment,
+  PersistedIncomingWeixinAttachmentFailure,
+  WeixinMediaKind,
+} from "./media-types";
 
 const DEFAULT_INBOX_DIR = "inbox";
 const MAX_FILE_NAME_LENGTH = 120;
+
+interface DownloadedAttachmentPayload {
+  bytes: Buffer;
+  contentType: string;
+}
 
 async function persistIncomingWeixinAttachments({
   attachments,
@@ -11,11 +24,14 @@ async function persistIncomingWeixinAttachments({
   cdnBaseUrl,
   messageId = "",
   receivedAt = "",
-}: any) {
-  const saved = [];
-  const failed = [];
+  workspaceRoot,
+}: PersistIncomingWeixinAttachmentsArgs): Promise<PersistIncomingWeixinAttachmentsResult> {
+  void workspaceRoot;
 
-  for (const attachment of Array.isArray(attachments) ? attachments : []) {
+  const saved: PersistedIncomingWeixinAttachment[] = [];
+  const failed: PersistedIncomingWeixinAttachmentFailure[] = [];
+
+  for (const attachment of attachments) {
     try {
       const persisted = await persistSingleAttachment({
         attachment,
@@ -27,9 +43,9 @@ async function persistIncomingWeixinAttachments({
       saved.push(persisted);
     } catch (error) {
       failed.push({
-        kind: attachment?.kind || "file",
-        sourceFileName: attachment?.fileName || "",
-        reason: error instanceof Error ? error.message : String(error || "unknown attachment error"),
+        kind: normalizeAttachmentKind(attachment.kind),
+        sourceFileName: normalizeText(attachment.fileName),
+        reason: formatErrorMessage(error) || "unknown attachment error",
       });
     }
   }
@@ -37,7 +53,19 @@ async function persistIncomingWeixinAttachments({
   return { saved, failed };
 }
 
-async function persistSingleAttachment({ attachment, stateDir, cdnBaseUrl, messageId, receivedAt }: any) {
+async function persistSingleAttachment({
+  attachment,
+  stateDir,
+  cdnBaseUrl,
+  messageId,
+  receivedAt,
+}: {
+  attachment: IncomingWeixinAttachment;
+  stateDir: string;
+  cdnBaseUrl: unknown;
+  messageId: string;
+  receivedAt: string;
+}): Promise<PersistedIncomingWeixinAttachment> {
   const download = await downloadAttachmentPayload(attachment, cdnBaseUrl);
   const plaintext = decodeAttachmentPayload(download.bytes, attachment, download.contentType);
   const fileName = buildTargetFileName({
@@ -51,8 +79,8 @@ async function persistSingleAttachment({ attachment, stateDir, cdnBaseUrl, messa
   const relativePath = path.relative(stateDir, absolutePath).replace(/\\/g, "/");
 
   return {
-    kind: attachment.kind || "file",
-    sourceFileName: attachment.fileName || "",
+    kind: normalizeAttachmentKind(attachment.kind),
+    sourceFileName: normalizeText(attachment.fileName),
     fileName: path.basename(absolutePath),
     absolutePath,
     relativePath,
@@ -60,26 +88,29 @@ async function persistSingleAttachment({ attachment, stateDir, cdnBaseUrl, messa
   };
 }
 
-function buildInboxDirectory(stateDir: any, receivedAt: any) {
+function buildInboxDirectory(stateDir: string, receivedAt: string): string {
   const day = normalizeDateFolder(receivedAt);
   return path.join(stateDir, DEFAULT_INBOX_DIR, day);
 }
 
-function normalizeDateFolder(receivedAt: any) {
-  const date = receivedAt ? new Date(receivedAt) : new Date();
+function normalizeDateFolder(receivedAt: unknown): string {
+  const date = receivedAt ? new Date(String(receivedAt)) : new Date();
   if (Number.isNaN(date.getTime())) {
     return new Date().toISOString().slice(0, 10);
   }
   return date.toISOString().slice(0, 10);
 }
 
-async function downloadAttachmentPayload(attachment: any, cdnBaseUrl: any) {
+async function downloadAttachmentPayload(
+  attachment: IncomingWeixinAttachment,
+  cdnBaseUrl: unknown,
+): Promise<DownloadedAttachmentPayload> {
   const candidates = buildDownloadCandidates(attachment, cdnBaseUrl);
   if (!candidates.length) {
     throw new Error("attachment did not include a supported download reference");
   }
 
-  let lastError = null;
+  let lastError: unknown = null;
   for (const candidate of candidates) {
     try {
       const response = await fetch(candidate, {
@@ -106,29 +137,29 @@ async function downloadAttachmentPayload(attachment: any, cdnBaseUrl: any) {
   throw lastError || new Error("attachment download failed");
 }
 
-function buildDownloadCandidates(attachment: any, cdnBaseUrl: any) {
+function buildDownloadCandidates(attachment: IncomingWeixinAttachment, cdnBaseUrl: unknown): string[] {
   const candidates: string[] = [];
-  const seen = new Set();
-  const directUrls = Array.isArray(attachment?.directUrls) ? attachment.directUrls : [];
+  const seen = new Set<string>();
+  const directUrls = Array.isArray(attachment.directUrls) ? attachment.directUrls : [];
   for (const directUrl of directUrls) {
     addCandidate(candidates, seen, directUrl);
   }
 
-  const encryptedQueryParam = normalizeText(attachment?.mediaRef?.encryptQueryParam);
+  const encryptedQueryParam = normalizeText(attachment.mediaRef?.encryptQueryParam);
   if (encryptedQueryParam) {
     const normalizedCdnBaseUrl = String(cdnBaseUrl || "").replace(/\/+$/g, "");
     addCandidate(
       candidates,
       seen,
-      `${normalizedCdnBaseUrl}/download?encrypted_query_param=${encodeURIComponent(encryptedQueryParam)}`
+      `${normalizedCdnBaseUrl}/download?encrypted_query_param=${encodeURIComponent(encryptedQueryParam)}`,
     );
 
-    const fileKey = normalizeText(attachment?.mediaRef?.fileKey);
+    const fileKey = normalizeText(attachment.mediaRef?.fileKey);
     if (fileKey) {
       addCandidate(
         candidates,
         seen,
-        `${normalizedCdnBaseUrl}/download?encrypted_query_param=${encodeURIComponent(encryptedQueryParam)}&filekey=${encodeURIComponent(fileKey)}`
+        `${normalizedCdnBaseUrl}/download?encrypted_query_param=${encodeURIComponent(encryptedQueryParam)}&filekey=${encodeURIComponent(fileKey)}`,
       );
     }
   }
@@ -136,7 +167,7 @@ function buildDownloadCandidates(attachment: any, cdnBaseUrl: any) {
   return candidates;
 }
 
-function addCandidate(candidates: any, seen: any, rawUrl: any) {
+function addCandidate(candidates: string[], seen: Set<string>, rawUrl: unknown): void {
   const normalizedUrl = normalizeText(rawUrl);
   if (!normalizedUrl || seen.has(normalizedUrl)) {
     return;
@@ -145,8 +176,8 @@ function addCandidate(candidates: any, seen: any, rawUrl: any) {
   candidates.push(normalizedUrl);
 }
 
-function decodeAttachmentPayload(bytes: any, attachment: any, contentType: any) {
-  const encryptType = Number(attachment?.mediaRef?.encryptType);
+function decodeAttachmentPayload(bytes: Buffer, attachment: IncomingWeixinAttachment, contentType: string): Buffer {
+  const encryptType = Number(attachment.mediaRef?.encryptType);
   const keyCandidates = buildAesKeyCandidates(attachment);
   if (encryptType !== 1 || keyCandidates.length === 0) {
     return bytes;
@@ -167,12 +198,12 @@ function decodeAttachmentPayload(bytes: any, attachment: any, contentType: any) 
   throw new Error("failed to decrypt attachment payload");
 }
 
-function buildAesKeyCandidates(attachment: any) {
+function buildAesKeyCandidates(attachment: IncomingWeixinAttachment): Buffer[] {
   const candidates: Buffer[] = [];
-  const seen = new Set();
+  const seen = new Set<string>();
   const rawValues = [
-    attachment?.mediaRef?.aesKeyHex,
-    attachment?.mediaRef?.aesKey,
+    attachment.mediaRef?.aesKeyHex,
+    attachment.mediaRef?.aesKey,
   ];
 
   for (const rawValue of rawValues) {
@@ -190,7 +221,7 @@ function buildAesKeyCandidates(attachment: any) {
   return candidates;
 }
 
-function decodeAesKeyVariants(value: any) {
+function decodeAesKeyVariants(value: unknown): Buffer[] {
   const normalized = normalizeText(value);
   if (!normalized) {
     return [];
@@ -218,16 +249,16 @@ function decodeAesKeyVariants(value: any) {
     // Ignore invalid base64 variants.
   }
 
-  return candidates.filter((candidate: any) => candidate.length === 16);
+  return candidates.filter((candidate) => candidate.length === 16);
 }
 
-function decryptAesEcb(ciphertext: any, key: any) {
+function decryptAesEcb(ciphertext: Buffer, key: Buffer): Buffer {
   const decipher = crypto.createDecipheriv("aes-128-ecb", key, null);
   decipher.setAutoPadding(true);
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 }
 
-function looksLikePlainMedia(bytes: any, contentType: any) {
+function looksLikePlainMedia(bytes: Buffer, contentType: string): boolean {
   if (!Buffer.isBuffer(bytes) || bytes.length === 0) {
     return false;
   }
@@ -239,8 +270,18 @@ function looksLikePlainMedia(bytes: any, contentType: any) {
   return detectExtensionFromBuffer(bytes) !== "";
 }
 
-function buildTargetFileName({ attachment, plaintext, contentType, messageId }: any) {
-  const sourceName = sanitizeFileName(attachment?.fileName || "");
+function buildTargetFileName({
+  attachment,
+  plaintext,
+  contentType,
+  messageId,
+}: {
+  attachment: IncomingWeixinAttachment;
+  plaintext: Buffer;
+  contentType: string;
+  messageId: string;
+}): string {
+  const sourceName = sanitizeFileName(attachment.fileName);
   if (sourceName) {
     const existingExt = path.extname(sourceName);
     if (existingExt) {
@@ -250,25 +291,33 @@ function buildTargetFileName({ attachment, plaintext, contentType, messageId }: 
     const inferredExt = inferExtension({
       contentType,
       plaintext,
-      kind: attachment?.kind,
+      kind: attachment.kind,
     });
     return `${sourceName}${inferredExt}`;
   }
 
   const baseName = sanitizeFileName([
-    attachment?.kind || "file",
+    normalizeAttachmentKind(attachment.kind),
     messageId || Date.now(),
-    String((attachment?.index ?? 0) + 1),
+    String((Number(attachment.index) || 0) + 1),
   ].join("-"));
   const inferredExt = inferExtension({
     contentType,
     plaintext,
-    kind: attachment?.kind,
+    kind: attachment.kind,
   });
   return `${baseName || "attachment"}${inferredExt}`;
 }
 
-function inferExtension({ contentType, plaintext, kind }: any) {
+function inferExtension({
+  contentType,
+  plaintext,
+  kind,
+}: {
+  contentType: string;
+  plaintext: Buffer;
+  kind?: WeixinMediaKind;
+}): string {
   const contentTypeExt = extensionFromContentType(contentType);
   if (contentTypeExt) {
     return contentTypeExt;
@@ -288,7 +337,7 @@ function inferExtension({ contentType, plaintext, kind }: any) {
   return ".bin";
 }
 
-function extensionFromContentType(contentType: any) {
+function extensionFromContentType(contentType: string): string {
   const normalized = normalizeContentType(contentType);
   const map: Record<string, string> = {
     "image/png": ".png",
@@ -302,7 +351,7 @@ function extensionFromContentType(contentType: any) {
   return map[normalized] || "";
 }
 
-function detectExtensionFromBuffer(buffer: any) {
+function detectExtensionFromBuffer(buffer: Buffer): string {
   if (!Buffer.isBuffer(buffer) || buffer.length < 4) {
     return "";
   }
@@ -329,14 +378,14 @@ function detectExtensionFromBuffer(buffer: any) {
   return "";
 }
 
-function sanitizeFileName(value: any) {
+function sanitizeFileName(value: unknown): string {
   const parsed = path.parse(String(value || "").trim().replace(/[<>:"/\\|?*\u0000-\u001F]/g, "-"));
   const safeBaseName = parsed.name || "attachment";
   const safeExt = parsed.ext || "";
   return `${safeBaseName.slice(0, MAX_FILE_NAME_LENGTH)}${safeExt.slice(0, 16)}`;
 }
 
-async function writeUniqueFile(targetDir: any, fileName: any, plaintext: any) {
+async function writeUniqueFile(targetDir: string, fileName: string, plaintext: Buffer): Promise<string> {
   await fs.mkdir(targetDir, { recursive: true });
   const parsed = path.parse(fileName);
   const baseName = parsed.name || "attachment";
@@ -348,7 +397,7 @@ async function writeUniqueFile(targetDir: any, fileName: any, plaintext: any) {
       await fs.writeFile(candidate, plaintext, { flag: "wx" });
       return candidate;
     } catch (error) {
-      if ((error as any)?.code !== "EEXIST") {
+      if (!isFileExistsError(error)) {
         throw error;
       }
     }
@@ -357,16 +406,37 @@ async function writeUniqueFile(targetDir: any, fileName: any, plaintext: any) {
   throw new Error("unable to allocate a unique attachment file name");
 }
 
-function normalizeText(value: any) {
+function normalizeAttachmentKind(value: unknown): WeixinMediaKind {
+  const normalized = normalizeText(value).toLowerCase();
+  if (normalized === "image" || normalized === "video" || normalized === "file") {
+    return normalized;
+  }
+  return "file";
+}
+
+function isFileExistsError(error: unknown): boolean {
+  return Boolean(error)
+    && typeof error === "object"
+    && error !== null
+    && "code" in error
+    && error.code === "EEXIST";
+}
+
+function formatErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message || String(error);
+  }
+  return String(error || "");
+}
+
+function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function normalizeContentType(value: any) {
+function normalizeContentType(value: unknown): string {
   return typeof value === "string" ? value.split(";")[0].trim().toLowerCase() : "";
 }
 
-module.exports = {
+export {
   persistIncomingWeixinAttachments,
 };
-
-export {};

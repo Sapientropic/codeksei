@@ -1,31 +1,110 @@
-const crypto = require("crypto");
-const path = require("path");
-const fs = require("fs/promises");
+import * as crypto from "node:crypto";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
+import * as apiModule from "./api";
+import * as apiV2Module from "./api-v2";
+import * as mediaMimeModule from "./media-mime";
+import type {
+  SendWeixinMediaFileArgs,
+  SendWeixinMediaFileResult,
+  WeixinFileSendResult,
+  WeixinMediaApi,
+} from "./media-types";
 
-const { getUploadUrl, sendMessage } = require("./api");
-const { getUploadUrlV2, sendMessageV2 } = require("./api-v2");
-const { getMimeFromFilename } = require("./media-mime");
+const { getUploadUrl, sendMessage } = apiModule as {
+  getUploadUrl: (args: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  sendMessage: (args: Record<string, unknown>) => Promise<unknown>;
+};
+const { getUploadUrlV2, sendMessageV2 } = apiV2Module as {
+  getUploadUrlV2: (args: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  sendMessageV2: (args: Record<string, unknown>) => Promise<unknown>;
+};
+const { getMimeFromFilename } = mediaMimeModule as {
+  getMimeFromFilename: (filePath: string) => string;
+};
 
 const WEIXIN_MEDIA_TYPE = {
   IMAGE: 1,
   VIDEO: 2,
   FILE: 3,
-};
+} as const;
 
-function encryptAesEcb(plaintext: any, key: any) {
+interface UploadedMedia {
+  downloadEncryptedQueryParam: string;
+  aeskey: string;
+  fileSize: number;
+  fileSizeCiphertext: number;
+}
+
+interface UploadMediaArgs {
+  filePath: string;
+  toUserId: string;
+  opts: Record<string, unknown>;
+  cdnBaseUrl: string;
+  mediaType: number;
+  getUploadUrlImpl: WeixinMediaApi["getUploadUrlImpl"];
+}
+
+interface SendMediaItemArgs {
+  to: string;
+  item: Record<string, unknown>;
+  contextToken: string;
+  baseUrl: string;
+  token: string;
+  routeTag?: string;
+  clientVersion?: string;
+  sendMessageImpl: WeixinMediaApi["sendMessageImpl"];
+}
+
+interface SendFileFallbackArgs {
+  filePath: string;
+  to: string;
+  contextToken: string;
+  baseUrl: string;
+  token: string;
+  routeTag: string;
+  clientVersion: string;
+  uploadOpts: Record<string, unknown>;
+  cdnBaseUrl: string;
+  primaryMediaApi: WeixinMediaApi;
+  fallbackMediaApi?: WeixinMediaApi | null;
+  fallbackFrom?: "" | "image";
+}
+
+function encryptAesEcb(plaintext: Buffer, key: Buffer): Buffer {
   const cipher = crypto.createCipheriv("aes-128-ecb", key, null);
   return Buffer.concat([cipher.update(plaintext), cipher.final()]);
 }
 
-function aesEcbPaddedSize(plaintextSize: any) {
+function aesEcbPaddedSize(plaintextSize: number): number {
   return Math.ceil((plaintextSize + 1) / 16) * 16;
 }
 
-function buildCdnUploadUrl({ cdnBaseUrl, uploadParam, filekey }: any) {
+function buildCdnUploadUrl({
+  cdnBaseUrl,
+  uploadParam,
+  filekey,
+}: {
+  cdnBaseUrl: string;
+  uploadParam: string;
+  filekey: string;
+}): string {
   return `${cdnBaseUrl}/upload?encrypted_query_param=${encodeURIComponent(uploadParam)}&filekey=${encodeURIComponent(filekey)}`;
 }
 
-async function uploadBufferToCdn({ buf, uploadParam, filekey, cdnBaseUrl, aeskey }: any) {
+async function uploadBufferToCdn({
+  buf,
+  uploadParam,
+  filekey,
+  cdnBaseUrl,
+  aeskey,
+}: {
+  buf: Buffer;
+  uploadParam: string;
+  filekey: string;
+  cdnBaseUrl: string;
+  aeskey: Buffer;
+}): Promise<{ downloadParam: string }> {
   const ciphertext = encryptAesEcb(buf, aeskey);
   const cdnUrl = buildCdnUploadUrl({ cdnBaseUrl, uploadParam, filekey });
   const response = await fetch(cdnUrl, {
@@ -44,7 +123,14 @@ async function uploadBufferToCdn({ buf, uploadParam, filekey, cdnBaseUrl, aeskey
   return { downloadParam };
 }
 
-async function uploadMediaToWeixin({ filePath, toUserId, opts, cdnBaseUrl, mediaType, getUploadUrlImpl }: any) {
+async function uploadMediaToWeixin({
+  filePath,
+  toUserId,
+  opts,
+  cdnBaseUrl,
+  mediaType,
+  getUploadUrlImpl,
+}: UploadMediaArgs): Promise<UploadedMedia> {
   const plaintext = await fs.readFile(filePath);
   const rawsize = plaintext.length;
   const rawfilemd5 = crypto.createHash("md5").update(plaintext).digest("hex");
@@ -64,7 +150,7 @@ async function uploadMediaToWeixin({ filePath, toUserId, opts, cdnBaseUrl, media
     aeskey: aeskey.toString("hex"),
   });
 
-  const uploadParam = uploadUrlResp?.upload_param || "";
+  const uploadParam = typeof uploadUrlResp?.upload_param === "string" ? uploadUrlResp.upload_param : "";
   if (!uploadParam) {
     throw new Error("getUploadUrl returned no upload_param");
   }
@@ -85,7 +171,7 @@ async function uploadMediaToWeixin({ filePath, toUserId, opts, cdnBaseUrl, media
   };
 }
 
-function buildMediaRef(uploaded: any) {
+function buildMediaRef(uploaded: UploadedMedia): Record<string, unknown> {
   return {
     encrypt_query_param: uploaded.downloadEncryptedQueryParam,
     aes_key: Buffer.from(uploaded.aeskey).toString("base64"),
@@ -93,7 +179,16 @@ function buildMediaRef(uploaded: any) {
   };
 }
 
-async function sendMediaItem({ to, item, contextToken, baseUrl, token, routeTag = "", clientVersion = "", sendMessageImpl }: any) {
+async function sendMediaItem({
+  to,
+  item,
+  contextToken,
+  baseUrl,
+  token,
+  routeTag = "",
+  clientVersion = "",
+  sendMessageImpl,
+}: SendMediaItemArgs): Promise<void> {
   await sendMessageImpl({
     baseUrl,
     token,
@@ -113,7 +208,7 @@ async function sendMediaItem({ to, item, contextToken, baseUrl, token, routeTag 
   });
 }
 
-function resolveWeixinMediaApi(apiVariant: any) {
+function resolveWeixinMediaApi(apiVariant: unknown): WeixinMediaApi {
   if (String(apiVariant || "").trim().toLowerCase() === "v2") {
     // Upload URL lookup and the final sendmessage call must stay on the same
     // v2 header stack as text polling/sending, or routed sessions may split
@@ -141,7 +236,7 @@ async function sendWeixinMediaFile({
   clientVersion = "",
   mediaApiOverride = null,
   mediaApiFallbackOverride = null,
-}: any) {
+}: SendWeixinMediaFileArgs): Promise<SendWeixinMediaFileResult> {
   if (!contextToken) {
     throw new Error("sendWeixinMediaFile requires contextToken");
   }
@@ -186,7 +281,7 @@ async function sendWeixinMediaFile({
       if (!isMissingUploadParamError(error)) {
         throw error;
       }
-      // Some WeChat routed sessions refuse image upload params but still accept
+      // Some routed sessions refuse image upload params but still accept
       // generic file uploads. Falling back keeps screenshot delivery alive
       // instead of failing the whole "send back the screenshot" flow.
       return sendFileFallback({
@@ -250,11 +345,11 @@ async function sendWeixinMediaFile({
   });
 }
 
-function isMissingUploadParamError(error: any) {
-  return String(error?.message || error || "").includes("getUploadUrl returned no upload_param");
+function isMissingUploadParamError(error: unknown): boolean {
+  return formatErrorMessage(error).includes("getUploadUrl returned no upload_param");
 }
 
-function resolveFallbackWeixinMediaApi(apiVariant: any) {
+function resolveFallbackWeixinMediaApi(apiVariant: unknown): WeixinMediaApi | null {
   const normalized = String(apiVariant || "").trim().toLowerCase();
   return normalized === "legacy" ? null : resolveWeixinMediaApi("legacy");
 }
@@ -272,13 +367,13 @@ async function sendFileFallback({
   primaryMediaApi,
   fallbackMediaApi = null,
   fallbackFrom = "",
-}: any) {
+}: SendFileFallbackArgs): Promise<WeixinFileSendResult> {
   const strategies = [
-    { label: "primary", api: primaryMediaApi },
-    { label: "fallback", api: fallbackMediaApi },
-  ].filter((entry: any) => entry.api);
+    { label: "primary" as const, api: primaryMediaApi },
+    { label: "fallback" as const, api: fallbackMediaApi },
+  ].filter((entry): entry is { label: "primary" | "fallback"; api: WeixinMediaApi } => Boolean(entry.api));
 
-  let lastError = null;
+  let lastError: unknown = null;
   for (let index = 0; index < strategies.length; index += 1) {
     const { label, api } = strategies[index];
     try {
@@ -320,7 +415,7 @@ async function sendFileFallback({
       }
       console.warn(
         `[codeksei] weixin media upload fallback `
-        + `file=${path.basename(filePath)} reason=${String((error as any)?.message || error)}`
+        + `file=${path.basename(filePath)} reason=${formatErrorMessage(error)}`,
       );
     }
   }
@@ -328,6 +423,13 @@ async function sendFileFallback({
   throw lastError || new Error("weixin media upload failed");
 }
 
-module.exports = { sendWeixinMediaFile };
+function formatErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message || String(error);
+  }
+  return String(error || "");
+}
 
-export {};
+export {
+  sendWeixinMediaFile,
+};

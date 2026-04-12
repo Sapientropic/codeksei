@@ -25,6 +25,13 @@ import {
   collectDiaryEntries,
   collectNightlyEntries,
 } from "./review-sources";
+import type {
+  DiaryReviewEntry,
+  NightlyReviewEntry,
+  ReviewDraft,
+  ReviewKind,
+  ReviewProfile,
+} from "./review-types";
 
 const DEFAULT_REVIEW_MODELS = {
   nightly: {
@@ -65,7 +72,11 @@ function loadReviewSchemaConfig(config: any = {}) {
   });
 }
 
-function resolveReviewProfile(config: any = {}, kind: any, options: any = {}) {
+function resolveReviewProfile(
+  config: Record<string, unknown> = {},
+  kind: unknown,
+  options: { required?: boolean } = {},
+): ReviewProfile | null {
   const normalizedKind = normalizeReviewKind(kind);
   const defaults = DEFAULT_REVIEW_MODELS[normalizedKind];
   const required = options.required !== false;
@@ -103,21 +114,21 @@ function resolveReviewProfile(config: any = {}, kind: any, options: any = {}) {
   };
 }
 
-async function buildReview(config: any = {}, kind: any, options: any = {}) {
+async function buildReview(config: Record<string, unknown> = {}, kind: unknown, options: Record<string, unknown> = {}) {
   const profile = resolveReviewProfile(config, kind)!;
   const timezone = config.timezone || LEGACY_TIMELINE_TIMEZONE;
   const window = resolveReviewWindow(profile.kind, {
     ...options,
     timezone,
   });
-  const diaryEntries = collectDiaryEntries(config.diaryDir, window.startDate, window.endDate);
+  const diaryEntries = collectDiaryEntries(config.diaryDir, window.startDate, window.endDate) as DiaryReviewEntry[];
   const nightlyProfile = profile.kind === "nightly"
     ? null
     : resolveReviewProfile(config, "nightly", { required: false });
   const nightlyEntries = profile.kind === "nightly"
     ? []
-    : collectNightlyEntries(nightlyProfile?.folderPath || "", window.startDate, window.endDate);
-  const deterministicDraft = buildReviewDraft(profile, window, diaryEntries, nightlyEntries);
+    : collectNightlyEntries(nightlyProfile?.folderPath || "", window.startDate, window.endDate) as NightlyReviewEntry[];
+  const deterministicDraft: ReviewDraft = buildReviewDraft(profile, window, diaryEntries, nightlyEntries);
   // Review v2 keeps routing, windowing, and managed-block writes deterministic.
   // The semantic pass may upgrade the human-facing bullets, but it must never
   // become a hard dependency for file generation.
@@ -130,7 +141,7 @@ async function buildReview(config: any = {}, kind: any, options: any = {}) {
     options,
   });
   const draft = mergeReviewDraft(profile.kind, deterministicDraft, semantic.data);
-  const notePath = normalizeDisplayPath(path.join(profile.folderPath, `${draft.periodLabel}.md`));
+  const notePath = normalizeDisplayPath(path.join(String(profile.folderPath || ""), `${draft.periodLabel}.md`));
   return {
     profile,
     window,
@@ -165,7 +176,7 @@ async function writeReview(config: any = {}, kind: any, options: any = {}) {
   };
 }
 
-function normalizeReviewKind(value: any) {
+function normalizeReviewKind(value: unknown): ReviewKind {
   const normalized = normalizeText(value).toLowerCase();
   if (normalized === "nightly" || normalized === "weekly" || normalized === "monthly") {
     return normalized;
@@ -173,10 +184,10 @@ function normalizeReviewKind(value: any) {
   throw new Error(`不支持的 review kind: ${value}`);
 }
 
-function normalizeTags(value: any, fallback: any) {
+function normalizeTags(value: unknown, fallback: string[]): string[] {
   const tags = Array.isArray(value) ? value : fallback;
   return tags
-    .map((tag: any) => normalizeText(tag))
+    .map((tag) => normalizeText(tag))
     .filter(Boolean);
 }
 

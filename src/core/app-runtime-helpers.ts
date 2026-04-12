@@ -8,13 +8,14 @@ import {
   resolveConfiguredPersonName,
   resolvePromptPersonEn,
 } from "./person-reference";
+import type {
+  PersistIncomingWeixinAttachmentsResult,
+  PersistedIncomingWeixinAttachment,
+} from "../adapters/channel/weixin/media-types";
 
 const SYSTEM_MESSAGE_FAILURE_RETRY_DELAYS_MS = [30_000, 2 * 60_000, 5 * 60_000];
 
-interface PersistedAttachmentResult {
-  saved?: unknown[];
-  failed?: Array<{ reason: string } & Record<string, unknown>>;
-}
+type PersistedAttachmentResult = Partial<PersistIncomingWeixinAttachmentsResult>;
 
 interface InboundMessageRef {
   text?: unknown;
@@ -109,10 +110,10 @@ export function buildCodexInboundText(
       lines.push("The person in this thread sent image/file attachments. They were saved under the local data directory:");
     }
     for (const item of saved) {
-      const attachment = item && typeof item === "object" ? item as Record<string, unknown> : {};
-      const sourceFileName = typeof attachment.sourceFileName === "string" ? attachment.sourceFileName : "";
-      const kind = typeof attachment.kind === "string" ? attachment.kind : "attachment";
-      const absolutePath = typeof attachment.absolutePath === "string" ? attachment.absolutePath : "";
+      const attachment = item as PersistedIncomingWeixinAttachment;
+      const sourceFileName = attachment.sourceFileName || "";
+      const kind = attachment.kind || "attachment";
+      const absolutePath = attachment.absolutePath || "";
       const suffix = sourceFileName ? ` (original name: ${sourceFileName})` : "";
       lines.push(`- [${kind}] ${absolutePath}${suffix}`);
     }

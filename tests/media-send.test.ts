@@ -1,29 +1,29 @@
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
-const os = require("node:os");
-const path = require("node:path");
+const test: typeof import("node:test") = require("node:test");
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
+const fs: typeof import("node:fs/promises") = require("node:fs/promises");
+const os: typeof import("node:os") = require("node:os");
+const path: typeof import("node:path") = require("node:path");
 
-const { sendWeixinMediaFile } = require("../src/adapters/channel/weixin/media-send");
+const { sendWeixinMediaFile }: typeof import("../src/adapters/channel/weixin/media-send") = require("../src/adapters/channel/weixin/media-send");
 
 test("image upload falls back to generic file delivery when image upload_param is missing", async () => {
   const tempFile = path.join(os.tmpdir(), `codeksei-media-fallback-${Date.now()}.png`);
   await fs.writeFile(tempFile, Buffer.from("fake-png"));
 
-  const uploadMediaTypes = [];
-  const sentItems = [];
+  const uploadMediaTypes: number[] = [];
+  const sentItems: Array<Record<string, unknown>> = [];
   const originalFetch = global.fetch;
-  global.fetch = async () => ({
+  global.fetch = (async () => ({
     status: 200,
     headers: {
-      get(name) {
+      get(name: string) {
         return String(name || "").toLowerCase() === "x-encrypted-param" ? "download-param" : null;
       },
     },
     async text() {
       return "";
     },
-  });
+  }) as unknown as Response) as typeof fetch;
 
   try {
     const result = await sendWeixinMediaFile({
@@ -35,15 +35,18 @@ test("image upload falls back to generic file delivery when image upload_param i
       cdnBaseUrl: "http://cdn.example.com",
       apiVariant: "v2",
       mediaApiOverride: {
-        async getUploadUrlImpl(params) {
-          uploadMediaTypes.push(params.media_type);
+        async getUploadUrlImpl(params: Record<string, unknown>) {
+          uploadMediaTypes.push(Number(params.media_type));
           if (params.media_type === 1) {
             return { ret: 0 };
           }
           return { ret: 0, upload_param: "upload-ok" };
         },
-        async sendMessageImpl(payload) {
-          sentItems.push(payload.body.msg.item_list[0]);
+        async sendMessageImpl(payload: Record<string, unknown>) {
+          const item = (payload as { body?: { msg?: { item_list?: Record<string, unknown>[] } } }).body?.msg?.item_list?.[0];
+          if (item) {
+            sentItems.push(item);
+          }
           return { ok: true };
         },
       },
@@ -51,8 +54,9 @@ test("image upload falls back to generic file delivery when image upload_param i
 
     assert.deepEqual(uploadMediaTypes, [1, 3]);
     assert.equal(sentItems.length, 1);
-    assert.equal(sentItems[0].type, 4);
-    assert.equal(sentItems[0].file_item.file_name, path.basename(tempFile));
+    const sentItem = sentItems[0] as { type?: number; file_item?: { file_name?: string } };
+    assert.equal(sentItem.type, 4);
+    assert.equal(sentItem.file_item?.file_name, path.basename(tempFile));
     assert.equal(result.kind, "file");
     assert.equal(result.fallbackFrom, "image");
   } finally {
@@ -65,21 +69,21 @@ test("media upload falls back to alternate media api when primary stack still ha
   const tempFile = path.join(os.tmpdir(), `codeksei-media-api-fallback-${Date.now()}.png`);
   await fs.writeFile(tempFile, Buffer.from("fake-png"));
 
-  const primaryMediaTypes = [];
-  const fallbackMediaTypes = [];
-  const sentItems = [];
+  const primaryMediaTypes: number[] = [];
+  const fallbackMediaTypes: number[] = [];
+  const sentItems: Array<Record<string, unknown>> = [];
   const originalFetch = global.fetch;
-  global.fetch = async () => ({
+  global.fetch = (async () => ({
     status: 200,
     headers: {
-      get(name) {
+      get(name: string) {
         return String(name || "").toLowerCase() === "x-encrypted-param" ? "download-param" : null;
       },
     },
     async text() {
       return "";
     },
-  });
+  }) as unknown as Response) as typeof fetch;
 
   try {
     const result = await sendWeixinMediaFile({
@@ -91,8 +95,8 @@ test("media upload falls back to alternate media api when primary stack still ha
       cdnBaseUrl: "http://cdn.example.com",
       apiVariant: "v2",
       mediaApiOverride: {
-        async getUploadUrlImpl(params) {
-          primaryMediaTypes.push(params.media_type);
+        async getUploadUrlImpl(params: Record<string, unknown>) {
+          primaryMediaTypes.push(Number(params.media_type));
           return { ret: 0 };
         },
         async sendMessageImpl() {
@@ -100,12 +104,15 @@ test("media upload falls back to alternate media api when primary stack still ha
         },
       },
       mediaApiFallbackOverride: {
-        async getUploadUrlImpl(params) {
-          fallbackMediaTypes.push(params.media_type);
+        async getUploadUrlImpl(params: Record<string, unknown>) {
+          fallbackMediaTypes.push(Number(params.media_type));
           return { ret: 0, upload_param: "legacy-upload-ok" };
         },
-        async sendMessageImpl(payload) {
-          sentItems.push(payload.body.msg.item_list[0]);
+        async sendMessageImpl(payload: Record<string, unknown>) {
+          const item = (payload as { body?: { msg?: { item_list?: Record<string, unknown>[] } } }).body?.msg?.item_list?.[0];
+          if (item) {
+            sentItems.push(item);
+          }
           return { ok: true };
         },
       },
@@ -114,7 +121,8 @@ test("media upload falls back to alternate media api when primary stack still ha
     assert.deepEqual(primaryMediaTypes, [1, 3]);
     assert.deepEqual(fallbackMediaTypes, [3]);
     assert.equal(sentItems.length, 1);
-    assert.equal(sentItems[0].type, 4);
+    const sentItem = sentItems[0] as { type?: number };
+    assert.equal(sentItem.type, 4);
     assert.equal(result.kind, "file");
     assert.equal(result.fallbackFrom, "image");
     assert.equal(result.uploadStrategy, "fallback");

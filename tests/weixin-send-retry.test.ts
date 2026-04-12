@@ -1,32 +1,48 @@
-// @ts-nocheck
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const crypto = require("crypto");
+const test: typeof import("node:test") = require("node:test");
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
+const crypto: typeof import("node:crypto") = require("node:crypto");
 
 const {
   packChunksForWeixinDelivery: packV2ChunksForWeixinDelivery,
   sendV2TextChunk,
-} = require("../src/adapters/channel/weixin/index");
+}: typeof import("../src/adapters/channel/weixin/index") = require("../src/adapters/channel/weixin/index");
+const legacyModule = require("../src/adapters/channel/weixin/legacy") as {
+  packChunksForWeixinDelivery: (chunks: string[], maxMessages?: number, maxChunkChars?: number) => string[];
+  sendLegacyTextChunk: (args: {
+    sendMessageImpl?: (args: Record<string, unknown>) => Promise<unknown>;
+    baseUrl: string;
+    token: string;
+    toUserId: string;
+    text: string;
+    contextToken: string;
+    clientId?: string;
+    trace?: Record<string, unknown> | null;
+  }) => Promise<unknown>;
+};
 const {
   packChunksForWeixinDelivery: packLegacyChunksForWeixinDelivery,
   sendLegacyTextChunk,
-} = require("../src/adapters/channel/weixin/legacy");
+} = legacyModule;
+
+function readLegacyClientId(payload: Record<string, unknown>): string {
+  return String((payload.body as { msg?: { client_id?: unknown } }).msg?.client_id || "");
+}
 
 test("v2 chunk retries ambiguous ret=-2 once with the same client_id", async () => {
-  const seenClientIds = [];
+  const seenClientIds: string[] = [];
   let attempts = 0;
   let randomCounter = 0;
   const originalRandomUUID = crypto.randomUUID;
-  crypto.randomUUID = () => {
+  crypto.randomUUID = (() => {
     randomCounter += 1;
     return `uuid-${randomCounter}`;
-  };
+  }) as typeof crypto.randomUUID;
 
   try {
     await sendV2TextChunk({
-      sendTextImpl: async (payload) => {
+      sendTextImpl: async (payload: Record<string, unknown>) => {
         attempts += 1;
-        seenClientIds.push(payload.clientId);
+        seenClientIds.push(String(payload.clientId || ""));
         if (attempts === 1) {
           throw new Error("sendMessage ret=-2 errcode= errmsg=");
         }
@@ -46,20 +62,20 @@ test("v2 chunk retries ambiguous ret=-2 once with the same client_id", async () 
 });
 
 test("legacy chunk retries ambiguous ret=-2 once with the same client_id", async () => {
-  const seenClientIds = [];
+  const seenClientIds: string[] = [];
   let attempts = 0;
   let randomCounter = 0;
   const originalRandomUUID = crypto.randomUUID;
-  crypto.randomUUID = () => {
+  crypto.randomUUID = (() => {
     randomCounter += 1;
     return `legacy-${randomCounter}`;
-  };
+  }) as typeof crypto.randomUUID;
 
   try {
     await sendLegacyTextChunk({
-      sendMessageImpl: async (payload) => {
+      sendMessageImpl: async (payload: Record<string, unknown>) => {
         attempts += 1;
-        seenClientIds.push(payload.body.msg.client_id);
+        seenClientIds.push(readLegacyClientId(payload));
         if (attempts === 1) {
           throw new Error("sendMessage ret=-2 errcode= errmsg=");
         }
@@ -79,20 +95,20 @@ test("legacy chunk retries ambiguous ret=-2 once with the same client_id", async
 });
 
 test("v2 chunk retry keeps the same client_id across network retries", async () => {
-  const seenClientIds = [];
+  const seenClientIds: string[] = [];
   let randomCounter = 0;
   const originalRandomUUID = crypto.randomUUID;
-  crypto.randomUUID = () => {
+  crypto.randomUUID = (() => {
     randomCounter += 1;
     return `uuid-${randomCounter}`;
-  };
+  }) as typeof crypto.randomUUID;
 
   try {
     let attempts = 0;
     await sendV2TextChunk({
-      sendTextImpl: async (payload) => {
+      sendTextImpl: async (payload: Record<string, unknown>) => {
         attempts += 1;
-        seenClientIds.push(payload.clientId);
+        seenClientIds.push(String(payload.clientId || ""));
         if (attempts < 3) {
           throw new Error("fetch failed");
         }
@@ -112,20 +128,20 @@ test("v2 chunk retry keeps the same client_id across network retries", async () 
 });
 
 test("legacy chunk retry keeps the same client_id across network retries", async () => {
-  const seenClientIds = [];
+  const seenClientIds: string[] = [];
   let randomCounter = 0;
   const originalRandomUUID = crypto.randomUUID;
-  crypto.randomUUID = () => {
+  crypto.randomUUID = (() => {
     randomCounter += 1;
     return `legacy-${randomCounter}`;
-  };
+  }) as typeof crypto.randomUUID;
 
   try {
     let attempts = 0;
     await sendLegacyTextChunk({
-      sendMessageImpl: async (payload) => {
+      sendMessageImpl: async (payload: Record<string, unknown>) => {
         attempts += 1;
-        seenClientIds.push(payload.body.msg.client_id);
+        seenClientIds.push(readLegacyClientId(payload));
         if (attempts < 3) {
           throw new Error("fetch failed");
         }

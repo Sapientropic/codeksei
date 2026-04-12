@@ -1,30 +1,40 @@
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const path = require("node:path");
+const test: typeof import("node:test") = require("node:test");
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
+const path: typeof import("node:path") = require("node:path");
 
+const runtimePaths = require("./helpers/runtime-paths") as {
+  repoRoot: string;
+  resolveRepoRuntimeModule: (relativePath: string) => string;
+  resolveRepoRuntimePath: (relativePath: string) => string;
+};
 const {
   repoRoot,
   resolveRepoRuntimeModule,
   resolveRepoRuntimePath,
-} = require("./helpers/runtime-paths");
+} = runtimePaths;
+import type { SendWeixinMediaFileArgs } from "../src/adapters/channel/weixin/media-types";
 const adapterModulePath = resolveRepoRuntimePath("src/adapters/channel/weixin/index.js");
 
-function resolveRepoModule(relativePath) {
+function resolveRepoModule(relativePath: string): string {
   return resolveRepoRuntimeModule(relativePath);
 }
 
-function stubModule(relativePath, exports, originals) {
+function stubModule(
+  relativePath: string,
+  moduleExports: unknown,
+  originals: Map<string, NodeJS.Module | undefined>,
+): void {
   const resolved = resolveRepoModule(relativePath);
   originals.set(resolved, require.cache[resolved]);
   require.cache[resolved] = {
     id: resolved,
     filename: resolved,
     loaded: true,
-    exports,
-  };
+    exports: moduleExports,
+  } as NodeJS.Module;
 }
 
-function restoreModules(originals) {
+function restoreModules(originals: Map<string, NodeJS.Module | undefined>): void {
   for (const [resolved, original] of originals.entries()) {
     if (original) {
       require.cache[resolved] = original;
@@ -35,8 +45,8 @@ function restoreModules(originals) {
 }
 
 test("v2 weixin adapter keeps media sends on the legacy stack", async () => {
-  const originals = new Map();
-  let capturedArgs = null;
+  const originals = new Map<string, NodeJS.Module | undefined>();
+  let capturedArgs: SendWeixinMediaFileArgs | null = null;
 
   try {
     stubModule("src/adapters/channel/weixin/account-store.js", {
@@ -56,7 +66,7 @@ test("v2 weixin adapter keeps media sends on the legacy stack", async () => {
       loadPersistedContextTokens() {
         return {};
       },
-      persistContextToken(_config, _accountId, userId, contextToken) {
+      persistContextToken(_config: unknown, _accountId: unknown, userId: string, contextToken: string) {
         return { [userId]: contextToken };
       },
     }, originals);
@@ -81,14 +91,14 @@ test("v2 weixin adapter keeps media sends on the legacy stack", async () => {
     stubModule("src/adapters/channel/weixin/message-utils-v2.js", {
       createInboundFilter() {
         return {
-          normalize(message) {
+          normalize(message: unknown) {
             return message;
           },
         };
       },
     }, originals);
     stubModule("src/adapters/channel/weixin/media-send.js", {
-      async sendWeixinMediaFile(args) {
+      async sendWeixinMediaFile(args: SendWeixinMediaFileArgs) {
         capturedArgs = args;
         return { kind: "file", fileName: "timeline.png" };
       },
@@ -102,9 +112,10 @@ test("v2 weixin adapter keeps media sends on the legacy stack", async () => {
 
     originals.set(adapterModulePath, require.cache[adapterModulePath]);
     delete require.cache[adapterModulePath];
-    const { createWeixinChannelAdapter } = require(adapterModulePath);
+    const { createWeixinChannelAdapter }: typeof import("../src/adapters/channel/weixin/index") = require(adapterModulePath);
 
     const adapter = createWeixinChannelAdapter({
+      stateDir: path.join(repoRoot, ".tmp-weixin-route"),
       weixinAdapterVariant: "v2",
       weixinCdnBaseUrl: "http://cdn.example.test",
       weixinProtocolClientVersion: "9.9.9",

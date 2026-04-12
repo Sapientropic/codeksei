@@ -3,9 +3,9 @@ const assert: typeof import("node:assert/strict") = require("node:assert/strict"
 
 import type { ChannelAdapterLike, SessionStoreLike } from "../src/core/app-service-contract";
 import type { DeliveryFailurePayload } from "../src/core/runtime-types";
-const { StreamDelivery }: typeof import("../src/core/stream-delivery") = require("../src/core/stream-delivery");
+const { StreamDelivery }: typeof import("../src/runtime/stream-delivery") = require("../src/runtime/stream-delivery");
 
-type StreamDeliveryInstance = import("../src/core/stream-delivery").StreamDelivery;
+type StreamDeliveryInstance = import("../src/runtime/stream-delivery").StreamDelivery;
 
 interface SentMessage {
   text: string;

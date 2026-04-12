@@ -13,7 +13,7 @@ const {
     queueReplyTargetForThread(threadId: string, target: ReplyTarget): void;
     setReplyTarget(bindingKey: string, target: ReplyTarget): void;
   };
-} = require("../src/core/stream-delivery/reply-target-registry");
+} = require("../src/runtime/stream-delivery/reply-target-registry");
 
 interface ReplyTarget {
   userId: string;

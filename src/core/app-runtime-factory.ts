@@ -16,8 +16,8 @@ import type {
   TimelineIntegrationLike,
   TimelineScreenshotQueueLike,
 } from "./app-service-contract";
-import { BackstageTaskLifecycle } from "./backstage-task-lifecycle";
-import { RuntimeTurnLifecycle } from "./runtime-turn-lifecycle";
+import { BackstageTaskLifecycle } from "../runtime/backstage-task-lifecycle";
+import { RuntimeTurnLifecycle } from "../runtime/runtime-turn-lifecycle";
 import type {
   DeliveryFailurePayload,
   HandlePreparedMessageOptions,
@@ -26,7 +26,7 @@ import type {
   ReplyTarget,
   TimelineScreenshotRequest,
 } from "./runtime-types";
-import { RuntimeWatchdogLifecycle } from "./runtime-watchdog-lifecycle";
+import { RuntimeWatchdogLifecycle } from "../runtime/runtime-watchdog-lifecycle";
 import * as timelineIntegrationModule from "../integrations/timeline";
 import * as channelCommandRouterModule from "./channel-command-router";
 import * as controlCommandHandlersModule from "./channel-command-control-handlers";
@@ -35,9 +35,13 @@ import * as reminderQueueStoreModule from "../state/reminder-queue-store";
 import * as systemMessageQueueStoreModule from "../state/system-message-queue-store";
 import * as timelineScreenshotQueueStoreModule from "../state/timeline-screenshot-queue-store";
 import * as mediaReceiveModule from "../adapters/channel/weixin/media-receive";
+import type {
+  PersistIncomingWeixinAttachmentsArgs,
+  PersistIncomingWeixinAttachmentsResult,
+} from "../adapters/channel/weixin/media-types";
 import * as approvalCommandPolicyModule from "./approval-command-policy";
-import { StreamDelivery } from "./stream-delivery";
-import { ThreadStateStore } from "./thread-state-store";
+import { StreamDelivery } from "../runtime/stream-delivery";
+import { ThreadStateStore } from "../runtime/thread-state-store";
 import {
   buildCodexInboundText,
   buildReminderSystemTrigger,
@@ -86,8 +90,8 @@ const { TimelineScreenshotQueueStore } = timelineScreenshotQueueStoreModule as {
 };
 const { persistIncomingWeixinAttachments } = mediaReceiveModule as {
   persistIncomingWeixinAttachments: (
-    args: Record<string, unknown>,
-  ) => Promise<{ saved: unknown[]; failed: Array<{ reason: string }> }>;
+    args: PersistIncomingWeixinAttachmentsArgs,
+  ) => Promise<PersistIncomingWeixinAttachmentsResult>;
 };
 const {
   buildApprovalPromptSignature,

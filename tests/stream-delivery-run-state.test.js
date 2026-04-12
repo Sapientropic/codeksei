@@ -10,7 +10,7 @@ const {
   removeStateItem,
   replaceStateItemText,
   upsertStateItem,
-} = require("../src/core/stream-delivery/run-state");
+} = require("../src/runtime/stream-delivery/run-state");
 
 test("run state reuses keyed runs and resolves pending turn fallback", () => {
   const stateByRunKey = new Map();

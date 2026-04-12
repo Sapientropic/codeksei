@@ -8,14 +8,14 @@ import type {
   SystemMessageQueueLike,
   ThreadStateStoreLike,
   TimelineScreenshotQueueLike,
-} from "./app-service-contract";
+} from "../core/app-service-contract";
 import type {
   HandlePreparedMessageOptions,
   NormalizedIncomingMessage,
   PendingApprovalState,
   SystemDispatchResult,
   TimelineScreenshotRequest,
-} from "./runtime-types";
+} from "../core/runtime-types";
 
 interface AccountRef {
   accountId: string;
