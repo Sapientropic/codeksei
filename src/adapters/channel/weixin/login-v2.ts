@@ -1,20 +1,49 @@
-const {
+import {
   buildCommonHeaders,
   normalizeProtocolClientVersion,
   normalizeRouteTag,
-} = require("./protocol");
-const { redactSensitiveText } = require("./redact");
-const {
+} from "./protocol";
+import { redactSensitiveText } from "./redact";
+import {
   ACTIVE_LOGIN_TTL_MS,
   MAX_QR_REFRESH_COUNT,
   ensureTrailingSlash,
   finishWeixinLogin,
   printQrCode,
-} = require("./login-common");
+} from "./login-common";
+import type { WeixinAccountConfig } from "./account-store";
 
 const QR_LONG_POLL_TIMEOUT_MS = 35_000;
 
-async function fetchQrCode({ apiBaseUrl, botType, routeTag = "", clientVersion = "" }: any) {
+interface V2QrResponse {
+  qrcode_img_content: string;
+  qrcode: string;
+}
+
+interface V2LoginStatusResponse extends Record<string, unknown> {
+  status?: string;
+  redirect_host?: string;
+  bot_token?: string;
+  ilink_bot_id?: string;
+  baseurl?: string;
+  ilink_user_id?: string;
+}
+
+interface V2LoginConfig extends WeixinAccountConfig {
+  weixinBaseUrl?: string;
+  weixinQrBotType?: string;
+  weixinRouteTag?: string;
+  weixinProtocolClientVersion?: string;
+}
+
+interface FetchQrCodeArgs {
+  apiBaseUrl: string;
+  botType: string;
+  routeTag?: string;
+  clientVersion?: string;
+}
+
+async function fetchQrCode({ apiBaseUrl, botType, routeTag = "", clientVersion = "" }: FetchQrCodeArgs): Promise<V2QrResponse> {
   const base = ensureTrailingSlash(apiBaseUrl);
   const url = new URL(`ilink/bot/get_bot_qrcode?bot_type=${encodeURIComponent(botType)}`, base);
   const response = await fetch(url.toString(), {
@@ -24,10 +53,20 @@ async function fetchQrCode({ apiBaseUrl, botType, routeTag = "", clientVersion =
     const body = await response.text().catch(() => "(unreadable)");
     throw new Error(`二维码获取失败: ${response.status} ${response.statusText} ${redactSensitiveText(body)}`);
   }
-  return /** @type {Promise<any>} */ (response.json());
+  return response.json() as Promise<V2QrResponse>;
 }
 
-async function pollQrStatus({ apiBaseUrl, qrcode, routeTag = "", clientVersion = "" }: any) {
+async function pollQrStatus({
+  apiBaseUrl,
+  qrcode,
+  routeTag = "",
+  clientVersion = "",
+}: {
+  apiBaseUrl: string;
+  qrcode: string;
+  routeTag?: string;
+  clientVersion?: string;
+}): Promise<V2LoginStatusResponse> {
   const base = ensureTrailingSlash(apiBaseUrl);
   const url = new URL(`ilink/bot/get_qrcode_status?qrcode=${encodeURIComponent(qrcode)}`, base);
   const controller = new AbortController();
@@ -52,7 +91,19 @@ async function pollQrStatus({ apiBaseUrl, qrcode, routeTag = "", clientVersion =
   }
 }
 
-async function waitForV2WeixinLogin({ apiBaseUrl, botType, routeTag = "", clientVersion = "", timeoutMs }: any) {
+async function waitForV2WeixinLogin({
+  apiBaseUrl,
+  botType,
+  routeTag = "",
+  clientVersion = "",
+  timeoutMs,
+}: {
+  apiBaseUrl: string;
+  botType: string;
+  routeTag?: string;
+  clientVersion?: string;
+  timeoutMs: number;
+}) {
   let qrResponse = await fetchQrCode({ apiBaseUrl, botType, routeTag, clientVersion });
   let startedAt = Date.now();
   let refreshCount = 0;
@@ -133,7 +184,21 @@ async function waitForV2WeixinLogin({ apiBaseUrl, botType, routeTag = "", client
   throw new Error("登录超时，请重新执行 login");
 }
 
-async function refreshQrCode({ reason, apiBaseUrl, botType, routeTag, clientVersion, refreshCount }: any) {
+async function refreshQrCode({
+  reason,
+  apiBaseUrl,
+  botType,
+  routeTag,
+  clientVersion,
+  refreshCount,
+}: {
+  reason: string;
+  apiBaseUrl: string;
+  botType: string;
+  routeTag: string;
+  clientVersion: string;
+  refreshCount: number;
+}) {
   const nextRefreshCount = refreshCount + 1;
   if (nextRefreshCount > MAX_QR_REFRESH_COUNT) {
     throw new Error("二维码多次过期，请重新执行 login");
@@ -150,11 +215,11 @@ async function refreshQrCode({ reason, apiBaseUrl, botType, routeTag, clientVers
   };
 }
 
-function isTransientLongPollError(error: any) {
+function isTransientLongPollError(error: unknown): boolean {
   if (error instanceof Error && error.name === "AbortError") {
     return true;
   }
-  const message = String(error?.message || "").toLowerCase();
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error || "").toLowerCase();
   return message.includes("aborted")
     || message.includes("fetch failed")
     || message.includes("networkerror")
@@ -162,18 +227,18 @@ function isTransientLongPollError(error: any) {
     || error instanceof TypeError;
 }
 
-function sleep(ms: any) {
-  return new Promise((resolve: any) => setTimeout(resolve, ms));
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function runV2LoginFlow(config: any) {
+async function runV2LoginFlow(config: V2LoginConfig): Promise<void> {
   const routeTag = normalizeRouteTag(config.weixinRouteTag);
   const clientVersion = normalizeProtocolClientVersion(config.weixinProtocolClientVersion);
   const routeTagLabel = routeTag ? ` routeTag=${routeTag}` : "";
   console.log(`[codeksei] 正在启动微信扫码登录（v2）...${routeTagLabel}`);
   const result = await waitForV2WeixinLogin({
-    apiBaseUrl: config.weixinBaseUrl,
-    botType: config.weixinQrBotType,
+    apiBaseUrl: String(config.weixinBaseUrl || ""),
+    botType: String(config.weixinQrBotType || ""),
     routeTag,
     clientVersion,
     timeoutMs: 480_000,
@@ -181,8 +246,6 @@ async function runV2LoginFlow(config: any) {
   finishWeixinLogin(config, result);
 }
 
-module.exports = {
+export {
   runV2LoginFlow,
 };
-
-export {};

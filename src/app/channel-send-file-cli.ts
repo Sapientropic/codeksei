@@ -1,8 +1,25 @@
-const { getCommandArgsSchema } = require("../contracts/command-args");
-const { parseCliArgs } = require("../core/cli-args");
-const { buildTerminalLeafHelp } = require("../core/command-registry");
+import { getCommandArgsSchema } from "../contracts/command-args";
+import { parseCliArgs } from "../core/cli-args";
+import { buildTerminalLeafHelp } from "../core/command-registry";
 
-async function runChannelSendFileCommand(app: any, args: any[] = []) {
+interface ChannelSendFileOptions {
+  help: boolean;
+  path: string;
+  user: string;
+}
+
+interface ChannelSendFileResult {
+  filePath: string;
+}
+
+interface ChannelSendFileApp {
+  sendLocalFileToCurrentChat(args: {
+    senderId: string;
+    filePath: string;
+  }): Promise<ChannelSendFileResult>;
+}
+
+async function runChannelSendFileCommand(app: ChannelSendFileApp, args: string[] = []) {
   if (args.includes("--help") || args.includes("-h")) {
     console.log(buildTerminalLeafHelp("channel.send_file"));
     return;
@@ -20,10 +37,8 @@ async function runChannelSendFileCommand(app: any, args: any[] = []) {
   console.log(`file sent: ${result.filePath}`);
 }
 
-function parseArgs(args: any) {
-  return parseCliArgs(args, getCommandArgsSchema("channelSendFile"));
+function parseArgs(args: string[]): ChannelSendFileOptions {
+  return parseCliArgs(args, getCommandArgsSchema("channelSendFile")) as unknown as ChannelSendFileOptions;
 }
 
-module.exports = { runChannelSendFileCommand };
-
-export {};
+export { runChannelSendFileCommand };

@@ -1,13 +1,14 @@
-const fs = require("fs");
-const path = require("path");
-const { spawnSync } = require("child_process");
-const { normalizeProjectRadarConfig } = require("../contracts/config-files");
-const { loadJsonConfig } = require("./config-loader");
-const {
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { spawnSync } from "node:child_process";
+
+import { normalizeProjectRadarConfig } from "../contracts/config-files";
+import { loadJsonConfig } from "./config-loader";
+import {
   normalizeDisplayPath,
   resolveCrossPlatformPath,
   resolveCrossPlatformPathFromRoot,
-} = require("./path-utils");
+} from "./path-utils";
 
 function loadProjectRadarConfig(config: any = {}) {
   const workspaceRoot = resolveCrossPlatformPath(String(config.workspaceRoot || process.cwd()));
@@ -391,10 +392,8 @@ function formatErrorMessage(error: any) {
   return error instanceof Error ? error.message : String(error || "unknown error");
 }
 
-module.exports = {
+export {
   collectProjectRadars,
   listTrackedProjects,
   loadProjectRadarConfig,
 };
-
-export {};

@@ -1,15 +1,23 @@
-// @ts-check
+import type { CommandArgFlag, CommandArgSchema } from "../contracts/command-args";
 
-function sliceLeafCommandArgs(argv: any = process.argv, startIndex: number = 4) {
+type ParsedCliOptions = Record<string, boolean | string | string[]>;
+
+interface ParseCliArgsOptions {
+  passthroughKey?: string;
+}
+
+function sliceLeafCommandArgs(argv: readonly string[] = process.argv, startIndex = 4): string[] {
   return Array.isArray(argv) ? argv.slice(startIndex) : [];
 }
 
-function parseCliArgs(args: any, schema: any, {
-  passthroughKey = "",
-}: any = {}) {
-  const normalizedArgs = Array.isArray(args) ? args.map((value: any) => String(value || "")) : [];
+function parseCliArgs(
+  args: readonly string[],
+  schema: CommandArgSchema | null,
+  { passthroughKey = "" }: ParseCliArgsOptions = {},
+): ParsedCliOptions {
+  const normalizedArgs = Array.isArray(args) ? args.map((value) => String(value || "")) : [];
   const normalizedSchema = normalizeSchema(schema);
-  const options: Record<string, any> = buildDefaultOptions(normalizedSchema);
+  const options: ParsedCliOptions = buildDefaultOptions(normalizedSchema);
   const flagMap = buildFlagMap(normalizedSchema.flags);
   const passthrough: string[] = [];
   const passthroughIgnore = new Set(
@@ -53,7 +61,9 @@ function parseCliArgs(args: any, schema: any, {
     }
     const value = next.trim();
     if (spec.type === "string[]") {
-      options[spec.name].push(value);
+      const list = Array.isArray(options[spec.name]) ? [...options[spec.name] as string[]] : [];
+      list.push(value);
+      options[spec.name] = list;
     } else {
       options[spec.name] = value;
     }
@@ -66,15 +76,15 @@ function parseCliArgs(args: any, schema: any, {
   return options;
 }
 
-function normalizeSchema(schema: any) {
+function normalizeSchema(schema: CommandArgSchema | null) {
   return {
     flags: Array.isArray(schema?.flags) ? schema.flags : [],
     passthrough: schema?.passthrough || null,
   };
 }
 
-function buildDefaultOptions(schema: any) {
-  const options: Record<string, any> = {};
+function buildDefaultOptions(schema: Pick<CommandArgSchema, "flags">): ParsedCliOptions {
+  const options: ParsedCliOptions = {};
   for (const flag of schema.flags) {
     if (flag.type === "string[]") {
       options[flag.name] = Array.isArray(flag.defaultValue) ? flag.defaultValue.slice() : [];
@@ -89,8 +99,8 @@ function buildDefaultOptions(schema: any) {
   return options;
 }
 
-function buildFlagMap(flags: any) {
-  const flagMap = new Map();
+function buildFlagMap(flags: readonly CommandArgFlag[]) {
+  const flagMap = new Map<string, CommandArgFlag>();
   for (const flag of flags) {
     for (const key of Array.isArray(flag.keys) ? flag.keys : []) {
       flagMap.set(String(key), flag);
@@ -99,7 +109,7 @@ function buildFlagMap(flags: any) {
   return flagMap;
 }
 
-function shouldCapturePassthroughValue(token: any, next: any) {
+function shouldCapturePassthroughValue(token: unknown, next: unknown) {
   const normalizedToken = String(token || "").trim();
   const normalizedNext = String(next || "").trim();
   if (!normalizedToken.startsWith("--") || !normalizedNext || normalizedNext.startsWith("--")) {
@@ -108,9 +118,7 @@ function shouldCapturePassthroughValue(token: any, next: any) {
   return true;
 }
 
-module.exports = {
+export {
   parseCliArgs,
   sliceLeafCommandArgs,
 };
-
-export {};

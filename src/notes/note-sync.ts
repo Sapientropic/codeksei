@@ -1,14 +1,14 @@
-const fs = require("fs");
-const path = require("path");
-const { writeForeignTextDocument } = require("../state/json-state");
-const { PRIMARY_NOTE_SYNC_MARKER_PREFIX } = require("../core/branding");
-const {
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+import { PRIMARY_NOTE_SYNC_MARKER_PREFIX } from "../core/branding";
+import { listTrackedProjects } from "../core/project-radar";
+import {
   normalizeDisplayPath,
   resolveCrossPlatformPath,
   resolveCrossPlatformPathFromRoot,
-} = require("../core/path-utils");
-
-const { listTrackedProjects } = require("../core/project-radar");
+} from "../core/path-utils";
+import { writeForeignTextDocument } from "../state/json-state";
 
 const SLOT_MARKER_PREFIX = PRIMARY_NOTE_SYNC_MARKER_PREFIX;
 
@@ -419,7 +419,7 @@ function escapeRegExp(value: any) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-module.exports = {
+export {
   appendSection,
   findSectionRange,
   normalizeBulletText,
@@ -428,5 +428,3 @@ module.exports = {
   syncNoteContent,
   syncNoteFile,
 };
-
-export {};

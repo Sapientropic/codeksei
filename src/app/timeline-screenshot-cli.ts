@@ -1,15 +1,35 @@
-const crypto = require("crypto");
-const path = require("path");
+import * as crypto from "node:crypto";
+import * as path from "node:path";
 
-const { resolveSelectedAccount } = require("../adapters/channel/weixin/account-store");
-const { SessionStore } = require("../adapters/runtime/codex/session-store");
-const { getCommandArgsSchema } = require("../contracts/command-args");
-const { parseCliArgs } = require("../core/cli-args");
-const { buildTerminalLeafHelp } = require("../core/command-registry");
-const { resolvePreferredSenderId } = require("../workspace/default-targets");
-const { TimelineScreenshotQueueStore } = require("../state/timeline-screenshot-queue-store");
+import * as accountStoreModule from "../adapters/channel/weixin/account-store";
+import { SessionStore } from "../adapters/runtime/codex/session-store";
+import { getCommandArgsSchema } from "../contracts/command-args";
+import { parseCliArgs } from "../core/cli-args";
+import { buildTerminalLeafHelp } from "../core/command-registry";
+import { TimelineScreenshotQueueStore } from "../state/timeline-screenshot-queue-store";
+import { resolvePreferredSenderId } from "../workspace/default-targets";
 
-async function runTimelineScreenshotCommand(config: any, args: any[] = []) {
+interface TimelineScreenshotOptions {
+  help: boolean;
+  user: string;
+  outputFile: string;
+  forwardArgs: string[];
+}
+
+interface RuntimeConfig extends Record<string, unknown> {
+  sessionsFile: string;
+  timelineScreenshotQueueFile: string;
+}
+
+interface SelectedAccount {
+  accountId: string;
+}
+
+const { resolveSelectedAccount } = accountStoreModule as {
+  resolveSelectedAccount: (config: unknown) => SelectedAccount;
+};
+
+async function runTimelineScreenshotCommand(config: RuntimeConfig, args: string[] = []) {
   const options = parseTimelineScreenshotArgs(args);
   if (options.help) {
     console.log(buildTerminalLeafHelp("timeline.screenshot"));
@@ -43,17 +63,15 @@ async function runTimelineScreenshotCommand(config: any, args: any[] = []) {
   console.log("delivery_status: pending_bridge_send");
 }
 
-function parseTimelineScreenshotArgs(args: any) {
-  const options = parseCliArgs(args, getCommandArgsSchema("timelineScreenshot"));
+function parseTimelineScreenshotArgs(args: string[]): TimelineScreenshotOptions {
+  const options = parseCliArgs(args, getCommandArgsSchema("timelineScreenshot")) as unknown as TimelineScreenshotOptions;
   if (options.outputFile) {
     options.outputFile = path.resolve(options.outputFile);
   }
   return options;
 }
 
-module.exports = {
+export {
   runTimelineScreenshotCommand,
   parseTimelineScreenshotArgs,
 };
-
-export {};

@@ -1,16 +1,16 @@
-const fs = require("fs");
-const path = require("path");
-const { normalizeDurableNoteSchemaConfig } = require("../contracts/config-files");
-const { loadJsonConfig } = require("../core/config-loader");
-const { writeForeignTextDocument } = require("../state/json-state");
+import * as fs from "node:fs";
+import * as path from "node:path";
 
-const { listTrackedProjects } = require("../core/project-radar");
-const { appendSection, findSectionRange, resolveNoteSyncTarget } = require("./note-sync");
-const {
+import { normalizeDurableNoteSchemaConfig } from "../contracts/config-files";
+import { loadJsonConfig } from "../core/config-loader";
+import { listTrackedProjects } from "../core/project-radar";
+import {
   normalizeDisplayPath,
   resolveCrossPlatformPath,
   resolveCrossPlatformPathFromRoot,
-} = require("../core/path-utils");
+} from "../core/path-utils";
+import { writeForeignTextDocument } from "../state/json-state";
+import { appendSection, findSectionRange, resolveNoteSyncTarget } from "./note-sync";
 
 const DURABLE_NOTE_SCOPE_ALIASES = {
   assistant: "companion",
@@ -347,7 +347,7 @@ function formatErrorMessage(error: any) {
   return error instanceof Error ? error.message : String(error || "unknown error");
 }
 
-module.exports = {
+export {
   canonicalizeDurableNoteScope,
   ensureDurableNoteSections,
   inspectDurableNoteRouting,
@@ -355,5 +355,3 @@ module.exports = {
   resolveDurableNoteProfile,
   resolveDurableNoteRoute,
 };
-
-export {};

@@ -1,4 +1,4 @@
-const crypto = require("crypto");
+import * as crypto from "node:crypto";
 
 const DEFAULT_PROTOCOL_CLIENT_VERSION = "2.1.1";
 const BOT_API_USER_AGENT = "node";
@@ -8,18 +8,18 @@ const ILINK_APP_ID = "bot";
 // which weakens upstream dedupe and can amplify duplicate sends.
 const PROCESS_WECHAT_UIN = createStableWechatUin();
 
-function normalizeRouteTag(routeTag: any) {
+function normalizeRouteTag(routeTag: unknown): string {
   return typeof routeTag === "string" ? routeTag.trim() : "";
 }
 
-function normalizeProtocolClientVersion(version: any) {
+function normalizeProtocolClientVersion(version: unknown): string {
   const normalized = typeof version === "string" ? version.trim() : "";
   return normalized || DEFAULT_PROTOCOL_CLIENT_VERSION;
 }
 
-function encodeClientVersion(version: any) {
+function encodeClientVersion(version: unknown): string {
   const parts = normalizeProtocolClientVersion(version).split(".");
-  const parse = (index: any) => {
+  const parse = (index: number): number => {
     const value = Number.parseInt(parts[index] || "0", 10);
     return Number.isFinite(value) ? value : 0;
   };
@@ -30,7 +30,13 @@ function encodeClientVersion(version: any) {
   return String(encoded);
 }
 
-function buildCommonHeaders({ routeTag = "", clientVersion = DEFAULT_PROTOCOL_CLIENT_VERSION }: any = {}) {
+function buildCommonHeaders({
+  routeTag = "",
+  clientVersion = DEFAULT_PROTOCOL_CLIENT_VERSION,
+}: {
+  routeTag?: unknown;
+  clientVersion?: unknown;
+} = {}): Record<string, string> {
   const headers: Record<string, string> = {
     "User-Agent": BOT_API_USER_AGENT,
     "iLink-App-Id": ILINK_APP_ID,
@@ -52,7 +58,17 @@ function getStableWechatUin() {
   return PROCESS_WECHAT_UIN;
 }
 
-function buildJsonHeaders({ body, token = "", routeTag = "", clientVersion = DEFAULT_PROTOCOL_CLIENT_VERSION }: any) {
+function buildJsonHeaders({
+  body,
+  token = "",
+  routeTag = "",
+  clientVersion = DEFAULT_PROTOCOL_CLIENT_VERSION,
+}: {
+  body: unknown;
+  token?: unknown;
+  routeTag?: unknown;
+  clientVersion?: unknown;
+}): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     AuthorizationType: "ilink_bot_token",
@@ -67,7 +83,7 @@ function buildJsonHeaders({ body, token = "", routeTag = "", clientVersion = DEF
   return headers;
 }
 
-module.exports = {
+export {
   DEFAULT_PROTOCOL_CLIENT_VERSION,
   buildCommonHeaders,
   buildJsonHeaders,
@@ -75,5 +91,3 @@ module.exports = {
   normalizeProtocolClientVersion,
   normalizeRouteTag,
 };
-
-export {};

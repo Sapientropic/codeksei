@@ -1,19 +1,28 @@
-const qrcodeTerminal = require("qrcode-terminal");
-const {
+import * as qrcodeTerminal from "qrcode-terminal";
+
+import {
   deleteWeixinAccount,
   listWeixinAccounts,
   saveWeixinAccount,
-} = require("./account-store");
-const { clearPersistedContextTokens } = require("./context-token-store");
+  type WeixinAccountConfig,
+  type WeixinAccountRecord,
+} from "./account-store";
+import { clearPersistedContextTokens } from "./context-token-store";
 
 const ACTIVE_LOGIN_TTL_MS = 5 * 60_000;
 const MAX_QR_REFRESH_COUNT = 3;
 
-function ensureTrailingSlash(url: any) {
+interface WeixinLoginResult extends Partial<WeixinAccountRecord>, Record<string, unknown> {
+  accountId: string;
+  token: string;
+  baseUrl: string;
+}
+
+function ensureTrailingSlash(url: string): string {
   return url.endsWith("/") ? url : `${url}/`;
 }
 
-function printQrCode(url: any) {
+function printQrCode(url: string): void {
   try {
     qrcodeTerminal.generate(url, { small: true });
     console.log("如果二维码未能成功展示，请用浏览器打开以下链接扫码：");
@@ -23,7 +32,10 @@ function printQrCode(url: any) {
   }
 }
 
-function cleanupStaleAccountsForUserId(config: any, activeAccount: any) {
+function cleanupStaleAccountsForUserId(
+  config: WeixinAccountConfig,
+  activeAccount: WeixinAccountRecord,
+): WeixinAccountRecord[] {
   const activeUserId = typeof activeAccount?.userId === "string" ? activeAccount.userId.trim() : "";
   if (!activeUserId) {
     return [];
@@ -41,7 +53,7 @@ function cleanupStaleAccountsForUserId(config: any, activeAccount: any) {
   return staleAccounts;
 }
 
-function finishWeixinLogin(config: any, result: any) {
+function finishWeixinLogin(config: WeixinAccountConfig, result: WeixinLoginResult): WeixinAccountRecord {
   const account = saveWeixinAccount(config, result.accountId, result);
   cleanupStaleAccountsForUserId(config, account);
   console.log("\n✅ 与微信连接成功！");
@@ -54,12 +66,11 @@ function finishWeixinLogin(config: any, result: any) {
   return account;
 }
 
-module.exports = {
+export {
   ACTIVE_LOGIN_TTL_MS,
   MAX_QR_REFRESH_COUNT,
   ensureTrailingSlash,
   finishWeixinLogin,
   printQrCode,
+  type WeixinLoginResult,
 };
-
-export {};

@@ -1,13 +1,33 @@
-const fs = require("fs");
-const path = require("path");
-const { normalizeRouteTag } = require("./protocol");
-const {
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+import { normalizeRouteTag } from "./protocol";
+import {
   isPlainObject,
   readManagedJsonStateFile,
   writeManagedJsonStateFile,
-} = require("../../../state/json-state");
+} from "../../../state/json-state";
 
-function normalizeAccountId(raw: any) {
+interface WeixinAccountConfig extends Record<string, unknown> {
+  accountsDir?: string;
+  weixinBaseUrl?: string;
+  weixinRouteTag?: string;
+  accountId?: string;
+}
+
+interface WeixinAccountRecord extends Record<string, unknown> {
+  accountId: string;
+  rawAccountId: string;
+  token: string;
+  baseUrl: string;
+  userId: string;
+  routeTag: string;
+  savedAt: string;
+}
+
+type WeixinAccountUpdate = Partial<WeixinAccountRecord> & Record<string, unknown>;
+
+function normalizeAccountId(raw: unknown): string {
   return String(raw || "")
     .trim()
     .toLowerCase()
@@ -16,15 +36,15 @@ function normalizeAccountId(raw: any) {
     .replace(/^-|-$/g, "");
 }
 
-function ensureAccountsDir(config: any) {
-  fs.mkdirSync(config.accountsDir, { recursive: true });
+function ensureAccountsDir(config: WeixinAccountConfig): void {
+  fs.mkdirSync(resolveAccountsDir(config), { recursive: true });
 }
 
-function resolveAccountPath(config: any, accountId: any) {
-  return path.join(config.accountsDir, `${normalizeAccountId(accountId)}.json`);
+function resolveAccountPath(config: WeixinAccountConfig, accountId: unknown): string {
+  return path.join(resolveAccountsDir(config), `${normalizeAccountId(accountId)}.json`);
 }
 
-function deleteWeixinAccount(config: any, accountId: any) {
+function deleteWeixinAccount(config: WeixinAccountConfig, accountId: unknown): boolean {
   const normalized = normalizeAccountId(accountId);
   if (!normalized) {
     return false;
@@ -41,7 +61,11 @@ function deleteWeixinAccount(config: any, accountId: any) {
   }
 }
 
-function saveWeixinAccount(config: any, rawAccountId: any, update: any) {
+function saveWeixinAccount(
+  config: WeixinAccountConfig,
+  rawAccountId: unknown,
+  update: WeixinAccountUpdate,
+): WeixinAccountRecord {
   ensureAccountsDir(config);
   const accountId = normalizeAccountId(rawAccountId);
   const filePath = resolveAccountPath(config, accountId);
@@ -51,7 +75,9 @@ function saveWeixinAccount(config: any, rawAccountId: any, update: any) {
     accountId,
     rawAccountId: String(rawAccountId || "").trim() || existing?.rawAccountId || "",
     token: typeof update.token === "string" && update.token.trim() ? update.token.trim() : existing?.token || "",
-    baseUrl: typeof update.baseUrl === "string" && update.baseUrl.trim() ? update.baseUrl.trim() : existing?.baseUrl || config.weixinBaseUrl,
+    baseUrl: typeof update.baseUrl === "string" && update.baseUrl.trim()
+      ? update.baseUrl.trim()
+      : existing?.baseUrl || resolveWeixinBaseUrl(config),
     userId: typeof update.userId === "string" ? update.userId.trim() : existing?.userId || "",
     routeTag: hasRouteTag
       ? normalizeRouteTag(update.routeTag)
@@ -62,12 +88,12 @@ function saveWeixinAccount(config: any, rawAccountId: any, update: any) {
   return next;
 }
 
-function loadWeixinAccount(config: any, accountId: any) {
+function loadWeixinAccount(config: WeixinAccountConfig, accountId: unknown): WeixinAccountRecord | null {
   const normalized = normalizeAccountId(accountId);
   if (!normalized) {
     return null;
   }
-  const parsed = readManagedJsonStateFile({
+  const parsed = readManagedJsonStateFile<Record<string, unknown> | null>({
     filePath: resolveAccountPath(config, normalized),
     fallback: null,
     label: "weixin account",
@@ -80,7 +106,9 @@ function loadWeixinAccount(config: any, accountId: any) {
     accountId: normalized,
     rawAccountId: typeof parsed.rawAccountId === "string" ? parsed.rawAccountId : "",
     token: typeof parsed.token === "string" ? parsed.token : "",
-    baseUrl: typeof parsed.baseUrl === "string" && parsed.baseUrl.trim() ? parsed.baseUrl.trim() : config.weixinBaseUrl,
+    baseUrl: typeof parsed.baseUrl === "string" && parsed.baseUrl.trim()
+      ? parsed.baseUrl.trim()
+      : resolveWeixinBaseUrl(config),
     userId: typeof parsed.userId === "string" ? parsed.userId : "",
     routeTag: Object.prototype.hasOwnProperty.call(parsed, "routeTag")
       ? normalizeRouteTag(parsed.routeTag)
@@ -89,17 +117,17 @@ function loadWeixinAccount(config: any, accountId: any) {
   };
 }
 
-function listWeixinAccounts(config: any) {
+function listWeixinAccounts(config: WeixinAccountConfig): WeixinAccountRecord[] {
   ensureAccountsDir(config);
-  const files = fs.readdirSync(config.accountsDir, { withFileTypes: true });
+  const files = fs.readdirSync(resolveAccountsDir(config), { withFileTypes: true });
   return files
-    .filter((entry: any) => entry.isFile() && entry.name.endsWith(".json") && !entry.name.endsWith(".context-tokens.json"))
-    .map((entry: any) => loadWeixinAccount(config, entry.name.slice(0, -5)))
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".json") && !entry.name.endsWith(".context-tokens.json"))
+    .map((entry) => loadWeixinAccount(config, entry.name.slice(0, -5)))
     .filter(Boolean)
-    .sort((left: any, right: any) => String(right.savedAt || "").localeCompare(String(left.savedAt || "")));
+    .sort((left, right) => String(right?.savedAt || "").localeCompare(String(left?.savedAt || ""))) as WeixinAccountRecord[];
 }
 
-function resolveSelectedAccount(config: any) {
+function resolveSelectedAccount(config: WeixinAccountConfig): WeixinAccountRecord {
   if (config.accountId) {
     const account = loadWeixinAccount(config, config.accountId);
     if (!account) {
@@ -124,7 +152,15 @@ function resolveSelectedAccount(config: any) {
   return accounts[0];
 }
 
-function validateWeixinAccountRecord(value: any) {
+function resolveAccountsDir(config: WeixinAccountConfig): string {
+  return typeof config.accountsDir === "string" ? config.accountsDir : "";
+}
+
+function resolveWeixinBaseUrl(config: WeixinAccountConfig): string {
+  return typeof config.weixinBaseUrl === "string" ? config.weixinBaseUrl : "";
+}
+
+function validateWeixinAccountRecord(value: unknown): true | string {
   if (!isPlainObject(value)) {
     return "weixin account state must be an object";
   }
@@ -152,7 +188,7 @@ function validateWeixinAccountRecord(value: any) {
   return true;
 }
 
-module.exports = {
+export {
   deleteWeixinAccount,
   listWeixinAccounts,
   loadWeixinAccount,
@@ -160,6 +196,6 @@ module.exports = {
   resolveAccountPath,
   resolveSelectedAccount,
   saveWeixinAccount,
+  type WeixinAccountConfig,
+  type WeixinAccountRecord,
 };
-
-export {};

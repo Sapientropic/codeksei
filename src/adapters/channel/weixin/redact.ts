@@ -22,7 +22,7 @@ const QUERY_FIELD_PATTERN = new RegExp(
 
 const BEARER_PATTERN = /\bBearer\s+[A-Za-z0-9._~+/=-]+/g;
 
-function redactSensitiveText(input: any, maxLen: number = 800) {
+function redactSensitiveText(input: unknown, maxLen = 800): string {
   const text = typeof input === "string" ? input : String(input || "");
   if (!text) {
     return "";
@@ -37,6 +37,4 @@ function redactSensitiveText(input: any, maxLen: number = 800) {
   return `${redacted.slice(0, maxLen)}…(truncated, totalLen=${redacted.length})`;
 }
 
-module.exports = { redactSensitiveText };
-
-export {};
+export { redactSensitiveText };

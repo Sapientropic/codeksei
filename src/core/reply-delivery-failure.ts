@@ -1,22 +1,47 @@
-// @ts-check
-
-const {
+import {
   normalizeCommandArgument,
-  normalizeText,
-} = require("./approval-command-policy");
+  normalizeTrimmedText,
+} from "./approval-command-policy";
+
+interface RuntimeAdapterLike {
+  getSessionStore(): {
+    findBindingForThreadId(threadId: string): { workspaceRoot?: unknown } | null;
+    clearPendingApprovalForThread?(threadId: string): void;
+    clearApprovalPrompt?(threadId: string): void;
+  };
+}
+
+interface ThreadStateStoreLike {
+  markTurnFailed(threadId: string, turnId: string, deliveryFailureText: string): void;
+}
+
+interface DeliveryFailurePayload {
+  threadId: unknown;
+  turnId?: unknown;
+  error: unknown;
+  sentText?: unknown;
+}
+
+interface DeliveryFailureContext {
+  runtimeAdapter: RuntimeAdapterLike;
+  threadStateStore: ThreadStateStoreLike;
+  clearRuntimeEventWatchdog(threadId: string): void;
+  clearTurnSettlementWatchdog(threadId: string, turnId: string): void;
+  stopTypingForThread(threadId: string): Promise<void>;
+}
 
 async function handleReplyDeliveryFailure({
   threadId,
   turnId = "",
   error,
   sentText = "",
-}: any, {
+}: DeliveryFailurePayload, {
   runtimeAdapter,
   threadStateStore,
   clearRuntimeEventWatchdog,
   clearTurnSettlementWatchdog,
   stopTypingForThread,
-}: any) {
+}: DeliveryFailureContext): Promise<void> {
   const normalizedThreadId = normalizeCommandArgument(threadId);
   const normalizedTurnId = normalizeCommandArgument(turnId);
   if (!normalizedThreadId) {
@@ -29,7 +54,7 @@ async function handleReplyDeliveryFailure({
     : `回复投递失败：${messageText}`;
   const sessionStore = runtimeAdapter.getSessionStore();
   const linked = sessionStore.findBindingForThreadId(normalizedThreadId);
-  const workspaceRoot = normalizeText(linked?.workspaceRoot);
+  const workspaceRoot = normalizeTrimmedText(linked?.workspaceRoot);
 
   console.error(
     `[codeksei] reply delivery degraded `
@@ -50,12 +75,15 @@ async function handleReplyDeliveryFailure({
   await stopTypingForThread(normalizedThreadId);
 }
 
-function isPersistentWeixinSendFailure(error: any) {
-  const message = String(error?.message || error || "");
+function isPersistentWeixinSendFailure(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error || "");
   return message.includes("sendMessage ret=-2");
 }
 
-function clearPendingApproval(sessionStore: any, threadId: any) {
+function clearPendingApproval(
+  sessionStore: ReturnType<RuntimeAdapterLike["getSessionStore"]>,
+  threadId: string,
+): void {
   if (typeof sessionStore?.clearPendingApprovalForThread === "function") {
     sessionStore.clearPendingApprovalForThread(threadId);
     return;
@@ -65,8 +93,6 @@ function clearPendingApproval(sessionStore: any, threadId: any) {
   }
 }
 
-module.exports = {
+export {
   handleReplyDeliveryFailure,
 };
-
-export {};

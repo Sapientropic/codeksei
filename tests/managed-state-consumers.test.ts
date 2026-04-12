@@ -1,33 +1,32 @@
-// @ts-nocheck
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
-const test = require("node:test");
-const assert = require("node:assert/strict");
+const fs: typeof import("node:fs") = require("node:fs");
+const os: typeof import("node:os") = require("node:os");
+const path: typeof import("node:path") = require("node:path");
+const test: typeof import("node:test") = require("node:test");
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 
-const { SessionStore } = require("../src/adapters/runtime/codex/session-store");
-const { loadWeixinAccount, saveWeixinAccount } = require("../src/adapters/channel/weixin/account-store");
+const { SessionStore }: typeof import("../src/adapters/runtime/codex/session-store") = require("../src/adapters/runtime/codex/session-store");
+const { loadWeixinAccount, saveWeixinAccount }: typeof import("../src/adapters/channel/weixin/account-store") = require("../src/adapters/channel/weixin/account-store");
 const {
   loadPersistedContextTokens,
   persistContextToken,
-} = require("../src/adapters/channel/weixin/context-token-store");
-const { loadSyncBuffer, saveSyncBuffer } = require("../src/adapters/channel/weixin/sync-buffer-store");
+}: typeof import("../src/adapters/channel/weixin/context-token-store") = require("../src/adapters/channel/weixin/context-token-store");
+const { loadSyncBuffer, saveSyncBuffer }: typeof import("../src/adapters/channel/weixin/sync-buffer-store") = require("../src/adapters/channel/weixin/sync-buffer-store");
 const {
   reminderQueueStateSchema,
   systemMessageDeadLetterStateSchema,
   systemMessageQueueStateSchema,
   timelineScreenshotQueueStateSchema,
-} = require("../src/contracts/queue-items");
-const { sessionStoreStateSchema } = require("../src/contracts/session-state");
-const { ReminderQueueStore } = require("../src/state/reminder-queue-store");
-const { SystemMessageQueueStore } = require("../src/state/system-message-queue-store");
-const { TimelineScreenshotQueueStore } = require("../src/state/timeline-screenshot-queue-store");
+}: typeof import("../src/contracts/queue-items") = require("../src/contracts/queue-items");
+const { sessionStoreStateSchema }: typeof import("../src/contracts/session-state") = require("../src/contracts/session-state");
+const { ReminderQueueStore }: typeof import("../src/state/reminder-queue-store") = require("../src/state/reminder-queue-store");
+const { SystemMessageQueueStore }: typeof import("../src/state/system-message-queue-store") = require("../src/state/system-message-queue-store");
+const { TimelineScreenshotQueueStore }: typeof import("../src/state/timeline-screenshot-queue-store") = require("../src/state/timeline-screenshot-queue-store");
 const {
   readSharedBridgeHeartbeat,
   writeSharedBridgeHeartbeat,
-} = require("../src/shared/shared-bridge-heartbeat");
+}: typeof import("../src/shared/shared-bridge-heartbeat") = require("../src/shared/shared-bridge-heartbeat");
 
-function createWeixinConfig(tempRoot) {
+function createWeixinConfig(tempRoot: string) {
   return {
     accountsDir: path.join(tempRoot, "accounts"),
     weixinBaseUrl: "http://127.0.0.1",
@@ -115,6 +114,7 @@ test("saveWeixinAccount round-trips through managed state", () => {
   });
 
   const account = loadWeixinAccount(config, "acct-1");
+  assert.ok(account);
   assert.equal(account.accountId, "acct-1");
   assert.equal(account.token, "token-1");
   assert.equal(account.baseUrl, "http://bridge.local");
@@ -187,6 +187,7 @@ test("writeSharedBridgeHeartbeat round-trips through managed state", () => {
   });
 
   const heartbeat = readSharedBridgeHeartbeat(filePath);
+  assert.ok(heartbeat);
   assert.equal(heartbeat.pid, 12345);
   assert.equal(heartbeat.status, "running");
   assert.equal(heartbeat.accountId, "acct-1");

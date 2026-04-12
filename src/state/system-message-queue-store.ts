@@ -1,7 +1,6 @@
-// @ts-check
+import * as path from "node:path";
 
-const path = require("path");
-const {
+import {
   clearSystemMessageInFlight,
   compareSystemMessageDeadLetters,
   compareSystemMessages,
@@ -11,14 +10,17 @@ const {
   normalizeSystemMessage,
   normalizeSystemMessageDeadLetterEntry,
   SYSTEM_MESSAGE_KIND_POLICIES,
+  type SystemMessageDeadLetterEntry,
+  type SystemMessage,
   systemMessageDeadLetterStateSchema,
   systemMessageQueueStateSchema,
-} = require("../contracts/queue-items");
-const {
+} from "../contracts/queue-items";
+import {
   ensureParentDirectory,
   readManagedJsonStateFile,
   writeManagedJsonStateFile,
-} = require("./json-state");
+} from "./json-state";
+import type { ZodType } from "zod";
 
 const SYSTEM_MESSAGE_IN_FLIGHT_LEASE_MS = 60_000;
 
@@ -45,11 +47,11 @@ class SystemMessageQueueStore {
     // systemMessageQueueStateSchema is the one ingress that repairs legacy queue
     // payloads. Once data crosses that boundary, the store should sort/clone it
     // instead of re-normalizing the same record on every load/save cycle.
-    const parsed = readManagedJsonStateFile({
+    const parsed = readManagedJsonStateFile<{ messages?: SystemMessage[] }>({
       filePath: this.filePath,
       fallback: { messages: [] },
       label: "system message queue",
-      schema: systemMessageQueueStateSchema,
+      schema: systemMessageQueueStateSchema as unknown as ZodType<{ messages?: SystemMessage[] }>,
     });
     const normalizedState = /** @type {{ messages?: unknown[] }} */ (parsed || {});
     const messages = Array.isArray(normalizedState.messages) ? normalizedState.messages.slice() : [];
@@ -72,17 +74,19 @@ class SystemMessageQueueStore {
   }
 
   loadDeadLetters() {
-    const parsed = readManagedJsonStateFile({
+    const parsed = readManagedJsonStateFile<{ entries?: SystemMessageDeadLetterEntry[] }>({
       filePath: this.deadLetterFilePath,
       fallback: { entries: [] },
       label: "system message dead letter",
-      schema: systemMessageDeadLetterStateSchema,
+      schema: systemMessageDeadLetterStateSchema as unknown as ZodType<{ entries?: SystemMessageDeadLetterEntry[] }>,
     });
     // Dead-letter payloads share the same single-ingress contract as the live
     // queue. Once schema parse succeeds here, stores should only clone/sort the
     // canonical entries instead of re-running per-entry repair.
     const normalizedState = /** @type {{ entries?: import("../contracts/queue-items").SystemMessageDeadLetterEntry[] }} */ (parsed || {});
-    const entries = Array.isArray(normalizedState.entries) ? normalizedState.entries.slice() : [];
+    const entries = Array.isArray(normalizedState.entries)
+      ? normalizedState.entries.slice() as SystemMessageDeadLetterEntry[]
+      : [];
     return {
       entries: entries.sort(compareSystemMessageDeadLetters),
     };
@@ -356,9 +360,7 @@ function normalizeText(value: any) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-module.exports = {
+export {
   SystemMessageQueueStore,
   SYSTEM_MESSAGE_KIND_POLICIES,
 };
-
-export {};

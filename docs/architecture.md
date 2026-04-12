@@ -3,6 +3,13 @@
 `Codeksei` 的产品重心仍然是一个会陪人生活、主动记录、帮助节奏校准与项目落地的本地优先生活助理。
 实现层现在按“入口适配 -> runtime 协调 -> 状态持久化 -> 上层工作流”收口，而不是继续把这些职责混在 `src/core` 一个桶里。
 
+当前质量基线也已经同步到结构层：
+
+- `npm run check` / `npm run verify` 默认全绿
+- TS 源码侧的 CommonJS 过渡 allowlist 已清零
+- `@ts-nocheck` allowlist 已清零
+- 构建产物仍输出 CommonJS，但源码内部已经不再靠 `require / module.exports / export {}` 过渡态维持结构
+
 这一页只解释当前稳定结构，不复述实现细节清单。
 
 ## 1. Core Orchestration Shell
@@ -73,6 +80,7 @@
 - schema / validate 只在 ingress canonicalize
 - store 只操作 canonical state
 - queue / reminder / screenshot 这类 managed state 不再挂在 `src/core`
+- note / review / timeline consumer 通过 typed boundary 进入 state owner，不再靠 allowlist 或 `@ts-nocheck` 兜底
 
 这一层是“状态怎么进、怎么存、怎么隔离坏文件”的真相层。
 
@@ -114,8 +122,15 @@
 当前收口方式：
 
 - `index.ts` 保持 facade
+- `legacy.ts` 只保留兼容 facade，不再回揉 text / media / login / update 混合职责
 - `delivery.ts` 负责 chunk / retry / trace / v2 text send
 - `updates.ts` 负责 account / context token / sync buffer / getUpdates
+- `login-*`、`message-utils*`、`protocol.ts`、`account-store.ts`、`context-token-store.ts` 各自承担 owner-local 边界
+
+实现约束：
+
+- 源码内部统一走标准 `import / export`
+- media 兼容路径与 v2 text delivery 的分工继续显式保留，避免“顺手统一”把文件发送重新路由回错误栈
 
 不负责：
 
@@ -140,6 +155,7 @@
 - `lifecycle.ts` 负责 reconnect / initialize / ready state
 - `bootstrap.ts` 负责 thread bootstrap / instruction refresh 文本
 - `diagnostics.ts` 负责 workspace diagnostics / turn completion wait
+- `session-store.ts`、`rpc-client.ts`、`diagnostics.ts` 继续按 owner-local helper 收口，避免高 fan-out 逻辑重新回到一个 bucket
 
 ## 7. Shared Mode
 
@@ -168,6 +184,12 @@
 - `src/review/*` 负责 nightly / weekly / monthly review
 - `src/notes/*` 负责 durable note routing 与写入
 - `src/app/*` 负责公开 CLI 入口命令
+
+当前这层的结构特征是：
+
+- note / review / timeline / state 已经形成各自可读的 typed boundary
+- `src/app/*` 继续只做公开入口，不重新吸回领域实现
+- `src/core` / `src/runtime` 不再依赖 style/type allowlist 才能维持这些边界
 
 架构保护规则默认守住：
 

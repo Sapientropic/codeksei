@@ -76,13 +76,13 @@ const { runTimelineEventCommand } = timelineEventCliModule as {
     args: string[],
   ) => Promise<void>;
 };
-const { runTimelineScreenshotCommand } = timelineScreenshotCliModule as {
+const { runTimelineScreenshotCommand } = timelineScreenshotCliModule as unknown as {
   runTimelineScreenshotCommand: (config: RuntimeConfig, args: string[]) => Promise<void>;
 };
 const { runSystemCheckinPoller } = systemCheckinPollerModule as {
   runSystemCheckinPoller: (config: RuntimeConfig) => Promise<void>;
 };
-const { runSystemSendCommand } = systemSendCliModule as {
+const { runSystemSendCommand } = systemSendCliModule as unknown as {
   runSystemSendCommand: (config: RuntimeConfig, args: string[]) => Promise<void>;
 };
 const { findTerminalCommandManifest } = commandSurfaceModule as {

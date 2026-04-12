@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-const fs = require("fs");
-const path = require("path");
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 const rootDir = path.resolve(__dirname, "..", "..", "..");
 const LEGACY_NAME = ["cyber", "boss"].join("");
@@ -24,8 +24,8 @@ const README_ACKNOWLEDGEMENT_SNIPPETS = [
   `WenXiaoWendy/${LEGACY_NAME}`,
 ];
 
-function collectFiles(entries: any, cwd: any = rootDir) {
-  const discovered = [];
+function collectFiles(entries: string[], cwd: string = rootDir): string[] {
+  const discovered: string[] = [];
   for (const entry of entries) {
     const absoluteEntry = path.resolve(cwd, entry);
     if (!fs.existsSync(absoluteEntry)) {
@@ -43,7 +43,7 @@ function collectFiles(entries: any, cwd: any = rootDir) {
   return discovered.sort();
 }
 
-function walkFiles(directory: any, discovered: any[]) {
+function walkFiles(directory: string, discovered: string[]): void {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     const absoluteEntry = path.join(directory, entry.name);
     if (entry.isDirectory()) {
@@ -56,7 +56,7 @@ function walkFiles(directory: any, discovered: any[]) {
   }
 }
 
-function isAllowedReadmeAcknowledgement(filePath: any, line: any) {
+function isAllowedReadmeAcknowledgement(filePath: string, line: string): boolean {
   const relativePath = toRelativePosix(filePath);
   if (relativePath !== "README.md" && relativePath !== "README.en.md") {
     return false;
@@ -64,12 +64,12 @@ function isAllowedReadmeAcknowledgement(filePath: any, line: any) {
   return README_ACKNOWLEDGEMENT_SNIPPETS.some((snippet: any) => line.includes(snippet));
 }
 
-function assertNoLegacyBranding({ files = collectFiles(TARGETS) }: any = {}) {
+function assertNoLegacyBranding({ files = collectFiles(TARGETS) }: { files?: string[] } = {}): void {
   const violations: string[] = [];
   for (const filePath of files) {
     const source = fs.readFileSync(filePath, "utf8");
     const lines = source.split(/\r?\n/u);
-    lines.forEach((line: any, index: any) => {
+    lines.forEach((line, index) => {
       if (!LEGACY_PATTERN.test(line)) {
         return;
       }
@@ -85,33 +85,31 @@ function assertNoLegacyBranding({ files = collectFiles(TARGETS) }: any = {}) {
   }
 }
 
-function toRelativePosix(filePath: any) {
+function toRelativePosix(filePath: string): string {
   return path.relative(rootDir, filePath).split(path.sep).join("/");
 }
 
-function isLocalOnlyFile(fileName: any) {
+function isLocalOnlyFile(fileName: string): boolean {
   const normalized = String(fileName || "").toLowerCase();
-  return LOCAL_ONLY_SUFFIXES.some((suffix: any) => normalized.endsWith(suffix));
+  return LOCAL_ONLY_SUFFIXES.some((suffix) => normalized.endsWith(suffix));
 }
 
-function main() {
+function main(): void {
   assertNoLegacyBranding();
   console.log("[codeksei] legacy branding guard passed");
 }
 
-function capitalize(value: any) {
+function capitalize(value: unknown): string {
   const text = String(value || "");
   return text ? `${text[0].toUpperCase()}${text.slice(1)}` : "";
 }
 
-if (require.main === module) {
-  main();
-}
-
-module.exports = {
+export {
   assertNoLegacyBranding,
   collectFiles,
   main,
 };
 
-export {};
+if (require.main === module) {
+  main();
+}

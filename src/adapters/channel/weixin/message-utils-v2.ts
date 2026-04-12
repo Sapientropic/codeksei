@@ -7,12 +7,41 @@ const MESSAGE_ITEM_FILE = 4;
 const MESSAGE_ITEM_VIDEO = 5;
 const DEDUP_TTL_MS = 5 * 60_000;
 
+type LooseRecord = Record<string, unknown>;
+
+interface WeixinIncomingConfig extends Record<string, unknown> {
+  workspaceId?: unknown;
+}
+
+interface WeixinAttachmentPayload {
+  kind: "image" | "file" | "video";
+  body: LooseRecord;
+  media: LooseRecord;
+}
+
+interface WeixinAttachmentItem {
+  kind: "image" | "file" | "video";
+  itemType: number;
+  index: number;
+  fileName: string;
+  sizeBytes: number;
+  directUrls: string[];
+  mediaRef: {
+    encryptQueryParam: string;
+    aesKey: string;
+    aesKeyHex: string;
+    encryptType: number;
+    fileKey: string;
+  };
+  rawItem: LooseRecord;
+}
+
 function createInboundFilter() {
-  const seen = new Map();
+  const seen = new Map<string, number>();
 
   return {
-    normalize(message: any, config: any, accountId: any) {
-      if (!message || typeof message !== "object") {
+    normalize(message: unknown, config: WeixinIncomingConfig, accountId: unknown) {
+      if (!isRecord(message)) {
         return null;
       }
       const messageType = Number(message.message_type);
@@ -63,7 +92,7 @@ function createInboundFilter() {
   };
 }
 
-function bodyFromItemList(items: any): string {
+function bodyFromItemList(items: unknown): string {
   if (!Array.isArray(items) || !items.length) {
     return "";
   }
@@ -102,16 +131,16 @@ function bodyFromItemList(items: any): string {
   return "";
 }
 
-function isMediaItemType(type: any) {
+function isMediaItemType(type: number): boolean {
   return type === MESSAGE_ITEM_IMAGE || type === MESSAGE_ITEM_VOICE || type === MESSAGE_ITEM_FILE || type === MESSAGE_ITEM_VIDEO;
 }
 
-function extractAttachmentItems(itemList: any) {
+function extractAttachmentItems(itemList: unknown): WeixinAttachmentItem[] {
   if (!Array.isArray(itemList) || !itemList.length) {
     return [];
   }
 
-  const attachments = [];
+  const attachments: WeixinAttachmentItem[] = [];
   for (let index = 0; index < itemList.length; index += 1) {
     const normalized = normalizeAttachmentItem(itemList[index], index);
     if (normalized) {
@@ -121,16 +150,18 @@ function extractAttachmentItems(itemList: any) {
   return attachments;
 }
 
-function normalizeAttachmentItem(item: any, index: any) {
-  const itemType = Number(item?.type);
-  const payload = resolveAttachmentPayload(itemType, item);
+function normalizeAttachmentItem(item: unknown, index: number): WeixinAttachmentItem | null {
+  const record = isRecord(item) ? item : null;
+  if (!record) {
+    return null;
+  }
+  const itemType = Number(record.type);
+  const payload = resolveAttachmentPayload(itemType, record);
   if (!payload) {
     return null;
   }
 
-  const media = payload.media && typeof payload.media === "object"
-    ? payload.media
-    : {};
+  const media = payload.media;
 
   return {
     kind: payload.kind,
@@ -139,15 +170,15 @@ function normalizeAttachmentItem(item: any, index: any) {
     fileName: normalizeText(
       payload.body?.file_name
       || payload.body?.filename
-      || item?.file_name
-      || item?.filename
+      || record.file_name
+      || record.filename
     ),
     sizeBytes: parseOptionalInt(
       payload.body?.len
       || payload.body?.file_size
       || payload.body?.size
       || payload.body?.video_size
-      || item?.len
+      || record.len
     ),
     directUrls: collectStringValues([
       payload.body?.url,
@@ -163,51 +194,54 @@ function normalizeAttachmentItem(item: any, index: any) {
         || media?.encrypted_query_param
         || payload.body?.encrypt_query_param
         || payload.body?.encrypted_query_param
-        || item?.encrypt_query_param
-        || item?.encrypted_query_param
+        || record.encrypt_query_param
+        || record.encrypted_query_param
       ),
       aesKey: normalizeText(
         media?.aes_key
         || payload.body?.aes_key
-        || item?.aes_key
+        || record.aes_key
       ),
       aesKeyHex: normalizeText(
         payload.body?.aeskey
         || payload.body?.aes_key_hex
-        || item?.aeskey
+        || record.aeskey
       ),
       encryptType: Number(
         media?.encrypt_type
         ?? payload.body?.encrypt_type
-        ?? item?.encrypt_type
+        ?? record.encrypt_type
         ?? 1
       ),
       fileKey: normalizeText(
         media?.filekey
         || payload.body?.filekey
-        || item?.filekey
+        || record.filekey
       ),
     },
-    rawItem: item,
+    rawItem: record,
   };
 }
 
-function resolveAttachmentPayload(itemType: any, item: any) {
-  if (itemType === MESSAGE_ITEM_IMAGE && item?.image_item && typeof item.image_item === "object") {
-    return { kind: "image", body: item.image_item, media: item.image_item.media };
+function resolveAttachmentPayload(itemType: number, item: LooseRecord): WeixinAttachmentPayload | null {
+  if (itemType === MESSAGE_ITEM_IMAGE && isRecord(item.image_item)) {
+    const imageItem = item.image_item as LooseRecord;
+    return { kind: "image", body: imageItem, media: isRecord(imageItem.media) ? imageItem.media : {} };
   }
-  if (itemType === MESSAGE_ITEM_FILE && item?.file_item && typeof item.file_item === "object") {
-    return { kind: "file", body: item.file_item, media: item.file_item.media };
+  if (itemType === MESSAGE_ITEM_FILE && isRecord(item.file_item)) {
+    const fileItem = item.file_item as LooseRecord;
+    return { kind: "file", body: fileItem, media: isRecord(fileItem.media) ? fileItem.media : {} };
   }
-  if (itemType === MESSAGE_ITEM_VIDEO && item?.video_item && typeof item.video_item === "object") {
-    return { kind: "video", body: item.video_item, media: item.video_item.media };
+  if (itemType === MESSAGE_ITEM_VIDEO && isRecord(item.video_item)) {
+    const videoItem = item.video_item as LooseRecord;
+    return { kind: "video", body: videoItem, media: isRecord(videoItem.media) ? videoItem.media : {} };
   }
   return null;
 }
 
-function collectStringValues(values: any) {
-  const seen = new Set();
-  const result = [];
+function collectStringValues(values: unknown[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
   for (const value of values) {
     const normalized = normalizeText(value);
     if (!normalized || seen.has(normalized)) {
@@ -219,7 +253,7 @@ function collectStringValues(values: any) {
   return result;
 }
 
-function parseOptionalInt(value: any) {
+function parseOptionalInt(value: unknown): number {
   if (value == null || value === "") {
     return 0;
   }
@@ -227,7 +261,7 @@ function parseOptionalInt(value: any) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
-function normalizeMessageId(message: any) {
+function normalizeMessageId(message: LooseRecord): string {
   const raw = message?.message_id;
   if (typeof raw === "number" && Number.isFinite(raw)) {
     return String(raw);
@@ -238,7 +272,7 @@ function normalizeMessageId(message: any) {
   return "";
 }
 
-function normalizeMessageTimestampMs(message: any) {
+function normalizeMessageTimestampMs(message: LooseRecord): number {
   const rawMs = Number(message?.create_time_ms);
   if (Number.isFinite(rawMs) && rawMs > 0) {
     return rawMs;
@@ -250,7 +284,7 @@ function normalizeMessageTimestampMs(message: any) {
   return 0;
 }
 
-function buildDedupKey(message: any, senderId: any, createdAtMs: any) {
+function buildDedupKey(message: LooseRecord, senderId: string, createdAtMs: number): string {
   const seq = normalizeNumeric(message?.seq);
   const messageId = normalizeNumeric(message?.message_id);
   const clientId = normalizeText(message?.client_id);
@@ -258,12 +292,12 @@ function buildDedupKey(message: any, senderId: any, createdAtMs: any) {
   return parts.join("|");
 }
 
-function normalizeNumeric(value: any) {
+function normalizeNumeric(value: unknown): string {
   const num = Number(value);
   return Number.isFinite(num) ? String(num) : "0";
 }
 
-function pruneSeen(seen: any) {
+function pruneSeen(seen: Map<string, number>): void {
   const now = Date.now();
   for (const [key, timestamp] of seen.entries()) {
     if (now - timestamp > DEDUP_TTL_MS) {
@@ -272,13 +306,15 @@ function pruneSeen(seen: any) {
   }
 }
 
-function normalizeText(value: any) {
+function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-module.exports = {
+function isRecord(value: unknown): value is LooseRecord {
+  return Boolean(value) && typeof value === "object";
+}
+
+export {
   createInboundFilter,
   bodyFromItemList,
 };
-
-export {};

@@ -36,10 +36,10 @@ const { loadEnvStack } = envLoaderModule as {
 const { resolvePackageRoot } = pathUtilsModule as {
   resolvePackageRoot: (baseDir: string) => string;
 };
-const { resolveSelectedAccount } = accountStoreModule as {
+const { resolveSelectedAccount } = accountStoreModule as unknown as {
   resolveSelectedAccount: (config: Record<string, unknown>) => { accountId: string };
 };
-const { loadPersistedContextTokens } = contextTokenStoreModule as {
+const { loadPersistedContextTokens } = contextTokenStoreModule as unknown as {
   loadPersistedContextTokens: (config: Record<string, unknown>, accountId: string) => Record<string, string>;
 };
 const { readConfig } = configModule as {

@@ -57,7 +57,7 @@ interface WeixinChannelAdapter {
 }
 
 export function createWeixinChannelAdapter(config: WeixinConfig): WeixinChannelAdapter {
-  const variant = normalizeAdapterVariant(config.weixinAdapterVariant);
+  const variant = normalizeAdapterVariantKey(config.weixinAdapterVariant);
   if (variant === "legacy") {
     return createLegacyWeixinChannelAdapter(config);
   }
@@ -134,21 +134,21 @@ export function createWeixinChannelAdapter(config: WeixinConfig): WeixinChannelA
         contextToken: resolvedToken,
         baseUrl: account.baseUrl,
         token: account.token,
-        cdnBaseUrl: normalizeText(config.weixinCdnBaseUrl),
+        cdnBaseUrl: normalizeWeixinConfigText(config.weixinCdnBaseUrl),
         apiVariant: "legacy",
         routeTag: account.routeTag,
-        clientVersion: normalizeText(config.weixinProtocolClientVersion),
+        clientVersion: normalizeWeixinConfigText(config.weixinProtocolClientVersion),
       });
     },
   };
 }
 
-function normalizeAdapterVariant(value: unknown): "legacy" | "v2" {
-  const normalized = normalizeText(value).toLowerCase();
+function normalizeAdapterVariantKey(value: unknown): "legacy" | "v2" {
+  const normalized = normalizeWeixinConfigText(value).toLowerCase();
   return normalized === "legacy" ? "legacy" : "v2";
 }
 
-function normalizeText(value: unknown): string {
+function normalizeWeixinConfigText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
