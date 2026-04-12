@@ -5,11 +5,13 @@ const path = require("path");
 const { resolveSelectedAccount } = require("../adapters/channel/weixin/account-store");
 const { loadPersistedContextTokens } = require("../adapters/channel/weixin/context-token-store");
 const { SessionStore } = require("../adapters/runtime/codex/session-store");
+const { getCommandArgsSchema } = require("../contracts/command-args");
+const { parseCliArgs } = require("../core/cli-args");
 const { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } = require("../core/default-targets");
 const { SystemMessageQueueStore } = require("../core/system-message-queue-store");
 
-async function runSystemSendCommand(config) {
-  const options = parseSystemSendArgs(process.argv.slice(4));
+async function runSystemSendCommand(config, args = []) {
+  const options = parseSystemSendArgs(args);
   if (options.help) {
     printSystemSendHelp();
     return;
@@ -73,48 +75,7 @@ async function runSystemSendCommand(config) {
 }
 
 function parseSystemSendArgs(args) {
-  const options = {
-    help: false,
-    user: "",
-    text: "",
-    workspace: "",
-  };
-
-  for (let index = 0; index < args.length; index += 1) {
-    const token = String(args[index] || "").trim();
-    if (!token) {
-      continue;
-    }
-
-    if (token === "--help" || token === "-h") {
-      options.help = true;
-      continue;
-    }
-
-    if (!token.startsWith("--")) {
-      throw new Error(`未知参数: ${token}`);
-    }
-
-    const key = token.slice(2);
-    const value = String(args[index + 1] || "");
-    if (!value || value.startsWith("--")) {
-      throw new Error(`参数缺少值: ${token}`);
-    }
-
-    if (key === "user") {
-      options.user = value.trim();
-    } else if (key === "text") {
-      options.text = value.trim();
-    } else if (key === "workspace") {
-      options.workspace = value.trim();
-    } else {
-      throw new Error(`未知参数: ${token}`);
-    }
-
-    index += 1;
-  }
-
-  return options;
+  return parseCliArgs(args, getCommandArgsSchema("systemSend"));
 }
 
 function printSystemSendHelp() {

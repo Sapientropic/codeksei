@@ -1,7 +1,9 @@
+const { getCommandArgsSchema } = require("../contracts/command-args");
+const { parseCliArgs } = require("../core/cli-args");
 const { collectProjectRadars, listTrackedProjects, loadProjectRadarConfig } = require("../core/project-radar");
 
-async function runProjectRadarCommand(config) {
-  const options = parseProjectRadarArgs(process.argv.slice(4));
+async function runProjectRadarCommand(config, args = []) {
+  const options = parseProjectRadarArgs(args);
   if (options.help) {
     printProjectRadarHelp(config);
     return;
@@ -31,53 +33,7 @@ async function runProjectRadarCommand(config) {
 }
 
 function parseProjectRadarArgs(args) {
-  const options = {
-    help: false,
-    list: false,
-    json: false,
-    project: "",
-    commits: 5,
-    changes: 20,
-  };
-
-  for (let index = 0; index < args.length; index += 1) {
-    const token = String(args[index] || "").trim();
-    if (!token) {
-      continue;
-    }
-    if (token === "--help" || token === "-h") {
-      options.help = true;
-      continue;
-    }
-    if (token === "--list") {
-      options.list = true;
-      continue;
-    }
-    if (token === "--json") {
-      options.json = true;
-      continue;
-    }
-    if (!token.startsWith("--")) {
-      throw new Error(`未知参数: ${token}`);
-    }
-    const key = token.slice(2);
-    const value = String(args[index + 1] || "");
-    if (!value || value.startsWith("--")) {
-      throw new Error(`参数缺少值: ${token}`);
-    }
-    if (key === "project") {
-      options.project = value.trim();
-    } else if (key === "commits") {
-      options.commits = value.trim();
-    } else if (key === "changes") {
-      options.changes = value.trim();
-    } else {
-      throw new Error(`未知参数: ${token}`);
-    }
-    index += 1;
-  }
-
-  return options;
+  return parseCliArgs(args, getCommandArgsSchema("projectRadar"));
 }
 
 function printProjectRadarHelp(config = {}) {

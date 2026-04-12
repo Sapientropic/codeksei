@@ -1,5 +1,8 @@
 const fs = require("fs");
 const path = require("path");
+const { normalizeDurableNoteSchemaConfig } = require("../contracts/config-files");
+const { loadJsonConfig } = require("./config-loader");
+const { writeTextFileAtomically } = require("./json-state");
 
 const { listTrackedProjects } = require("./project-radar");
 const { appendSection, findSectionRange, resolveNoteSyncTarget } = require("./note-sync");
@@ -22,20 +25,14 @@ function loadDurableNoteSchemaConfig(config = {}) {
   if (!filePath) {
     return {};
   }
-
-  let raw = "";
-  try {
-    raw = fs.readFileSync(filePath, "utf8");
-  } catch {
-    return {};
-  }
-
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch (error) {
-    throw new Error(`durable note schema 不是合法 JSON: ${filePath} (${formatErrorMessage(error)})`);
-  }
+  return loadJsonConfig({
+    filePath,
+    label: "durable note schema",
+    normalize: normalizeDurableNoteSchemaConfig,
+    fallback: {},
+    missing: "fallback",
+    invalid: "throw",
+  });
 }
 
 function resolveDurableNoteProfile(config = {}) {
@@ -151,7 +148,7 @@ function ensureDurableNoteSections(filePath, sections = []) {
   }
 
   if (changed) {
-    fs.writeFileSync(normalizedPath, ensureTrailingNewline(content), "utf8");
+    writeTextFileAtomically(normalizedPath, ensureTrailingNewline(content), { encoding: "utf8" });
   }
   return {
     changed,

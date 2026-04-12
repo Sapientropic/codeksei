@@ -1,3 +1,5 @@
+const { getCommandArgsSchema } = require("../contracts/command-args");
+const { parseCliArgs } = require("../core/cli-args");
 const {
   ensureDurableNoteSections,
   inspectDurableNoteRouting,
@@ -5,7 +7,7 @@ const {
 } = require("../core/durable-note-schema");
 const { syncNoteFile } = require("../core/note-sync");
 
-async function runNoteAutoCommand(config, args = process.argv.slice(4)) {
+async function runNoteAutoCommand(config, args = []) {
   const options = parseNoteAutoArgs(args);
   if (options.help) {
     printNoteAutoHelp();
@@ -35,7 +37,7 @@ async function runNoteAutoCommand(config, args = process.argv.slice(4)) {
   }
 }
 
-function runNoteMaybeCommand(config, args = process.argv.slice(4)) {
+function runNoteMaybeCommand(config, args = []) {
   const options = parseNoteAutoArgs(args);
   if (options.help) {
     printNoteMaybeHelp();
@@ -51,55 +53,7 @@ function runNoteMaybeCommand(config, args = process.argv.slice(4)) {
 }
 
 function parseNoteAutoArgs(args) {
-  const options = {
-    help: false,
-    json: false,
-    project: "",
-    scope: "",
-    kind: "",
-    text: "",
-    useStdin: false,
-  };
-
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = String(args[index] || "").trim();
-    if (!arg) {
-      continue;
-    }
-    if (arg === "--help" || arg === "-h") {
-      options.help = true;
-      continue;
-    }
-    if (arg === "--json") {
-      options.json = true;
-      continue;
-    }
-    if (arg === "--stdin") {
-      options.useStdin = true;
-      continue;
-    }
-    if (!arg.startsWith("--")) {
-      throw new Error(`未知参数: ${arg}`);
-    }
-    const value = String(args[index + 1] || "");
-    if (!value || value.startsWith("--")) {
-      throw new Error(`参数缺少值: ${arg}`);
-    }
-    if (arg === "--project") {
-      options.project = value;
-    } else if (arg === "--scope") {
-      options.scope = value;
-    } else if (arg === "--kind") {
-      options.kind = value;
-    } else if (arg === "--text") {
-      options.text = value;
-    } else {
-      throw new Error(`未知参数: ${arg}`);
-    }
-    index += 1;
-  }
-
-  return options;
+  return parseCliArgs(args, getCommandArgsSchema("noteAuto"));
 }
 
 async function resolveBody(options) {

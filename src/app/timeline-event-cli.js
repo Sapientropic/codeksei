@@ -1,10 +1,12 @@
 const crypto = require("crypto");
+const { getCommandArgsSchema } = require("../contracts/command-args");
+const { parseCliArgs } = require("../core/cli-args");
 const {
   LEGACY_TIMELINE_TIMEZONE,
   coerceLocalDateTimeToIso,
 } = require("../core/timezone");
 
-async function runTimelineEventCommand(timelineIntegration, configOrArgs = {}, argsMaybe = process.argv.slice(4)) {
+async function runTimelineEventCommand(timelineIntegration, configOrArgs = {}, argsMaybe = []) {
   const config = Array.isArray(configOrArgs) ? {} : (configOrArgs || {});
   const args = Array.isArray(configOrArgs) ? configOrArgs : argsMaybe;
   const options = parseTimelineEventArgs(args);
@@ -19,87 +21,7 @@ async function runTimelineEventCommand(timelineIntegration, configOrArgs = {}, a
 }
 
 function parseTimelineEventArgs(args) {
-  const options = {
-    help: false,
-    date: "",
-    start: "",
-    end: "",
-    title: "",
-    note: "",
-    categoryId: "",
-    subcategoryId: "",
-    eventNodeId: "",
-    mode: "merge",
-    eventId: "",
-    finalize: false,
-    useStdin: false,
-    tags: [],
-  };
-
-  for (let index = 0; index < args.length; index += 1) {
-    const token = String(args[index] || "").trim();
-    if (!token) {
-      continue;
-    }
-    if (token === "--help" || token === "-h") {
-      options.help = true;
-      continue;
-    }
-    if (token === "--stdin") {
-      options.useStdin = true;
-      continue;
-    }
-    if (token === "--finalize") {
-      options.finalize = true;
-      continue;
-    }
-
-    const value = String(args[index + 1] || "").trim();
-    if (!value || value.startsWith("--")) {
-      throw new Error(`参数缺少值: ${token}`);
-    }
-
-    switch (token) {
-      case "--date":
-        options.date = value;
-        break;
-      case "--start":
-        options.start = value;
-        break;
-      case "--end":
-        options.end = value;
-        break;
-      case "--title":
-        options.title = value;
-        break;
-      case "--note":
-        options.note = value;
-        break;
-      case "--category":
-        options.categoryId = value;
-        break;
-      case "--subcategory":
-        options.subcategoryId = value;
-        break;
-      case "--event-node":
-        options.eventNodeId = value;
-        break;
-      case "--mode":
-        options.mode = value;
-        break;
-      case "--id":
-        options.eventId = value;
-        break;
-      case "--tag":
-        options.tags.push(value);
-        break;
-      default:
-        throw new Error(`未知参数: ${token}`);
-    }
-    index += 1;
-  }
-
-  return options;
+  return parseCliArgs(args, getCommandArgsSchema("timelineEvent"));
 }
 
 async function resolveNote(options) {

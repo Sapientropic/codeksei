@@ -171,10 +171,14 @@ class BackstageTaskLifecycle {
     const workspaceRoot = prepared.workspaceRoot || this.resolveWorkspaceRoot(bindingKey);
     const threadId = this.runtimeAdapter.getSessionStore().getThreadIdForWorkspace(bindingKey, workspaceRoot);
     const threadState = threadId ? this.threadStateStore.getThreadState(threadId) : null;
+    const persistedPendingApproval = threadId
+      ? this.runtimeAdapter.getSessionStore().getPendingApprovalForThread(threadId)
+      : null;
+    const pendingApproval = threadState?.pendingApproval || persistedPendingApproval;
     if (threadState?.status === "running") {
       return { status: "deferred_busy", reason: "thread_running" };
     }
-    if (this.hasRpcId(threadState?.pendingApproval?.requestId)) {
+    if (this.hasRpcId(pendingApproval?.requestId)) {
       return { status: "deferred_busy", reason: "waiting_approval" };
     }
     const sendResult = await this.handlePreparedMessage(prepared, {

@@ -32,11 +32,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run syntax checks
-        run: npm run check
-
-      - name: Run test suite
-        run: node --test tests/*.test.js
+      - name: Run verification suite
+        run: npm run verify
 
       - name: Resolve package metadata
         id: package_meta

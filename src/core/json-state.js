@@ -1,3 +1,5 @@
+// @ts-check
+
 const fs = require("fs");
 const path = require("path");
 
@@ -59,6 +61,25 @@ function writeForeignJsonDocument(filePath, payload, { mode = null } = {}) {
   writeJsonFileAtomically(filePath, payload, { mode });
 }
 
+function writeTextFileAtomically(filePath, content, {
+  mode = null,
+  encoding = "utf8",
+} = {}) {
+  ensureParentDirectory(filePath);
+  const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(tempPath, String(content ?? ""), {
+    encoding: /** @type {BufferEncoding} */ (encoding),
+  });
+  fs.renameSync(tempPath, filePath);
+  if (mode !== null && mode !== undefined) {
+    try {
+      fs.chmodSync(filePath, mode);
+    } catch {
+      // best effort
+    }
+  }
+}
+
 function isolateCorruptStateFile(filePath) {
   try {
     if (!fs.existsSync(filePath)) {
@@ -112,18 +133,7 @@ function isPlainObject(value) {
 }
 
 function writeJsonFileAtomically(filePath, payload, { mode = null } = {}) {
-  ensureParentDirectory(filePath);
-  const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-  const content = JSON.stringify(payload, null, 2);
-  fs.writeFileSync(tempPath, content, "utf8");
-  fs.renameSync(tempPath, filePath);
-  if (mode !== null && mode !== undefined) {
-    try {
-      fs.chmodSync(filePath, mode);
-    } catch {
-      // best effort
-    }
-  }
+  writeTextFileAtomically(filePath, JSON.stringify(payload, null, 2), { mode, encoding: "utf8" });
 }
 
 const readJsonStateFile = readManagedJsonStateFile;
@@ -136,6 +146,7 @@ module.exports = {
   readForeignJsonDocument,
   readManagedJsonStateFile,
   readJsonStateFile,
+  writeTextFileAtomically,
   writeForeignJsonDocument,
   writeManagedJsonStateFile,
   writeJsonStateFile,

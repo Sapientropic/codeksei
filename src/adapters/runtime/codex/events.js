@@ -1,3 +1,10 @@
+// @ts-check
+
+const {
+  RUNTIME_EVENT_TYPES,
+  createRuntimeEvent,
+  normalizeRuntimeText,
+} = require("../../../contracts/runtime-events");
 const {
   extractAssistantDeltaFragment,
   extractAssistantPhase,
@@ -6,15 +13,14 @@ const {
   extractThreadIdFromParams,
   extractTurnIdFromParams,
 } = require("./message-utils");
+const { splitCommandLine } = require("../../../core/approval-command-policy");
 
 function mapCodexMessageToRuntimeEvent(message) {
   if (message?.type === "event_msg" && message?.payload?.type === "token_count") {
-    return {
-      type: "runtime.usage.updated",
-      payload: normalizeUsagePayload(message.payload),
-    };
+    return createRuntimeEvent(RUNTIME_EVENT_TYPES.USAGE_UPDATED, message.payload);
   }
-  const method = normalizeString(message?.method);
+
+  const method = normalizeRuntimeText(message?.method);
   const params = message?.params || {};
   const threadId = extractThreadIdFromParams(params);
   const turnId = extractTurnIdFromParams(params);
@@ -24,34 +30,25 @@ function mapCodexMessageToRuntimeEvent(message) {
   }
 
   if (method === "turn/started" || method === "turn/start") {
-    return {
-      type: "runtime.turn.started",
-      payload: {
-        threadId,
-        turnId,
-      },
-    };
+    return createRuntimeEvent(RUNTIME_EVENT_TYPES.TURN_STARTED, {
+      threadId,
+      turnId,
+    });
   }
 
   if (method === "turn/completed") {
-    return {
-      type: "runtime.turn.completed",
-      payload: {
-        threadId,
-        turnId,
-      },
-    };
+    return createRuntimeEvent(RUNTIME_EVENT_TYPES.TURN_COMPLETED, {
+      threadId,
+      turnId,
+    });
   }
 
   if (method === "turn/failed") {
-    return {
-      type: "runtime.turn.failed",
-      payload: {
-        threadId,
-        turnId,
-        text: extractFailureText(params),
-      },
-    };
+    return createRuntimeEvent(RUNTIME_EVENT_TYPES.TURN_FAILED, {
+      threadId,
+      turnId,
+      text: extractFailureText(params),
+    });
   }
 
   if (method === "item/agentMessage/delta") {
@@ -60,70 +57,39 @@ function mapCodexMessageToRuntimeEvent(message) {
     if (!fragment.text) {
       return null;
     }
-    return {
-      type: "runtime.reply.delta",
-      payload: {
-        threadId,
-        turnId,
-        itemId: normalizeString(params?.itemId || params?.item?.id),
-        text: fragment.text,
-        fragmentKind: fragment.fragmentKind,
-        phase,
-      },
-    };
+    return createRuntimeEvent(RUNTIME_EVENT_TYPES.REPLY_DELTA, {
+      threadId,
+      turnId,
+      itemId: normalizeRuntimeText(params?.itemId || params?.item?.id),
+      text: fragment.text,
+      fragmentKind: fragment.fragmentKind,
+      phase,
+    });
   }
 
-  if (method === "item/completed" && normalizeString(params?.item?.type).toLowerCase() === "agentmessage") {
+  if (method === "item/completed" && normalizeRuntimeText(params?.item?.type).toLowerCase() === "agentmessage") {
     const text = extractCompletedAssistantText(params);
     const phase = extractAssistantPhase(params);
-    return {
-      type: "runtime.reply.completed",
-      payload: {
-        threadId,
-        turnId,
-        itemId: normalizeString(params?.item?.id),
-        text,
-        phase,
-      },
-    };
+    return createRuntimeEvent(RUNTIME_EVENT_TYPES.REPLY_COMPLETED, {
+      threadId,
+      turnId,
+      itemId: normalizeRuntimeText(params?.item?.id),
+      text,
+      phase,
+    });
   }
 
   if (isApprovalRequestMethod(method)) {
-    return {
-      type: "runtime.approval.requested",
-      payload: {
-        threadId,
-        requestId: message?.id ?? null,
-        reason: normalizeString(params?.reason),
-        command: extractApprovalDisplayCommand(params),
-        commandTokens: extractApprovalCommandTokens(params),
-      },
-    };
+    return createRuntimeEvent(RUNTIME_EVENT_TYPES.APPROVAL_REQUESTED, {
+      threadId,
+      requestId: message?.id ?? null,
+      reason: normalizeRuntimeText(params?.reason),
+      command: extractApprovalDisplayCommand(params),
+      commandTokens: extractApprovalCommandTokens(params),
+    });
   }
 
   return null;
-}
-
-function normalizeUsagePayload(payload) {
-  const info = payload?.info || {};
-  const total = info?.total_token_usage || {};
-  const last = info?.last_token_usage || {};
-  const rateLimits = payload?.rate_limits || {};
-  return {
-    totalInputTokens: numberOrZero(total.input_tokens),
-    totalCachedInputTokens: numberOrZero(total.cached_input_tokens),
-    totalOutputTokens: numberOrZero(total.output_tokens),
-    totalReasoningTokens: numberOrZero(total.reasoning_output_tokens),
-    totalTokens: numberOrZero(total.total_tokens),
-    lastInputTokens: numberOrZero(last.input_tokens),
-    lastCachedInputTokens: numberOrZero(last.cached_input_tokens),
-    lastOutputTokens: numberOrZero(last.output_tokens),
-    lastReasoningTokens: numberOrZero(last.reasoning_output_tokens),
-    lastTotalTokens: numberOrZero(last.total_tokens),
-    modelContextWindow: numberOrZero(info?.model_context_window),
-    primaryUsedPercent: numberOrZero(rateLimits?.primary?.used_percent),
-    secondaryUsedPercent: numberOrZero(rateLimits?.secondary?.used_percent),
-  };
 }
 
 function isApprovalRequestMethod(method) {
@@ -185,50 +151,6 @@ function extractTokens(value) {
   return [];
 }
 
-function splitCommandLine(input) {
-  const tokens = [];
-  let current = "";
-  let quote = null;
-  let escaped = false;
-
-  for (const char of String(input || "")) {
-    if (escaped) {
-      current += char;
-      escaped = false;
-      continue;
-    }
-    if (char === "\\") {
-      escaped = true;
-      continue;
-    }
-    if (quote) {
-      if (char === quote) {
-        quote = null;
-      } else {
-        current += char;
-      }
-      continue;
-    }
-    if (char === "\"" || char === "'") {
-      quote = char;
-      continue;
-    }
-    if (/\s/.test(char)) {
-      if (current) {
-        tokens.push(current);
-        current = "";
-      }
-      continue;
-    }
-    current += char;
-  }
-
-  if (current) {
-    tokens.push(current);
-  }
-  return tokens;
-}
-
 function buildApprovalCommandPreview(tokens) {
   const normalized = normalizeCommandTokens(tokens);
   if (!normalized.length) {
@@ -239,16 +161,8 @@ function buildApprovalCommandPreview(tokens) {
 
 function normalizeCommandTokens(tokens) {
   return Array.isArray(tokens)
-    ? tokens.map((part) => normalizeString(part)).filter(Boolean)
+    ? tokens.map((part) => normalizeRuntimeText(part)).filter(Boolean)
     : [];
-}
-
-function normalizeString(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function numberOrZero(value) {
-  return Number.isFinite(Number(value)) ? Number(value) : 0;
 }
 
 module.exports = { mapCodexMessageToRuntimeEvent };

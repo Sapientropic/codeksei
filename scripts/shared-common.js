@@ -14,6 +14,7 @@ const {
 const { loadEnvStack } = require("../src/core/env-loader");
 const {
   readManagedJsonStateFile,
+  writeTextFileAtomically,
   writeManagedJsonStateFile,
 } = require("../src/core/json-state");
 const { loadWeixinAccount } = require("../src/adapters/channel/weixin/account-store");
@@ -95,7 +96,7 @@ function readPidFile(filePath) {
 
 function writePidFile(filePath, pid) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, `${pid}\n`, "utf8");
+  writeTextFileAtomically(filePath, `${pid}\n`, { encoding: "utf8" });
 }
 
 function removePidFileIfMatches(filePath, pid) {

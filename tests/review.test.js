@@ -8,6 +8,7 @@ const {
   buildReview,
   writeReview,
 } = require("../src/core/review");
+const { clearJsonConfigCache } = require("../src/core/config-loader");
 
 function setupReviewFixture() {
   const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cyberboss-review-"));
@@ -228,4 +229,31 @@ test("review can upgrade legacy managed markers to codeksei markers", async () =
   const content = fs.readFileSync(legacyNotePath, "utf8");
   assert.match(content, /codeksei-review:daily-summaries:start/u);
   assert.doesNotMatch(content, /cyberboss-review:daily-summaries:start/u);
+});
+
+test("review falls back to deterministic draft when semantic generator errors", async () => {
+  const fixture = setupReviewFixture();
+  fixture.config.reviewSemanticMode = "hybrid";
+  fixture.config.reviewSemanticGenerator = async () => {
+    throw new Error("semantic boom");
+  };
+
+  const review = await buildReview(fixture.config, "weekly", { week: "2026-W15" });
+  assert.equal(review.semantic.used, false);
+  assert.match(review.semantic.reason, /semantic boom/u);
+  assert.match(review.draft.content.progress, /Apple Watch 提醒实验/u);
+});
+
+test("review weekly still works when nightly profile is absent", async () => {
+  const fixture = setupReviewFixture();
+  const schemaPath = fixture.config.reviewSchemaConfigFile;
+  const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
+  delete schema.workspaces[fixture.workspaceRoot.replace(/\\/g, "/")].reviews.nightly;
+  fs.writeFileSync(schemaPath, JSON.stringify(schema, null, 2), "utf8");
+  clearJsonConfigCache(schemaPath);
+
+  const review = await buildReview(fixture.config, "weekly", { week: "2026-W15" });
+  assert.equal(review.nightlyEntries.length, 0);
+  assert.equal(review.draft.sourceNightlyDays, 0);
+  assert.match(review.draft.content.progress, /Apple Watch 提醒实验/u);
 });

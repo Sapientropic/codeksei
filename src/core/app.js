@@ -1,4 +1,3 @@
-const path = require("path");
 const { createWeixinChannelAdapter } = require("../adapters/channel/weixin");
 const { persistIncomingWeixinAttachments } = require("../adapters/channel/weixin/media-receive");
 const { createCodexRuntimeAdapter } = require("../adapters/runtime/codex");
@@ -26,10 +25,23 @@ const {
   LEGACY_TIMELINE_TIMEZONE,
   formatDateTimeInTimezone,
 } = require("./timezone");
+const {
+  formatErrorMessage,
+  resolveLongPollTimeoutMs: resolveAppLongPollTimeoutMs,
+  runAppPollLoop,
+} = require("./app-poll-loop");
+const {
+  buildApprovalPromptSignature,
+  buildApprovalPromptText,
+  matchesBuiltInCommandPrefix,
+  matchesCommandPrefix,
+  normalizeCommandArgument,
+  normalizeText,
+} = require("./approval-command-policy");
+const { handleReplyDeliveryFailure: processReplyDeliveryFailure } = require("./reply-delivery-failure");
 
 const DEFAULT_LONG_POLL_TIMEOUT_MS = 35_000;
 const MIN_LONG_POLL_TIMEOUT_MS = 2_000;
-const SESSION_EXPIRED_ERRCODE = -14;
 const RETRY_DELAY_MS = 2_000;
 const BACKOFF_DELAY_MS = 30_000;
 const MAX_CONSECUTIVE_FAILURES = 3;
@@ -237,71 +249,24 @@ class CyberbossApp {
     });
 
     try {
-      let consecutiveFailures = 0;
-      while (!shutdown.stopped) {
-        try {
-          this.updateBridgeHeartbeat({
-            pid: process.pid,
-            status: "running",
-            accountId: account.accountId,
-            workspaceRoot: this.config.workspaceRoot,
-            codexEndpoint: runtimeState.endpoint,
-            lastPollStartedAt: new Date().toISOString(),
-          });
-          await this.flushDueReminders(account);
-          await this.flushPendingSystemMessages();
-          await this.flushPendingTimelineScreenshots(account);
-          const response = await this.channelAdapter.getUpdates({
-            syncBuffer: this.channelAdapter.loadSyncBuffer(),
-            timeoutMs: this.resolveLongPollTimeoutMs(),
-          });
-          assertWeixinUpdateResponse(response);
-          consecutiveFailures = 0;
-          this.updateBridgeHeartbeat({
-            pid: process.pid,
-            status: "running",
-            accountId: account.accountId,
-            workspaceRoot: this.config.workspaceRoot,
-            codexEndpoint: runtimeState.endpoint,
-            lastPollSucceededAt: new Date().toISOString(),
-            consecutiveFailures: 0,
-            lastError: "",
-          });
-          const messages = Array.isArray(response?.msgs) ? response.msgs : [];
-          for (const message of messages) {
-            if (shutdown.stopped) {
-              break;
-            }
-            await this.handleIncomingMessage(message);
-          }
-          await this.flushDueReminders(account);
-          await this.flushPendingSystemMessages();
-          await this.flushPendingTimelineScreenshots(account);
-        } catch (error) {
-          if (shutdown.stopped) {
-            break;
-          }
-
-          if (isSessionExpiredError(error)) {
-            throw new Error("微信会话已失效，请重新执行 `npm run login`");
-          }
-
-          consecutiveFailures += 1;
-          const errorMessage = formatErrorMessage(error);
-          this.updateBridgeHeartbeat({
-            pid: process.pid,
-            status: "degraded",
-            accountId: account.accountId,
-            workspaceRoot: this.config.workspaceRoot,
-            codexEndpoint: runtimeState.endpoint,
-            lastPollFailedAt: new Date().toISOString(),
-            consecutiveFailures,
-            lastError: errorMessage,
-          });
-          console.error(`[codeksei] poll failed: ${errorMessage}`);
-          await sleep(consecutiveFailures >= MAX_CONSECUTIVE_FAILURES ? BACKOFF_DELAY_MS : RETRY_DELAY_MS);
-        }
-      }
+      await runAppPollLoop({
+        account,
+        runtimeState: {
+          endpoint: runtimeState.endpoint,
+          workspaceRoot: this.config.workspaceRoot,
+        },
+        shutdown,
+        channelAdapter: this.channelAdapter,
+        flushDueReminders: (currentAccount) => this.flushDueReminders(currentAccount),
+        flushPendingSystemMessages: () => this.flushPendingSystemMessages(),
+        flushPendingTimelineScreenshots: (currentAccount) => this.flushPendingTimelineScreenshots(currentAccount),
+        resolveLongPollTimeoutMs: () => this.resolveLongPollTimeoutMs(),
+        handleIncomingMessage: (message) => this.handleIncomingMessage(message),
+        updateBridgeHeartbeat: (patch) => this.updateBridgeHeartbeat(patch),
+        retryDelayMs: RETRY_DELAY_MS,
+        backoffDelayMs: BACKOFF_DELAY_MS,
+        maxConsecutiveFailures: MAX_CONSECUTIVE_FAILURES,
+      });
     } finally {
       shutdown.dispose();
       this.updateBridgeHeartbeat({
@@ -392,23 +357,14 @@ class CyberbossApp {
   }
 
   resolveLongPollTimeoutMs() {
-    if (this.systemMessageDispatcher?.hasPending()) {
-      return MIN_LONG_POLL_TIMEOUT_MS;
-    }
-    if (this.activeAccountId && this.timelineScreenshotQueue.hasPendingForAccount(this.activeAccountId)) {
-      return MIN_LONG_POLL_TIMEOUT_MS;
-    }
-
-    const nextDueAtMs = this.reminderQueue.peekNextDueAtMs();
-    if (!nextDueAtMs) {
-      return DEFAULT_LONG_POLL_TIMEOUT_MS;
-    }
-
-    const remainingMs = nextDueAtMs - Date.now();
-    if (remainingMs <= MIN_LONG_POLL_TIMEOUT_MS) {
-      return MIN_LONG_POLL_TIMEOUT_MS;
-    }
-    return Math.max(MIN_LONG_POLL_TIMEOUT_MS, Math.min(DEFAULT_LONG_POLL_TIMEOUT_MS, remainingMs));
+    return resolveAppLongPollTimeoutMs({
+      systemMessageDispatcher: this.systemMessageDispatcher,
+      activeAccountId: this.activeAccountId,
+      timelineScreenshotQueue: this.timelineScreenshotQueue,
+      reminderQueue: this.reminderQueue,
+      defaultLongPollTimeoutMs: DEFAULT_LONG_POLL_TIMEOUT_MS,
+      minLongPollTimeoutMs: MIN_LONG_POLL_TIMEOUT_MS,
+    });
   }
 
   async flushDueReminders(account) {
@@ -425,36 +381,20 @@ class CyberbossApp {
     error,
     sentText = "",
   }) {
-    const normalizedThreadId = normalizeCommandArgument(threadId);
-    const normalizedTurnId = normalizeCommandArgument(turnId);
-    if (!normalizedThreadId) {
-      return;
-    }
-
-    const messageText = error instanceof Error ? error.message : String(error || "unknown error");
-    const deliveryFailureText = isPersistentWeixinSendFailure(error)
-      ? "微信发送层连续失败（sendMessage ret=-2），本地已停止继续投递这轮回复。"
-      : `回复投递失败：${messageText}`;
-    const linked = this.runtimeAdapter.getSessionStore().findBindingForThreadId(normalizedThreadId);
-    const workspaceRoot = normalizeText(linked?.workspaceRoot);
-
-    console.error(
-      `[codeksei] reply delivery degraded `
-      + `thread=${normalizedThreadId} turn=${normalizedTurnId || "(pending)"} `
-      + `workspace=${workspaceRoot || "(unknown)"} `
-      + `sentChars=${String(sentText || "").length} `
-      + `reason=${messageText}`
-    );
-
-    this.clearRuntimeEventWatchdog(normalizedThreadId);
-    if (normalizedTurnId) {
-      this.clearTurnSettlementWatchdog(normalizedThreadId, normalizedTurnId);
-    }
-    // Delivery failure is a local terminal state even if Codex later finishes
-    // the turn, otherwise the bridge UI keeps showing a ghost "still replying".
-    this.runtimeAdapter.getSessionStore().clearApprovalPrompt(normalizedThreadId);
-    this.threadStateStore.markTurnFailed(normalizedThreadId, normalizedTurnId, deliveryFailureText);
-    await this.stopTypingForThread(normalizedThreadId);
+    await processReplyDeliveryFailure({
+      threadId,
+      turnId,
+      error,
+      sentText,
+    }, {
+      runtimeAdapter: this.runtimeAdapter,
+      threadStateStore: this.threadStateStore,
+      clearRuntimeEventWatchdog: (candidateThreadId) => this.clearRuntimeEventWatchdog(candidateThreadId),
+      clearTurnSettlementWatchdog: (candidateThreadId, candidateTurnId) => {
+        this.clearTurnSettlementWatchdog(candidateThreadId, candidateTurnId);
+      },
+      stopTypingForThread: (candidateThreadId) => this.stopTypingForThread(candidateThreadId),
+    });
   }
 
   resolveWorkspaceRoot(bindingKey) {
@@ -559,258 +499,12 @@ function createShutdownController(onStop) {
   };
 }
 
-function assertWeixinUpdateResponse(response) {
-  const ret = normalizeErrorCode(response?.ret);
-  const errcode = normalizeErrorCode(response?.errcode);
-  if ((ret !== 0 && ret !== null) || (errcode !== 0 && errcode !== null)) {
-    const error = new Error(
-      `weixin getUpdates ret=${ret ?? ""} errcode=${errcode ?? ""} errmsg=${normalizeText(response?.errmsg) || ""}`
-    );
-    error.ret = ret;
-    error.errcode = errcode;
-    throw error;
-  }
-}
-
-function isSessionExpiredError(error) {
-  const ret = normalizeErrorCode(error?.ret);
-  const errcode = normalizeErrorCode(error?.errcode);
-  return ret === SESSION_EXPIRED_ERRCODE
-    || errcode === SESSION_EXPIRED_ERRCODE
-    || String(error?.message || "").includes("session expired")
-    || String(error?.message || "").includes("会话已失效");
-}
-
-function normalizeErrorCode(value) {
-  if (value === undefined || value === null || value === "") {
-    return null;
-  }
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : null;
-}
-
-function formatErrorMessage(error) {
-  const raw = error instanceof Error ? error.message : String(error || "unknown error");
-  if (isSessionExpiredError(error)) {
-    return "微信会话已失效，请重新执行 `npm run login`";
-  }
-  return raw;
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function getSystemMessageFailureRetryDelayMs(attemptCount) {
   const index = Math.max(0, Math.min(SYSTEM_MESSAGE_FAILURE_RETRY_DELAYS_MS.length - 1, Number(attemptCount) - 1));
   return SYSTEM_MESSAGE_FAILURE_RETRY_DELAYS_MS[index];
 }
 
 module.exports = { CyberbossApp };
-
-function normalizeCommandArgument(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function normalizeText(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function matchesCommandPrefix(commandTokens, allowlist) {
-  const normalizedCommandTokens = Array.isArray(commandTokens)
-    ? commandTokens.map((part) => normalizeCommandArgument(part)).filter(Boolean)
-    : [];
-  if (!normalizedCommandTokens.length || !Array.isArray(allowlist) || !allowlist.length) {
-    return false;
-  }
-  return allowlist.some((prefix) => {
-    if (!Array.isArray(prefix) || !prefix.length || prefix.length > normalizedCommandTokens.length) {
-      return false;
-    }
-    return prefix.every((part, index) => normalizeCommandArgument(part) === normalizedCommandTokens[index]);
-  });
-}
-
-function matchesBuiltInCommandPrefix(commandTokens) {
-  const normalized = normalizeCommandTokensForMatching(commandTokens);
-  if (!normalized.length) {
-    return false;
-  }
-
-  if (normalized[0] === "npm") {
-    const runIndex = normalized.indexOf("run");
-    if (runIndex >= 0) {
-      const scriptName = normalizeCommandArgument(normalized[runIndex + 1]);
-      return isBuiltInScriptName(scriptName);
-    }
-  }
-
-  const executable = path.basename(normalized[0] || "");
-  if ((executable === "sh" || executable === "bash" || executable === "zsh")
-    && matchesBuiltInShellScript(normalized[1])) {
-    return true;
-  }
-  if (executable === "node" || executable === "node.exe") {
-    const binPath = normalizeCommandArgument(normalized[1]);
-    if (binPath === "./bin/cyberboss.js"
-      || binPath.endsWith("/bin/cyberboss.js")
-      || binPath === "./bin/codeksei.js"
-      || binPath.endsWith("/bin/codeksei.js")) {
-      return matchesBuiltInCliCommand(normalized.slice(2));
-    }
-  }
-
-  if (executable === "cyberboss"
-    || executable === "cyberboss.js"
-    || executable === "codeksei"
-    || executable === "codeksei.js") {
-    return matchesBuiltInCliCommand(normalized.slice(1));
-  }
-
-  return false;
-}
-
-function normalizeCommandTokensForMatching(commandTokens) {
-  const normalized = Array.isArray(commandTokens)
-    ? commandTokens.map((part) => normalizeCommandArgument(part)).filter(Boolean)
-    : [];
-  if (normalized.length >= 3 && isShellWrapper(normalized[0], normalized[1])) {
-    return splitCommandLine(normalized.slice(2).join(" "));
-  }
-  return normalized;
-}
-
-function isShellWrapper(command, flag) {
-  const executable = path.basename(normalizeCommandArgument(command));
-  return (executable === "sh" || executable === "bash" || executable === "zsh") && flag === "-lc";
-}
-
-function isBuiltInScriptName(scriptName) {
-  return scriptName === "reminder:write"
-    || scriptName === "diary:write"
-    || scriptName === "note:auto"
-    || scriptName === "note:maybe"
-    || scriptName === "note:sync"
-    || scriptName === "project:radar"
-    || scriptName === "review:nightly"
-    || scriptName === "review:weekly"
-    || scriptName === "review:monthly"
-    || scriptName.startsWith("timeline:");
-}
-
-function matchesBuiltInShellScript(scriptPath) {
-  const basename = path.basename(normalizeCommandArgument(scriptPath));
-  return basename === "timeline-screenshot.sh";
-}
-
-function matchesBuiltInCliCommand(tokens) {
-  if (!Array.isArray(tokens) || tokens.length < 2) {
-    return false;
-  }
-  const topic = normalizeCommandArgument(tokens[0]);
-  const action = normalizeCommandArgument(tokens[1]);
-  if (topic === "timeline") {
-    return action === "write"
-      || action === "build"
-      || action === "serve"
-      || action === "dev"
-      || action === "screenshot"
-      || action === "read"
-      || action === "categories"
-      || action === "proposals";
-  }
-  if (topic === "project") {
-    return action === "radar";
-  }
-  if (topic === "note") {
-    return action === "sync";
-  }
-  return (topic === "reminder" && action === "write")
-    || (topic === "diary" && action === "write")
-    || false;
-}
-
-function splitCommandLine(input) {
-  const tokens = [];
-  let current = "";
-  let quote = null;
-  let escaped = false;
-
-  for (const char of String(input || "")) {
-    if (escaped) {
-      current += char;
-      escaped = false;
-      continue;
-    }
-    if (char === "\\") {
-      escaped = true;
-      continue;
-    }
-    if (quote) {
-      if (char === quote) {
-        quote = null;
-      } else {
-        current += char;
-      }
-      continue;
-    }
-    if (char === "\"" || char === "'") {
-      quote = char;
-      continue;
-    }
-    if (/\s/.test(char)) {
-      if (current) {
-        tokens.push(current);
-        current = "";
-      }
-      continue;
-    }
-    current += char;
-  }
-
-  if (current) {
-    tokens.push(current);
-  }
-  return tokens;
-}
-
-function buildApprovalPromptText(approval) {
-  const reasonText = normalizeText(approval?.reason);
-  const commandText = normalizeText(approval?.command);
-  const sections = ["Codex 请求授权"];
-
-  if (reasonText && reasonText !== commandText) {
-    sections.push(`操作说明：\n${reasonText}`);
-  }
-
-  if (commandText) {
-    sections.push(`待执行命令：\n${commandText}`);
-  } else if (!reasonText) {
-    sections.push("(unknown)");
-  }
-
-  sections.push([
-    "回复以下命令继续：",
-    "/yes  本次允许",
-    "/always  本项目后续同前缀自动允许",
-    "/no  拒绝本次请求",
-  ].join("\n"));
-
-  return sections.join("\n\n");
-}
-
-function buildApprovalPromptSignature(approval) {
-  const reasonText = normalizeText(approval?.reason);
-  const commandText = normalizeText(approval?.command);
-  const commandTokens = Array.isArray(approval?.commandTokens)
-    ? approval.commandTokens.map((token) => normalizeCommandArgument(token)).filter(Boolean)
-    : [];
-  return JSON.stringify({
-    reason: reasonText,
-    command: commandText,
-    commandTokens,
-  });
-}
 
 function buildReminderSystemTrigger(reminder, config = {}) {
   const reminderText = String(reminder?.text || "").trim();
@@ -895,11 +589,6 @@ function stringifyRpcId(value) {
 
 function hasRpcId(value) {
   return stringifyRpcId(value) !== "";
-}
-
-function isPersistentWeixinSendFailure(error) {
-  const message = String(error?.message || error || "");
-  return message.includes("sendMessage ret=-2");
 }
 
 function resolveTimelineScreenshotOutput(args) {

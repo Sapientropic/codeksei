@@ -1,6 +1,9 @@
 const fs = require("fs");
 const path = require("path");
 const { PACKAGE_NAME } = require("../core/branding");
+const { getCommandArgsSchema } = require("../contracts/command-args");
+const { parseCliArgs } = require("../core/cli-args");
+const { writeTextFileAtomically } = require("../core/json-state");
 const {
   LEGACY_TIMELINE_TIMEZONE,
   formatDateInTimezone,
@@ -23,8 +26,7 @@ const TODO_STATE_MARKERS = Object.freeze({
 const TODO_LINE_RE = /^- \[( |x|X)\] (.*)$/u;
 const TODO_START_MARKER_RE = /\s*<!--\s*codeksei-todo:start=(\d{2}:\d{2})\s*-->\s*$/u;
 
-async function runDiaryWriteCommand(config) {
-  const args = process.argv.slice(4);
+async function runDiaryWriteCommand(config, args = []) {
   const options = parseArgs(args);
   const body = await resolveBody(options);
   if (!body) {
@@ -75,65 +77,12 @@ async function runDiaryWriteCommand(config) {
     (draft, payload) => insertDiaryEntry(draft, payload, dateString),
     current
   );
-  fs.writeFileSync(filePath, next, "utf8");
+  writeTextFileAtomically(filePath, next, { encoding: "utf8" });
   console.log(`diary written: ${filePath}`);
 }
 
 function parseArgs(args) {
-  const options = {
-    text: "",
-    title: "",
-    date: "",
-    time: "",
-    section: DEFAULT_SECTION,
-    state: "",
-    timelineText: "",
-    useStdin: false,
-  };
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index];
-    if (arg === "--text") {
-      options.text = readOptionValue(args, index, "--text");
-      index += 1;
-      continue;
-    }
-    if (arg === "--title") {
-      options.title = readOptionValue(args, index, "--title");
-      index += 1;
-      continue;
-    }
-    if (arg === "--date") {
-      options.date = readOptionValue(args, index, "--date");
-      index += 1;
-      continue;
-    }
-    if (arg === "--time") {
-      options.time = readOptionValue(args, index, "--time");
-      index += 1;
-      continue;
-    }
-    if (arg === "--section") {
-      options.section = readOptionValue(args, index, "--section");
-      index += 1;
-      continue;
-    }
-    if (arg === "--state") {
-      options.state = readOptionValue(args, index, "--state");
-      index += 1;
-      continue;
-    }
-    if (arg === "--timeline-text") {
-      options.timelineText = readOptionValue(args, index, "--timeline-text");
-      index += 1;
-      continue;
-    }
-    if (arg === "--stdin") {
-      options.useStdin = true;
-      continue;
-    }
-    throw new Error(`未知参数: ${arg}`);
-  }
-  return options;
+  return parseCliArgs(args, getCommandArgsSchema("diaryWrite"));
 }
 
 function readOptionValue(args, index, optionName) {
@@ -351,7 +300,7 @@ function ensureDiaryFile(filePath, now, timezone = LEGACY_TIMELINE_TIMEZONE) {
   }
   const createdAt = formatDateTime(now, timezone);
   const updated = formatDate(now, timezone);
-  fs.writeFileSync(filePath, buildDiaryFileSkeleton({ createdAt, updated }), "utf8");
+  writeTextFileAtomically(filePath, buildDiaryFileSkeleton({ createdAt, updated }), { encoding: "utf8" });
 }
 
 function buildDiaryFileSkeleton({ createdAt, updated }) {

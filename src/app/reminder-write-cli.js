@@ -4,6 +4,8 @@ const { resolveSelectedAccount } = require("../adapters/channel/weixin/account-s
 const { loadPersistedContextTokens } = require("../adapters/channel/weixin/context-token-store");
 const { ReminderQueueStore } = require("../adapters/channel/weixin/reminder-queue-store");
 const { SessionStore } = require("../adapters/runtime/codex/session-store");
+const { getCommandArgsSchema } = require("../contracts/command-args");
+const { parseCliArgs } = require("../core/cli-args");
 const { resolvePreferredSenderId } = require("../core/default-targets");
 const {
   LEGACY_TIMELINE_TIMEZONE,
@@ -17,8 +19,7 @@ const DELAY_UNIT_MS = {
   d: 24 * 60 * 60_000,
 };
 
-async function runReminderWriteCommand(config) {
-  const args = process.argv.slice(4);
+async function runReminderWriteCommand(config, args = []) {
   const options = parseArgs(args);
   const body = await resolveBody(options);
   if (!body) {
@@ -65,42 +66,7 @@ async function runReminderWriteCommand(config) {
 }
 
 function parseArgs(args) {
-  const options = {
-    delay: "",
-    at: "",
-    text: "",
-    user: "",
-    useStdin: false,
-  };
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index];
-    if (arg === "--delay") {
-      options.delay = String(args[index + 1] || "");
-      index += 1;
-      continue;
-    }
-    if (arg === "--at") {
-      options.at = String(args[index + 1] || "");
-      index += 1;
-      continue;
-    }
-    if (arg === "--text") {
-      options.text = String(args[index + 1] || "");
-      index += 1;
-      continue;
-    }
-    if (arg === "--user") {
-      options.user = String(args[index + 1] || "");
-      index += 1;
-      continue;
-    }
-    if (arg === "--stdin") {
-      options.useStdin = true;
-      continue;
-    }
-    throw new Error(`未知参数: ${arg}`);
-  }
-  return options;
+  return parseCliArgs(args, getCommandArgsSchema("reminderWrite"));
 }
 
 function resolveDueAtMs(options, timezone = LEGACY_TIMELINE_TIMEZONE) {

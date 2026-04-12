@@ -1,5 +1,7 @@
-async function runChannelSendFileCommand(app) {
-  const args = process.argv.slice(4);
+const { getCommandArgsSchema } = require("../contracts/command-args");
+const { parseCliArgs } = require("../core/cli-args");
+
+async function runChannelSendFileCommand(app, args = []) {
   if (args.includes("--help") || args.includes("-h")) {
     printHelp();
     return;
@@ -18,27 +20,7 @@ async function runChannelSendFileCommand(app) {
 }
 
 function parseArgs(args) {
-  const options = {
-    path: "",
-    user: "",
-  };
-
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = String(args[index] || "");
-    if (arg === "--path") {
-      options.path = String(args[index + 1] || "");
-      index += 1;
-      continue;
-    }
-    if (arg === "--user") {
-      options.user = String(args[index + 1] || "");
-      index += 1;
-      continue;
-    }
-    throw new Error(`未知参数: ${arg}`);
-  }
-
-  return options;
+  return parseCliArgs(args, getCommandArgsSchema("channelSendFile"));
 }
 
 function printHelp() {

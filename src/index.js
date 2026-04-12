@@ -22,11 +22,14 @@ const { runTimelineEventCommand } = require("./app/timeline-event-cli");
 const { runTimelineScreenshotCommand } = require("./app/timeline-screenshot-cli");
 const { runSystemCheckinPoller } = require("./app/system-checkin-poller");
 const { runSystemSendCommand } = require("./app/system-send-cli");
+const { findTerminalCommandManifest } = require("./contracts/command-surface");
+const { sliceLeafCommandArgs } = require("./core/cli-args");
 const {
   buildTerminalHelpText,
   buildTerminalTopicHelp,
   isPlannedTerminalTopic,
 } = require("./core/command-registry");
+const { writeTextFileAtomically } = require("./core/json-state");
 const { resolveConfiguredPersonName } = require("./core/person-reference");
 
 function ensureDefaultStateDirectory() {
@@ -70,7 +73,7 @@ function ensureInstructionsTemplate(config) {
     userName,
   }).trimEnd() + "\n";
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, content, "utf8");
+  writeTextFileAtomically(filePath, content, { encoding: "utf8" });
 }
 
 function printHelp() {
@@ -102,6 +105,7 @@ async function main() {
   ensureRuntimeEnv();
   installRuntimeErrorHooks();
   const argv = process.argv.slice(2);
+  const leafArgs = sliceLeafCommandArgs(process.argv, 4);
   const config = readConfig();
   ensureBootstrapFiles(config);
   const command = config.mode || "help";
@@ -121,119 +125,20 @@ async function main() {
   }
 
   if (isPlannedTerminalTopic(command)) {
-    const topicHelp = buildTerminalTopicHelp(command);
-    const subcommandArgs = argv.slice(2);
-    const wantsSubcommandHelp = subcommandArgs.includes("--help") || subcommandArgs.includes("-h");
     if (subcommand === "help" || !subcommand) {
-      console.log(topicHelp);
-      return;
-    }
-    if (command === "diary" && subcommand === "write") {
-      if (wantsSubcommandHelp) {
-        console.log(topicHelp);
-        return;
-      }
-      await runDiaryWriteCommand(config);
-      return;
-    }
-    if (command === "reminder" && subcommand === "write") {
-      if (wantsSubcommandHelp) {
-        console.log(topicHelp);
-        return;
-      }
-      await runReminderWriteCommand(config);
-      return;
-    }
-    if (command === "system" && subcommand === "send") {
-      await runSystemSendCommand(config);
-      return;
-    }
-    if (command === "system" && subcommand === "checkin-poller") {
-      await runSystemCheckinPoller(config);
-      return;
-    }
-    if (command === "channel" && subcommand === "send-file") {
-      await runChannelSendFileCommand(getApp());
-      return;
-    }
-    if (command === "note" && subcommand === "sync") {
-      if (wantsSubcommandHelp) {
-        console.log(topicHelp);
-        return;
-      }
-      await runNoteSyncCommand(config);
-      return;
-    }
-    if (command === "note" && subcommand === "auto") {
-      if (wantsSubcommandHelp) {
-        console.log(topicHelp);
-        return;
-      }
-      await runNoteAutoCommand(config);
-      return;
-    }
-    if (command === "note" && subcommand === "maybe") {
-      if (wantsSubcommandHelp) {
-        console.log(topicHelp);
-        return;
-      }
-      runNoteMaybeCommand(config);
-      return;
-    }
-    if (command === "project" && subcommand === "radar") {
-      if (wantsSubcommandHelp) {
-        console.log(topicHelp);
-        return;
-      }
-      await runProjectRadarCommand(config);
-      return;
-    }
-    if (command === "review" && subcommand === "weekly") {
-      if (wantsSubcommandHelp) {
-        console.log(topicHelp);
-        return;
-      }
-      await runReviewCommand(config, "weekly");
-      return;
-    }
-    if (command === "review" && subcommand === "nightly") {
-      if (wantsSubcommandHelp) {
-        console.log(topicHelp);
-        return;
-      }
-      await runReviewCommand(config, "nightly");
-      return;
-    }
-    if (command === "review" && subcommand === "monthly") {
-      if (wantsSubcommandHelp) {
-        console.log(topicHelp);
-        return;
-      }
-      await runReviewCommand(config, "monthly");
+      console.log(buildTerminalTopicHelp(command));
       return;
     }
   }
 
-  if (command === "timeline") {
-    const timelineIntegration = createTimelineIntegration(config);
-    if (!subcommand || subcommand === "help") {
-      console.log(buildTerminalTopicHelp("timeline"));
-      return;
-    }
-    if (subcommand === "event") {
-      await runTimelineEventCommand(timelineIntegration, config, argv.slice(2));
-      return;
-    }
-    if (subcommand === "screenshot") {
-      const screenshotArgs = argv.slice(2);
-      if (screenshotArgs.includes("--help") || screenshotArgs.includes("-h")) {
-        await timelineIntegration.runSubcommand(subcommand, screenshotArgs);
-        return;
-      }
-      await runTimelineScreenshotCommand(config, argv.slice(2));
-      return;
-    }
-    await timelineIntegration.runSubcommand(subcommand, argv.slice(2));
+  const manifest = findTerminalCommandManifest(command, subcommand);
+  if (manifest) {
+    await runTerminalManifestCommand(manifest, {
+      argv,
+      config,
+      getApp,
+      leafArgs,
+    });
     return;
   }
 
@@ -261,3 +166,73 @@ async function main() {
 }
 
 module.exports = { main };
+
+async function runTerminalManifestCommand(manifest, {
+  argv,
+  config,
+  getApp,
+  leafArgs,
+}) {
+  switch (manifest.runner) {
+    case "help":
+      printHelp();
+      return;
+    case "login":
+      await getApp().login();
+      return;
+    case "accounts":
+      getApp().printAccounts();
+      return;
+    case "start":
+      await getApp().start();
+      return;
+    case "doctor":
+      getApp().printDoctor();
+      return;
+    case "channel.send-file":
+      await runChannelSendFileCommand(getApp(), leafArgs);
+      return;
+    case "note.sync":
+      await runNoteSyncCommand(config, leafArgs);
+      return;
+    case "note.auto":
+      await runNoteAutoCommand(config, leafArgs);
+      return;
+    case "note.maybe":
+      runNoteMaybeCommand(config, leafArgs);
+      return;
+    case "project.radar":
+      await runProjectRadarCommand(config, leafArgs);
+      return;
+    case "review.command":
+      await runReviewCommand(config, manifest.kind, leafArgs);
+      return;
+    case "reminder.write":
+      await runReminderWriteCommand(config, leafArgs);
+      return;
+    case "diary.write":
+      await runDiaryWriteCommand(config, leafArgs);
+      return;
+    case "system.send":
+      await runSystemSendCommand(config, leafArgs);
+      return;
+    case "system.checkin-poller":
+      await runSystemCheckinPoller(config);
+      return;
+    case "timeline.event": {
+      const timelineIntegration = createTimelineIntegration(config);
+      await runTimelineEventCommand(timelineIntegration, config, argv.slice(2));
+      return;
+    }
+    case "timeline.screenshot":
+      await runTimelineScreenshotCommand(config, argv.slice(2));
+      return;
+    case "timeline.subcommand": {
+      const timelineIntegration = createTimelineIntegration(config);
+      await timelineIntegration.runSubcommand(manifest.timelineSubcommand, argv.slice(2));
+      return;
+    }
+    default:
+      throw new Error(`未知命令: ${manifest.command}${manifest.subcommand ? ` ${manifest.subcommand}` : ""}`);
+  }
+}

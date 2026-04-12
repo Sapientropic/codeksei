@@ -1,6 +1,12 @@
+// @ts-check
+
+const {
+  compareTimelineScreenshotJobs,
+  normalizeTimelineScreenshotJob,
+  validateTimelineScreenshotQueueState,
+} = require("../contracts/queue-items");
 const {
   ensureParentDirectory,
-  isPlainObject,
   readJsonStateFile,
   writeJsonStateFile,
 } = require("./json-state");
@@ -78,76 +84,8 @@ class TimelineScreenshotQueueStore {
   }
 }
 
-function normalizeTimelineScreenshotJob(job) {
-  if (!job || typeof job !== "object") {
-    return null;
-  }
-
-  const id = normalizeText(job.id);
-  const accountId = normalizeText(job.accountId);
-  const senderId = normalizeText(job.senderId);
-  const outputFile = normalizeText(job.outputFile);
-  const createdAt = normalizeIsoTime(job.createdAt);
-  const args = normalizeArgs(job.args);
-
-  if (!id || !accountId || !senderId) {
-    return null;
-  }
-
-  return {
-    id,
-    accountId,
-    senderId,
-    outputFile,
-    args,
-    createdAt: createdAt || new Date().toISOString(),
-  };
-}
-
-function normalizeArgs(args) {
-  return Array.isArray(args)
-    ? args.map((value) => normalizeText(value)).filter(Boolean)
-    : [];
-}
-
-function normalizeIsoTime(value) {
-  const normalized = normalizeText(value);
-  if (!normalized) {
-    return "";
-  }
-  const parsed = Date.parse(normalized);
-  if (!Number.isFinite(parsed)) {
-    return "";
-  }
-  return new Date(parsed).toISOString();
-}
-
-function compareTimelineScreenshotJobs(left, right) {
-  const leftTime = Date.parse(left?.createdAt || "") || 0;
-  const rightTime = Date.parse(right?.createdAt || "") || 0;
-  if (leftTime !== rightTime) {
-    return leftTime - rightTime;
-  }
-  return String(left?.id || "").localeCompare(String(right?.id || ""));
-}
-
 function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function validateTimelineScreenshotQueueState(state) {
-  if (!isPlainObject(state)) {
-    return "timeline screenshot queue top-level state must be an object";
-  }
-  if (!Array.isArray(state.jobs)) {
-    return "timeline screenshot queue jobs must be an array";
-  }
-  for (let index = 0; index < state.jobs.length; index += 1) {
-    if (!normalizeTimelineScreenshotJob(state.jobs[index])) {
-      return `timeline screenshot queue jobs[${index}] is invalid`;
-    }
-  }
-  return true;
 }
 
 module.exports = { TimelineScreenshotQueueStore };
