@@ -2,7 +2,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { normalizeProjectRadarConfig } from "../contracts/config-files";
+import {
+  normalizeProjectRadarConfig,
+  type NormalizedProjectRadarConfig,
+} from "../contracts/config-files";
 import { loadJsonConfig } from "./config-loader";
 import {
   normalizeDisplayPath,
@@ -38,7 +41,7 @@ function loadProjectRadarConfig(config: ProjectRadarConfigInput = {}) {
   const configFile = resolveCrossPlatformPath(String(
     config.projectRadarConfigFile || path.join(workspaceRoot, ".codex", "code-projects.json")
   ));
-  const parsed = loadJsonConfig({
+  const parsed = loadJsonConfig<NormalizedProjectRadarConfig>({
     filePath: configFile,
     label: "project radar config",
     normalize: normalizeProjectRadarConfig,

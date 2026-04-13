@@ -1,33 +1,12 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { normalizeWorkspaceBootstrapConfig } from "../contracts/config-files";
+import {
+  normalizeWorkspaceBootstrapConfig,
+  type NormalizedBootstrapProfile,
+  type NormalizedWorkspaceBootstrapConfig,
+  type NormalizedWorkspaceOverrideProfile,
+} from "../contracts/config-files";
 import { loadJsonConfig } from "../core/config-loader";
-
-interface FileCandidateInput extends Record<string, unknown> {
-  path?: unknown;
-  relativePath?: unknown;
-  role?: unknown;
-  when?: unknown;
-}
-
-interface RecentFileSpecInput extends Record<string, unknown> {
-  directory?: unknown;
-  pattern?: unknown;
-  role?: unknown;
-  maxCount?: unknown;
-}
-
-interface WorkspaceBootstrapProfileInput extends Record<string, unknown> {
-  primaryFiles?: unknown;
-  conditionalFiles?: unknown;
-  recentFiles?: unknown;
-}
-
-interface WorkspaceBootstrapConfig extends Record<string, unknown> {
-  defaults?: WorkspaceBootstrapProfileInput;
-  default?: WorkspaceBootstrapProfileInput;
-  workspaces?: Record<string, WorkspaceBootstrapProfileInput>;
-}
 
 interface WorkspaceBootstrapOptions extends Record<string, unknown> {
   workspaceBootstrapConfigFile?: unknown;
@@ -159,31 +138,31 @@ function resolveWorkspaceBootstrapProfile(
   config: WorkspaceBootstrapOptions = {},
 ): WorkspaceBootstrapProfile {
   const externalConfig = loadWorkspaceBootstrapConfig(config);
-  const externalDefaults = externalConfig.defaults || externalConfig.default || {};
+  const externalDefaults = externalConfig.defaults || externalConfig.default;
   const baseProfile = mergeProfiles(DEFAULT_BOOTSTRAP_PROFILE, externalDefaults);
   const workspaceOverrides = selectWorkspaceOverrides(externalConfig.workspaces, workspaceRoot);
-  return mergeProfiles(baseProfile, workspaceOverrides || {});
+  return mergeProfiles(baseProfile, workspaceOverrides);
 }
 
-function loadWorkspaceBootstrapConfig(config: WorkspaceBootstrapOptions = {}): WorkspaceBootstrapConfig {
+function loadWorkspaceBootstrapConfig(config: WorkspaceBootstrapOptions = {}): NormalizedWorkspaceBootstrapConfig {
   const filePath = normalizeText(config.workspaceBootstrapConfigFile);
   if (!filePath) {
-    return {};
+    return { workspaces: {} };
   }
-  return loadJsonConfig<WorkspaceBootstrapConfig>({
+  return loadJsonConfig<NormalizedWorkspaceBootstrapConfig>({
     filePath,
     label: "workspace bootstrap",
-    normalize: normalizeWorkspaceBootstrapConfig as (value: unknown) => WorkspaceBootstrapConfig,
-    fallback: {},
+    normalize: normalizeWorkspaceBootstrapConfig,
+    fallback: { workspaces: {} },
     missing: "fallback",
     invalid: "fallback",
   });
 }
 
 function selectWorkspaceOverrides(
-  workspaces: Record<string, WorkspaceBootstrapProfileInput> | undefined,
+  workspaces: Record<string, NormalizedWorkspaceOverrideProfile> | undefined,
   workspaceRoot: string,
-): WorkspaceBootstrapProfileInput | null {
+): NormalizedWorkspaceOverrideProfile | null {
   if (!workspaces || typeof workspaces !== "object") {
     return null;
   }
@@ -198,7 +177,7 @@ function selectWorkspaceOverrides(
 
 function mergeProfiles(
   baseProfile: WorkspaceBootstrapProfile,
-  overrideProfile: WorkspaceBootstrapProfileInput,
+  overrideProfile: Partial<NormalizedBootstrapProfile> | null | undefined,
 ): WorkspaceBootstrapProfile {
   const override = isRecord(overrideProfile) ? overrideProfile : {};
   return {

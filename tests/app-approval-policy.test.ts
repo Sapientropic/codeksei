@@ -89,3 +89,14 @@ test("approval command policy still recognizes the legacy timeline screenshot sh
   assert.equal(matchesBuiltInCommandPrefix(["bash", "./scripts/timeline-screenshot.sh"]), true);
   assert.equal(matchesBuiltInCommandPrefix(["sh", "-lc", "./scripts/timeline-screenshot.sh --send"]), true);
 });
+
+test("approval command policy keeps Windows executable aliases in parity with repo entrypoints", () => {
+  assert.equal(
+    matchesBuiltInCommandPrefix(["node.exe", ".\\dist\\src\\index.js", "review", "weekly", "--week", "2026-W15"]),
+    true
+  );
+  assert.equal(
+    matchesBuiltInCommandPrefix(["codeksei.cmd", "review", "weekly", "--week", "2026-W15"]),
+    true
+  );
+});

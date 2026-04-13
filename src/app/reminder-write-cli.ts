@@ -1,23 +1,33 @@
 import * as crypto from "node:crypto";
 
 import { SessionStore } from "../adapters/runtime/codex/session-store";
+import {
+  resolveSelectedAccount,
+  type WeixinAccountConfig,
+} from "../adapters/channel/weixin/account-store";
+import { loadPersistedContextTokens } from "../adapters/channel/weixin/context-token-store";
 import { getCommandArgsSchema } from "../contracts/command-args";
+import { parseCliArgs } from "../core/cli-args";
 import {
   LEGACY_TIMELINE_TIMEZONE,
   coerceLocalDateTimeToIso,
 } from "../core/timezone";
-import { resolvePreferredSenderId } from "../workspace/default-targets";
-import { resolveSelectedAccount } from "../adapters/channel/weixin/account-store";
-import { loadPersistedContextTokens } from "../adapters/channel/weixin/context-token-store";
-import { parseCliArgs } from "../core/cli-args";
 import { ReminderQueueStore } from "../state/reminder-queue-store";
+import { resolvePreferredSenderId } from "../workspace/default-targets";
 
 const DELAY_UNIT_MS = {
   s: 1_000,
   m: 60_000,
   h: 60 * 60_000,
   d: 24 * 60 * 60_000,
-};
+} as const;
+
+export interface ReminderWriteConfig extends WeixinAccountConfig {
+  allowedUserIds?: unknown;
+  reminderQueueFile: string;
+  sessionsFile: string;
+  timezone?: unknown;
+}
 
 interface ReminderWriteOptions extends Record<string, unknown> {
   delay?: unknown;
@@ -27,14 +37,17 @@ interface ReminderWriteOptions extends Record<string, unknown> {
   useStdin?: boolean;
 }
 
-async function runReminderWriteCommand(config: any, args: any[] = []) {
+async function runReminderWriteCommand(
+  config: ReminderWriteConfig,
+  args: readonly string[] = [],
+): Promise<void> {
   const options = parseArgs(args);
   const body = await resolveBody(options);
   if (!body) {
     throw new Error("提醒内容不能为空，传 --text 或通过 stdin 输入");
   }
 
-  const timezone = config?.timezone || LEGACY_TIMELINE_TIMEZONE;
+  const timezone = normalizeTimezone(config.timezone);
   const dueAtMs = resolveDueAtMs(options, timezone);
   if (!Number.isFinite(dueAtMs) || dueAtMs <= Date.now()) {
     throw new Error(
@@ -47,7 +60,7 @@ async function runReminderWriteCommand(config: any, args: any[] = []) {
   const senderId = resolvePreferredSenderId({
     config,
     accountId: account.accountId,
-    explicitUser: typeof options.user === "string" ? options.user : "",
+    explicitUser: normalizeText(options.user),
     sessionStore,
   });
   if (!senderId) {
@@ -55,7 +68,7 @@ async function runReminderWriteCommand(config: any, args: any[] = []) {
   }
 
   const contextTokens = loadPersistedContextTokens(config, account.accountId);
-  const contextToken = String(contextTokens[senderId] || "").trim();
+  const contextToken = normalizeText(contextTokens[senderId]);
   if (!contextToken) {
     throw new Error(`找不到 ${senderId} 的 context_token，先让这个用户和 bot 聊过一次`);
   }
@@ -73,11 +86,14 @@ async function runReminderWriteCommand(config: any, args: any[] = []) {
   console.log(`reminder queued: ${reminder.id}`);
 }
 
-function parseArgs(args: string[]): ReminderWriteOptions {
-  return parseCliArgs(args, getCommandArgsSchema("reminderWrite"));
+function parseArgs(args: readonly string[]): ReminderWriteOptions {
+  return parseCliArgs<ReminderWriteOptions>(args, getCommandArgsSchema("reminderWrite"));
 }
 
-function resolveDueAtMs(options: any, timezone: any = LEGACY_TIMELINE_TIMEZONE) {
+function resolveDueAtMs(
+  options: ReminderWriteOptions,
+  timezone: string = LEGACY_TIMELINE_TIMEZONE,
+): number {
   const delayMs = parseDelay(options.delay);
   const scheduledAtMs = parseAbsoluteTime(options.at, timezone);
   if (delayMs && scheduledAtMs) {
@@ -92,8 +108,8 @@ function resolveDueAtMs(options: any, timezone: any = LEGACY_TIMELINE_TIMEZONE) 
   return 0;
 }
 
-function parseDelay(rawValue: any) {
-  const normalized = String(rawValue || "").trim().toLowerCase();
+function parseDelay(rawValue: unknown): number {
+  const normalized = normalizeText(rawValue).toLowerCase();
   if (!normalized) {
     return 0;
   }
@@ -114,8 +130,8 @@ function parseDelay(rawValue: any) {
     }
 
     const amount = Number.parseInt(match[1] || "", 10);
-    const unit = match[2];
-    const unitMs = unit ? DELAY_UNIT_MS[unit as keyof typeof DELAY_UNIT_MS] || 0 : 0;
+    const unitKey = normalizeText(match[2]).toLowerCase() as keyof typeof DELAY_UNIT_MS;
+    const unitMs = DELAY_UNIT_MS[unitKey] || 0;
     if (!Number.isFinite(amount) || amount <= 0 || !unitMs) {
       return 0;
     }
@@ -127,8 +143,8 @@ function parseDelay(rawValue: any) {
   return totalMs > 0 ? totalMs : 0;
 }
 
-function parseAbsoluteTime(rawValue: any, timezone: any = LEGACY_TIMELINE_TIMEZONE) {
-  const normalized = String(rawValue || "").trim();
+function parseAbsoluteTime(rawValue: unknown, timezone: string = LEGACY_TIMELINE_TIMEZONE): number {
+  const normalized = normalizeText(rawValue);
   if (!normalized) {
     return 0;
   }
@@ -138,8 +154,8 @@ function parseAbsoluteTime(rawValue: any, timezone: any = LEGACY_TIMELINE_TIMEZO
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function normalizeAbsoluteTimeString(value: any, timezone: any = LEGACY_TIMELINE_TIMEZONE) {
-  const normalized = String(value || "").trim();
+function normalizeAbsoluteTimeString(value: unknown, timezone: string = LEGACY_TIMELINE_TIMEZONE): string {
+  const normalized = normalizeText(value);
   if (!normalized) {
     return "";
   }
@@ -149,7 +165,7 @@ function normalizeAbsoluteTimeString(value: any, timezone: any = LEGACY_TIMELINE
   }) || normalized;
 }
 
-async function resolveBody(options: any) {
+async function resolveBody(options: ReminderWriteOptions): Promise<string> {
   const inlineText = normalizeBody(options.text);
   if (inlineText) {
     return inlineText;
@@ -160,11 +176,11 @@ async function resolveBody(options: any) {
   return normalizeBody(await readStdin());
 }
 
-function readStdin() {
-  return new Promise((resolve: any, reject: any) => {
+function readStdin(): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
     let buffer = "";
     process.stdin.setEncoding("utf8");
-    process.stdin.on("data", (chunk: any) => {
+    process.stdin.on("data", (chunk: string) => {
       buffer += chunk;
     });
     process.stdin.on("end", () => resolve(buffer));
@@ -172,19 +188,29 @@ function readStdin() {
   });
 }
 
-function normalizeBody(value: any) {
+function normalizeBody(value: unknown): string {
   return String(value || "").replace(/\r\n/g, "\n").trim();
 }
 
-function buildAbsoluteTimeExample(timezone: any = LEGACY_TIMELINE_TIMEZONE) {
+function buildAbsoluteTimeExample(timezone: string = LEGACY_TIMELINE_TIMEZONE): string {
   const explicit = normalizeAbsoluteTimeString("2026-04-07 21:30", timezone);
   return `${explicit || "2026-04-07T21:30+08:00"} 或 2026-04-07 21:30（后者按当前 timezone 解释）`;
+}
+
+function normalizeText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeTimezone(value: unknown): string {
+  return normalizeText(value) || LEGACY_TIMELINE_TIMEZONE;
 }
 
 export {
   buildAbsoluteTimeExample,
   normalizeAbsoluteTimeString,
+  normalizeBody,
   parseAbsoluteTime,
+  parseDelay,
   resolveDueAtMs,
   runReminderWriteCommand,
 };

@@ -1,27 +1,18 @@
 import type { SessionState } from "../../../contracts/session-state";
-import { normalizeModelCatalog } from "./model-catalog";
+import {
+  normalizeModelCatalog,
+  type AvailableModelCatalogView,
+} from "./model-catalog";
 import { isRecord } from "./session-store-bindings";
 
-export interface NormalizedModelCatalogEntry {
-  id: string;
-  model: string;
-  displayName: string;
-  supportedReasoningEfforts: string[];
-  defaultReasoningEffort: string;
-  isDefault: boolean;
-}
-
-export interface AvailableModelCatalogView {
-  models: NormalizedModelCatalogEntry[];
-  updatedAt: string;
-}
+export type { AvailableModelCatalogView } from "./model-catalog";
 
 export function getAvailableModelCatalogFromState(state: SessionState): AvailableModelCatalogView | null {
   const raw = state.availableModelCatalog;
   if (!isRecord(raw)) {
     return null;
   }
-  const models = normalizeModelCatalog(raw.models) as NormalizedModelCatalogEntry[];
+  const models = normalizeModelCatalog(raw.models);
   if (!models.length) {
     return null;
   }
@@ -33,7 +24,7 @@ export function setAvailableModelCatalogInState(
   state: SessionState,
   models: unknown,
 ): AvailableModelCatalogView | null {
-  const normalizedModels = normalizeModelCatalog(models) as NormalizedModelCatalogEntry[];
+  const normalizedModels = normalizeModelCatalog(models);
   if (!normalizedModels.length) {
     return null;
   }

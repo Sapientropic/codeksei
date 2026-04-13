@@ -1,23 +1,16 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { normalizeWorkspaceAliasManifest } from "../contracts/config-files";
+import {
+  normalizeWorkspaceAliasManifest,
+  type NormalizedWorkspaceAliasManifest,
+} from "../contracts/config-files";
 import { loadJsonConfig } from "../core/config-loader";
 
 const DEFAULT_ALIAS_MANIFEST = path.join(os.homedir(), ".codex", "windows-ascii-alias", "aliases.json");
 
 interface ResolveAliasOptions {
   manifestPath?: string;
-}
-
-interface AliasManifestEntry {
-  slug?: unknown;
-  target_path?: unknown;
-  alias_path?: unknown;
-}
-
-interface AliasManifest {
-  mappings?: AliasManifestEntry[];
 }
 
 interface AliasMapping {
@@ -99,10 +92,10 @@ export function loadAliasMappings(options: ResolveAliasOptions = {}): AliasMappi
   const manifestPath = typeof options.manifestPath === "string" && options.manifestPath.trim()
     ? options.manifestPath.trim()
     : DEFAULT_ALIAS_MANIFEST;
-  const manifest = loadJsonConfig<AliasManifest>({
+  const manifest = loadJsonConfig<NormalizedWorkspaceAliasManifest>({
     filePath: manifestPath,
     label: "workspace alias manifest",
-    normalize: normalizeWorkspaceAliasManifest as (value: unknown) => AliasManifest,
+    normalize: normalizeWorkspaceAliasManifest,
     fallback: { mappings: [] },
     missing: "fallback",
     invalid: "fallback",

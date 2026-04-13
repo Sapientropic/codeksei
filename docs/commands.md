@@ -192,6 +192,7 @@ Project radar 用于回答“项目现在在哪、应该从哪里重新进去”
 - built `dist` shared entrypoints
 - `stream` 与 `settled` 两种 reply mode
 - pending approval 持久化后 restart 再 `/yes`
+- 这组自动化证明的是仓内 fake-harness integration surface，不是 live account / live network / live runtime 证明
 
 maintainer 仍需额外补一次真实账号 smoke：
 
