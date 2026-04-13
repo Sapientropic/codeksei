@@ -140,7 +140,7 @@ test("persistIncomingWeixinAttachments keeps plain media when decrypt fails but 
         directUrls: ["https://cdn.example.com/proof.bin"],
         mediaRef: {
           encryptType: 1,
-          aesKeyHex: "00112233445566778899aabbccddeeff",
+          aesKey: "plainfallbackkey",
         },
       }],
       stateDir,

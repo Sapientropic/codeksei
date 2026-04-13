@@ -7,28 +7,27 @@ test("formatLogText redacts sensitive token-like fields", () => {
   const text = formatLogText([
     "request failed",
     {
-      token: "secret-token",
+      token: "demo",
       nested: {
-        authorization: "Bearer super-secret",
+        authorization: "Bearer test",
       },
     },
-    "?context_token=abc123",
+    "?context_token=demo",
   ]);
 
   assert.match(text, /request failed/);
   assert.match(text, /<redacted>/);
-  assert.equal(text.includes("secret-token"), false);
-  assert.equal(text.includes("super-secret"), false);
-  assert.equal(text.includes("abc123"), false);
+  assert.equal(text.includes("demo"), false);
+  assert.equal(text.includes("Bearer test"), false);
 });
 
 test("formatLogText keeps useful error text while still redacting", () => {
-  const error = new Error("boom Bearer super-secret");
+  const error = new Error("boom Bearer test");
   const text = formatLogText([
     error,
-    "upload_full_url=https://example.com/upload?encrypted_query_param=raw-secret",
+    "upload_full_url=https://example.com/upload?encrypted_query_param=test",
   ]);
 
   assert.match(text, /boom Bearer <redacted>/);
-  assert.equal(text.includes("raw-secret"), false);
+  assert.equal(text.includes("encrypted_query_param=test"), false);
 });
