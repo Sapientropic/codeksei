@@ -28,6 +28,7 @@ test("first-party timeline runtime can build a static site from the published di
   assert.equal(fs.existsSync(path.join(stateDir, "timeline", "site", "assets", "dashboard.css")), true);
   assert.equal(fs.existsSync(path.join(stateDir, "timeline", "site", "dashboard-data.json")), true);
   assert.equal(fs.existsSync(path.join(repoRoot, "dist", "src", "timeline", "examples", "demo-facts.json")), true);
+  assert.equal(fs.existsSync(path.join(repoRoot, "dist", "src", "timeline", "examples", "demo-facts.en.json")), true);
   assert.equal(fs.existsSync(path.join(repoRoot, "dist", "src", "timeline", "runtime", "timeline", "css", "dashboard.css")), true);
 });
 
@@ -45,6 +46,11 @@ test("first-party timeline runtime honors CODEKSEI_TIMELINE_LOCALE when building
   assert.match(html, /<html lang="en">/u);
   assert.equal(payload.meta.locale, "en");
   assert.equal(payload.taxonomy.categories[0].label, "Life");
+  assert.equal(payload.timelines.day["2026-04-02"].items[0].tooltip.title, "Overnight sleep");
+  assert.match(
+    payload.timelines.day["2026-04-02"].items[0].tooltip.note,
+    /early-morning block/u,
+  );
 });
 
 test("first-party timeline runtime still accepts legacy TIMELINE_FOR_AGENT_LOCALE for compatibility", () => {
@@ -58,6 +64,62 @@ test("first-party timeline runtime still accepts legacy TIMELINE_FOR_AGENT_LOCAL
   assert.equal(result.status, 0, result.stderr || "expected legacy-locale timeline build to succeed");
   const payload = JSON.parse(fs.readFileSync(path.join(stateDir, "timeline", "site", "dashboard-data.json"), "utf8"));
   assert.equal(payload.meta.locale, "en");
+});
+
+test("english demo facts stay aligned with the canonical demo schedule and ship without Chinese copy", () => {
+  const zhPayload = JSON.parse(fs.readFileSync(path.join(repoRoot, "src", "timeline", "examples", "demo-facts.json"), "utf8"));
+  const enPayload = JSON.parse(fs.readFileSync(path.join(repoRoot, "src", "timeline", "examples", "demo-facts.en.json"), "utf8"));
+  const zhDates = Object.keys(zhPayload.facts || {}).sort();
+  const enDates = Object.keys(enPayload.facts || {}).sort();
+
+  assert.deepEqual(enDates, zhDates);
+  for (const date of zhDates) {
+    const zhDay = zhPayload.facts[date];
+    const enDay = enPayload.facts[date];
+    assert.equal(enDay.status, zhDay.status);
+    assert.equal(enDay.updatedAt, zhDay.updatedAt);
+    assert.equal(enDay.source, zhDay.source);
+    assert.equal(enDay.events.length, zhDay.events.length);
+    for (let index = 0; index < zhDay.events.length; index += 1) {
+      const zhEvent = zhDay.events[index];
+      const enEvent = enDay.events[index];
+      assert.deepEqual(
+        {
+          id: enEvent.id,
+          startAt: enEvent.startAt,
+          endAt: enEvent.endAt,
+          categoryId: enEvent.categoryId,
+          subcategoryId: enEvent.subcategoryId,
+          eventNodeId: enEvent.eventNodeId,
+          confidence: enEvent.confidence,
+          sourceMessageIds: enEvent.sourceMessageIds,
+        },
+        {
+          id: zhEvent.id,
+          startAt: zhEvent.startAt,
+          endAt: zhEvent.endAt,
+          categoryId: zhEvent.categoryId,
+          subcategoryId: zhEvent.subcategoryId,
+          eventNodeId: zhEvent.eventNodeId,
+          confidence: zhEvent.confidence,
+          sourceMessageIds: zhEvent.sourceMessageIds,
+        },
+      );
+      assert.equal(typeof enEvent.title, "string");
+      assert.equal(typeof enEvent.note, "string");
+      assert.equal(enEvent.title.length > 0, true);
+      assert.equal(enEvent.note.length > 0, true);
+      assert.equal(Array.isArray(enEvent.tags), true);
+      assert.equal(enEvent.tags.length, zhEvent.tags.length);
+      assert.doesNotMatch(enEvent.title, /[\u3400-\u9fff]/u);
+      assert.doesNotMatch(enEvent.note, /[\u3400-\u9fff]/u);
+      for (const tag of enEvent.tags) {
+        assert.equal(typeof tag, "string");
+        assert.equal(tag.length > 0, true);
+        assert.doesNotMatch(tag, /[\u3400-\u9fff]/u);
+      }
+    }
+  }
 });
 
 test("first-party timeline runtime covers categories, write, read, proposals, and screenshot help", () => {

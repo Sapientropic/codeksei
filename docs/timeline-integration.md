@@ -22,6 +22,7 @@
 
 - `CODEKSEI_TIMELINE_LOCALE=zh-CN|en`
 - 当前只作用于 timeline dashboard：文案、日期格式、HTML `lang` 与 demo data 语言
+- 英文 demo data 由独立资产 `src/timeline/examples/demo-facts.en.json` 提供，不再依赖运行时临时翻译
 - 不会改变 timeline 写入 JSON 的 schema，也不会改动真实用户已经写入的事件内容
 
 ## CLI-First Path
