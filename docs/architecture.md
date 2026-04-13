@@ -122,8 +122,10 @@
 当前收口方式：
 
 - `index.ts` 保持 facade
-- `legacy.ts` 只保留兼容 facade，不再回揉 text / media / login / update 混合职责
-- `delivery.ts` 负责 chunk / retry / trace / v2 text send
+- `legacy.ts` 只保留 legacy adapter facade、account/context/getUpdates/login/sendFile
+- `delivery.ts` 只保留 v2 text transport / typing facade
+- `delivery-text.ts` 负责文本归一化、chunk、packing、stream 边界
+- `delivery-trace.ts` 负责 trace context、retry backoff、stable client id 重试
 - `updates.ts` 负责 account / context token / sync buffer / getUpdates
 - `login-*`、`message-utils*`、`protocol.ts`、`account-store.ts`、`context-token-store.ts` 各自承担 owner-local 边界
 
@@ -155,7 +157,8 @@
 - `lifecycle.ts` 负责 reconnect / initialize / ready state
 - `bootstrap.ts` 负责 thread bootstrap / instruction refresh 文本
 - `diagnostics.ts` 负责 workspace diagnostics / turn completion wait
-- `session-store.ts`、`rpc-client.ts`、`diagnostics.ts` 继续按 owner-local helper 收口，避免高 fan-out 逻辑重新回到一个 bucket
+- `session-store.ts` 继续保留 public class surface，但内部 lock / binding / approval 规则已拆到 `session-store-lock.ts`、`session-store-bindings.ts`、`session-store-approvals.ts`
+- `rpc-client.ts` 继续承担 transport owner，但不再顺手吸收 session / shared 恢复规则
 
 ## 7. Shared Mode
 
@@ -171,6 +174,18 @@
 - shared heartbeat ownership
 
 `src/shared/shared-bridge-heartbeat.ts` 现在是 heartbeat ingress 与 owner，不再挂在 `src/core`。
+
+当前 shared 进一步收口为：
+
+- `shared-process-context.ts` 负责 shared env / path / context 解析
+- `shared-process-state.ts` 负责 pid/json state 读写
+- `shared-process-control.ts` 负责 readyz / spawn / stop / process control
+- `shared-process.ts` 退回 barrel
+- `shared-watchdog.ts`、`shared-status.ts`、`shared-supervisor.ts` 共享 `SharedBridgeHealth`、`SharedWatchdogState`、`ManagedStopResult` 等显式类型，而不是继续走高风险 `any`
+
+运行时恢复链当前默认还有一条真实 smoke 保护：
+
+- `tests/shared-mode-long-chain.test.ts` 会走 built `dist` 入口与 fake Codex app-server / fake Weixin HTTP server，覆盖 `shared:start -> shared:status -> shared:open`、approval continuity after restart，以及 `stream / settled` reply mode 的真实 adapter 链路
 
 ## 8. Integrations And Operational Layer
 

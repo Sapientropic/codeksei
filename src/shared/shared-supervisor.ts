@@ -9,6 +9,7 @@ import {
   resolveSharedProcessContext,
   writePidFile,
 } from "./shared-common";
+import type { SharedWatchdogState } from "./shared-types";
 
 const { readPrefixedEnv } = brandingModule as {
   readPrefixedEnv: (env: NodeJS.ProcessEnv, key: string) => string;
@@ -19,7 +20,7 @@ const DEFAULT_INTERVAL_MINUTES = 5;
 let shuttingDown = false;
 let lastLoggedSignature = "";
 
-function parseIntervalMinutes(argv: any) {
+function parseIntervalMinutes(argv: string[]): number {
   for (const rawArg of argv) {
     if (!rawArg.startsWith("--interval-minutes=")) {
       continue;
@@ -40,18 +41,18 @@ function parseIntervalMinutes(argv: any) {
   return DEFAULT_INTERVAL_MINUTES;
 }
 
-function formatErrorMessage(error: any) {
+function formatErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message || error.stack || String(error);
   }
   return String(error || "unknown error");
 }
 
-function sleep(ms: any) {
-  return new Promise((resolve: any) => setTimeout(resolve, ms));
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function buildStateSignature(state: any) {
+function buildStateSignature(state: SharedWatchdogState) {
   const actions = Array.isArray(state?.actions) ? state.actions.join("|") : "";
   const error = typeof state?.error === "string" ? state.error.trim() : "";
   const readyz = state?.after?.appServer?.ready ? "ok" : "down";
@@ -59,12 +60,12 @@ function buildStateSignature(state: any) {
   return [state?.result || "unknown", readyz, heartbeat, actions, error].join("|");
 }
 
-function logLine(message: any) {
+function logLine(message: unknown) {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] ${message}`);
 }
 
-function isRecord(value: unknown): value is Record<string, any> {
+function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object";
 }
 
@@ -84,7 +85,7 @@ function ensureSingleInstance() {
 
 function installSignalHandlers() {
   const sharedContext = resolveSharedProcessContext();
-  const shutdown = (signal: any) => {
+  const shutdown = (signal: NodeJS.Signals) => {
     if (shuttingDown) {
       return;
     }
@@ -92,7 +93,8 @@ function installSignalHandlers() {
     logLine(`signal=${signal} shutting_down=true`);
   };
 
-  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"]) {
+  const handledSignals: NodeJS.Signals[] = ["SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"];
+  for (const signal of handledSignals) {
     process.on(signal, () => shutdown(signal));
   }
 
@@ -153,7 +155,7 @@ async function main() {
 }
 
 if (require.main === module) {
-  main().catch((error: any) => {
+  main().catch((error: unknown) => {
     logLine(`fatal=${formatErrorMessage(error)}`);
     process.exit(1);
   });

@@ -17,6 +17,16 @@ export {
 export type {
   SharedProcessContext,
 } from "./shared-process";
+export type {
+  ManagedStopResult,
+  SharedBridgeHealth,
+  SharedBridgeHeartbeatClassification,
+  SharedBridgeHeartbeatRecord,
+  SharedStatusSnapshot,
+  SharedWatchdogAlert,
+  SharedWatchdogNotification,
+  SharedWatchdogState,
+} from "./shared-types";
 export {
   ensureBridgeNotRunning,
   ensureManagedAppServer,

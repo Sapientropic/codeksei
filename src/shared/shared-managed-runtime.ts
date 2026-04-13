@@ -16,6 +16,7 @@ import {
   waitForReadyz,
   writePidFile,
 } from "./shared-process";
+import type { SharedBridgeHealth } from "./shared-types";
 
 const { readPrefixedEnv } = brandingModule as {
   readPrefixedEnv: (env: NodeJS.ProcessEnv, key: string) => string;
@@ -25,26 +26,14 @@ const {
   readSharedBridgeHeartbeat,
 } = sharedBridgeHeartbeatModule as {
   classifySharedBridgeHeartbeat: (
-    record: unknown,
+    record: ReturnType<typeof import("./shared-bridge-heartbeat").readSharedBridgeHeartbeat>,
     options?: { expectedPid?: number; maxAgeMs?: number },
   ) => { status: string; healthy: boolean; updatedAt: string };
-  readSharedBridgeHeartbeat: (filePath: string) => Record<string, unknown> | null;
+  readSharedBridgeHeartbeat: typeof import("./shared-bridge-heartbeat").readSharedBridgeHeartbeat;
 };
 const { resolveBundledCodexBinary } = codexSpawnModule as {
   resolveBundledCodexBinary: (command?: string) => string;
 };
-
-interface SharedBridgeHealth {
-  pid: number;
-  alive: boolean;
-  heartbeat: Record<string, unknown> | null;
-  classification: {
-    status: string;
-    healthy: boolean;
-    updatedAt: string;
-  };
-  healthy: boolean;
-}
 
 function readSharedBridgeHealth(context: SharedProcessContext = resolveSharedProcessContext()): SharedBridgeHealth {
   const pid = readPidFile(context.bridgePidFile);

@@ -1,4 +1,8 @@
 import * as jsonStateModule from "../state/json-state";
+import type {
+  SharedBridgeHeartbeatClassification,
+  SharedBridgeHeartbeatRecord,
+} from "./shared-types";
 
 const {
   isPlainObject,
@@ -17,7 +21,7 @@ const {
 
 const DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS = 120_000;
 
-function readSharedBridgeHeartbeat(filePath: any) {
+function readSharedBridgeHeartbeat(filePath: string): SharedBridgeHeartbeatRecord | null {
   const parsed = readManagedJsonStateFile({
     filePath,
     fallback: null,
@@ -27,7 +31,10 @@ function readSharedBridgeHeartbeat(filePath: any) {
   return normalizeHeartbeat(parsed);
 }
 
-function writeSharedBridgeHeartbeat(filePath: any, patch: any) {
+function writeSharedBridgeHeartbeat(
+  filePath: string,
+  patch: Partial<SharedBridgeHeartbeatRecord>,
+): SharedBridgeHeartbeatRecord | null {
   const current = readSharedBridgeHeartbeat(filePath) || {};
   const next = normalizeHeartbeat({
     ...current,
@@ -38,7 +45,13 @@ function writeSharedBridgeHeartbeat(filePath: any, patch: any) {
   return next;
 }
 
-function classifySharedBridgeHeartbeat(record: any, { expectedPid = 0, maxAgeMs = DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS }: any = {}) {
+function classifySharedBridgeHeartbeat(
+  record: SharedBridgeHeartbeatRecord | null,
+  { expectedPid = 0, maxAgeMs = DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS }: {
+    expectedPid?: number;
+    maxAgeMs?: number;
+  } = {},
+): SharedBridgeHeartbeatClassification {
   if (!record) {
     return {
       status: "missing",
@@ -101,34 +114,35 @@ function classifySharedBridgeHeartbeat(record: any, { expectedPid = 0, maxAgeMs 
   };
 }
 
-function normalizeHeartbeat(value: any) {
+function normalizeHeartbeat(value: unknown): SharedBridgeHeartbeatRecord | null {
   if (!value || typeof value !== "object") {
     return null;
   }
+  const record = value as Record<string, unknown>;
 
   return {
-    pid: normalizePid(value.pid),
-    status: normalizeText(value.status),
-    accountId: normalizeText(value.accountId),
-    workspaceRoot: normalizeText(value.workspaceRoot),
-    codexEndpoint: normalizeText(value.codexEndpoint),
-    startedAt: normalizeIso(value.startedAt),
-    updatedAt: normalizeIso(value.updatedAt),
-    stoppedAt: normalizeIso(value.stoppedAt),
-    lastPollStartedAt: normalizeIso(value.lastPollStartedAt),
-    lastPollSucceededAt: normalizeIso(value.lastPollSucceededAt),
-    lastPollFailedAt: normalizeIso(value.lastPollFailedAt),
-    consecutiveFailures: normalizeCount(value.consecutiveFailures),
-    lastError: normalizeText(value.lastError),
+    pid: normalizePid(record.pid),
+    status: normalizeText(record.status),
+    accountId: normalizeText(record.accountId),
+    workspaceRoot: normalizeText(record.workspaceRoot),
+    codexEndpoint: normalizeText(record.codexEndpoint),
+    startedAt: normalizeIso(record.startedAt),
+    updatedAt: normalizeIso(record.updatedAt),
+    stoppedAt: normalizeIso(record.stoppedAt),
+    lastPollStartedAt: normalizeIso(record.lastPollStartedAt),
+    lastPollSucceededAt: normalizeIso(record.lastPollSucceededAt),
+    lastPollFailedAt: normalizeIso(record.lastPollFailedAt),
+    consecutiveFailures: normalizeCount(record.consecutiveFailures),
+    lastError: normalizeText(record.lastError),
   };
 }
 
-function normalizePid(value: any) {
+function normalizePid(value: unknown): number {
   const numeric = Number.parseInt(String(value || ""), 10);
   return Number.isInteger(numeric) && numeric > 0 ? numeric : 0;
 }
 
-function normalizeIso(value: any) {
+function normalizeIso(value: unknown): string {
   const normalized = normalizeText(value);
   if (!normalized) {
     return "";
@@ -137,56 +151,57 @@ function normalizeIso(value: any) {
   return Number.isFinite(parsed) ? new Date(parsed).toISOString() : "";
 }
 
-function normalizeCount(value: any) {
+function normalizeCount(value: unknown): number {
   const numeric = Number.parseInt(String(value || ""), 10);
   return Number.isInteger(numeric) && numeric >= 0 ? numeric : 0;
 }
 
-function normalizeText(value: any) {
+function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function validateHeartbeatRecord(value: any) {
+function validateHeartbeatRecord(value: unknown): true | string {
   if (!isPlainObject(value)) {
     return "shared bridge heartbeat must be an object";
   }
-  if ("pid" in value && typeof value.pid !== "number" && typeof value.pid !== "string") {
+  const record = value as Record<string, unknown>;
+  if ("pid" in record && typeof record.pid !== "number" && typeof record.pid !== "string") {
     return "shared bridge heartbeat pid must be numeric";
   }
-  if ("status" in value && typeof value.status !== "string") {
+  if ("status" in record && typeof record.status !== "string") {
     return "shared bridge heartbeat status must be a string";
   }
-  if ("accountId" in value && typeof value.accountId !== "string") {
+  if ("accountId" in record && typeof record.accountId !== "string") {
     return "shared bridge heartbeat accountId must be a string";
   }
-  if ("workspaceRoot" in value && typeof value.workspaceRoot !== "string") {
+  if ("workspaceRoot" in record && typeof record.workspaceRoot !== "string") {
     return "shared bridge heartbeat workspaceRoot must be a string";
   }
-  if ("codexEndpoint" in value && typeof value.codexEndpoint !== "string") {
+  if ("codexEndpoint" in record && typeof record.codexEndpoint !== "string") {
     return "shared bridge heartbeat codexEndpoint must be a string";
   }
-  if ("startedAt" in value && typeof value.startedAt !== "string") {
+  if ("startedAt" in record && typeof record.startedAt !== "string") {
     return "shared bridge heartbeat startedAt must be a string";
   }
-  if ("updatedAt" in value && typeof value.updatedAt !== "string") {
+  if ("updatedAt" in record && typeof record.updatedAt !== "string") {
     return "shared bridge heartbeat updatedAt must be a string";
   }
-  if ("stoppedAt" in value && typeof value.stoppedAt !== "string") {
+  if ("stoppedAt" in record && typeof record.stoppedAt !== "string") {
     return "shared bridge heartbeat stoppedAt must be a string";
   }
-  if ("lastPollStartedAt" in value && typeof value.lastPollStartedAt !== "string") {
+  if ("lastPollStartedAt" in record && typeof record.lastPollStartedAt !== "string") {
     return "shared bridge heartbeat lastPollStartedAt must be a string";
   }
-  if ("lastPollSucceededAt" in value && typeof value.lastPollSucceededAt !== "string") {
+  if ("lastPollSucceededAt" in record && typeof record.lastPollSucceededAt !== "string") {
     return "shared bridge heartbeat lastPollSucceededAt must be a string";
   }
-  if ("lastPollFailedAt" in value && typeof value.lastPollFailedAt !== "string") {
+  if ("lastPollFailedAt" in record && typeof record.lastPollFailedAt !== "string") {
     return "shared bridge heartbeat lastPollFailedAt must be a string";
   }
-  if ("consecutiveFailures" in value && typeof value.consecutiveFailures !== "number" && typeof value.consecutiveFailures !== "string") {
+  if ("consecutiveFailures" in record && typeof record.consecutiveFailures !== "number" && typeof record.consecutiveFailures !== "string") {
     return "shared bridge heartbeat consecutiveFailures must be numeric";
   }
-  if ("lastError" in value && typeof value.lastError !== "string") {
+  if ("lastError" in record && typeof record.lastError !== "string") {
     return "shared bridge heartbeat lastError must be a string";
   }
   return true;
