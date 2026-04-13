@@ -93,7 +93,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
   {
     action: "app.login",
     groupId: "lifecycle",
-    summary: "发起微信扫码登录并保存账号",
+    summary: "发起 Codeksei 自带微信桥的扫码登录并保存账号（bridge-only）",
     terminal: ["login"],
     weixin: [],
     status: "active",
@@ -105,7 +105,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
   {
     action: "app.accounts",
     groupId: "lifecycle",
-    summary: "查看本地已保存账号",
+    summary: "查看 Codeksei 自带微信桥的本地已保存账号（bridge-only）",
     terminal: ["accounts"],
     weixin: [],
     status: "active",
@@ -117,7 +117,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
   {
     action: "app.start",
     groupId: "lifecycle",
-    summary: "启动当前 channel/runtime 主循环",
+    summary: "启动当前 Codeksei bridge 主循环（bridge-only）",
     terminal: ["start"],
     weixin: [],
     status: "active",
@@ -129,7 +129,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
   {
     action: "app.shared_start",
     groupId: "lifecycle",
-    summary: "启动共享 app-server 与共享微信桥接",
+    summary: "启动共享 app-server 与共享微信桥接（bridge-only）",
     terminal: ["shared:start"],
     weixin: [],
     status: "active",
@@ -139,7 +139,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
   {
     action: "app.shared_open",
     groupId: "lifecycle",
-    summary: "接入当前微信绑定的共享线程",
+    summary: "接入当前微信绑定的共享线程（bridge-only）",
     terminal: ["shared:open"],
     weixin: [],
     status: "active",
@@ -149,7 +149,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
   {
     action: "app.shared_status",
     groupId: "lifecycle",
-    summary: "查看共享 app-server 与共享桥接状态",
+    summary: "查看共享桥接状态；Hermes hosted mode 下仅显示宿主管理提示",
     terminal: ["shared:status"],
     weixin: [],
     status: "active",
@@ -159,7 +159,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
   {
     action: "app.shared_watchdog",
     groupId: "lifecycle",
-    summary: "主动巡检并自恢复共享链路",
+    summary: "主动巡检并自恢复共享链路（bridge-only）",
     terminal: ["shared:watchdog"],
     weixin: [],
     status: "active",

@@ -74,7 +74,7 @@ test("SessionStore round-trips pending approvals with deep normalized state", as
     threadIdByWorkspaceRoot: {
       "E:/repo/current": "thread-current",
     },
-    codexParamsByWorkspaceRoot: {},
+    runtimeParamsByWorkspaceRoot: {},
     workspaceBootstrapThreadIdByWorkspaceRoot: {
       "E:/repo/current": "",
     },

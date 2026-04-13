@@ -10,6 +10,7 @@ export interface RawSessionBinding extends PlainObject {
   activeWorkspaceRoot?: unknown;
   updatedAt?: unknown;
   threadIdByWorkspaceRoot?: unknown;
+  runtimeParamsByWorkspaceRoot?: unknown;
   codexParamsByWorkspaceRoot?: unknown;
   workspaceBootstrapThreadIdByWorkspaceRoot?: unknown;
 }
@@ -51,7 +52,7 @@ export interface SessionBinding {
   activeWorkspaceRoot: string;
   updatedAt: string;
   threadIdByWorkspaceRoot: Record<string, string>;
-  codexParamsByWorkspaceRoot: Record<string, { model: string; effort: string }>;
+  runtimeParamsByWorkspaceRoot: Record<string, { model: string; effort: string }>;
   workspaceBootstrapThreadIdByWorkspaceRoot: Record<string, string>;
   [key: string]: unknown;
 }
@@ -169,7 +170,9 @@ export function normalizeSessionBinding(binding: unknown): SessionBinding {
     activeWorkspaceRoot: normalizeText(source.activeWorkspaceRoot),
     updatedAt: normalizeIsoTimestamp(source.updatedAt),
     threadIdByWorkspaceRoot: normalizeStringMap(source.threadIdByWorkspaceRoot),
-    codexParamsByWorkspaceRoot: normalizeCodexParamsMap(source.codexParamsByWorkspaceRoot),
+    runtimeParamsByWorkspaceRoot: normalizeRuntimeParamsMap(
+      source.runtimeParamsByWorkspaceRoot ?? source.codexParamsByWorkspaceRoot,
+    ),
     workspaceBootstrapThreadIdByWorkspaceRoot: normalizeStringMap(
       source.workspaceBootstrapThreadIdByWorkspaceRoot,
     ),
@@ -188,7 +191,7 @@ function normalizeBindings(value: unknown): Record<string, SessionBinding> {
   return bindings;
 }
 
-function normalizeCodexParamsMap(value: unknown): Record<string, { model: string; effort: string }> {
+function normalizeRuntimeParamsMap(value: unknown): Record<string, { model: string; effort: string }> {
   const result: Record<string, { model: string; effort: string }> = {};
   for (const [workspaceRoot, params] of objectEntries(value)) {
     const normalizedWorkspaceRoot = normalizeText(workspaceRoot);
@@ -304,19 +307,25 @@ function validateBinding(binding: unknown, bindingKey: string): string {
       }
     }
   }
-  if ("codexParamsByWorkspaceRoot" in source) {
-    if (!isPlainObject(source.codexParamsByWorkspaceRoot)) {
-      return `session store binding ${bindingKey}.codexParamsByWorkspaceRoot must be an object`;
+  const runtimeParamsSource = "runtimeParamsByWorkspaceRoot" in source
+    ? source.runtimeParamsByWorkspaceRoot
+    : source.codexParamsByWorkspaceRoot;
+  const runtimeParamsLabel = "runtimeParamsByWorkspaceRoot" in source
+    ? "runtimeParamsByWorkspaceRoot"
+    : "codexParamsByWorkspaceRoot";
+  if (runtimeParamsSource !== undefined) {
+    if (!isPlainObject(runtimeParamsSource)) {
+      return `session store binding ${bindingKey}.${runtimeParamsLabel} must be an object`;
     }
-    for (const [workspaceRoot, params] of objectEntries(source.codexParamsByWorkspaceRoot)) {
+    for (const [workspaceRoot, params] of objectEntries(runtimeParamsSource)) {
       if (typeof workspaceRoot !== "string" || !isPlainObject(params)) {
-        return `session store binding ${bindingKey}.codexParamsByWorkspaceRoot entries must be object values`;
+        return `session store binding ${bindingKey}.${runtimeParamsLabel} entries must be object values`;
       }
       if ("model" in params && typeof params.model !== "string") {
-        return `session store binding ${bindingKey}.codexParamsByWorkspaceRoot.${workspaceRoot}.model must be a string`;
+        return `session store binding ${bindingKey}.${runtimeParamsLabel}.${workspaceRoot}.model must be a string`;
       }
       if ("effort" in params && typeof params.effort !== "string") {
-        return `session store binding ${bindingKey}.codexParamsByWorkspaceRoot.${workspaceRoot}.effort must be a string`;
+        return `session store binding ${bindingKey}.${runtimeParamsLabel}.${workspaceRoot}.effort must be a string`;
       }
     }
   }
@@ -434,4 +443,3 @@ function asRawAvailableModelCatalog(value: unknown): RawAvailableModelCatalog {
 function asRawSessionState(value: unknown): RawSessionState {
   return isPlainObject(value) ? value as RawSessionState : {};
 }
-

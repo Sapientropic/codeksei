@@ -9,6 +9,11 @@ LOG_DIR="${STATE_DIR}/logs"
 PID_FILE="${LOG_DIR}/shared-wechat.pid"
 READYZ_URL="http://127.0.0.1:${PORT}/readyz"
 
+if [[ "${CODEKSEI_RUNTIME:-codex}" == "hermes" || "${CODEKSEI_CHANNEL_PROVIDER:-}" == "hermes" ]]; then
+  echo "Hermes Hosted Mode 下不要启动 Codeksei 自己的 shared Weixin bridge；请改用 Hermes gateway。" >&2
+  exit 1
+fi
+
 function resolve_pid_cwd() {
   local pid="$1"
   lsof -a -p "${pid}" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1

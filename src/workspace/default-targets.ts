@@ -357,7 +357,7 @@ function collectWorkspaceRoots(binding: SessionBindingLike | null | undefined): 
       workspaceRoots.add(normalizedWorkspaceRoot);
     }
   }
-  for (const workspaceRoot of Object.keys(binding?.codexParamsByWorkspaceRoot || {})) {
+  for (const workspaceRoot of Object.keys(binding?.runtimeParamsByWorkspaceRoot || {})) {
     const normalizedWorkspaceRoot = normalizeText(workspaceRoot);
     if (normalizedWorkspaceRoot) {
       workspaceRoots.add(normalizedWorkspaceRoot);
@@ -365,4 +365,3 @@ function collectWorkspaceRoots(binding: SessionBindingLike | null | undefined): 
   }
   return Array.from(workspaceRoots).sort((left, right) => left.localeCompare(right));
 }
-

@@ -42,6 +42,7 @@ export function buildTerminalHelpText({ audience = "public" }: { audience?: CliA
       filter: (action) => action.entrypointType === "script",
     });
     lines.push("  这些入口需要在 clone 下来的仓库工作树里运行。");
+    lines.push("  Hermes hosted mode 下，shared:* 入口只用于提示宿主管理边界，不会替你启动 Codeksei 自己的桥。");
   }
 
   lines.push("");

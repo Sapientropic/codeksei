@@ -26,8 +26,8 @@ import { createRuntimeLifecycle } from "./lifecycle";
 interface CodexRuntimeConfig extends Record<string, unknown> {
   sessionsFile: string;
   stateDir: string;
-  codexEndpoint?: string;
-  codexCommand?: string;
+  runtimeEndpoint?: string;
+  runtimeCommand?: string;
   weixinInstructionsFile?: string;
   weixinOperationsFile?: string;
   weixinInstructionsOverlayFile?: string;
@@ -88,7 +88,7 @@ interface CodexRuntimeAdapter {
   respondApproval(args: RespondApprovalArgs): Promise<{ requestId: string | number; decision: "accept" | "decline" }>;
   cancelTurn(args: CancelTurnArgs): Promise<CancelTurnArgs>;
   resumeThread(args: ResumeThreadArgs): Promise<unknown>;
-  probeAppServerCapabilities(command: string): ReturnType<typeof probeCodexAppServerCapabilities>;
+  probeRuntimeCapabilities(command: string): ReturnType<typeof probeCodexAppServerCapabilities>;
   refreshThreadInstructions(args: RefreshThreadInstructionsArgs): Promise<WaitForTurnCompletionResult & { threadId: string }>;
   sendTextTurn(args: SendTextTurnArgs): Promise<RuntimeTurnSendState>;
 }
@@ -149,8 +149,8 @@ export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRunt
     async resumeThread({ threadId }) {
       return runtimeLifecycle.withRuntimeReconnect((runtimeClient) => runtimeClient.resumeThread({ threadId }));
     },
-    probeAppServerCapabilities(command: string) {
-      return probeCodexAppServerCapabilities(command || config.codexCommand || "codex");
+    probeRuntimeCapabilities(command: string) {
+      return probeCodexAppServerCapabilities(command || config.runtimeCommand || "codex");
     },
     async refreshThreadInstructions({
       bindingKey = "",

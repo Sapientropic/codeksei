@@ -5,12 +5,12 @@ import {
 } from "../../../contracts/session-state";
 import {
   createEmptySessionBinding,
-  getCodexParamsMap,
+  getRuntimeParamsMap,
   getThreadMap,
   getWorkspaceBootstrapThreadMap,
   normalizeValue,
   type BindingRef,
-  type CodexWorkspaceParams,
+  type RuntimeWorkspaceParams,
   type SessionBindingUpdate,
 } from "./session-store-bindings";
 
@@ -112,25 +112,25 @@ export function setThreadIdForWorkspaceInState(
   return normalizeSessionBinding(state.bindings[normalizedBindingKey]);
 }
 
-export function getCodexParamsForWorkspaceFromState(
+export function getRuntimeParamsForWorkspaceFromState(
   state: SessionState,
   bindingKey: unknown,
   workspaceRoot: unknown,
-): CodexWorkspaceParams {
+): RuntimeWorkspaceParams {
   const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
   if (!normalizedWorkspaceRoot) {
     return { model: "", effort: "" };
   }
   const current = getBindingFromState(state, bindingKey) || createEmptySessionBinding();
-  const codexParamsByWorkspaceRoot = getCodexParamsMap(current);
-  const entry = codexParamsByWorkspaceRoot[normalizedWorkspaceRoot];
+  const runtimeParamsByWorkspaceRoot = getRuntimeParamsMap(current);
+  const entry = runtimeParamsByWorkspaceRoot[normalizedWorkspaceRoot];
   return {
     model: typeof entry?.model === "string" ? entry.model : "",
     effort: typeof entry?.effort === "string" ? entry.effort : "",
   };
 }
 
-export function setCodexParamsForWorkspaceInState(
+export function setRuntimeParamsForWorkspaceInState(
   state: SessionState,
   bindingKey: unknown,
   workspaceRoot: unknown,
@@ -145,8 +145,8 @@ export function setCodexParamsForWorkspaceInState(
     return null;
   }
   const current = state.bindings[normalizedBindingKey] || createEmptySessionBinding();
-  const codexParamsByWorkspaceRoot = {
-    ...getCodexParamsMap(current),
+  const runtimeParamsByWorkspaceRoot = {
+    ...getRuntimeParamsMap(current),
     [normalizedWorkspaceRoot]: {
       model: normalizeValue(model),
       effort: normalizeValue(effort),
@@ -154,7 +154,7 @@ export function setCodexParamsForWorkspaceInState(
   };
   const normalizedBinding = normalizeSessionBinding({
     ...current,
-    codexParamsByWorkspaceRoot,
+    runtimeParamsByWorkspaceRoot,
     updatedAt: new Date().toISOString(),
   });
   state.bindings = {
@@ -162,6 +162,23 @@ export function setCodexParamsForWorkspaceInState(
     [normalizedBindingKey]: normalizedBinding,
   };
   return normalizeSessionBinding(state.bindings[normalizedBindingKey]);
+}
+
+export function getCodexParamsForWorkspaceFromState(
+  state: SessionState,
+  bindingKey: unknown,
+  workspaceRoot: unknown,
+): RuntimeWorkspaceParams {
+  return getRuntimeParamsForWorkspaceFromState(state, bindingKey, workspaceRoot);
+}
+
+export function setCodexParamsForWorkspaceInState(
+  state: SessionState,
+  bindingKey: unknown,
+  workspaceRoot: unknown,
+  params: { model?: unknown; effort?: unknown },
+): SessionBinding | null {
+  return setRuntimeParamsForWorkspaceInState(state, bindingKey, workspaceRoot, params);
 }
 
 export function clearThreadIdForWorkspaceInState(
@@ -309,6 +326,6 @@ export function buildBindingKey({
 
 export type {
   BindingRef,
-  CodexWorkspaceParams,
+  RuntimeWorkspaceParams,
   SessionBindingUpdate,
 };

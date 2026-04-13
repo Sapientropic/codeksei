@@ -151,7 +151,7 @@ function createTestAppHarness({
     getBinding(candidateBindingKey) {
       return this.state?.bindings?.[candidateBindingKey] || null;
     },
-    getCodexParamsForWorkspace() {
+    getRuntimeParamsForWorkspace() {
       return { model: "" };
     },
     getPendingApprovalForThread() {
@@ -182,7 +182,7 @@ function createTestAppHarness({
     async setActiveWorkspaceRoot() {
       return null;
     },
-    async setCodexParamsForWorkspace() {
+    async setRuntimeParamsForWorkspace() {
       return null;
     },
     async setThreadIdForWorkspace() {
@@ -370,7 +370,7 @@ function createTestAppHarness({
     });
 
     const runtimeTurnLifecycle: RuntimeTurnLifecycleLike = new RuntimeTurnLifecycle({
-      buildCodexInboundText: (normalized: { text?: string }) => normalizeText(normalized.text),
+      buildRuntimeInboundText: (normalized: { text?: string }) => normalizeText(normalized.text),
       channelAdapter,
       config,
       formatErrorMessage,
@@ -466,4 +466,3 @@ function resolveTimelineScreenshotOutput(tempRoot: string, args: string[]): stri
 module.exports = {
   createTestAppHarness,
 };
-

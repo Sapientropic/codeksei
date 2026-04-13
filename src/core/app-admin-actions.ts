@@ -2,6 +2,7 @@ import { writeSharedBridgeHeartbeat } from "../shared/shared-bridge-heartbeat";
 import { formatCheckinRange, resolveCheckinConfig } from "../state/checkin-config";
 import { normalizeTrimmedText } from "./approval-command-policy";
 import { formatErrorMessage } from "./app-poll-loop";
+import { collectHermesHostedDoctorReport, resolveHostMode } from "./host-mode";
 import type {
   AppRuntimeConfig,
   ChannelAdapterLike,
@@ -15,7 +16,7 @@ import { writeJson } from "./terminal-output";
 interface PrintDoctorArgs {
   config: AppRuntimeConfig;
   channelAdapter: Pick<ChannelAdapterLike, "describe">;
-  runtimeAdapter: Pick<RuntimeAdapterLike, "describe" | "probeAppServerCapabilities">;
+  runtimeAdapter: Pick<RuntimeAdapterLike, "describe" | "probeRuntimeCapabilities">;
   threadStateStore: Pick<ThreadStateStoreLike, "snapshot">;
   timelineIntegration: Pick<TimelineIntegrationLike, "describe">;
 }
@@ -47,12 +48,24 @@ export function collectDoctorReport({
   const checkin = checkinConfigFile
     ? resolveCheckinConfig({ filePath: checkinConfigFile })
     : null;
+  const hostMode = resolveHostMode(config);
   return {
     stateDir: config.stateDir,
+    mode: hostMode.mode,
+    runtimeProvider: hostMode.runtime,
+    channelProvider: hostMode.channelProvider,
+    compatibility: {
+      supported: hostMode.supported,
+      reason: hostMode.reason,
+      channel: hostMode.channel,
+    },
+    hostedHermes: hostMode.mode === "hosted"
+      ? collectHermesHostedDoctorReport(config)
+      : null,
     channel: channelAdapter.describe(),
     runtime: runtimeAdapter.describe(),
-    codexCapabilities: typeof runtimeAdapter.probeAppServerCapabilities === "function"
-      ? runtimeAdapter.probeAppServerCapabilities(config.codexCommand || "codex")
+    runtimeCapabilities: typeof runtimeAdapter.probeRuntimeCapabilities === "function"
+      ? runtimeAdapter.probeRuntimeCapabilities(config.runtimeCommand || "codex")
       : null,
     timeline: timelineIntegration.describe(),
     checkin: checkin

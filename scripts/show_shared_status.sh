@@ -9,6 +9,15 @@ APP_SERVER_PID_FILE="${LOG_DIR}/shared-app-server.pid"
 WECHAT_PID_FILE="${LOG_DIR}/shared-wechat.pid"
 WECHAT_LOG_FILE="${LOG_DIR}/shared-wechat.log"
 
+if [[ "${CODEKSEI_RUNTIME:-codex}" == "hermes" || "${CODEKSEI_CHANNEL_PROVIDER:-}" == "hermes" ]]; then
+  echo "mode=hosted"
+  echo "runtime=hermes"
+  echo "channel_provider=hermes"
+  echo "channel=weixin"
+  echo "shared_bridge=managed_by_host"
+  exit 0
+fi
+
 function print_pid_state() {
   local label="$1"
   local pid_file="$2"

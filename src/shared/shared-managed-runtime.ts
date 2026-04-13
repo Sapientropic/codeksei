@@ -65,6 +65,7 @@ function startSharedBridge(): number {
     logFile: context.bridgeLogFile,
     cwd: context.rootDir,
     env: {
+      CODEKSEI_RUNTIME_ENDPOINT: context.listenUrl,
       CODEKSEI_CODEX_ENDPOINT: context.listenUrl,
     },
   });

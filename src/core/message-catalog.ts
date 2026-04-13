@@ -24,14 +24,14 @@ export const userFacingMessages = Object.freeze({
   timelineScreenshotFailed: (reason: unknown) => `时间轴截图失败：${normalizeText(reason) || "unknown error"}`,
   executionFailed: (reason: unknown) => normalizeText(reason) || "执行失败",
   runtimeFirstEventNotice: (workspaceRoot: unknown, threadId: unknown) => joinNonEmptyLines([
-    "这条消息已经发到 bridge，但 Codex runtime 还没有返回首个事件。",
+    "这条消息已经发到 bridge，但当前 runtime 还没有返回首个事件。",
     "如果你看到 terminal 正在 reconnecting，这一轮大概率还卡在共享线程启动阶段。",
     "先不用一直空等；如果稍后连上，消息会继续往下跑。",
     `workspace: ${normalizeText(workspaceRoot) || "(unknown)"}`,
     `thread: ${normalizeText(threadId) || "(unknown)"}`,
   ]),
   runtimeFirstEventFailure: (workspaceRoot: unknown, threadId: unknown) => joinNonEmptyLines([
-    "这条消息已经发到 bridge，但 Codex runtime 直到现在都没有返回首个事件。",
+    "这条消息已经发到 bridge，但当前 runtime 直到现在都没有返回首个事件。",
     "如果 terminal 里的那轮 reconnecting 已经跑完 5 次，这条共享线程基本可以判定没有真正启动成功。",
     `workspace: ${normalizeText(workspaceRoot) || "(unknown)"}`,
     `thread: ${normalizeText(threadId) || "(unknown)"}`,

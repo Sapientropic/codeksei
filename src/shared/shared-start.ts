@@ -1,5 +1,6 @@
 import { readPrefixedEnv } from "../contracts/app-env";
 import { formatErrorMessage } from "../core/error-handling";
+import { assertBridgeMode } from "../core/host-mode";
 import { operatorMessages } from "../core/message-catalog";
 import { writeStderrLine, writeStdoutLine } from "../core/terminal-output";
 import {
@@ -28,6 +29,7 @@ function parseIntervalMinutes() {
 }
 
 async function main() {
+  assertBridgeMode(process.env, "npm run shared:start");
   const sharedContext = resolveSharedProcessContext();
   const appServer = await ensureManagedAppServer({ restartUnhealthy: true });
   writeStdoutLine(operatorMessages.sharedStartAppServer(appServer.status, appServer.pid, sharedContext.listenUrl));

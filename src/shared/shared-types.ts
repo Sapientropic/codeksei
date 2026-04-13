@@ -25,7 +25,7 @@ export interface SharedBridgeHeartbeatRecord {
   status: string;
   accountId: string;
   workspaceRoot: string;
-  codexEndpoint: string;
+  runtimeEndpoint: string;
   startedAt: string;
   updatedAt: string;
   stoppedAt: string;

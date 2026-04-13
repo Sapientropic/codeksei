@@ -7,6 +7,7 @@ import { loadPersistedContextTokens } from "../adapters/channel/weixin/context-t
 import { SessionStore } from "../adapters/runtime/codex/session-store";
 import { readConfig } from "../core/config";
 import { loadEnvStack } from "../core/env-loader";
+import { assertBridgeMode } from "../core/host-mode";
 import { writeStderrLine, writeStdoutLine } from "../core/terminal-output";
 import { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } from "../workspace/default-targets";
 import {
@@ -102,6 +103,7 @@ async function runWatchdogOnce({ shouldPrintSummary = true }: { shouldPrintSumma
 }
 
 async function main() {
+  assertBridgeMode(process.env, "npm run shared:watchdog");
   const state = await runWatchdogOnce({ shouldPrintSummary: true });
   if (state.result === "failed") {
     process.exit(1);
@@ -284,4 +286,3 @@ export {
   main,
   runWatchdogOnce,
 };
-

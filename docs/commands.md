@@ -7,6 +7,20 @@
 `Codeksei` 先定义稳定动作，再分别映射到终端和微信，让不同入口共享同一套行为语义。
 这页只负责对外说明；真实 active command surface 以当前共享 help / manifest 为准，不再单独发明第二套命令语义。
 
+## Host Modes
+
+当前有两条官方路径：
+
+- `Bridge Mode`
+  `runtime=codex` + `channelProvider=codeksei` + `channel=weixin`
+- `Hermes Hosted Mode`
+  `runtime=hermes` + `channelProvider=hermes` + `channel=weixin`
+
+边界：
+
+- `Bridge Mode` 下，Codeksei 自己托管 bridge / shared 线程
+- `Hermes Hosted Mode` 下，宿主控制命令交给 Hermes；Codeksei 主要暴露 timeline / diary / reminder / review / note / project radar / doctor / schema
+
 ## 命名
 
 对外统一只用新名字。
@@ -38,17 +52,17 @@ operator / bootstrap：
 
 - `codeksei operator help`
 - `codeksei operator schema`
-- `codeksei login`
-- `codeksei accounts`
-- `codeksei start`
+- `codeksei login` `Bridge Mode only`
+- `codeksei accounts` `Bridge Mode only`
+- `codeksei start` `Bridge Mode only`
 - `codeksei system checkin-poller`
 
 仓库脚本 / shared 模式：
 
-- `npm run shared:start`
-- `npm run shared:open`
+- `npm run shared:start` `Bridge Mode only`
+- `npm run shared:open` `Bridge Mode only`
 - `npm run shared:status`
-- `npm run shared:watchdog`
+- `npm run shared:watchdog` `Bridge Mode only`
 - `npm run background:install`
 - `npm run background:uninstall`
 
@@ -67,10 +81,11 @@ operator / bootstrap：
 - 全局参数统一支持：`--format json|text`、`--verbose`、`--workspace-root /absolute/path`
 - 日常使用默认走共享模式，让微信入口和终端执行落在同一条线上
 - `codeksei start` / `npm run start:checkin` 更适合 operator 调试，不再视作默认 public discovery 面
+- 如果当前配置是 `Hermes Hosted Mode`，`codeksei start` 与 `shared:start` 会明确提示“改由 Hermes gateway 托管”，不会隐式回退到 Codex app-server
 
 ## 微信命令
 
-微信侧命令保持少而稳，重点是绑定、查看状态、切换线程和审批。
+下面这一组是 `Bridge Mode` 下 Codeksei 自带微信桥的命令。`Hermes Hosted Mode` 下，宿主控制命令应交给 Hermes 自己。
 
 - `/bind`
 - `/status`
@@ -193,7 +208,7 @@ Durable note 负责把值得长期记住的判断、偏好和项目脉络，放�
 
 说明：
 
-- 默认走 hybrid review：脚本保骨架，Codex 做结构化语义提炼
+- 默认走 hybrid review：脚本保骨架，runtime 语义生成器做结构化提炼
 - 不传 `--date/--week/--month` 时，当前日期按统一 timezone contract 推断
 - 失败或超时会回退 deterministic
 - nightly 是周/月复盘的前置压缩层
@@ -242,6 +257,7 @@ maintainer 仍需额外补一次真实账号 smoke：
   assisted smoke。脚本会等待 pending approval 落盘、自动重启 bridge，然后等待 `/yes` 之后 approval 清空和最终 delivered hash。
 - 这三条脚本都会在 `shared-wechat.log` / `shared-app-server.log` 里写 `[codeksei-smoke] stage=...` checkpoint，排查时优先从这些 marker 往后看。
 - `[⚠️ 需确认]` 这组真实 smoke 依赖可用的 WeChat 登录态、绑定 thread 和能触发 approval 的活跃 Codex runtime；环境不满足时脚本会直接报错，而不是静默跳过。
+- Hermes Hosted Mode 的真实验证不走这套 shared smoke；那条线要验证的是 Hermes gateway + Hermes Weixin + Codeksei companion skill。
 - 最近一次 recorded 结果入口统一看 [docs/maintainer/live-smoke.md](./maintainer/live-smoke.md)
 
 ## Maintainer Quality Gates

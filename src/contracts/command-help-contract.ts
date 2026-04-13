@@ -95,7 +95,7 @@ const TOPIC_HELP = {
     ],
     bodyLabel: "补充：",
     body: [
-      "  默认走 hybrid：脚本保骨架，Codex 负责结构化语义提炼；失败时自动回退 deterministic",
+      "  默认走 hybrid：脚本保骨架，runtime 语义生成器负责结构化提炼；失败时自动回退 deterministic",
       "  nightly 负责睡前收口；周/月复盘在有 nightly 时会优先吸收它",
       "  传 --deterministic 可强制只走脚本；传 --model <id> 可覆盖语义提炼使用的模型",
       "  周复盘默认按周一到周日；月复盘默认按自然月",
@@ -111,7 +111,8 @@ const LEAF_HELP = {
     usage: [buildTerminalActionExample("app.doctor", { audience: "public", includeArgs: true })],
     bodyLabel: "说明：",
     body: [
-      "  输出当前 public CLI 相关的运行时快照，包括状态目录、channel/runtime 描述、timeline 描述与 thread state 摘要。",
+      "  输出当前 public CLI 相关的运行时快照，包括 host mode、runtime/channel provider、timeline 描述与 thread state 摘要。",
+      "  Hermes hosted mode 下会额外检查 hermes 命令、仓内 skill 资产，以及本机 Hermes Weixin 配置痕迹。",
       "  非 TTY 下默认走 JSON envelope；TTY 下默认走文本。",
     ],
   }),
@@ -376,7 +377,7 @@ function buildReviewLeafHelpDocument(actionId: "review.nightly" | "review.weekly
       description: [
         "  从当前 diary 真相源生成一份 Codeksei 睡前收口。",
         `  默认按 ${resolvedTimezone} 的当前日期推断今天，并给周/月复盘提供更轻的日级原料。`,
-        "  默认走 hybrid：脚本保骨架，Codex 负责结构化语义提炼；失败时自动回退。",
+        "  默认走 hybrid：脚本保骨架，runtime 语义生成器负责结构化提炼；失败时自动回退。",
       ],
       examples: [
         "  codeksei review nightly",
@@ -388,7 +389,7 @@ function buildReviewLeafHelpDocument(actionId: "review.nightly" | "review.weekly
       description: [
         "  从当前 diary 真相源生成一份 Codeksei 生活助理周复盘。",
         `  默认按 ${resolvedTimezone} 的当前日期推断本周（周一到周日）。`,
-        "  默认走 hybrid：脚本保骨架，Codex 负责结构化语义提炼；失败时自动回退。",
+        "  默认走 hybrid：脚本保骨架，runtime 语义生成器负责结构化提炼；失败时自动回退。",
       ],
       examples: [
         "  codeksei review weekly",
@@ -401,7 +402,7 @@ function buildReviewLeafHelpDocument(actionId: "review.nightly" | "review.weekly
       description: [
         "  从当前 diary 真相源生成一份 Codeksei 生活助理月复盘。",
         `  默认按 ${resolvedTimezone} 的当前日期推断本月。`,
-        "  默认走 hybrid：脚本保骨架，Codex 负责结构化语义提炼；失败时自动回退。",
+        "  默认走 hybrid：脚本保骨架，runtime 语义生成器负责结构化提炼；失败时自动回退。",
       ],
       examples: [
         "  codeksei review monthly",
@@ -562,4 +563,3 @@ export {
   listTerminalHelpTopics,
   listTerminalLeafHelpKeys,
 };
-

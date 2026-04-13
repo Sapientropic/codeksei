@@ -1,5 +1,6 @@
 import { normalizeText } from "../contracts/text-normalization";
 import * as http from "node:http";
+import { resolveHostMode } from "../core/host-mode";
 import { writeStderrLine, writeStdoutLine } from "../core/terminal-output";
 import {
   isPidAlive,
@@ -15,6 +16,19 @@ import type {
 } from "./shared-types";
 
 async function main() {
+  const hostMode = resolveHostMode(process.env);
+  if (hostMode.mode !== "bridge") {
+    writeStdoutLine(`mode=${hostMode.mode}`);
+    writeStdoutLine(`runtime=${hostMode.runtime}`);
+    writeStdoutLine(`channel_provider=${hostMode.channelProvider}`);
+    writeStdoutLine(`channel=${hostMode.channel}`);
+    writeStdoutLine(`supported=${hostMode.supported ? "yes" : "no"}`);
+    writeStdoutLine(`shared_bridge=managed_by_host`);
+    if (hostMode.reason) {
+      writeStdoutLine(`reason=${hostMode.reason}`);
+    }
+    return;
+  }
   const snapshot = await collectSharedStatusSnapshot();
   writeStdoutLine(`listen=${snapshot.listenUrl}`);
   printPidState("shared_supervisor_pid", snapshot.supervisorPid);
@@ -92,4 +106,3 @@ export {
   checkReadyz,
   main,
 };
-

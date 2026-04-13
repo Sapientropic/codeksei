@@ -46,13 +46,15 @@ import { SystemMessageQueueStore } from "../state/system-message-queue-store";
 import { TimelineScreenshotQueueStore } from "../state/timeline-screenshot-queue-store";
 import { persistIncomingWeixinAttachments } from "../adapters/channel/weixin/media-receive";
 import {
-  buildCodexInboundText,
+  buildRuntimeInboundText,
   buildReminderSystemTrigger,
   getSystemMessageFailureRetryDelayMs,
   hasRpcId,
   resolveTimelineScreenshotOutput,
 } from "./app-runtime-helpers";
 import { formatErrorMessage } from "./app-poll-loop";
+import { createHostedChannelAdapter, createHostedRuntimeAdapter } from "./hosted-mode-adapters";
+import { resolveHostMode } from "./host-mode";
 
 const FIRST_RUNTIME_EVENT_NOTICE_TIMEOUT_MS = 8_000;
 const FIRST_RUNTIME_EVENT_FAILURE_TIMEOUT_MS = 45_000;
@@ -112,8 +114,13 @@ function createAppInfrastructure({
     : "";
   const reminderQueueFile = typeof config.reminderQueueFile === "string" ? config.reminderQueueFile : "";
 
-  const channelAdapter = createWeixinChannelAdapter(config);
-  const runtimeAdapter = createCodexRuntimeAdapter(config);
+  const hostMode = resolveHostMode(config);
+  const channelAdapter = hostMode.mode === "bridge"
+    ? createWeixinChannelAdapter(config)
+    : createHostedChannelAdapter(config);
+  const runtimeAdapter = hostMode.mode === "bridge"
+    ? createCodexRuntimeAdapter(config)
+    : createHostedRuntimeAdapter(config);
   const sessionWriter = runtimeAdapter.getSessionWriter();
   const timelineIntegration = createTimelineIntegration(config);
   const threadStateStore = new ThreadStateStore();
@@ -234,7 +241,7 @@ function createRuntimeWorkflowServices({
     }) => runtimeWatchdogLifecycle.scheduleRuntimeEventWatchdog(payload),
     streamDelivery,
     timelineIntegration,
-    buildCodexInboundText,
+    buildRuntimeInboundText,
   });
 
   const systemMessageDispatcherState: SystemMessageDispatcherRef = { current: null };

@@ -80,7 +80,7 @@ export async function runCodekseiAppLifecycle({
     status: "running",
     accountId: account.accountId,
     workspaceRoot: config.workspaceRoot,
-    codexEndpoint: runtimeState.endpoint,
+    runtimeEndpoint: runtimeState.endpoint,
     consecutiveFailures: 0,
     lastError: "",
   });
@@ -96,8 +96,8 @@ export async function runCodekseiAppLifecycle({
   logInfo(`[codeksei] syncBuffer=${syncBuffer ? "ready" : "empty"}`);
   logInfo(`[codeksei] weixinReplyMode=${String(config.weixinReplyMode || "")}`);
   logInfo(`[codeksei] weixinDeliveryTrace=${config.weixinDeliveryTrace ? "on" : "off"}`);
-  logInfo(`[codeksei] codexEndpoint=${runtimeState.endpoint}`);
-  logInfo(`[codeksei] codexModels=${runtimeState.models.length}`);
+  logInfo(`[codeksei] runtimeEndpoint=${runtimeState.endpoint}`);
+  logInfo(`[codeksei] runtimeModels=${runtimeState.models.length}`);
   logInfo("[codeksei] 最小消息链路已启动，正在等待微信消息。");
   if (config.startWithCheckin) {
     logInfo("[codeksei] checkin: enabled");

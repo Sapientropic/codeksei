@@ -9,6 +9,11 @@ LOG_DIR="${STATE_DIR}/logs"
 PID_FILE="${LOG_DIR}/shared-wechat.pid"
 READYZ_URL="http://127.0.0.1:${PORT}/readyz"
 
+if [[ "${CODEKSEI_RUNTIME:-codex}" == "hermes" || "${CODEKSEI_CHANNEL_PROVIDER:-}" == "hermes" ]]; then
+  echo "Hermes Hosted Mode 下共享线程由 Hermes 宿主管理；不要再执行 open_shared_wechat_thread.sh。" >&2
+  exit 1
+fi
+
 mkdir -p "${LOG_DIR}"
 
 function resolve_pid_cwd() {
@@ -71,5 +76,6 @@ echo "${EXISTING_PID}" > "${PID_FILE}"
 
 echo "shared codeksei running pid=${EXISTING_PID} endpoint=${REMOTE_URL}"
 
+export CODEKSEI_RUNTIME_ENDPOINT="${REMOTE_URL}"
 export CODEKSEI_CODEX_ENDPOINT="${REMOTE_URL}"
 exec "${ROOT_DIR}/scripts/open_wechat_thread.sh" "$@"

@@ -112,7 +112,7 @@ function normalizeHeartbeat(value: unknown): SharedBridgeHeartbeatRecord | null 
     status: normalizeText(record.status),
     accountId: normalizeText(record.accountId),
     workspaceRoot: normalizeText(record.workspaceRoot),
-    codexEndpoint: normalizeText(record.codexEndpoint),
+    runtimeEndpoint: normalizeText(record.runtimeEndpoint || record.codexEndpoint),
     startedAt: normalizeIso(record.startedAt),
     updatedAt: normalizeIso(record.updatedAt),
     stoppedAt: normalizeIso(record.stoppedAt),
@@ -160,6 +160,12 @@ function validateHeartbeatRecord(value: unknown): true | string {
   if ("workspaceRoot" in record && typeof record.workspaceRoot !== "string") {
     return "shared bridge heartbeat workspaceRoot must be a string";
   }
+  if (
+    "runtimeEndpoint" in record
+    && typeof record.runtimeEndpoint !== "string"
+  ) {
+    return "shared bridge heartbeat runtimeEndpoint must be a string";
+  }
   if ("codexEndpoint" in record && typeof record.codexEndpoint !== "string") {
     return "shared bridge heartbeat codexEndpoint must be a string";
   }
@@ -196,4 +202,3 @@ export {
   readSharedBridgeHeartbeat,
   writeSharedBridgeHeartbeat,
 };
-

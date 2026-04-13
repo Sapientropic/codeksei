@@ -29,11 +29,11 @@ type WorkspaceCommandMessage = Pick<
 >;
 
 type WorkspaceCommandChannelAdapter = Pick<ChannelAdapterLike, "sendText">;
-type WorkspaceCommandConfig = Pick<AppRuntimeConfig, "checkinConfigFile" | "codexAccessMode" | "workspaceRoot">;
+type WorkspaceCommandConfig = Pick<AppRuntimeConfig, "checkinConfigFile" | "runtimeAccessMode" | "workspaceRoot">;
 
 interface WorkspaceCommandSessionStore extends ChannelCommandSessionStore {
   findBindingForThreadId(threadId: string): ThreadBindingRef | null;
-  getCodexParamsForWorkspace(bindingKey: string, workspaceRoot: string): { model?: string; effort?: string };
+  getRuntimeParamsForWorkspace(bindingKey: string, workspaceRoot: string): { model?: string; effort?: string };
 }
 
 interface WorkspaceCommandRuntimeAdapter extends Pick<
@@ -158,9 +158,9 @@ function createWorkspaceCommandHandlers({
         `thread: ${threadId || "(none)"}`,
         `status: ${threadState?.status || "idle"}`,
       ];
-      const codexParams = sessionStore.getCodexParamsForWorkspace(bindingKey, workspaceRoot);
-      lines.push(`model: ${codexParams.model || "(default)"}`);
-      lines.push(`effort: ${codexParams.effort || "(default)"}`);
+      const runtimeParams = sessionStore.getRuntimeParamsForWorkspace(bindingKey, workspaceRoot);
+      lines.push(`model: ${runtimeParams.model || "(default)"}`);
+      lines.push(`effort: ${runtimeParams.effort || "(default)"}`);
       const checkinConfigFile = normalizeCommandArgument(config.checkinConfigFile);
       if (checkinConfigFile) {
         const checkinConfig = resolveCheckinConfig({ filePath: checkinConfigFile });
@@ -250,7 +250,7 @@ function createWorkspaceCommandHandlers({
           bindingKey,
           threadId,
           workspaceRoot,
-          accessMode: config.codexAccessMode,
+          accessMode: config.runtimeAccessMode,
         } as {
           bindingKey: string;
           threadId: string;
@@ -259,13 +259,13 @@ function createWorkspaceCommandHandlers({
           effort?: string;
           accessMode?: string;
         };
-        const codexParams = sessionStore.getCodexParamsForWorkspace(bindingKey, workspaceRoot);
-        const model = codexParams.model;
+        const runtimeParams = sessionStore.getRuntimeParamsForWorkspace(bindingKey, workspaceRoot);
+        const model = runtimeParams.model;
         if (model) {
           refreshArgs.model = model;
         }
-        if (codexParams.effort) {
-          refreshArgs.effort = codexParams.effort;
+        if (runtimeParams.effort) {
+          refreshArgs.effort = runtimeParams.effort;
         }
         if (!refreshArgs.accessMode) {
           delete refreshArgs.accessMode;

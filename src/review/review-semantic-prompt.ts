@@ -33,8 +33,8 @@ export interface SemanticReviewConfig extends JsonObject {
   reviewSemanticTimeoutMs?: unknown;
   reviewSemanticModel?: unknown;
   reviewSemanticGenerator?: ((input: SemanticGeneratorInput) => Promise<unknown>) | unknown;
-  codexEndpoint?: unknown;
-  codexCommand?: unknown;
+  runtimeEndpoint?: unknown;
+  runtimeCommand?: unknown;
   stateDir?: unknown;
   workspaceRoot?: unknown;
 }

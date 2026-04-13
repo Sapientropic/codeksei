@@ -53,7 +53,7 @@ function createLifecycleHarness() {
       rememberPendingApprovalForThread: async () => undefined,
       rememberWorkspaceBootstrapForThread: async () => undefined,
       setActiveWorkspaceRoot: async () => undefined,
-      setCodexParamsForWorkspace: async () => undefined,
+      setRuntimeParamsForWorkspace: async () => undefined,
       setThreadIdForWorkspace: async () => undefined,
       clearThreadIdForWorkspace: async () => undefined,
     },
