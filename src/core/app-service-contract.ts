@@ -1,5 +1,6 @@
 import type { RuntimeEvent } from "../contracts/runtime-events";
 import type { ReminderQueueEntry, SystemMessage } from "../contracts/queue-items";
+import type { AvailableModelCatalogView } from "../adapters/runtime/codex/model-catalog";
 import type {
   DeliveryFailurePayload,
   HandlePreparedMessageOptions,
@@ -28,6 +29,7 @@ export interface AppRuntimeConfig extends Record<string, unknown> {
   codexAccessMode?: string;
   sharedBridgeHeartbeatFile?: string;
   startWithCheckin?: boolean;
+  checkinConfigFile?: string;
   systemMessageDeadLetterFile?: string;
   systemMessageQueueFile?: string;
   reminderQueueFile?: string;
@@ -65,12 +67,9 @@ export interface SessionStoreLike {
   findBindingForThreadId(threadId: unknown): ThreadBindingRef | null;
   getActiveWorkspaceRoot(bindingKey: string): string;
   getApprovalCommandAllowlistForWorkspace(workspaceRoot: string): string[][];
-  getAvailableModelCatalog(): {
-    models: Array<{ model: string }>;
-    updatedAt: string;
-  } | null;
+  getAvailableModelCatalog(): AvailableModelCatalogView | null;
   getBinding(bindingKey: string): { senderId?: string } | null;
-  getCodexParamsForWorkspace(bindingKey: string, workspaceRoot?: string): { model?: string };
+  getCodexParamsForWorkspace(bindingKey: string, workspaceRoot?: string): { model?: string; effort?: string };
   getPendingApprovalForThread(threadId: string): PendingApprovalState | null;
   getThreadIdForWorkspace(bindingKey: string, workspaceRoot: string): string;
   listBindings(): SessionBindingSnapshot[];
@@ -92,7 +91,7 @@ export interface SessionStoreWriterLike {
   setCodexParamsForWorkspace(
     bindingKey: string,
     workspaceRoot: string,
-    params: { model: string },
+    params: { model?: string; effort?: string },
   ): Promise<unknown>;
   setThreadIdForWorkspace(
     bindingKey: string,
@@ -147,6 +146,7 @@ export interface RuntimeAdapterLike {
     threadId: string;
     workspaceRoot: string;
     model?: string;
+    effort?: string;
     accessMode?: string;
   }): Promise<unknown>;
   respondApproval(args: { requestId: string; decision: "accept" | "decline" }): Promise<unknown>;
@@ -156,6 +156,7 @@ export interface RuntimeAdapterLike {
     workspaceRoot: string;
     text: string;
     model?: string;
+    effort?: string;
     accessMode?: string;
     metadata?: Record<string, unknown>;
   }): Promise<RuntimeTurnSendState>;

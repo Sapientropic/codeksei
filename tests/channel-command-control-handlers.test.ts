@@ -9,9 +9,13 @@ const {
   createControlCommandHarness,
 } = require("./helpers/channel-command-harness.ts") as {
   buildNormalizedCommandMessage(text?: string): NormalizedIncomingMessage;
-  createControlCommandHarness(): {
+  createControlCommandHarness(options?: {
+    currentEffort?: string;
+  }): {
     handlers: {
       approval(normalized: NormalizedIncomingMessage, command: { name: string; args: string }): Promise<void>;
+      checkin(normalized: NormalizedIncomingMessage, command: { name: string; args: string }): Promise<void>;
+      effort(normalized: NormalizedIncomingMessage, command: { name: string; args: string }): Promise<void>;
       help(normalized: NormalizedIncomingMessage): Promise<void>;
       model(normalized: NormalizedIncomingMessage, command: { name: string; args: string }): Promise<void>;
     };
@@ -19,7 +23,7 @@ const {
     respondApprovalCalls: Array<{ decision: "accept" | "decline"; requestId: string }>;
     setModelCalls: Array<{
       bindingKey: string;
-      params: { model: string };
+      params: { effort?: string; model?: string };
       workspaceRoot: string;
     }>;
     textCalls: Array<{ text: string }>;
@@ -61,7 +65,7 @@ test("approval handler only remembers prefixes for always", async () => {
 });
 
 test("model handler lists current and available models when no query is given", async () => {
-  const harness = createControlCommandHarness();
+  const harness = createControlCommandHarness({ currentEffort: "medium" });
 
   await harness.handlers.model(buildNormalizedCommandMessage("/model"), {
     name: "model",
@@ -71,11 +75,12 @@ test("model handler lists current and available models when no query is given", 
   const currentModelText = harness.textCalls[0];
   assert.ok(currentModelText);
   assert.match(currentModelText.text, /当前模型: gpt-5/);
+  assert.match(currentModelText.text, /当前 effort: medium/);
   assert.match(currentModelText.text, /可用模型: gpt-5、gpt-5-mini/);
 });
 
-test("model handler switches to a matched model", async () => {
-  const harness = createControlCommandHarness();
+test("model handler switches to a matched model and keeps a compatible effort", async () => {
+  const harness = createControlCommandHarness({ currentEffort: "low" });
 
   await harness.handlers.model(buildNormalizedCommandMessage("/model gpt-5-mini"), {
     name: "model",
@@ -85,11 +90,12 @@ test("model handler switches to a matched model", async () => {
   assert.deepEqual(harness.setModelCalls, [{
     bindingKey: "workspace-1:acct-1:user-1",
     workspaceRoot: "E:/repo/current",
-    params: { model: "gpt-5-mini" },
+    params: { model: "gpt-5-mini", effort: "low" },
   }]);
   const switchedModelText = harness.textCalls[0];
   assert.ok(switchedModelText);
   assert.match(switchedModelText.text, /已切换模型。/);
+  assert.match(switchedModelText.text, /effort: low/);
 });
 
 test("model handler reports when a model cannot be found", async () => {
@@ -103,6 +109,74 @@ test("model handler reports when a model cannot be found", async () => {
   const missingModelText = harness.textCalls[0];
   assert.ok(missingModelText);
   assert.match(missingModelText.text, /未找到模型：nope/);
+});
+
+test("model handler rejects unsupported explicit effort for the selected model", async () => {
+  const harness = createControlCommandHarness();
+
+  await harness.handlers.model(buildNormalizedCommandMessage("/model gpt-5-mini high"), {
+    name: "model",
+    args: "gpt-5-mini high",
+  });
+
+  assert.deepEqual(harness.setModelCalls, []);
+  const textCall = harness.textCalls[0];
+  assert.ok(textCall);
+  assert.match(textCall.text, /不支持 effort：high/);
+});
+
+test("effort handler lists current effort and model-supported choices", async () => {
+  const harness = createControlCommandHarness({ currentEffort: "medium" });
+
+  await harness.handlers.effort(buildNormalizedCommandMessage("/effort"), {
+    name: "effort",
+    args: "",
+  });
+
+  const textCall = harness.textCalls[0];
+  assert.ok(textCall);
+  assert.match(textCall.text, /当前模型: gpt-5/);
+  assert.match(textCall.text, /当前 effort: medium/);
+  assert.match(textCall.text, /可用 effort: low、medium、high/);
+});
+
+test("effort handler updates effort while reusing current model", async () => {
+  const harness = createControlCommandHarness();
+
+  await harness.handlers.effort(buildNormalizedCommandMessage("/effort high"), {
+    name: "effort",
+    args: "high",
+  });
+
+  assert.deepEqual(harness.setModelCalls, [{
+    bindingKey: "workspace-1:acct-1:user-1",
+    workspaceRoot: "E:/repo/current",
+    params: { model: "gpt-5", effort: "high" },
+  }]);
+  const textCall = harness.textCalls[0];
+  assert.ok(textCall);
+  assert.match(textCall.text, /已切换 effort。/);
+});
+
+test("checkin handler shows and updates persisted interval config", async () => {
+  const harness = createControlCommandHarness();
+
+  await harness.handlers.checkin(buildNormalizedCommandMessage("/checkin"), {
+    name: "checkin",
+    args: "",
+  });
+  await harness.handlers.checkin(buildNormalizedCommandMessage("/checkin 5-30"), {
+    name: "checkin",
+    args: "5-30",
+  });
+
+  assert.equal(harness.textCalls.length, 2);
+  const firstText = harness.textCalls[0];
+  const secondText = harness.textCalls[1];
+  assert.ok(firstText);
+  assert.ok(secondText);
+  assert.match(firstText.text, /当前 checkin: 3m-60m/);
+  assert.match(secondText.text, /当前 checkin: 5m-30m/);
 });
 
 test("help handler uses the shared weixin help text", async () => {

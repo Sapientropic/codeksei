@@ -147,9 +147,12 @@ export class SessionStore {
   async setCodexParamsForWorkspace(
     bindingKey: unknown,
     workspaceRoot: unknown,
-    { model = "" }: { model?: unknown },
+    { model = "", effort = "" }: { model?: unknown; effort?: unknown },
   ): Promise<SessionBinding | null> {
-    return this.mutateState((state) => setCodexParamsForWorkspaceInState(state, bindingKey, workspaceRoot, { model }));
+    return this.mutateState((state) => setCodexParamsForWorkspaceInState(state, bindingKey, workspaceRoot, {
+      model,
+      effort,
+    }));
   }
 
   async clearThreadIdForWorkspace(bindingKey: unknown, workspaceRoot: unknown): Promise<SessionBinding | null> {

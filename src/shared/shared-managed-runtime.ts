@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import { readPrefixedEnv } from "../core/branding";
 import { classifySharedBridgeHeartbeat, readSharedBridgeHeartbeat } from "./shared-bridge-heartbeat";
 import { resolveBundledCodexBinary } from "../core/codex-spawn";
+import { probeCodexAppServerCapabilities } from "../adapters/runtime/codex/capability-probe";
 import {
   ensureLogDir,
   isPidAlive,
@@ -109,6 +110,13 @@ async function ensureSharedAppServer(): Promise<{ pid: number; status: string }>
   const detachedCommand = context.sharedUseBundledCodexBinary
     ? (resolveBundledCodexBinary(command) || command)
     : command;
+  const capabilityProbe = probeCodexAppServerCapabilities(detachedCommand);
+  if (!capabilityProbe.canInvokeAppServer) {
+    throw new Error(`shared app-server probe failed via ${capabilityProbe.attempted}: ${capabilityProbe.diagnosis.hint || capabilityProbe.helpExcerpt || "无法调用 app-server"}`);
+  }
+  if (capabilityProbe.supportsListen === false) {
+    throw new Error(`shared app-server probe failed: current Codex app-server help does not advertise --listen. ${capabilityProbe.helpExcerpt || capabilityProbe.diagnosis.hint}`);
+  }
   const appServerArgs = ["app-server", "--listen", context.listenUrl];
   if (context.sharedDisablePlugins) {
     appServerArgs.push("--disable", "plugins");

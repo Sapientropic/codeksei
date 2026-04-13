@@ -52,6 +52,7 @@ interface RefreshThreadInstructionsArgs {
   threadId: string;
   workspaceRoot: string;
   model?: string;
+  effort?: string;
   accessMode?: string;
 }
 
@@ -61,6 +62,7 @@ interface SendTextTurnArgs {
   text: string;
   metadata?: Record<string, unknown>;
   model?: string;
+  effort?: string;
   accessMode?: string;
 }
 
@@ -150,6 +152,7 @@ export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRunt
       threadId,
       workspaceRoot,
       model = "",
+      effort = "",
       accessMode = "",
     }) {
       return runtimeLifecycle.withRuntimeReconnect(async (runtimeClient) => {
@@ -163,6 +166,7 @@ export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRunt
             threadId,
             text: refreshText,
             model,
+            effort,
             accessMode,
             workspaceRoot: runtimeWorkspaceRoot,
           },
@@ -185,6 +189,7 @@ export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRunt
       text,
       metadata = {},
       model = "",
+      effort = "",
       accessMode = "",
     }) {
       return runtimeLifecycle.withRuntimeReconnect(async (runtimeClient) => {
@@ -244,6 +249,7 @@ export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRunt
             threadId,
             text: outboundText,
             model,
+            effort,
             accessMode,
             workspaceRoot: runtimeWorkspaceRoot,
           },

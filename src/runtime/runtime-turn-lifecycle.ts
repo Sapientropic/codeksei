@@ -376,6 +376,7 @@ export class RuntimeTurnLifecycle {
           workspaceRoot: string;
           text: string;
           model?: string;
+          effort?: string;
           accessMode?: string;
           metadata?: Record<string, unknown>;
         } = {
@@ -388,9 +389,13 @@ export class RuntimeTurnLifecycle {
             senderId: prepared.senderId,
           },
         };
-        const model = this.runtimeAdapter.getSessionStore().getCodexParamsForWorkspace(bindingKey, workspaceRoot).model;
+        const codexParams = this.runtimeAdapter.getSessionStore().getCodexParamsForWorkspace(bindingKey, workspaceRoot);
+        const model = codexParams.model;
         if (model) {
           sendArgs.model = model;
+        }
+        if (codexParams.effort) {
+          sendArgs.effort = codexParams.effort;
         }
         const accessMode = this.normalizeText(this.config.codexAccessMode);
         if (accessMode) {

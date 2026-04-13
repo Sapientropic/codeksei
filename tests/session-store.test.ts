@@ -133,7 +133,7 @@ test("SessionStoreWriter persists rebinding, workspace bootstrap, model params, 
 
   await writer.setThreadIdForWorkspace("binding-a", "E:/repo/current", "thread-current");
   await writer.rememberWorkspaceBootstrapForThread("binding-a", "E:/repo/current", "thread-current");
-  await writer.setCodexParamsForWorkspace("binding-a", "E:/repo/current", { model: "gpt-5.4" });
+  await writer.setCodexParamsForWorkspace("binding-a", "E:/repo/current", { model: "gpt-5.4", effort: "high" });
   await writer.rememberPendingApprovalForThread("thread-current", {
     requestId: "approval-2",
     reason: "Need shell",
@@ -145,7 +145,10 @@ test("SessionStoreWriter persists rebinding, workspace bootstrap, model params, 
   });
 
   assert.equal(store.hasWorkspaceBootstrapForThread("binding-a", "E:/repo/current", "thread-current"), true);
-  assert.equal(store.getCodexParamsForWorkspace("binding-a", "E:/repo/current").model, "gpt-5.4");
+  assert.deepEqual(store.getCodexParamsForWorkspace("binding-a", "E:/repo/current"), {
+    model: "gpt-5.4",
+    effort: "high",
+  });
   assert.equal(store.getPendingApprovalForThread("thread-current")?.requestId, "approval-2");
 
   await writer.clearPendingApprovalForThread("thread-current");

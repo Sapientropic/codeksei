@@ -119,13 +119,14 @@ export function getCodexParamsForWorkspaceFromState(
 ): CodexWorkspaceParams {
   const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
   if (!normalizedWorkspaceRoot) {
-    return { model: "" };
+    return { model: "", effort: "" };
   }
   const current = getBindingFromState(state, bindingKey) || createEmptySessionBinding();
   const codexParamsByWorkspaceRoot = getCodexParamsMap(current);
   const entry = codexParamsByWorkspaceRoot[normalizedWorkspaceRoot];
   return {
     model: typeof entry?.model === "string" ? entry.model : "",
+    effort: typeof entry?.effort === "string" ? entry.effort : "",
   };
 }
 
@@ -133,7 +134,7 @@ export function setCodexParamsForWorkspaceInState(
   state: SessionState,
   bindingKey: unknown,
   workspaceRoot: unknown,
-  { model = "" }: { model?: unknown },
+  { model = "", effort = "" }: { model?: unknown; effort?: unknown },
 ): SessionBinding | null {
   const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
   if (!normalizedWorkspaceRoot) {
@@ -148,6 +149,7 @@ export function setCodexParamsForWorkspaceInState(
     ...getCodexParamsMap(current),
     [normalizedWorkspaceRoot]: {
       model: normalizeValue(model),
+      effort: normalizeValue(effort),
     },
   };
   const normalizedBinding = normalizeSessionBinding({

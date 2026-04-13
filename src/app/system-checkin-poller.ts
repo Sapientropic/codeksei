@@ -6,9 +6,7 @@ import { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } from "../work
 import { resolveSelectedAccount } from "../adapters/channel/weixin/account-store";
 import { PACKAGE_NAME, readPrefixedEnv } from "../core/branding";
 import { SystemMessageQueueStore } from "../state/system-message-queue-store";
-
-const DEFAULT_MIN_INTERVAL_MS = 3 * 60_000;
-const DEFAULT_MAX_INTERVAL_MS = 60 * 60_000;
+import { formatCheckinRange, resolveCheckinConfig } from "../state/checkin-config";
 const INTERNAL_CHECKIN_TRIGGER_TEMPLATE = "Take a quiet look at whether now is a good moment to reach out to %PERSON%. You may stay silent, send one short WeChat message, update diary/timeline, or take another useful backstage action. If no user-visible message should be sent, output exactly SILENT. If you do send a message, output only the message text.";
 
 async function runSystemCheckinPoller(config: any) {
@@ -19,16 +17,19 @@ async function runSystemCheckinPoller(config: any) {
   });
   const sessionStore = new SessionStore({ filePath: config.sessionsFile });
   const target = resolvePollerTarget({ config, account, sessionStore });
-  const minIntervalMs = readIntervalMs(readPrefixedEnv(process.env, "CHECKIN_MIN_INTERVAL_MS"), DEFAULT_MIN_INTERVAL_MS);
-  const maxIntervalMs = Math.max(
-    minIntervalMs,
-    readIntervalMs(readPrefixedEnv(process.env, "CHECKIN_MAX_INTERVAL_MS"), DEFAULT_MAX_INTERVAL_MS)
-  );
+  let lastRangeLabel = "";
 
   console.log(`[${PACKAGE_NAME}] checkin poller ready user=${target.senderId} workspace=${target.workspaceRoot}`);
-  console.log(`[${PACKAGE_NAME}] checkin interval range ${Math.round(minIntervalMs / 60000)}m-${Math.round(maxIntervalMs / 60000)}m`);
 
   while (true) {
+    const intervalConfig = resolvePollerIntervalConfig(config);
+    const rangeLabel = `${formatCheckinRange(intervalConfig)} source=${intervalConfig.source}`;
+    if (rangeLabel !== lastRangeLabel) {
+      console.log(`[${PACKAGE_NAME}] checkin interval range ${rangeLabel}`);
+      lastRangeLabel = rangeLabel;
+    }
+    const minIntervalMs = intervalConfig.minIntervalMs;
+    const maxIntervalMs = intervalConfig.maxIntervalMs;
     const delayMs = pickRandomDelayMs(minIntervalMs, maxIntervalMs);
     const wakeAt = new Date(Date.now() + delayMs).toISOString();
     console.log(`[${PACKAGE_NAME}] next checkin in ${Math.round(delayMs / 60000)}m at ${wakeAt}`);
@@ -77,9 +78,20 @@ function resolvePollerTarget({ config, account, sessionStore }: any) {
   return { senderId, workspaceRoot };
 }
 
-function readIntervalMs(rawValue: any, fallback: any) {
-  const parsed = Number.parseInt(String(rawValue || ""), 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+function resolvePollerIntervalConfig(config: any) {
+  const filePath = normalizeText(config.checkinConfigFile);
+  if (filePath) {
+    return resolveCheckinConfig({ filePath });
+  }
+  const envMin = Number.parseInt(String(readPrefixedEnv(process.env, "CHECKIN_MIN_INTERVAL_MS") || ""), 10);
+  const envMax = Number.parseInt(String(readPrefixedEnv(process.env, "CHECKIN_MAX_INTERVAL_MS") || ""), 10);
+  const minIntervalMs = Number.isFinite(envMin) && envMin > 0 ? envMin : 3 * 60_000;
+  const maxIntervalMs = Math.max(minIntervalMs, Number.isFinite(envMax) && envMax > 0 ? envMax : 60 * 60_000);
+  return {
+    minIntervalMs,
+    maxIntervalMs,
+    source: envMin || envMax ? "env" : "default",
+  };
 }
 
 function pickRandomDelayMs(minIntervalMs: any, maxIntervalMs: any) {
@@ -96,6 +108,10 @@ function sleep(ms: any) {
 function buildCheckinTrigger(config: any) {
   const person = resolvePromptPersonEn(config);
   return INTERNAL_CHECKIN_TRIGGER_TEMPLATE.replace("%PERSON%", person);
+}
+
+function normalizeText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 export { runSystemCheckinPoller };

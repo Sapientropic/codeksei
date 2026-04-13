@@ -75,6 +75,28 @@ export function findModelByQuery(models: unknown, query: unknown): NormalizedMod
   )) || null;
 }
 
+export function findReasoningEffortByQuery(
+  efforts: unknown,
+  query: unknown,
+): string {
+  const normalizedQuery = normalizeText(query).toLowerCase();
+  if (!normalizedQuery) {
+    return "";
+  }
+  return normalizeReasoningEfforts(efforts).find((effort) => effort.toLowerCase() === normalizedQuery) || "";
+}
+
+export function supportsReasoningEffort(
+  model: Pick<NormalizedModelCatalogEntry, "supportedReasoningEfforts"> | null | undefined,
+  effort: unknown,
+): boolean {
+  const normalizedEffort = normalizeText(effort);
+  if (!normalizedEffort) {
+    return false;
+  }
+  return Boolean(findReasoningEffortByQuery(model?.supportedReasoningEfforts || [], normalizedEffort));
+}
+
 export function normalizeModelCatalog(models: unknown): NormalizedModelCatalogEntry[] {
   if (!Array.isArray(models)) {
     return [];

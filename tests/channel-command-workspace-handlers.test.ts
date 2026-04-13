@@ -106,6 +106,7 @@ test("status reports thread, model, and usage summary", async () => {
   assert.match(statusTextCall.text, /thread: thread-current/);
   assert.match(statusTextCall.text, /status: running/);
   assert.match(statusTextCall.text, /model: gpt-5/);
+  assert.match(statusTextCall.text, /effort: medium/);
   assert.match(statusTextCall.text, /usage:/);
 });
 

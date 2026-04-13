@@ -53,7 +53,7 @@ export class SessionStoreWriter implements SessionStoreWriterLike {
   async setCodexParamsForWorkspace(
     bindingKey: string,
     workspaceRoot: string,
-    params: { model: string },
+    params: { model?: string; effort?: string },
   ): Promise<unknown> {
     return this.store.setCodexParamsForWorkspace(bindingKey, workspaceRoot, params);
   }

@@ -45,7 +45,9 @@ const TOPIC_HELP = {
     usage: [buildExample("channel.send_file", true)],
   }),
   system: () => ({
-    usage: [`${buildExample("system.send", true)} / ${buildTerminalEntryUsage("system.checkin_poller", "public")}`],
+    usage: [
+      `${buildExample("system.send", true)} / ${buildTerminalActionExample("system.checkin_config", { audience: "public", includeArgs: true })} / ${buildTerminalEntryUsage("system.checkin_poller", "public")}`,
+    ],
   }),
   timeline: () => ({
     usage: [
@@ -181,6 +183,20 @@ const LEAF_HELP = {
     usage: [buildExample("system.send", true)],
     examples: [
       "  codeksei system send --text \"提醒她今天早点睡\" --workspace \"$(pwd)\"",
+    ],
+    includeFlagBlock: true,
+  }),
+  "system.checkin_config": () => ({
+    usage: [buildTerminalActionExample("system.checkin_config", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  查看或修改主动 check-in 的随机分钟区间。",
+      "  持久化配置优先于 CODEKSEI_CHECKIN_MIN_INTERVAL_MS / MAX_INTERVAL_MS；--reset 会清除本地覆盖。",
+    ],
+    examples: [
+      "  codeksei system checkin --show",
+      "  codeksei system checkin --range 3-60",
+      "  codeksei system checkin --reset",
     ],
     includeFlagBlock: true,
   }),

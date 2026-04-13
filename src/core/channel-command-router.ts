@@ -1,7 +1,7 @@
 import type { NormalizedIncomingMessage } from "./runtime-types";
 
 type WorkspaceRouteName = "bind" | "status" | "new" | "reread" | "switch" | "stop";
-type ControlRouteName = "approval" | "model" | "help";
+type ControlRouteName = "approval" | "model" | "effort" | "checkin" | "help";
 
 export interface ParsedChannelCommand {
   args: string;
@@ -24,6 +24,8 @@ export interface WorkspaceCommandHandlerSet {
 
 export interface ControlCommandHandlerSet {
   approval(normalized: ChannelCommandMessage, command: ParsedChannelCommand): Promise<unknown>;
+  checkin(normalized: ChannelCommandMessage, command: ParsedChannelCommand): Promise<unknown>;
+  effort(normalized: ChannelCommandMessage, command: ParsedChannelCommand): Promise<unknown>;
   help(normalized: ChannelCommandMessage, command: ParsedChannelCommand): Promise<unknown>;
   model(normalized: ChannelCommandMessage, command: ParsedChannelCommand): Promise<unknown>;
 }
@@ -36,6 +38,8 @@ const ROUTE_BY_COMMAND = new Map<string, WorkspaceRouteName | Exclude<ControlRou
   ["switch", "switch"],
   ["stop", "stop"],
   ["model", "model"],
+  ["effort", "effort"],
+  ["checkin", "checkin"],
   ["help", "help"],
 ]);
 
@@ -75,6 +79,12 @@ class ChannelCommandRouter {
         return true;
       case "model":
         await this.controlHandlers.model(normalized, command);
+        return true;
+      case "effort":
+        await this.controlHandlers.effort(normalized, command);
+        return true;
+      case "checkin":
+        await this.controlHandlers.checkin(normalized, command);
         return true;
       case "help":
       default:

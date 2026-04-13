@@ -1,3 +1,7 @@
+const fs: typeof import("node:fs") = require("node:fs");
+const os: typeof import("node:os") = require("node:os");
+const path: typeof import("node:path") = require("node:path");
+
 const { createControlCommandHandlers }: typeof import("../../src/core/channel-command-control-handlers") = require("../../src/core/channel-command-control-handlers");
 const { createWorkspaceCommandHandlers }: typeof import("../../src/core/channel-command-workspace-handlers") = require("../../src/core/channel-command-workspace-handlers");
 
@@ -14,11 +18,20 @@ interface TextCall {
 }
 
 interface ModelCatalogView {
-  models: Array<{ model: string }>;
+  models: Array<{
+    displayName: string;
+    defaultReasoningEffort: string;
+    id: string;
+    isDefault: boolean;
+    model: string;
+    supportedReasoningEfforts: string[];
+  }>;
+  updatedAt: string;
 }
 
 interface ControlHarnessOptions {
   catalog?: ModelCatalogView;
+  currentEffort?: string;
   currentModel?: string;
   pendingApproval?: PendingApprovalState | null;
   workspaceRoot?: string;
@@ -31,7 +44,7 @@ interface ControlHarness {
   respondApprovalCalls: Array<{ decision: "accept" | "decline"; requestId: string }>;
   setModelCalls: Array<{
     bindingKey: string;
-    params: { model: string };
+    params: { effort?: string; model?: string };
     workspaceRoot: string;
   }>;
   textCalls: TextCall[];
@@ -108,12 +121,28 @@ function createControlCommandHarness({
     signature: "sig-1",
     promptedAt: "2026-04-12T00:00:00.000Z",
   },
+  currentEffort = "",
   currentModel = "gpt-5",
   catalog = {
     models: [
-      { model: "gpt-5" },
-      { model: "gpt-5-mini" },
+      {
+        id: "gpt-5",
+        model: "gpt-5",
+        displayName: "GPT-5",
+        supportedReasoningEfforts: ["low", "medium", "high"],
+        defaultReasoningEffort: "medium",
+        isDefault: true,
+      },
+      {
+        id: "gpt-5-mini",
+        model: "gpt-5-mini",
+        displayName: "GPT-5 mini",
+        supportedReasoningEfforts: ["low", "medium"],
+        defaultReasoningEffort: "medium",
+        isDefault: false,
+      },
     ],
+    updatedAt: "2026-04-12T00:00:00.000Z",
   },
   workspaceRoot = DEFAULT_WORKSPACE_ROOT,
 }: ControlHarnessOptions = {}): ControlHarness {
@@ -121,7 +150,7 @@ function createControlCommandHarness({
   const respondApprovalCalls: Array<{ decision: "accept" | "decline"; requestId: string }> = [];
   const rememberPrefixCalls: Array<{ commandTokens: string[]; workspaceRoot: string }> = [];
   const resolveApprovalCalls: Array<{ status?: string; threadId: string }> = [];
-  const setModelCalls: Array<{ bindingKey: string; params: { model: string }; workspaceRoot: string }> = [];
+  const setModelCalls: Array<{ bindingKey: string; params: { effort?: string; model?: string }; workspaceRoot: string }> = [];
 
   const sessionStore = {
     buildBindingKey() {
@@ -131,7 +160,7 @@ function createControlCommandHarness({
       return catalog;
     },
     getCodexParamsForWorkspace() {
-      return { model: currentModel };
+      return { model: currentModel, effort: currentEffort };
     },
     getPendingApprovalForThread() {
       return null;
@@ -147,7 +176,11 @@ function createControlCommandHarness({
       rememberPrefixCalls.push({ workspaceRoot: targetWorkspaceRoot, commandTokens });
       return [];
     },
-    async setCodexParamsForWorkspace(bindingKey: string, targetWorkspaceRoot: string, params: { model: string }) {
+    async setCodexParamsForWorkspace(
+      bindingKey: string,
+      targetWorkspaceRoot: string,
+      params: { effort?: string; model?: string },
+    ) {
       setModelCalls.push({ bindingKey, workspaceRoot: targetWorkspaceRoot, params });
       return undefined;
     },
@@ -183,6 +216,9 @@ function createControlCommandHarness({
   return {
     handlers: createControlCommandHandlers({
       channelAdapter,
+      config: {
+        checkinConfigFile: path.join(fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-checkin-harness-")), "checkin-config.json"),
+      },
       resolveWorkspaceRoot() {
         return workspaceRoot;
       },
@@ -217,6 +253,7 @@ function createWorkspaceCommandHarness({
   const setWorkspaceCalls: WorkspaceHarness["setWorkspaceCalls"] = [];
 
   const config = {
+    checkinConfigFile: "",
     workspaceRoot: currentWorkspaceRoot,
     codexAccessMode: "workspace-write",
   };
@@ -232,7 +269,7 @@ function createWorkspaceCommandHarness({
       return currentWorkspaceRoot;
     },
     getCodexParamsForWorkspace() {
-      return { model: currentModel };
+      return { model: currentModel, effort: "medium" };
     },
     getPendingApprovalForThread() {
       return null;

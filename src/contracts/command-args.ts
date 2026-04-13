@@ -131,6 +131,14 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", required: true, description: "绝对 workspace 路径" },
     ],
   }),
+  systemCheckinConfig: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "show", keys: ["--show"], type: "boolean", defaultValue: false, description: "显示当前 checkin 区间" },
+      { name: "range", keys: ["--range"], type: "string", defaultValue: "", placeholder: "3-60", description: "设置新的 min-max 分钟区间" },
+      { name: "reset", keys: ["--reset"], type: "boolean", defaultValue: false, description: "清除持久化配置并回退到 env/default" },
+    ],
+  }),
   timelineEvent: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,

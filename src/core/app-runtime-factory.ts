@@ -203,6 +203,7 @@ function createRuntimeWorkflowServices({
     }),
     controlHandlers: createControlCommandHandlers({
       channelAdapter,
+      config,
       resolveWorkspaceRoot,
       runtimeAdapter,
       sessionWriter,

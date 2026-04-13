@@ -3,6 +3,7 @@ const assert: typeof import("node:assert/strict") = require("node:assert/strict"
 
 const {
   extractModelCatalogFromListResponse,
+  findReasoningEffortByQuery,
   findModelByQuery,
   normalizeModelCatalog,
   resolveEffectiveModelForEffort,
@@ -80,4 +81,9 @@ test("resolveEffectiveModelForEffort prefers current model match and otherwise f
 
   assert.equal(resolveEffectiveModelForEffort(models, "GPT-5.4-mini")?.model, "gpt-5.4-mini");
   assert.equal(resolveEffectiveModelForEffort(models, "missing")?.model, "gpt-5.4");
+});
+
+test("findReasoningEffortByQuery matches supported efforts case-insensitively", () => {
+  assert.equal(findReasoningEffortByQuery(["low", "medium", "high"], "HIGH"), "high");
+  assert.equal(findReasoningEffortByQuery(["low", "medium"], "unknown"), "");
 });

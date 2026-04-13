@@ -39,6 +39,12 @@ README、帮助文本和公开示例默认都按 `codeksei` 书写。
 - `npm run background:install`
 - `npm run background:uninstall`
 
+主动 check-in 控制：
+
+- `codeksei system checkin --show`
+- `codeksei system checkin --range 3-60`
+- `codeksei system checkin --reset`
+
 说明：
 
 - 日常使用默认走共享模式，让微信入口和终端执行落在同一条线上
@@ -58,7 +64,12 @@ README、帮助文本和公开示例默认都按 `codeksei` 书写。
 - `/always`
 - `/no`
 - `/model`
-- `/model <id>`
+- `/model <id> [effort]`
+- `/effort`
+- `/effort <level>`
+- `/checkin`
+- `/checkin <min>-<max>`
+- `/checkin reset`
 - `/help`
 
 ## Timeline

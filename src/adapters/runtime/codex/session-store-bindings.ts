@@ -5,6 +5,7 @@ import {
 
 export interface CodexWorkspaceParams {
   model: string;
+  effort: string;
 }
 
 export interface BindingRef {

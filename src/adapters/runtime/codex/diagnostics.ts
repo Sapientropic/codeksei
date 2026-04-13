@@ -14,6 +14,7 @@ import {
   resolveReplyFragmentCollectorTurnId,
   shouldIgnoreReplyFragmentTurnCompletion,
 } from "./reply-fragment-collector";
+import { appendCodexCapabilityHint } from "./capability-probe";
 
 
 interface RpcMessageParams extends UnknownRecord {
@@ -182,7 +183,8 @@ export function normalizeText(value: unknown): string {
 }
 
 export function formatErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error || "unknown error");
+  const message = error instanceof Error ? error.message : String(error || "unknown error");
+  return appendCodexCapabilityHint(message, error instanceof Error ? error.message : error);
 }
 
 function logInvalidWorkspaceError({

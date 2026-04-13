@@ -50,6 +50,12 @@ function createRouterHarness() {
     async approval(normalized: ChannelCommandMessage, command: ParsedChannelCommand) {
       calls.push({ type: "approval", normalized, command });
     },
+    async checkin(normalized: ChannelCommandMessage, command: ParsedChannelCommand) {
+      calls.push({ type: "checkin", normalized, command });
+    },
+    async effort(normalized: ChannelCommandMessage, command: ParsedChannelCommand) {
+      calls.push({ type: "effort", normalized, command });
+    },
     async model(normalized: ChannelCommandMessage, command: ParsedChannelCommand) {
       calls.push({ type: "model", normalized, command });
     },
@@ -92,6 +98,19 @@ test("ChannelCommandRouter routes approval aliases through one approval handler"
   assert.ok(firstCall);
   assert.equal(firstCall.type, "approval");
   assert.equal(firstCall.command.name, "always");
+});
+
+test("ChannelCommandRouter routes effort commands through the effort handler", async () => {
+  const { calls, router } = createRouterHarness();
+
+  const handled = await router.maybeDispatchCommand(buildNormalizedCommandMessage("/effort high"));
+
+  assert.equal(handled, true);
+  assert.equal(calls.length, 1);
+  const firstCall = calls[0];
+  assert.ok(firstCall);
+  assert.equal(firstCall.type, "effort");
+  assert.equal(firstCall.command.args, "high");
 });
 
 test("ChannelCommandRouter falls back unknown commands to help", async () => {

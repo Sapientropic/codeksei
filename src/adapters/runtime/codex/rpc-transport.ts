@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { WebSocket, type RawData } from "ws";
 import { buildSpawnInvocation } from "../../../core/codex-spawn";
+import { appendCodexCapabilityHint } from "./capability-probe";
 
 const TRANSPORT_STDERR_MAX_CHARS = 4000;
 
@@ -300,12 +301,12 @@ export function createSpawnFailureError(
 ): Error {
   const attempted = [spawnSpec.command, ...(spawnSpec.args || [])].filter(Boolean).join(" ");
   const detail = error instanceof Error && error.message ? `: ${error.message}` : "";
-  return new Error(`Unable to spawn Codex app-server via ${attempted}${detail}.`);
+  return new Error(appendCodexCapabilityHint(`Unable to spawn Codex app-server via ${attempted}${detail}.`, error));
 }
 
 export function buildSpawnRuntimeErrorMessage(error: unknown, stderrBuffer: string): string {
   const detail = error instanceof Error && error.message ? `: ${error.message}` : "";
-  return appendTransportDiagnostic(`Codex process transport errored${detail}`, stderrBuffer);
+  return appendTransportDiagnostic(appendCodexCapabilityHint(`Codex process transport errored${detail}`, `${detail}\n${stderrBuffer}`), stderrBuffer);
 }
 
 export function buildSpawnCloseMessage({
@@ -319,11 +320,17 @@ export function buildSpawnCloseMessage({
 }): string {
   const codeLabel = code == null ? "unknown" : String(code);
   const signalLabel = signal ? ` signal=${signal}` : "";
-  return appendTransportDiagnostic(`Codex process closed (code=${codeLabel}${signalLabel})`, stderrBuffer);
+  return appendTransportDiagnostic(
+    appendCodexCapabilityHint(`Codex process closed (code=${codeLabel}${signalLabel})`, stderrBuffer),
+    stderrBuffer,
+  );
 }
 
 export function buildSpawnStdinClosedMessage(stderrBuffer: string): string {
-  return appendTransportDiagnostic("Codex process stdin is not writable", stderrBuffer);
+  return appendTransportDiagnostic(
+    appendCodexCapabilityHint("Codex process stdin is not writable", stderrBuffer),
+    stderrBuffer,
+  );
 }
 
 function appendTransportDiagnostic(message: string, stderrBuffer: string): string {

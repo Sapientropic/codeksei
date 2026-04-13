@@ -14,6 +14,7 @@ import { resolveConfiguredPersonName } from "../core/person-reference";
 export interface TerminalRuntimeConfig extends Record<string, unknown> {
   sessionsFile: string;
   stateDir: string;
+  checkinConfigFile?: string;
   systemMessageQueueFile: string;
   systemMessageDeadLetterFile: string;
   timelineScreenshotQueueFile: string;

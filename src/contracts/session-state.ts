@@ -50,7 +50,7 @@ export interface SessionBinding {
   activeWorkspaceRoot: string;
   updatedAt: string;
   threadIdByWorkspaceRoot: Record<string, string>;
-  codexParamsByWorkspaceRoot: Record<string, { model: string }>;
+  codexParamsByWorkspaceRoot: Record<string, { model: string; effort: string }>;
   workspaceBootstrapThreadIdByWorkspaceRoot: Record<string, string>;
   [key: string]: unknown;
 }
@@ -187,8 +187,8 @@ function normalizeBindings(value: unknown): Record<string, SessionBinding> {
   return bindings;
 }
 
-function normalizeCodexParamsMap(value: unknown): Record<string, { model: string }> {
-  const result: Record<string, { model: string }> = {};
+function normalizeCodexParamsMap(value: unknown): Record<string, { model: string; effort: string }> {
+  const result: Record<string, { model: string; effort: string }> = {};
   for (const [workspaceRoot, params] of objectEntries(value)) {
     const normalizedWorkspaceRoot = normalizeText(workspaceRoot);
     if (!normalizedWorkspaceRoot) {
@@ -197,6 +197,7 @@ function normalizeCodexParamsMap(value: unknown): Record<string, { model: string
     const source = asPlainObject(params);
     result[normalizedWorkspaceRoot] = {
       model: normalizeText(source.model),
+      effort: normalizeText(source.effort),
     };
   }
   return result;
@@ -312,6 +313,9 @@ function validateBinding(binding: unknown, bindingKey: string): string {
       }
       if ("model" in params && typeof params.model !== "string") {
         return `session store binding ${bindingKey}.codexParamsByWorkspaceRoot.${workspaceRoot}.model must be a string`;
+      }
+      if ("effort" in params && typeof params.effort !== "string") {
+        return `session store binding ${bindingKey}.codexParamsByWorkspaceRoot.${workspaceRoot}.effort must be a string`;
       }
     }
   }

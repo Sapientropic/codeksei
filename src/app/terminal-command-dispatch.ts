@@ -5,6 +5,7 @@ import { runNoteSyncCommand } from "./note-sync-cli";
 import { runProjectRadarCommand } from "./project-radar-cli";
 import { runReminderWriteCommand } from "./reminder-write-cli";
 import { runReviewCommand } from "./review-cli";
+import { runSystemCheckinConfigCommand } from "./system-checkin-config-cli";
 import { runSystemCheckinPoller } from "./system-checkin-poller";
 import { runSystemSendCommand } from "./system-send-cli";
 import { runTimelineEventCommand } from "./timeline-event-cli";
@@ -92,6 +93,9 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
   },
   "system.send": async (_manifest, context) => {
     await runSystemSendCommand(context.config as SystemSendConfig, context.leafArgs);
+  },
+  "system.checkin-config": async (_manifest, context) => {
+    await runSystemCheckinConfigCommand(context.config, context.leafArgs);
   },
   "system.checkin-poller": async (_manifest, context) => {
     await runSystemCheckinPoller(context.config);

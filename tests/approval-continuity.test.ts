@@ -53,6 +53,9 @@ test("approval commands still resolve persisted pending approval after a restart
         textCalls.push({ text: String(payload.text || "") });
       },
     },
+    config: {
+      checkinConfigFile: path.join(os.tmpdir(), "codeksei-approval-checkin.json"),
+    },
     resolveWorkspaceRoot() {
       return "E:/repo/current";
     },

@@ -42,6 +42,8 @@ import { handleReplyDeliveryFailure as processReplyDeliveryFailure } from "./rep
 import { normalizeTrimmedText } from "./approval-command-policy";
 import { runCodekseiAppLifecycle } from "./app-lifecycle-runner";
 import { attachRuntimeEventPipeline } from "./app-runtime-event-pipeline";
+import { formatCheckinRange, resolveCheckinConfig } from "../state/checkin-config";
+import { probeCodexAppServerCapabilities } from "../adapters/runtime/codex/capability-probe";
 import {
   formatErrorMessage,
   resolveLongPollTimeoutMs as resolveAppLongPollTimeoutMs,
@@ -116,11 +118,22 @@ export class CodekseiApp {
   }
 
   printDoctor(): void {
+    const checkinConfigFile = normalizeTrimmedText(this.config.checkinConfigFile);
+    const checkin = checkinConfigFile
+      ? resolveCheckinConfig({ filePath: checkinConfigFile })
+      : null;
     console.log(JSON.stringify({
       stateDir: this.config.stateDir,
       channel: this.channelAdapter.describe(),
       runtime: this.runtimeAdapter.describe(),
+      codexCapabilities: probeCodexAppServerCapabilities(this.config.codexCommand || "codex"),
       timeline: this.timelineIntegration.describe(),
+      checkin: checkin
+        ? {
+          ...checkin,
+          range: formatCheckinRange(checkin),
+        }
+        : null,
       threads: this.threadStateStore.snapshot(),
     }, null, 2));
   }
