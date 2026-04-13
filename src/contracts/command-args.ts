@@ -30,7 +30,7 @@ function createCommandArgSchema({
   passthrough?: CommandArgPassthrough | null;
 }): CommandArgSchema {
   return Object.freeze({
-    flags: Object.freeze(flags.map((flag: any, index: any) => Object.freeze({
+    flags: Object.freeze(flags.map((flag: CommandArgFlag, index: number) => Object.freeze({
       description: "",
       placeholder: "",
       required: false,
@@ -181,6 +181,6 @@ export function listCommandArgFlagsForHelp(name: string): CommandArgFlag[] {
   }
   return schema.flags
     .slice()
-    .sort((left: any, right: any) => (left.helpOrder || 0) - (right.helpOrder || 0))
-    .map((flag: any) => ({ ...flag, keys: Array.isArray(flag.keys) ? flag.keys.slice() : [] }));
+    .sort((left: CommandArgFlag, right: CommandArgFlag) => (left.helpOrder || 0) - (right.helpOrder || 0))
+    .map((flag: CommandArgFlag) => ({ ...flag, keys: Array.isArray(flag.keys) ? flag.keys.slice() : [] }));
 }

@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 import { readConfig } from "../core/config";
 import { runTimelineBuildCommand } from "./runtime/app/timeline-build-cli";
 import { runTimelineCategoriesCommand } from "./runtime/app/timeline-categories-cli";
@@ -60,10 +61,6 @@ Commands:
 `);
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 if (require.main === module) {
   void main().catch((error: unknown) => {
     const message = error instanceof Error ? error.stack || error.message : String(error);
@@ -75,3 +72,4 @@ if (require.main === module) {
 export {
   main,
 };
+

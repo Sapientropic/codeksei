@@ -1,3 +1,4 @@
+import { normalizeText } from "./text-normalization";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -388,35 +389,39 @@ function normalizeRelativePath(value: unknown): string {
     .replace(/\/+$/, "");
 }
 
-function isReadableDirectory(directoryPath: any) {
+function isReadableDirectory(directoryPath: unknown): boolean {
+  const normalizedPath = normalizeText(directoryPath);
+  if (!normalizedPath) {
+    return false;
+  }
   try {
-    return fs.statSync(directoryPath).isDirectory();
+    return fs.statSync(normalizedPath).isDirectory();
   } catch {
     return false;
   }
 }
 
-function isReadableFile(filePath: any) {
+function isReadableFile(filePath: unknown): boolean {
+  const normalizedPath = normalizeText(filePath);
+  if (!normalizedPath) {
+    return false;
+  }
   try {
-    return fs.statSync(filePath).isFile();
+    return fs.statSync(normalizedPath).isFile();
   } catch {
     return false;
   }
 }
 
-function normalizeCommandStdout(value: any) {
+function normalizeCommandStdout(value: unknown): string {
   return String(value || "").replace(/\r\n/g, "\n").trimEnd();
 }
 
-function normalizeCommandStderr(value: any) {
+function normalizeCommandStderr(value: unknown): string {
   return String(value || "").replace(/\r\n/g, "\n").trim();
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function formatErrorMessage(error: any) {
+function formatErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error || "unknown error");
 }
 
@@ -425,3 +430,4 @@ export {
   listTrackedProjects,
   loadProjectRadarConfig,
 };
+

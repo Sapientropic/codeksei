@@ -1,3 +1,4 @@
+import { normalizeText } from "../../core/text-normalization";
 import { spawn } from "node:child_process";
 
 import { resolveTimelineStateFiles } from "../../core/timezone";
@@ -130,7 +131,7 @@ function normalizeArgs(args: unknown): string[] {
 }
 
 function normalizeTimelineArgs(subcommand: string, args: unknown): string[] {
-  const normalizedArgs = normalizeArgs(args).filter((value: any) => value !== "--");
+  const normalizedArgs = normalizeArgs(args).filter((value: string) => value !== "--");
   if (!["read", "write"].includes(subcommand)) {
     return normalizedArgs;
   }
@@ -186,10 +187,6 @@ function normalizeTimelineArgs(subcommand: string, args: unknown): string[] {
 
 function isIsoDateToken(value: unknown): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(normalizeText(value));
-}
-
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function resolveTimelineChromePath() {
@@ -286,3 +283,4 @@ export {
   normalizeTimelineArgs,
   shouldForwardTimelineStdin,
 };
+

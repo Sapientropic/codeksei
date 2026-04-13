@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 import * as http from "node:http";
 import {
   isPidAlive,
@@ -78,10 +79,6 @@ function checkReadyz(): Promise<boolean> {
   });
 }
 
-function normalizeText(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 if (require.main === module) {
   main().catch((error: unknown) => {
     console.error(error instanceof Error ? error.message || error.stack || String(error) : String(error));
@@ -94,3 +91,4 @@ export {
   checkReadyz,
   main,
 };
+

@@ -1,3 +1,4 @@
+import { normalizeText } from "../../../core/text-normalization";
 const TEXT_ITEM_TYPE = 1;
 const IMAGE_ITEM_TYPE = 2;
 const VOICE_ITEM_TYPE = 3;
@@ -217,10 +218,6 @@ function parseOptionalInt(value: unknown): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function resolveReceivedAt(message: LooseRecord): string {
   const rawMs = Number(message?.create_time_ms);
   if (Number.isFinite(rawMs) && rawMs > 0) {
@@ -240,3 +237,4 @@ function isRecord(value: unknown): value is LooseRecord {
 export {
   normalizeWeixinIncomingMessage,
 };
+

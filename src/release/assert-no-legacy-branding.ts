@@ -62,7 +62,7 @@ function isAllowedReadmeAcknowledgement(filePath: string, line: string): boolean
   if (relativePath !== "README.md" && relativePath !== "README.en.md") {
     return false;
   }
-  return README_ACKNOWLEDGEMENT_SNIPPETS.some((snippet: any) => line.includes(snippet));
+  return README_ACKNOWLEDGEMENT_SNIPPETS.some((snippet: string) => line.includes(snippet));
 }
 
 function assertNoLegacyBranding({ files = collectFiles(TARGETS) }: { files?: string[] } = {}): void {

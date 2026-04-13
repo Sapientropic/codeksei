@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -177,10 +178,7 @@ function isAscii(value: unknown): boolean {
   return true;
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 export {
   DEFAULT_ALIAS_MANIFEST,
 };
+

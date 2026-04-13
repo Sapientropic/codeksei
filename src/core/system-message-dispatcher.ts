@@ -1,3 +1,4 @@
+import { normalizeText } from "./text-normalization";
 import type { SystemMessage } from "../contracts/queue-items";
 import type { NormalizedIncomingMessage } from "./runtime-types";
 import { resolvePromptPersonEn } from "./person-reference";
@@ -120,8 +121,5 @@ function normalizeIsoTime(value: unknown): string {
   return new Date(parsed).toISOString();
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 export { SystemMessageDispatcher };
+

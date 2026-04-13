@@ -1,3 +1,4 @@
+const { normalizeText }: typeof import("../src/core/text-normalization") = require("../src/core/text-normalization");
 const test: typeof import("node:test") = require("node:test");
 const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 
@@ -33,9 +34,7 @@ function createLifecycleHarness() {
     normalizeCommandArgument(value: unknown) {
       return typeof value === "string" ? value.trim() : "";
     },
-    normalizeText(value: unknown) {
-      return typeof value === "string" ? value.trim() : "";
-    },
+    normalizeText,
     resolveReplyTargetForBinding() {
       return null;
     },

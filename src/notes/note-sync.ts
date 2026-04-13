@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -318,10 +319,10 @@ function upsertParagraph(sectionMain: unknown, text: unknown): string {
 
   const blocks = normalizeFileEnding(sectionMain)
     .split(/\n{2,}/u)
-    .map((block: any) => block.trim())
+    .map((block: string) => block.trim())
     .filter(Boolean);
   const comparableText = normalizeComparableText(normalizedText);
-  if (blocks.some((block: any) => normalizeComparableText(block) === comparableText)) {
+  if (blocks.some((block: string) => normalizeComparableText(block) === comparableText)) {
     return normalizeFileEnding(sectionMain).trimEnd();
   }
 
@@ -487,10 +488,6 @@ function normalizeFileEnding(value: unknown): string {
   return String(value || "").replace(/\r\n/g, "\n");
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function ensureTrailingNewline(value: unknown): string {
   const normalized = normalizeFileEnding(value);
   return normalized.endsWith("\n") ? normalized : `${normalized}\n`;
@@ -513,3 +510,4 @@ export {
   syncNoteContent,
   syncNoteFile,
 };
+

@@ -1,3 +1,4 @@
+import { normalizeText } from "../../core/text-normalization";
 // @ts-check
 
 import { sanitizeProtocolLeakText } from "../../adapters/runtime/codex/protocol-leak-monitor";
@@ -18,10 +19,7 @@ export interface SanitizedReplyText {
   suppress: boolean;
   text: string;
 }
-
-export function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
+export { normalizeText };
 
 export function normalizeLineEndings(value: unknown): string {
   return String(value || "").replace(/\r\n/g, "\n");
@@ -277,3 +275,4 @@ export function sanitizeReplyText(
     text: trimOuterBlankLines(deduped),
   };
 }
+

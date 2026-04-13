@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 import { loadPersistedContextTokens } from "../adapters/channel/weixin/context-token-store";
 import type { SessionBinding } from "../contracts/session-state";
 
@@ -214,6 +215,3 @@ function collectWorkspaceRoots(binding: SessionBindingLike | null | undefined): 
   return Array.from(workspaceRoots).sort((left, right) => left.localeCompare(right));
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}

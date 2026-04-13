@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { formatErrorMessage } from "../core/error-handling";
 import { readPrefixedEnv } from "../core/branding";
 import { resolveCodexWorkspaceRoot } from "../workspace/workspace-alias";
 import {
@@ -7,6 +8,9 @@ import {
   resolveBoundThread,
   resolveSharedProcessContext,
 } from "./shared-common";
+
+type ChildExitCode = number | null;
+type ChildSignal = NodeJS.Signals | null;
 
 
 async function main() {
@@ -33,7 +37,7 @@ async function main() {
     windowsHide: true,
   });
 
-  child.on("exit", (code: any, signal: any) => {
+  child.on("exit", (code: ChildExitCode, signal: ChildSignal) => {
     if (signal) {
       process.kill(process.pid, signal);
       return;
@@ -43,8 +47,8 @@ async function main() {
 }
 
 if (require.main === module) {
-  main().catch((error: any) => {
-    console.error(error.message || String(error));
+  main().catch((error: unknown) => {
+    console.error(formatErrorMessage(error));
     process.exit(1);
   });
 }

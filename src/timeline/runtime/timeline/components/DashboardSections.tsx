@@ -1,4 +1,4 @@
-import type { CSSProperties, JSX } from "react";
+import type { CSSProperties, JSX, PointerEvent as ReactPointerEvent } from "react";
 import {
   Bar,
   BarChart,
@@ -10,6 +10,8 @@ import {
   ResponsiveContainer,
   XAxis,
   YAxis,
+  type PieLabelRenderProps,
+  type PieSectorDataItem,
 } from "recharts";
 
 import type {
@@ -77,6 +79,14 @@ interface PieLegendItem {
 interface EventBlockGridProps {
   events: TimelineEventBlock[];
   color: string;
+}
+
+interface CategoryClickPayload {
+  categoryId?: string;
+}
+
+interface SubcategoryClickPayload {
+  subcategoryId?: string;
 }
 
 function HeaderStats({
@@ -158,18 +168,18 @@ function AnalyticsPanels({
   // briefly leave a native blue focus ring on the sector/surface even after disabling
   // the accessibility layer. Clearing focus on pointer down/up keeps the pie charts
   // visually stable. Bar charts likely need a different fix, so keep this scoped to pie.
-  const handlePieChartPointerDown = (event: any) => {
-    if (event?.detail <= 0) {
+  const handlePieChartPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (Number(event.detail || 0) <= 0) {
       return;
     }
     if (event.target instanceof SVGElement) {
-      event.preventDefault?.();
+      event.preventDefault();
       event.target.blur?.();
     }
   };
 
-  const handlePieChartPointerCommit = (event: any) => {
-    if (event?.detail <= 0) {
+  const handlePieChartPointerCommit = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (Number(event.detail || 0) <= 0) {
       return;
     }
     requestAnimationFrame(() => {
@@ -194,9 +204,9 @@ function AnalyticsPanels({
           </div>
           {categories.length ? (
             <div className="pie-with-legend">
-              <div className="pie-chart-shell">
+              <div className="pie-chart-shell" onPointerDown={handlePieChartPointerDown} onPointerUp={handlePieChartPointerCommit}>
                 <ResponsiveContainer width="100%" height={248}>
-                  <PieChart accessibilityLayer={false} onMouseDown={handlePieChartPointerDown} onMouseUp={handlePieChartPointerCommit}>
+                  <PieChart accessibilityLayer={false}>
                     <Pie
                       data={categories}
                       dataKey="minutes"
@@ -207,8 +217,11 @@ function AnalyticsPanels({
                       stroke="none"
                       style={{ outline: "none" }}
                       labelLine={{ stroke: "rgba(127, 140, 163, 0.6)", strokeWidth: 1 }}
-                      label={renderPieLabel as any}
-                      onClick={(entry: any) => onCategorySelect(String(entry?.categoryId || ""))}
+                      label={renderPieLabel}
+                      onClick={(entry: PieSectorDataItem) => {
+                        const payload = entry.payload as CategoryClickPayload | undefined;
+                        onCategorySelect(String(payload?.categoryId || ""));
+                      }}
                     >
                       {categories.map((entry) => (
                         <Cell key={entry.categoryId} fill={entry.color} stroke="none" style={{ outline: "none" }} />
@@ -250,9 +263,9 @@ function AnalyticsPanels({
           </div>
           {styledSubcategories.length ? (
             <div className="pie-with-legend">
-              <div className="pie-chart-shell">
+              <div className="pie-chart-shell" onPointerDown={handlePieChartPointerDown} onPointerUp={handlePieChartPointerCommit}>
                 <ResponsiveContainer width="100%" height={248}>
-                  <PieChart accessibilityLayer={false} onMouseDown={handlePieChartPointerDown} onMouseUp={handlePieChartPointerCommit}>
+                  <PieChart accessibilityLayer={false}>
                     <Pie
                       data={styledSubcategories}
                       dataKey="minutes"
@@ -263,8 +276,11 @@ function AnalyticsPanels({
                       stroke="none"
                       style={{ outline: "none" }}
                       labelLine={{ stroke: "rgba(127, 140, 163, 0.6)", strokeWidth: 1 }}
-                      label={renderPieLabel as any}
-                      onClick={(entry: any) => onSubcategorySelect(String(entry?.subcategoryId || ""))}
+                      label={renderPieLabel}
+                      onClick={(entry: PieSectorDataItem) => {
+                        const payload = entry.payload as SubcategoryClickPayload | undefined;
+                        onSubcategorySelect(String(payload?.subcategoryId || ""));
+                      }}
                     >
                       {styledSubcategories.map((entry) => (
                         <Cell key={entry.subcategoryId} fill={entry.shadeColor} stroke="none" style={{ outline: "none" }} />
@@ -376,12 +392,15 @@ function renderPieLabel({
   outerRadius,
   percent,
   name,
-}: any): JSX.Element {
+}: PieLabelRenderProps): JSX.Element {
   const RADIAN = Math.PI / 180;
+  const angle = Number(midAngle || 0);
+  const centerX = Number(cx || 0);
+  const centerY = Number(cy || 0);
   const radius = Number(outerRadius || 0) + 18;
-  const x = Number(cx || 0) + radius * Math.cos(-midAngle * RADIAN);
-  const y = Number(cy || 0) + radius * Math.sin(-midAngle * RADIAN);
-  const textAnchor = x >= Number(cx || 0) ? "start" : "end";
+  const x = centerX + radius * Math.cos(-angle * RADIAN);
+  const y = centerY + radius * Math.sin(-angle * RADIAN);
+  const textAnchor = x >= centerX ? "start" : "end";
   return (
     <text
       x={x}
@@ -392,7 +411,7 @@ function renderPieLabel({
       textAnchor={textAnchor}
       dominantBaseline="central"
     >
-      {`${name} ${formatPercent(percent)}`}
+      {`${String(name || "")} ${formatPercent(Number(percent || 0))}`}
     </text>
   );
 }

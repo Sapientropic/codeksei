@@ -1,3 +1,4 @@
+import { normalizeText } from "../../../core/text-normalization";
 import { CodexRpcClient } from "./rpc-client";
 import type { RuntimeClientLike } from "./diagnostics";
 
@@ -128,6 +129,3 @@ function isReconnectableRuntimeError(error: unknown): boolean {
     || message.includes("Codex RPC client closed");
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}

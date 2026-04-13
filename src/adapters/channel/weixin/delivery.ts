@@ -1,3 +1,4 @@
+import { normalizeText } from "../../../core/text-normalization";
 import * as crypto from "node:crypto";
 import {
   getConfigV2,
@@ -232,6 +233,3 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}

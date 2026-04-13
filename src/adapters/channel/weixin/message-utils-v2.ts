@@ -1,3 +1,4 @@
+import { normalizeText } from "../../../core/text-normalization";
 const MESSAGE_TYPE_USER = 1;
 const MESSAGE_TYPE_BOT = 2;
 const MESSAGE_ITEM_TEXT = 1;
@@ -307,10 +308,6 @@ function pruneSeen(seen: Map<string, number>): void {
   }
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function isRecord(value: unknown): value is LooseRecord {
   return Boolean(value) && typeof value === "object";
 }
@@ -319,3 +316,4 @@ export {
   createInboundFilter,
   bodyFromItemList,
 };
+

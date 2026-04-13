@@ -83,7 +83,7 @@ function readConfig() {
   };
 }
 
-function normalizeWeixinReplyMode(value: any) {
+function normalizeWeixinReplyMode(value: unknown): "settled" | "stream" {
   return String(value || "").trim().toLowerCase() === "settled" ? "settled" : "stream";
 }
 

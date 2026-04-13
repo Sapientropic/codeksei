@@ -1,3 +1,4 @@
+import { normalizeText } from "../../../core/text-normalization";
 type PlainObject = Record<string, unknown>;
 
 export interface RawModelCatalogEntry extends PlainObject {
@@ -141,10 +142,7 @@ export function normalizeReasoningEfforts(efforts: unknown): string[] {
   }
   return result;
 }
-
-export function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
+export { normalizeText };
 
 function normalizeSingleModel(model: RawModelCatalogEntry): NormalizedModelCatalogEntry | null {
   const modelId = normalizeText(model.model);
@@ -182,3 +180,4 @@ function isPlainObject(value: unknown): value is PlainObject {
 export type {
   PlainObject as ModelCatalogPlainObject,
 };
+

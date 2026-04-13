@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 import {
   compareTimelineScreenshotJobs,
   normalizeTimelineScreenshotJob,
@@ -90,8 +91,5 @@ class TimelineScreenshotQueueStore {
   }
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 export { TimelineScreenshotQueueStore };
+

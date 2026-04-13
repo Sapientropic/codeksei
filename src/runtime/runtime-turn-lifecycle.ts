@@ -1,6 +1,8 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { ignoreBestEffortError } from "../core/error-handling";
+import { userFacingMessages } from "../core/message-catalog";
 import type { SessionStore } from "../adapters/runtime/codex/session-store";
 import type {
   AppRuntimeConfig,
@@ -242,11 +244,14 @@ export class RuntimeTurnLifecycle {
 
     if (reportFailureToUser) {
       const messageText = this.normalizeText(sendResult.reason) || "unknown error";
-      await this.channelAdapter.sendText({
+      await ignoreBestEffortError(this.channelAdapter.sendText({
         userId: normalized.senderId,
-        text: `处理失败：${messageText}`,
+        text: userFacingMessages.runtimeSendFailed(messageText),
         contextToken: normalized.contextToken,
-      }).catch(() => {});
+      }), {
+        label: "runtime turn failure notice",
+        reason: "user-visible retry notice is best-effort cleanup after a failed send",
+      });
     }
     if (throwOnFailure) {
       if ("error" in sendResult && sendResult.error) {
@@ -285,23 +290,29 @@ export class RuntimeTurnLifecycle {
     });
 
     if (!persisted.saved.length && persisted.failed.length && !String(normalized.text || "").trim()) {
-      await this.channelAdapter.sendText({
+      await ignoreBestEffortError(this.channelAdapter.sendText({
         userId: normalized.senderId,
-        text: `图片/附件接收失败：${persisted.failed.map((item) => item.reason).join("; ")}`,
+        text: userFacingMessages.attachmentReceiveFailed(persisted.failed.map((item) => item.reason)),
         contextToken: normalized.contextToken,
         preserveBlock: true,
-      }).catch(() => {});
+      }), {
+        label: "attachment failure notice",
+        reason: "attachment persistence failure should still return null even if the courtesy notice cannot be delivered",
+      });
       return null;
     }
 
     const codexInboundText = this.buildCodexInboundText(normalized, persisted, this.config);
     if (!codexInboundText) {
-      await this.channelAdapter.sendText({
+      await ignoreBestEffortError(this.channelAdapter.sendText({
         userId: normalized.senderId,
-        text: `图片/附件接收失败：${persisted.failed.map((item) => item.reason).join("; ")}`,
+        text: userFacingMessages.attachmentReceiveFailed(persisted.failed.map((item) => item.reason)),
         contextToken: normalized.contextToken,
         preserveBlock: true,
-      }).catch(() => {});
+      }), {
+        label: "attachment-only failure notice",
+        reason: "the user-facing attachment failure notice is best-effort after the runtime payload collapsed to empty",
+      });
       return null;
     }
 
@@ -329,11 +340,14 @@ export class RuntimeTurnLifecycle {
       return runner();
     }
 
-    await this.channelAdapter.sendTyping({
+    await ignoreBestEffortError(this.channelAdapter.sendTyping({
       userId: normalizedUserId,
       status: 1,
       contextToken,
-    }).catch(() => {});
+    }), {
+      label: "typing start",
+      reason: "typing start should not block the actual runtime work",
+    });
 
     let succeeded = false;
     try {
@@ -342,11 +356,14 @@ export class RuntimeTurnLifecycle {
       return result;
     } finally {
       if (clearOnSuccess || !succeeded) {
-        await this.channelAdapter.sendTyping({
+        await ignoreBestEffortError(this.channelAdapter.sendTyping({
           userId: normalizedUserId,
           status: 0,
           contextToken,
-        }).catch(() => {});
+        }), {
+          label: "typing stop",
+          reason: "typing stop is best-effort cleanup after the runtime work has already settled",
+        });
       }
     }
   }

@@ -2,7 +2,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { chromium } from "playwright-core";
+import { chromium, type Browser, type Page } from "playwright-core";
+import { ignoreCleanupError } from "../../../../core/error-handling";
 
 import type {
   TimelineRangeKey,
@@ -76,6 +77,8 @@ interface TimelineItemMatchAttributes {
   labelAttribute: string;
 }
 
+type TimelineSiteServerHandle = Awaited<ReturnType<typeof startTimelineSiteServer>>;
+
 async function captureTimelineScreenshot(
   config: TimelineRuntimeConfig,
   options: TimelineScreenshotInput = {},
@@ -85,9 +88,9 @@ async function captureTimelineScreenshot(
 
   await buildTimelineSite(config);
 
-  let server = null;
-  let serverInfo = null;
-    let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
+  let server: TimelineSiteServerHandle["server"] | null = null;
+  let serverInfo: TimelineSiteServerHandle["info"] | null = null;
+  let browser: Browser | null = null;
   try {
     const started = await startTimelineSiteServer(config, { port: 0 });
     server = started.server;
@@ -129,7 +132,10 @@ async function captureTimelineScreenshot(
     };
   } finally {
     if (browser) {
-      await browser.close().catch(() => {});
+      await ignoreCleanupError(browser.close(), {
+        label: "timeline screenshot browser close",
+        reason: "screenshot teardown should not fail after capture has already completed",
+      });
     }
     if (server && serverInfo) {
       await closeTimelineSiteServer(server);
@@ -345,7 +351,7 @@ function dedupePaths(paths: string[]): string[] {
   return output;
 }
 
-async function waitForDashboardReady(page: any, selector: string = ".page"): Promise<void> {
+async function waitForDashboardReady(page: Page, selector: string = ".page"): Promise<void> {
   await waitForDashboardShell(page);
   await waitForTargetVisible(page, selector);
   const targetKind = resolveScreenshotTargetKind(selector);
@@ -394,11 +400,11 @@ function resolveScreenshotTargetKind(selector: string): "timeline" | "events" | 
   return "page";
 }
 
-async function waitForTargetVisible(page: any, selector: string): Promise<void> {
+async function waitForTargetVisible(page: Page, selector: string): Promise<void> {
   await page.locator(selector).first().waitFor({ state: "visible", timeout: 15_000 });
 }
 
-async function waitForTimelineSection(page: any): Promise<void> {
+async function waitForTimelineSection(page: Page): Promise<void> {
   await page.waitForFunction(() => {
     const timelineRoot = document.querySelector(".screenshot-target-timeline");
     if (!(timelineRoot instanceof HTMLElement)) {
@@ -418,7 +424,7 @@ async function waitForTimelineSection(page: any): Promise<void> {
   }, { timeout: 15_000 });
 }
 
-async function waitForEventsSection(page: any): Promise<void> {
+async function waitForEventsSection(page: Page): Promise<void> {
   await page.waitForFunction(() => {
     const eventsRoot = document.querySelector(".screenshot-target-events");
     if (!(eventsRoot instanceof HTMLElement)) {
@@ -437,7 +443,7 @@ async function waitForEventsSection(page: any): Promise<void> {
   }, { timeout: 15_000 });
 }
 
-async function waitForAnalyticsSection(page: any): Promise<void> {
+async function waitForAnalyticsSection(page: Page): Promise<void> {
   await page.waitForFunction(() => {
     const root = document.querySelector(".screenshot-target-analytics");
     if (!(root instanceof HTMLElement)) {
@@ -466,7 +472,7 @@ async function waitForAnalyticsSection(page: any): Promise<void> {
   }, { timeout: 15_000 });
 }
 
-async function waitForDashboardShell(page: any): Promise<void> {
+async function waitForDashboardShell(page: Page): Promise<void> {
   await page.locator(".page").waitFor({ state: "visible", timeout: 15_000 });
   await page.waitForFunction(async () => {
     if (!("fonts" in document) || !document.fonts || typeof document.fonts.ready?.then !== "function") {
@@ -477,7 +483,7 @@ async function waitForDashboardShell(page: any): Promise<void> {
   }, { timeout: 15_000 });
 }
 
-async function applyScreenshotControls(page: any, options: TimelineScreenshotOptions): Promise<void> {
+async function applyScreenshotControls(page: Page, options: TimelineScreenshotOptions): Promise<void> {
   if (options.range) {
     await selectRangeTab(page, options.range);
   }
@@ -492,7 +498,7 @@ async function applyScreenshotControls(page: any, options: TimelineScreenshotOpt
   }
 }
 
-async function selectRangeTab(page: any, range: TimelineRangeKey): Promise<void> {
+async function selectRangeTab(page: Page, range: TimelineRangeKey): Promise<void> {
   const button = page.locator(`.tabbar button[data-range-id="${range}"]`).first();
   await button.waitFor({ state: "visible", timeout: 15_000 });
   const active = await button.evaluate((element: HTMLElement) => element.classList.contains("active")).catch(() => false);
@@ -505,7 +511,7 @@ async function selectRangeTab(page: any, range: TimelineRangeKey): Promise<void>
   }, range, { timeout: 15_000 });
 }
 
-async function selectRangeValue(page: any, requestedValue: string): Promise<void> {
+async function selectRangeValue(page: Page, requestedValue: string): Promise<void> {
   const trigger = page.locator('.range-select-trigger[data-range-trigger="true"]').first();
   await trigger.waitFor({ state: "visible", timeout: 15_000 });
   await trigger.click();
@@ -525,7 +531,7 @@ async function selectRangeValue(page: any, requestedValue: string): Promise<void
   }, match.label, { timeout: 15_000 });
 }
 
-async function selectLegendItem(page: any, kind: "category" | "subcategory", requestedValue: string): Promise<void> {
+async function selectLegendItem(page: Page, kind: "category" | "subcategory", requestedValue: string): Promise<void> {
   const selector = `.pie-legend-row[data-legend-kind="${kind}"]`;
   const match = await findMatchingItem(page, selector, requestedValue, {
     idAttribute: "data-legend-id",
@@ -543,7 +549,7 @@ async function selectLegendItem(page: any, kind: "category" | "subcategory", req
   }, `${selector}[data-legend-id="${match.id}"]`, { timeout: 15_000 });
 }
 
-async function selectSubcategoryItem(page: any, requestedValue: string, categoryValue: string): Promise<void> {
+async function selectSubcategoryItem(page: Page, requestedValue: string, categoryValue: string): Promise<void> {
   const selector = '.pie-legend-row[data-legend-kind="subcategory"]';
   let match = await findMatchingItem(page, selector, requestedValue, {
     idAttribute: "data-legend-id",
@@ -580,7 +586,7 @@ async function selectSubcategoryItem(page: any, requestedValue: string, category
 }
 
 async function findMatchingItem(
-  page: any,
+  page: Page,
   selector: string,
   requestedValue: string,
   attributes: TimelineItemMatchAttributes,

@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 import { z } from "zod";
 
 type PlainObject = Record<string, unknown>;
@@ -402,10 +403,6 @@ function normalizeIsoTimestamp(value: unknown): string {
   return Number.isFinite(parsed) ? new Date(parsed).toISOString() : "";
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function objectEntries(value: unknown): Array<[string, unknown]> {
   return isPlainObject(value) ? Object.entries(value) : [];
 }
@@ -437,3 +434,4 @@ function asRawAvailableModelCatalog(value: unknown): RawAvailableModelCatalog {
 function asRawSessionState(value: unknown): RawSessionState {
   return isPlainObject(value) ? value as RawSessionState : {};
 }
+

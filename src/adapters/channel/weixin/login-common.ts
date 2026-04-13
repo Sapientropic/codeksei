@@ -40,7 +40,7 @@ function cleanupStaleAccountsForUserId(
   if (!activeUserId) {
     return [];
   }
-  const staleAccounts = listWeixinAccounts(config).filter((account: any) => (
+  const staleAccounts = listWeixinAccounts(config).filter((account: WeixinAccountRecord) => (
     account.accountId !== activeAccount.accountId
     && typeof account.userId === "string"
     && account.userId.trim() === activeUserId

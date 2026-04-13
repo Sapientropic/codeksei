@@ -639,8 +639,8 @@ function slugify(value: unknown): string {
     .slice(0, 80) || "event";
 }
 
-function asRecord(value: unknown): Record<string, any> | null {
-  return value && typeof value === "object" ? (value as Record<string, any>) : null;
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
 }
 
 export {

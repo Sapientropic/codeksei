@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 // @ts-check
 
 import * as fs from "node:fs";
@@ -181,10 +182,6 @@ function normalizeLineEnding(value: unknown): string {
   return String(value || "").replace(/\r\n/g, "\n");
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function escapeRegExp(value: unknown): string {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -195,3 +192,4 @@ export {
   parseDiaryFile,
   parseNightlyReviewFile,
 };
+

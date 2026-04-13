@@ -1,5 +1,3 @@
-// @ts-check
-
 import {
   hasCompletedFlushTrigger,
   hasNaturalFlushBoundary,
@@ -8,47 +6,52 @@ import {
   shouldScheduleStreamingIdleFlush,
   type FlushTrigger,
 } from "./delivery-transport";
+import type { RunState } from "./run-state";
 import { normalizeText } from "./visible-text";
 
-/**
-/**
- * @typedef {{
- *   scheduledFlushTimer: NodeJS.Timeout | null,
- *   flushPromise: Promise<void> | null,
- *   sendChain: Promise<void>,
- *   replyTarget?: { provider?: string } | null,
- *   weixinReplyMode?: string,
- *   items: Map<string, unknown>,
- * }} FlushState
- */
+type FlushState = RunState;
 
-/**
- * @typedef {{
- *   REPLY_COMPLETED: string,
- *   TURN_COMPLETED: string,
- * }} RuntimeEventTypes
- */
+interface RuntimeEventTypes {
+  REPLY_COMPLETED: string;
+  TURN_COMPLETED: string;
+}
 
-/**
- * @param {{
- *   flushNow(state: FlushState, options: { force: boolean, trigger?: FlushTrigger }): Promise<void>,
- *   runtimeEventTypes: RuntimeEventTypes,
- *   streamIdleFlushMs: number,
- *   streamForceFlushChars: number,
- *   streamBoundaryFlushChars: number,
- * }} options
- */
+interface FlushExecutionOptions {
+  force: boolean;
+  trigger?: FlushTrigger | null;
+}
+
+interface FlushSchedulerOptions {
+  flushNow(state: FlushState, options: FlushExecutionOptions): Promise<void>;
+  runtimeEventTypes: RuntimeEventTypes;
+  streamIdleFlushMs: number;
+  streamForceFlushChars: number;
+  streamBoundaryFlushChars: number;
+}
+
+interface FlushScheduler {
+  clearScheduledFlush(state: FlushState | null | undefined): void;
+  flush(state: FlushState, options: FlushExecutionOptions): Promise<void>;
+  scheduleStreamingFlush(state: FlushState, options?: Partial<FlushExecutionOptions>): void;
+  serializeSend(state: FlushState, sendOperation: () => Promise<void>): Promise<void>;
+}
+
+function recoverSerializedWork(previous: Promise<void>): Promise<void> {
+  return previous.catch(() => undefined);
+}
+
+function rememberSendChain(current: Promise<void>): Promise<void> {
+  return current.catch(() => undefined);
+}
+
 function createFlushScheduler({
   flushNow,
   runtimeEventTypes,
   streamIdleFlushMs,
   streamForceFlushChars,
   streamBoundaryFlushChars,
-}: any) {
-  /**
-   * @param {FlushState | null | undefined} state
-   */
-  function clearScheduledFlush(state: any) {
+}: FlushSchedulerOptions): FlushScheduler {
+  function clearScheduledFlush(state: FlushState | null | undefined): void {
     if (!state?.scheduledFlushTimer) {
       return;
     }
@@ -59,19 +62,9 @@ function createFlushScheduler({
   return {
     clearScheduledFlush,
 
-    /**
-     * Serialize flush work per run so REPLY_COMPLETED / TURN_COMPLETED cannot
-     * overlap with an earlier idle flush. Future callers should keep this queue
-     * local to run-state instead of inventing another scheduler layer.
-     *
-     * @param {FlushState} state
-     * @param {{ force: boolean, trigger?: FlushTrigger | null }} options
-     */
-    async flush(state: any, { force, trigger = null }: any) {
+    async flush(state: FlushState, { force, trigger = null }: FlushExecutionOptions): Promise<void> {
       const previous = state.flushPromise || Promise.resolve();
-      const current = previous
-        .catch(() => {})
-        .then(() => flushNow(state, { force, trigger }));
+      const current = recoverSerializedWork(previous).then(() => flushNow(state, { force, trigger }));
       const tracked = current.finally(() => {
         if (state.flushPromise === tracked) {
           state.flushPromise = null;
@@ -81,11 +74,10 @@ function createFlushScheduler({
       await tracked;
     },
 
-    /**
-     * @param {FlushState} state
-     * @param {{ force?: boolean, trigger?: FlushTrigger | null }} [options]
-     */
-    scheduleStreamingFlush(state: any, { force = false, trigger = null }: any = {}) {
+    scheduleStreamingFlush(
+      state: FlushState,
+      { force = false, trigger = null }: Partial<FlushExecutionOptions> = {},
+    ): void {
       if (!prefersStreamingDelivery(state)) {
         return;
       }
@@ -125,20 +117,10 @@ function createFlushScheduler({
       }, streamIdleFlushMs);
     },
 
-    /**
-     * Serialize actual sends per run. The chain intentionally swallows the
-     * previous failure when scheduling the next send so a single WeChat send
-     * error does not poison the rest of the local cleanup path.
-     *
-     * @param {FlushState} state
-     * @param {() => Promise<void>} sendOperation
-     */
-    serializeSend(state: any, sendOperation: any) {
+    serializeSend(state: FlushState, sendOperation: () => Promise<void>): Promise<void> {
       const previous = state.sendChain || Promise.resolve();
-      const current = previous
-        .catch(() => {})
-        .then(() => sendOperation());
-      state.sendChain = current.catch(() => {});
+      const current = recoverSerializedWork(previous).then(() => sendOperation());
+      state.sendChain = rememberSendChain(current);
       return current;
     },
   };
@@ -146,4 +128,8 @@ function createFlushScheduler({
 
 export {
   createFlushScheduler,
+  type FlushExecutionOptions,
+  type FlushScheduler,
+  type FlushState,
+  type RuntimeEventTypes,
 };

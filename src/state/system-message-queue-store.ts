@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 import * as path from "node:path";
 
 import {
@@ -388,10 +389,6 @@ function formatIsoTime(value: unknown): string {
   return new Date(Number.isFinite(numeric) ? numeric : Date.now()).toISOString();
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -402,3 +399,4 @@ export {
   SystemMessageQueueStore,
   SYSTEM_MESSAGE_KIND_POLICIES,
 };
+

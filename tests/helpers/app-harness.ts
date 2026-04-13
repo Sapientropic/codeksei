@@ -1,3 +1,4 @@
+const { normalizeText }: typeof import("../../src/core/text-normalization") = require("../../src/core/text-normalization");
 const fs: typeof import("node:fs") = require("node:fs");
 const os: typeof import("node:os") = require("node:os");
 const path: typeof import("node:path") = require("node:path");
@@ -453,10 +454,6 @@ function formatErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message || error.stack || String(error) : String(error || "unknown error");
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function resolveTimelineScreenshotOutput(tempRoot: string, args: string[]): string {
   for (let index = 0; index < args.length; index += 1) {
     if (args[index] === "--output" && args[index + 1]) {
@@ -469,3 +466,4 @@ function resolveTimelineScreenshotOutput(tempRoot: string, args: string[]): stri
 module.exports = {
   createTestAppHarness,
 };
+

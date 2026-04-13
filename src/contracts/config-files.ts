@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 type PlainObject = Record<string, unknown>;
 
 export interface NormalizedBootstrapFileCandidate extends PlainObject {
@@ -263,10 +264,7 @@ function normalizePositiveInteger(value: unknown): number {
   return Number.isInteger(numeric) && numeric > 0 ? numeric : 0;
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function isPlainObject(value: unknown): value is PlainObject {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
+

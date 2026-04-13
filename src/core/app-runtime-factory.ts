@@ -276,26 +276,18 @@ export function createAppServices({
   sendTimelineScreenshot,
   handleReplyDeliveryFailure,
 }: CreateAppServicesArgs): AppServices {
-  const typedConfig = config;
-  const typedResolveDefaultTerminalUser = resolveDefaultTerminalUser;
-  const typedResolveReplyTargetForBinding = resolveReplyTargetForBinding;
-  const typedResolveWorkspaceRoot = resolveWorkspaceRoot;
-  const typedHandlePreparedMessage = handlePreparedMessage;
-  const typedSendTimelineScreenshot = sendTimelineScreenshot;
-  const typedHandleReplyDeliveryFailure = handleReplyDeliveryFailure;
-
   const infrastructure = createAppInfrastructure({
-    config: typedConfig,
-    handleReplyDeliveryFailure: typedHandleReplyDeliveryFailure,
+    config,
+    handleReplyDeliveryFailure,
   });
   const workflows = createRuntimeWorkflowServices({
     infrastructure,
-    config: typedConfig,
-    resolveDefaultTerminalUser: typedResolveDefaultTerminalUser,
-    resolveReplyTargetForBinding: typedResolveReplyTargetForBinding,
-    resolveWorkspaceRoot: typedResolveWorkspaceRoot,
-    handlePreparedMessage: typedHandlePreparedMessage,
-    sendTimelineScreenshot: typedSendTimelineScreenshot,
+    config,
+    resolveDefaultTerminalUser,
+    resolveReplyTargetForBinding,
+    resolveWorkspaceRoot,
+    handlePreparedMessage,
+    sendTimelineScreenshot,
   });
 
   return {

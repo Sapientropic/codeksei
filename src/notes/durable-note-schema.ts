@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -168,14 +169,14 @@ function inspectDurableNoteRouting(
     },
     scopes: Object.fromEntries(
       Object.entries(profile.notes).map(([familyId, family]) => {
-        const typedFamily = family as DurableNoteFamily;
+        const familyDefinition = family as DurableNoteFamily;
         return [
         familyId,
         {
-          label: typedFamily.label || familyId,
-          filePath: resolveWorkspaceNotePath(profile.workspaceRoot, typedFamily.filePath),
-          sections: [...typedFamily.sections],
-          kinds: Object.keys(typedFamily.kinds),
+          label: familyDefinition.label || familyId,
+          filePath: resolveWorkspaceNotePath(profile.workspaceRoot, familyDefinition.filePath),
+          sections: [...familyDefinition.sections],
+          kinds: Object.keys(familyDefinition.kinds),
         },
       ];
       })
@@ -306,12 +307,14 @@ function normalizeNamedFamilies(rawFamilies: unknown) {
   if (!rawFamilies || typeof rawFamilies !== "object") {
     return {};
   }
-  /** @type {Map<string, { priority: number, value: any }>} */
-  const families = new Map();
+  const families = new Map<string, { priority: number; value: DurableNoteFamily & { label: string } }>();
 
-  for (const [familyId, rawFamily] of Object.entries(rawFamilies) as Array<[string, any]>) {
+  for (const [familyId, rawFamily] of Object.entries(rawFamilies) as Array<[string, unknown]>) {
     const canonicalId = canonicalizeDurableNoteScope(familyId);
     const family = normalizeFamily(rawFamily);
+    const familyRecord = rawFamily && typeof rawFamily === "object"
+      ? rawFamily as Record<string, unknown>
+      : {};
     if (!canonicalId || !family.filePath || !Object.keys(family.kinds).length) {
       continue;
     }
@@ -326,7 +329,7 @@ function normalizeNamedFamilies(rawFamilies: unknown) {
       priority,
       value: {
         ...family,
-        label: normalizeText(rawFamily?.label) || canonicalId,
+        label: normalizeText(familyRecord.label) || canonicalId,
       },
     });
   }
@@ -386,7 +389,7 @@ function normalizeSections(rawSections: unknown): string[] {
     : [];
 }
 
-function normalizePositiveInteger(value: any) {
+function normalizePositiveInteger(value: unknown): number {
   const raw = String(value || "").trim();
   if (!raw) {
     return 0;
@@ -426,10 +429,6 @@ function canonicalizeDurableNoteScope(value: unknown): string {
   return DURABLE_NOTE_SCOPE_ALIASES[normalized as keyof typeof DURABLE_NOTE_SCOPE_ALIASES] || normalized;
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function normalizeLineEnding(value: unknown): string {
   return String(value || "").replace(/\r\n/g, "\n");
 }
@@ -439,7 +438,7 @@ function ensureTrailingNewline(value: unknown): string {
   return normalized.endsWith("\n") ? normalized : `${normalized}\n`;
 }
 
-function formatErrorMessage(error: any) {
+function formatErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error || "unknown error");
 }
 
@@ -451,3 +450,4 @@ export {
   resolveDurableNoteProfile,
   resolveDurableNoteRoute,
 };
+

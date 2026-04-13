@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 import * as crypto from "node:crypto";
 
 import { getCommandArgsSchema } from "../contracts/command-args";
@@ -69,14 +70,14 @@ function parseTimelineEventArgs(args: string[]): TimelineEventOptions {
 }
 
 async function resolveNote(options: TimelineEventOptions): Promise<string> {
-  const inline = normalizeText(options.note);
+  const inline = normalizeTimelineEventText(options.note);
   if (inline) {
     return inline;
   }
   if (!options.useStdin && process.stdin.isTTY) {
     return "";
   }
-  return normalizeText(await readStdin());
+  return normalizeTimelineEventText(await readStdin());
 }
 
 function buildTimelineEventWriteArgs(
@@ -90,7 +91,7 @@ function buildTimelineEventWriteArgs(
   }
   const timezone = normalizeTimezoneConfigValue(config.timezone) || LEGACY_TIMELINE_TIMEZONE;
 
-  const title = normalizeText(options.title);
+  const title = normalizeTimelineEventText(options.title);
   if (!title) {
     throw new Error("缺少标题，使用 --title \"事件标题\"");
   }
@@ -150,7 +151,7 @@ function buildTimelineEventWriteArgs(
 }
 
 function normalizeDate(value: unknown): string {
-  const normalized = normalizeText(value);
+  const normalized = normalizeTimelineEventText(value);
   return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : "";
 }
 
@@ -203,7 +204,7 @@ function readStdin(): Promise<string> {
   });
 }
 
-function normalizeText(value: unknown): string {
+function normalizeTimelineEventText(value: unknown): string {
   return String(value || "").replace(/\r\n/g, "\n").trim();
 }
 
@@ -217,3 +218,4 @@ export {
 function normalizeTimezoneConfigValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
+

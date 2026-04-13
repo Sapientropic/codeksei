@@ -1,3 +1,4 @@
+import { normalizeText } from "../../../core/text-normalization";
 import * as fs from "node:fs";
 import { renderInstructionTemplate } from "../../../core/instructions-template";
 import { buildWorkspaceContinuityInstructions } from "../../../workspace/workspace-bootstrap";
@@ -113,6 +114,3 @@ function loadInstructionFile(filePath: unknown, config: CodexInstructionConfig):
   }
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}

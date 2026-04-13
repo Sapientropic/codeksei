@@ -9,6 +9,8 @@ import type {
   ThreadStateStoreLike,
   TimelineScreenshotQueueLike,
 } from "../core/app-service-contract";
+import { ignoreBestEffortError } from "../core/error-handling";
+import { operatorMessages, userFacingMessages } from "../core/message-catalog";
 import type {
   HandlePreparedMessageOptions,
   NormalizedIncomingMessage,
@@ -187,18 +189,24 @@ export class BackstageTaskLifecycle {
         });
       } catch (error) {
         const messageText = error instanceof Error ? error.message : String(error || "unknown error");
-        console.error(`[codeksei] timeline screenshot failed job=${job.id} ${messageText}`);
+        console.error(operatorMessages.timelineScreenshotJobFailed(job.id, messageText));
         // The job has already failed locally. Clearing typing state and sending
         // the user-facing failure notice are best-effort cleanup steps only.
-        await this.channelAdapter.sendTyping({
+        await ignoreBestEffortError(this.channelAdapter.sendTyping({
           userId: job.senderId,
           status: 0,
-        }).catch(() => {});
-        await this.channelAdapter.sendText({
+        }), {
+          label: "backstage timeline screenshot typing stop",
+          reason: "typing stop is best-effort cleanup after the screenshot job already failed locally",
+        });
+        await ignoreBestEffortError(this.channelAdapter.sendText({
           userId: job.senderId,
-          text: `时间轴截图失败：${messageText}`,
+          text: userFacingMessages.timelineScreenshotFailed(messageText),
           preserveBlock: true,
-        }).catch(() => {});
+        }), {
+          label: "backstage timeline screenshot failure notice",
+          reason: "failure notice should not mask the original screenshot job failure",
+        });
       }
     }
   }

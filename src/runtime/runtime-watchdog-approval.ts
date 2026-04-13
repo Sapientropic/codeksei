@@ -1,4 +1,5 @@
 import { RUNTIME_EVENT_TYPES, type RuntimeEvent } from "../contracts/runtime-events";
+import { ignoreBestEffortError } from "../core/error-handling";
 import type {
   ChannelAdapterLike,
   RuntimeAdapterLike,
@@ -7,6 +8,7 @@ import type {
   StreamDeliveryLike,
   ThreadStateStoreLike,
 } from "../core/app-service-contract";
+import { userFacingMessages } from "../core/message-catalog";
 import type {
   PendingApprovalState,
   ReplyTarget,
@@ -79,10 +81,13 @@ export async function handleApprovalRequested(
     return true;
   }
   await clearPendingApproval(dependencies.sessionWriter, eventThreadId);
-  await dependencies.runtimeAdapter.respondApproval({
+  await ignoreBestEffortError(dependencies.runtimeAdapter.respondApproval({
     requestId: approval.requestId,
     decision: "accept",
-  }).catch(() => {});
+  }), {
+    label: "approval auto-accept",
+    reason: "auto-approved commands should not leave a rejected promise in the approval recovery path",
+  });
   dependencies.threadStateStore.resolveApproval(eventThreadId, "running");
   return true;
 }
@@ -96,11 +101,14 @@ export async function stopTypingForThread(
   if (!target) {
     return;
   }
-  await dependencies.channelAdapter.sendTyping({
+  await ignoreBestEffortError(dependencies.channelAdapter.sendTyping({
     userId: target.userId,
     status: 0,
     contextToken: target.contextToken,
-  }).catch(() => {});
+  }), {
+    label: "approval typing stop",
+    reason: "typing stop is best-effort cleanup for approval-side recovery",
+  });
 }
 
 export async function sendFailureToThread(
@@ -113,11 +121,14 @@ export async function sendFailureToThread(
   if (!target) {
     return;
   }
-  await dependencies.channelAdapter.sendText({
+  await ignoreBestEffortError(dependencies.channelAdapter.sendText({
     userId: target.userId,
-    text: dependencies.normalizeText(text) || "执行失败",
+    text: userFacingMessages.executionFailed(text),
     contextToken: target.contextToken,
-  }).catch(() => {});
+  }), {
+    label: "approval failure notice",
+    reason: "failure notice should not block watchdog recovery when the reply target is already flaky",
+  });
 }
 
 export async function sendApprovalPrompt(
@@ -140,11 +151,14 @@ export async function sendApprovalPrompt(
   console.log(
     `[codeksei] approval prompt sending binding=${bindingKey} user=${target.userId} requestId=${approval?.requestId || ""}`,
   );
-  await dependencies.channelAdapter.sendTyping({
+  await ignoreBestEffortError(dependencies.channelAdapter.sendTyping({
     userId: target.userId,
     status: 0,
     contextToken: target.contextToken,
-  }).catch(() => {});
+  }), {
+    label: "approval prompt typing stop",
+    reason: "approval prompt typing stop is best-effort cleanup before the prompt send",
+  });
   await dependencies.channelAdapter.sendText({
     userId: target.userId,
     text: dependencies.buildApprovalPromptText(approval),
@@ -183,7 +197,10 @@ export async function restoreBoundThreadSubscriptions(
         continue;
       }
       seenThreadIds.add(normalizedThreadId);
-      await dependencies.runtimeAdapter.resumeThread({ threadId: normalizedThreadId }).catch(() => {});
+      await ignoreBestEffortError(dependencies.runtimeAdapter.resumeThread({ threadId: normalizedThreadId }), {
+        label: "watchdog thread resume",
+        reason: "subscription restore should keep hydrating later bindings even if one resume fails",
+      });
     }
   }
 

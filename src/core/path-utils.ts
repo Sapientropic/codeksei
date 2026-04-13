@@ -1,9 +1,6 @@
+import { normalizeText } from "./text-normalization";
 import * as fs from "node:fs";
 import * as path from "node:path";
-
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
 
 export function normalizeDisplayPath(targetPath: unknown): string {
   return normalizeText(targetPath).replace(/\\/gu, "/");
@@ -32,7 +29,7 @@ export function resolveCrossPlatformPathFromRoot(rootPath: unknown, ...segments:
   const normalizedRoot = normalizeText(rootPath);
   const normalizedSegments = segments
     .flat()
-    .map((segment: any) => normalizeText(segment))
+    .map((segment: unknown) => normalizeText(segment))
     .filter(Boolean);
 
   if (!normalizedRoot) {
@@ -59,3 +56,4 @@ export function resolvePackageRoot(fromDir: unknown): string {
   }
   return normalizeDisplayPath(path.resolve(normalizeText(fromDir) || process.cwd()));
 }
+

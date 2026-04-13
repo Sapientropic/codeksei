@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 export type JsonObject = Record<string, unknown>;
 
 export function compactDiaryDays(entries: unknown): Array<JsonObject> {
@@ -218,13 +219,11 @@ export function extractFirstJsonObject(text: unknown): string {
   }
   return input.slice(start, end + 1);
 }
-
-export function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
+export { normalizeText };
 
 export function asRecord(value: unknown): JsonObject {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as JsonObject
     : {};
 }
+

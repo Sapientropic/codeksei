@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 import * as fs from "node:fs";
 import { resolveSelectedAccount } from "../adapters/channel/weixin/account-store";
 import { SessionStore } from "../adapters/runtime/codex/session-store";
@@ -86,10 +87,7 @@ function parseTimestamp(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 export {
   resolveBoundThread,
 };
+

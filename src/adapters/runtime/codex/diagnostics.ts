@@ -1,3 +1,4 @@
+import { normalizeText } from "../../../core/text-normalization";
 import * as fs from "node:fs";
 import {
   RUNTIME_EVENT_TYPES,
@@ -177,10 +178,7 @@ export function waitForTurnCompletion(
 export function normalizeLogValue(value: unknown): string {
   return typeof value === "string" ? value.trim().replace(/\\/g, "/") : "";
 }
-
-export function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
+export { normalizeText };
 
 export function formatErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error || "unknown error");
@@ -232,3 +230,4 @@ function describeWorkspaceState(workspaceRoot: unknown): string {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object";
 }
+

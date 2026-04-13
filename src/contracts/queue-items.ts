@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 import { z } from "zod";
 
 type PlainObject = Record<string, unknown>;
@@ -193,7 +194,7 @@ export function normalizeTimelineScreenshotJob(job: unknown): TimelineScreenshot
   const outputFile = normalizeText(job.outputFile);
   const createdAt = normalizeIsoTime(job.createdAt);
   const args = Array.isArray(job.args)
-    ? job.args.map((value: any) => normalizeText(value)).filter(Boolean)
+    ? job.args.map((value: unknown) => normalizeText(value)).filter(Boolean)
     : [];
 
   if (!id || !accountId || !senderId) {
@@ -367,7 +368,7 @@ export function clearSystemMessageInFlight(message: SystemMessage): SystemMessag
   });
 }
 
-export function markSystemMessageInFlight(message: SystemMessage, nowMs: any = Date.now()): SystemMessage | null {
+export function markSystemMessageInFlight(message: SystemMessage, nowMs: number = Date.now()): SystemMessage | null {
   return normalizeSystemMessage({
     ...message,
     deliveryState: "in_flight",
@@ -375,7 +376,7 @@ export function markSystemMessageInFlight(message: SystemMessage, nowMs: any = D
   });
 }
 
-export function isSystemMessageExpired(message: Partial<SystemMessage> | null | undefined, nowMs: any = Date.now()): boolean {
+export function isSystemMessageExpired(message: Partial<SystemMessage> | null | undefined, nowMs: number = Date.now()): boolean {
   const expiresAtMs = parseIsoTime(message?.expiresAt);
   return Number.isFinite(expiresAtMs) && expiresAtMs <= nowMs;
 }
@@ -435,10 +436,7 @@ function normalizePositiveInteger(value: unknown): number {
   return Number.isInteger(numeric) && numeric > 0 ? numeric : 0;
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function isPlainObject(value: unknown): value is PlainObject {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
+

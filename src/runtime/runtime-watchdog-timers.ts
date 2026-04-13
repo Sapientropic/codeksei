@@ -3,7 +3,9 @@ import {
   RUNTIME_EVENT_TYPES,
   type RuntimeEvent,
 } from "../contracts/runtime-events";
+import { ignoreBestEffortError } from "../core/error-handling";
 import type { ChannelAdapterLike, RuntimeAdapterLike, StreamDeliveryLike, ThreadStateStoreLike } from "../core/app-service-contract";
+import { operatorMessages, userFacingMessages } from "../core/message-catalog";
 import type {
   PreparedRuntimeMessage,
   UnknownRecord,
@@ -110,18 +112,15 @@ export function scheduleRuntimeEventWatchdog(
       return;
     }
     watchdog.noticeSent = true;
-    await dependencies.channelAdapter.sendText({
+    await ignoreBestEffortError(dependencies.channelAdapter.sendText({
       userId: normalized.senderId,
       contextToken: normalized.contextToken,
       preserveBlock: true,
-      text: [
-        "这条消息已经发到 bridge，但 Codex runtime 还没有返回首个事件。",
-        "如果你看到 terminal 正在 reconnecting，这一轮大概率还卡在共享线程启动阶段。",
-        "先不用一直空等；如果稍后连上，消息会继续往下跑。",
-        `workspace: ${workspaceRoot}`,
-        `thread: ${normalizedThreadId}`,
-      ].join("\n"),
-    }).catch(() => {});
+      text: userFacingMessages.runtimeFirstEventNotice(workspaceRoot, normalizedThreadId),
+    }), {
+      label: "runtime first-event notice",
+      reason: "first-event notice is best-effort; watchdog timing should continue even if chat delivery fails",
+    });
   }, dependencies.firstRuntimeEventNoticeTimeoutMs);
   const failureTimer = setTimeout(async () => {
     pendingRuntimeEventWatchdogs.delete(normalizedThreadId);
@@ -129,28 +128,23 @@ export function scheduleRuntimeEventWatchdog(
     if (hasObservedInitialRuntimeProgress(currentThreadState)) {
       return;
     }
-    await dependencies.channelAdapter.sendTyping({
+    await ignoreBestEffortError(dependencies.channelAdapter.sendTyping({
       userId: normalized.senderId,
       status: 0,
       contextToken: normalized.contextToken,
-    }).catch(() => {});
-    await dependencies.channelAdapter.sendText({
+    }), {
+      label: "runtime watchdog typing stop",
+      reason: "typing stop is best-effort cleanup before the failure escalation notice",
+    });
+    await ignoreBestEffortError(dependencies.channelAdapter.sendText({
       userId: normalized.senderId,
       contextToken: normalized.contextToken,
       preserveBlock: true,
-      text: [
-        "这条消息已经发到 bridge，但 Codex runtime 直到现在都没有返回首个事件。",
-        "如果 terminal 里的那轮 reconnecting 已经跑完 5 次，这条共享线程基本可以判定没有真正启动成功。",
-        `workspace: ${workspaceRoot}`,
-        `thread: ${normalizedThreadId}`,
-        "优先检查：共享 app-server 是否正常、当前终端是否接在同一个 thread、runtime 是否真的开始处理这条消息。",
-        "如果你现在是在替这条线排查，直接按这套顺序做：",
-        "1. 在项目目录执行 npm run shared:status",
-        "2. 如果 bridge 不在，先执行 npm run shared:start",
-        "3. 再开一个终端执行 npm run shared:open",
-        "4. 确认 terminal 里打开的是上面这条 thread，而不是另一条私有线程",
-      ].join("\n"),
-    }).catch(() => {});
+      text: userFacingMessages.runtimeFirstEventFailure(workspaceRoot, normalizedThreadId),
+    }), {
+      label: "runtime first-event failure notice",
+      reason: "the escalation notice is best-effort after the watchdog already concluded this turn is stuck",
+    });
   }, dependencies.firstRuntimeEventFailureTimeoutMs);
   pendingRuntimeEventWatchdogs.set(normalizedThreadId, {
     noticeTimer,
@@ -227,10 +221,7 @@ export function refreshTurnSettlementWatchdog(
     // Once a reply has already started streaming, hanging forever is worse
     // than surfacing a partial answer. We only trip this guard after a long
     // quiet period to avoid fighting normal long-running tool calls.
-    console.error(
-      `[codeksei] runtime settlement watchdog expired `
-      + `thread=${threadId} turn=${turnId} workspace=${workspaceRoot || "(unknown)"}`,
-    );
+    console.error(operatorMessages.runtimeSettlementWatchdogExpired(threadId, turnId, workspaceRoot));
     await dependencies.streamDelivery.finalizeAbandonedTurn({
       threadId,
       turnId,

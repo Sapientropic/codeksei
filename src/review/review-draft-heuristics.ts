@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 import type {
   DiaryReviewEntry,
   DiarySupplementEntry,
@@ -155,7 +156,5 @@ export function normalizeLineItem(value: unknown): string {
 export function normalizeLineEnding(value: unknown): string {
   return String(value || "").replace(/\r\n/g, "\n");
 }
+export { normalizeText };
 
-export function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}

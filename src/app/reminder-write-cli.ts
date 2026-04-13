@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 import * as crypto from "node:crypto";
 
 import { SessionStore } from "../adapters/runtime/codex/session-store";
@@ -197,10 +198,6 @@ function buildAbsoluteTimeExample(timezone: string = LEGACY_TIMELINE_TIMEZONE): 
   return `${explicit || "2026-04-07T21:30+08:00"} 或 2026-04-07 21:30（后者按当前 timezone 解释）`;
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function normalizeTimezone(value: unknown): string {
   return normalizeText(value) || LEGACY_TIMELINE_TIMEZONE;
 }
@@ -214,3 +211,4 @@ export {
   resolveDueAtMs,
   runReminderWriteCommand,
 };
+

@@ -79,7 +79,7 @@
     "smoke:shared:real:attach": "node ./dist/src/maintainer/shared-real-smoke.js attach",
     "smoke:shared:real:reply": "node ./dist/src/maintainer/shared-real-smoke.js reply",
     "smoke:shared:real:approval": "node ./dist/src/maintainer/shared-real-smoke.js approval",
-    "lint": "tsx ./src/release/assert-no-authored-js-extensions.ts && tsx ./src/release/assert-published-runtime-artifacts.ts && tsx ./src/release/assert-no-js-tests.ts && tsx ./src/release/assert-no-legacy-branding.ts && tsx ./src/release/assert-no-key-ts-commonjs.ts && tsx ./src/release/assert-no-typed-module-destructure.ts && tsx ./src/release/assert-no-ts-nocheck-regressions.ts",
+    "lint": "tsx ./src/release/assert-no-authored-js-extensions.ts && tsx ./src/release/assert-published-runtime-artifacts.ts && tsx ./src/release/assert-no-js-tests.ts && tsx ./src/release/assert-no-legacy-branding.ts && tsx ./src/release/assert-no-key-ts-commonjs.ts && tsx ./src/release/assert-no-typed-module-destructure.ts && tsx ./src/release/assert-no-ts-nocheck-regressions.ts && tsx ./src/release/assert-no-empty-catch.ts && tsx ./src/release/assert-no-duplicate-normalize-text.ts && tsx ./src/release/assert-no-redundant-typed-aliases.ts && tsx ./src/release/assert-no-definite-assignment.ts && tsx ./src/release/assert-no-explicit-any.ts",
     "typecheck": "tsc -p ./tsconfig.json --noEmit --pretty false",
     "typecheck:tests:ts": "tsc -p ./tsconfig.tests.json --noEmit --pretty false",
     "typecheck:strict": "npm run typecheck",

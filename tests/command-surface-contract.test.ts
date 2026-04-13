@@ -24,7 +24,7 @@ const {
 
 test("terminal manifest declares unique command keys", () => {
   const manifest = listTerminalCommandManifest();
-  const keys = manifest.map((entry: any) => entry.key);
+  const keys = manifest.map((entry: { key: string }) => entry.key);
   assert.equal(new Set(keys).size, keys.length);
 });
 
@@ -40,8 +40,8 @@ test("command surface can resolve routed terminal commands from a single manifes
 test("command surface groups still expose terminal and weixin help entries", () => {
   const groups = listCommandGroups();
   const helpAction = groups
-    .flatMap((group: any) => group.actions)
-    .find((action: any) => action.action === "app.help");
+    .flatMap((group: { actions: Array<{ action: string; terminal: string[]; weixin: string[] }> }) => group.actions)
+    .find((action: { action: string; terminal: string[]; weixin: string[] }) => action.action === "app.help");
 
   assert.ok(helpAction);
   assert.deepEqual(helpAction.terminal, ["help"]);
@@ -51,8 +51,8 @@ test("command surface groups still expose terminal and weixin help entries", () 
 test("active terminal actions all point at real package scripts", () => {
   const scripts = (packageJson.scripts || {}) as Record<string, unknown>;
   const missing = listCommandActions()
-    .filter((action: any) => action.status === "active" && action.terminal.length && action.scriptName)
-    .map((action: any) => action.scriptName as string)
+    .filter((action: { status: string; terminal: string[]; scriptName?: string }) => action.status === "active" && action.terminal.length && action.scriptName)
+    .map((action: { scriptName?: string }) => action.scriptName as string)
     .filter((scriptName: string) => !(scriptName in scripts));
 
   assert.deepEqual(missing, []);
@@ -109,7 +109,7 @@ test("package scripts keep runtime entrypoints aligned with the published-runtim
 test("public CLI help topics stay aligned with the manifest help topics", () => {
   const manifestTopics = Array.from(new Set(
     listTerminalCommandManifest()
-      .map((entry: any) => entry.helpTopic)
+      .map((entry: { helpTopic?: string }) => entry.helpTopic)
       .filter((topic: string) => topic)
   )).sort();
 
@@ -120,15 +120,15 @@ test("public CLI help topics stay aligned with the manifest help topics", () => 
 });
 
 test("leaf-help actions all resolve to non-empty leaf help text", () => {
-  const actionsById = new Map<string, any>(
-    listCommandActions().map((action: any) => [action.action, action])
+  const actionsById = new Map<string, { action: string; help?: { detail?: string } }>(
+    listCommandActions().map((action: { action: string; help?: { detail?: string } }) => [action.action, action])
   );
 
   assert.deepEqual(
     listTerminalLeafHelpKeys().sort(),
     listCommandActions()
-      .filter((action: any) => action.help?.detail === "leaf")
-      .map((action: any) => action.help.leafKey)
+      .filter((action: { help?: { detail?: string; leafKey?: string } }) => action.help?.detail === "leaf")
+      .map((action: { help?: { leafKey?: string } }) => action.help?.leafKey || "")
       .sort()
   );
 

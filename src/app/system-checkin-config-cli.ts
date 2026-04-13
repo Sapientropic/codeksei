@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 import { getCommandArgsSchema } from "../contracts/command-args";
 import { parseCliArgs } from "../core/cli-args";
 import { buildTerminalLeafHelp } from "../core/command-registry";
@@ -67,8 +68,5 @@ function renderResolvedCheckinConfig(filePath: string): string {
   ].join("\n");
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 export { runSystemCheckinConfigCommand };
+

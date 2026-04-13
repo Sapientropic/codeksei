@@ -1,7 +1,9 @@
+import { normalizeText } from "../core/text-normalization";
 import * as crypto from "node:crypto";
 
 import { SessionStore } from "../adapters/runtime/codex/session-store";
 import { resolvePromptPersonEn } from "../core/person-reference";
+import type { AppRuntimeConfig } from "../core/app-service-contract";
 import { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } from "../workspace/default-targets";
 import { resolveSelectedAccount } from "../adapters/channel/weixin/account-store";
 import { PACKAGE_NAME, readPrefixedEnv } from "../core/branding";
@@ -9,13 +11,17 @@ import { SystemMessageQueueStore } from "../state/system-message-queue-store";
 import { formatCheckinRange, resolveCheckinConfig } from "../state/checkin-config";
 const INTERNAL_CHECKIN_TRIGGER_TEMPLATE = "Take a quiet look at whether now is a good moment to reach out to %PERSON%. You may stay silent, send one short WeChat message, update diary/timeline, or take another useful backstage action. If no user-visible message should be sent, output exactly SILENT. If you do send a message, output only the message text.";
 
-async function runSystemCheckinPoller(config: any) {
+type CheckinPollerConfig = AppRuntimeConfig;
+type SelectedAccount = ReturnType<typeof resolveSelectedAccount>;
+type PollerIntervalConfig = ReturnType<typeof resolveCheckinConfig>;
+
+async function runSystemCheckinPoller(config: CheckinPollerConfig) {
   const account = resolveSelectedAccount(config);
   const queue = new SystemMessageQueueStore({
-    filePath: config.systemMessageQueueFile,
-    deadLetterFilePath: config.systemMessageDeadLetterFile,
+    filePath: normalizeText(config.systemMessageQueueFile),
+    deadLetterFilePath: normalizeText(config.systemMessageDeadLetterFile),
   });
-  const sessionStore = new SessionStore({ filePath: config.sessionsFile });
+  const sessionStore = new SessionStore({ filePath: normalizeText(config.sessionsFile) });
   const target = resolvePollerTarget({ config, account, sessionStore });
   let lastRangeLabel = "";
 
@@ -53,7 +59,15 @@ async function runSystemCheckinPoller(config: any) {
   }
 }
 
-function resolvePollerTarget({ config, account, sessionStore }: any) {
+function resolvePollerTarget({
+  config,
+  account,
+  sessionStore,
+}: {
+  config: CheckinPollerConfig;
+  account: SelectedAccount;
+  sessionStore: SessionStore;
+}) {
   const senderId = resolvePreferredSenderId({
     config,
     accountId: account.accountId,
@@ -78,7 +92,7 @@ function resolvePollerTarget({ config, account, sessionStore }: any) {
   return { senderId, workspaceRoot };
 }
 
-function resolvePollerIntervalConfig(config: any) {
+function resolvePollerIntervalConfig(config: CheckinPollerConfig): PollerIntervalConfig {
   const filePath = normalizeText(config.checkinConfigFile);
   if (filePath) {
     return resolveCheckinConfig({ filePath });
@@ -91,27 +105,25 @@ function resolvePollerIntervalConfig(config: any) {
     minIntervalMs,
     maxIntervalMs,
     source: envMin || envMax ? "env" : "default",
+    storedConfig: null,
   };
 }
 
-function pickRandomDelayMs(minIntervalMs: any, maxIntervalMs: any) {
+function pickRandomDelayMs(minIntervalMs: number, maxIntervalMs: number): number {
   if (maxIntervalMs <= minIntervalMs) {
     return minIntervalMs;
   }
   return minIntervalMs + Math.floor(Math.random() * (maxIntervalMs - minIntervalMs + 1));
 }
 
-function sleep(ms: any) {
-  return new Promise((resolve: any) => setTimeout(resolve, ms));
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function buildCheckinTrigger(config: any) {
+function buildCheckinTrigger(config: CheckinPollerConfig): string {
   const person = resolvePromptPersonEn(config);
   return INTERNAL_CHECKIN_TRIGGER_TEMPLATE.replace("%PERSON%", person);
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 export { runSystemCheckinPoller };
+

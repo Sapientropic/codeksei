@@ -1,3 +1,4 @@
+const { normalizeText }: typeof import("../src/core/text-normalization") = require("../src/core/text-normalization");
 const fs: typeof import("node:fs") = require("node:fs");
 const os: typeof import("node:os") = require("node:os");
 const path: typeof import("node:path") = require("node:path");
@@ -191,9 +192,7 @@ test("restoreBoundThreadSubscriptions rehydrates persisted approval into thread 
     normalizeCommandArgument(value) {
       return typeof value === "string" ? value.trim() : "";
     },
-    normalizeText(value) {
-      return typeof value === "string" ? value.trim() : "";
-    },
+    normalizeText,
     resolveReplyTargetForBinding(candidateBindingKey: string) {
       if (candidateBindingKey === bindingKey) {
         return {

@@ -1,3 +1,4 @@
+import { normalizeText } from "../../core/text-normalization";
 import * as fs from "node:fs";
 
 import { writeForeignJsonDocument } from "../../state/json-state";
@@ -315,10 +316,7 @@ function asTimelineSourceRecord(value: unknown): TimelineSourceRecord {
   return isRecord(value) ? value as TimelineSourceRecord : {};
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 export {
   ensureTimelineStateTimezone,
 };
+

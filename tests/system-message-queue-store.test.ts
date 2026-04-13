@@ -45,7 +45,7 @@ test("SystemMessageQueueStore infers legacy metadata and only drains ready messa
   }));
 
   const ready = store.takeReadyForAccount("acct-1", { nowMs });
-  assert.deepEqual(ready.map((entry: any) => entry.id), ["legacy-checkin"]);
+  assert.deepEqual(ready.map((entry: { id: string }) => entry.id), ["legacy-checkin"]);
   assert.equal(ready[0].kind, "checkin");
   assert.equal(ready[0].attemptCount, 0);
   assert.equal(ready[0].deliveryState, "in_flight");
@@ -55,7 +55,7 @@ test("SystemMessageQueueStore infers legacy metadata and only drains ready messa
   const futureReady = store.takeReadyForAccount("acct-1", {
     nowMs: Date.parse("2026-04-12T08:05:00.000Z"),
   });
-  assert.deepEqual(futureReady.map((entry: any) => entry.id), ["reminder:future"]);
+  assert.deepEqual(futureReady.map((entry: { id: string }) => entry.id), ["reminder:future"]);
   assert.equal(futureReady[0].kind, "reminder");
 });
 
@@ -153,7 +153,7 @@ test("SystemMessageQueueStore keeps leased ready messages recoverable across a r
   assert.deepEqual(restartedStore.takeReadyForAccount("acct-1", { nowMs: nowMs + 1_000 }), []);
 
   const retried = restartedStore.takeReadyForAccount("acct-1", { nowMs: nowMs + 61_000 });
-  assert.deepEqual(retried.map((entry: any) => entry.id), ["leased-message"]);
+  assert.deepEqual(retried.map((entry: { id: string }) => entry.id), ["leased-message"]);
 });
 
 test("SystemMessageQueueStore records dead-letter before removing the live queue entry", () => {
@@ -182,7 +182,7 @@ test("SystemMessageQueueStore records dead-letter before removing the live queue
     deadLetterFilePath: deadLetterFile,
   });
   assert.equal(recoveredQueue.hasPendingForAccount("acct-1", { nowMs }), true);
-  assert.equal(recoveredQueue.listDeadLetters().some((entry: any) => entry.id === "dead-letter-order"), true);
+  assert.equal(recoveredQueue.listDeadLetters().some((entry: { id: string }) => entry.id === "dead-letter-order"), true);
 
   store.persistMessages = originalPersistMessages;
 });
@@ -209,7 +209,7 @@ test("SystemMessageQueueStore quarantines schema-invalid queue state on load", (
   assert.equal(reloaded.hasPendingForAccount("acct-1"), false);
   assert.equal(fs.existsSync(queueFile), false);
   assert.equal(
-    fs.readdirSync(tempRoot).some((entry: any) => /^system-message-queue\.corrupt-.*\.json$/.test(entry)),
+    fs.readdirSync(tempRoot).some((entry: string) => /^system-message-queue\.corrupt-.*\.json$/.test(entry)),
     true
   );
 });

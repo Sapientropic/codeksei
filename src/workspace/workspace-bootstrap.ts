@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
@@ -346,10 +347,6 @@ function normalizeDisplayPath(targetPath: unknown): string {
   return normalizeText(targetPath).replace(/\\/g, "/");
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function hasOwn(value: unknown, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(value || {}, key);
 }
@@ -357,3 +354,4 @@ function hasOwn(value: unknown, key: string): boolean {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
+

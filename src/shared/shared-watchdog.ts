@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 import { createWeixinChannelAdapter } from "../adapters/channel/weixin";
 import { resolveSelectedAccount } from "../adapters/channel/weixin/account-store";
 import { loadPersistedContextTokens } from "../adapters/channel/weixin/context-token-store";
@@ -202,21 +203,21 @@ async function sendVisibleAlert(
   text: string,
 ): Promise<Omit<SharedWatchdogNotification, "kind" | "sentAt">> {
   try {
-    const typedConfig = config as ReturnType<typeof readConfig>;
-    const account = resolveSelectedAccount(typedConfig);
-    const sessionStore = new SessionStore({ filePath: typedConfig.sessionsFile });
+    const runtimeConfig = config as ReturnType<typeof readConfig>;
+    const account = resolveSelectedAccount(runtimeConfig);
+    const sessionStore = new SessionStore({ filePath: runtimeConfig.sessionsFile });
     const senderId = resolvePreferredSenderId({
-      config: typedConfig,
+      config: runtimeConfig,
       accountId: account.accountId,
       sessionStore,
     });
     const workspaceRoot = resolvePreferredWorkspaceRoot({
-      config: typedConfig,
+      config: runtimeConfig,
       accountId: account.accountId,
       senderId,
       sessionStore,
     });
-    const contextToken = loadPersistedContextTokens(typedConfig, account.accountId)?.[senderId] || "";
+    const contextToken = loadPersistedContextTokens(runtimeConfig, account.accountId)?.[senderId] || "";
     if (!senderId || !contextToken) {
       return {
         sent: false,
@@ -226,7 +227,7 @@ async function sendVisibleAlert(
       };
     }
 
-    const channelAdapter = createWeixinChannelAdapter(typedConfig);
+    const channelAdapter = createWeixinChannelAdapter(runtimeConfig);
     await channelAdapter.sendText({
       userId: senderId,
       contextToken,
@@ -271,10 +272,6 @@ function formatErrorMessage(error: unknown): string {
   return String(error || "unknown error");
 }
 
-function normalizeText(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 if (require.main === module) {
   main().catch((error: unknown) => {
     console.error(formatErrorMessage(error));
@@ -286,3 +283,4 @@ export {
   main,
   runWatchdogOnce,
 };
+

@@ -15,6 +15,12 @@ interface AttachRuntimeEventPipelineArgs {
   logRuntimeEventFailure(event: RuntimeEvent<UnknownRecord>, error: unknown): void;
 }
 
+function recoverRuntimeEventChain(chain: Promise<void>): Promise<void> {
+  // A rejected event must not poison the serialized chain for every later
+  // runtime event in the same session.
+  return chain.catch(() => undefined);
+}
+
 export function attachRuntimeEventPipeline({
   runtimeAdapter,
   runtimeWatchdogLifecycle,
@@ -26,10 +32,7 @@ export function attachRuntimeEventPipeline({
   runtimeAdapter.onEvent((event) => {
     runtimeWatchdogLifecycle.observeRuntimeEvent(event);
     threadStateStore.applyRuntimeEvent(event);
-    const nextChain = getRuntimeEventChain()
-      // Reset the serialized promise chain after a rejected event so one bad
-      // runtime callback cannot block every later event in the same session.
-      .catch(() => {})
+    const nextChain = recoverRuntimeEventChain(getRuntimeEventChain())
       .then(() => runtimeWatchdogLifecycle.handleRuntimeEvent(event))
       .catch((error) => {
         logRuntimeEventFailure(event, error);

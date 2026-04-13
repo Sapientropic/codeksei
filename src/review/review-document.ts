@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 // @ts-check
 
 import {
@@ -250,10 +251,6 @@ function normalizeLineEnding(value: unknown): string {
   return String(value || "").replace(/\r\n/g, "\n");
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function ensureTrailingNewline(value: unknown): string {
   const normalized = normalizeLineEnding(value);
   return normalized.endsWith("\n") ? normalized : `${normalized}\n`;
@@ -269,3 +266,4 @@ export {
   parseManagedBulletList,
   syncReviewContent,
 };
+

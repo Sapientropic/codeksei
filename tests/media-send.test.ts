@@ -5,6 +5,7 @@ const os: typeof import("node:os") = require("node:os");
 const path: typeof import("node:path") = require("node:path");
 
 const { sendWeixinMediaFile }: typeof import("../src/adapters/channel/weixin/media-send") = require("../src/adapters/channel/weixin/media-send");
+const { ignoreCleanupError }: typeof import("../src/core/error-handling") = require("../src/core/error-handling");
 
 test("image upload falls back to generic file delivery when image upload_param is missing", async () => {
   const tempFile = path.join(os.tmpdir(), `codeksei-media-fallback-${Date.now()}.png`);
@@ -61,7 +62,10 @@ test("image upload falls back to generic file delivery when image upload_param i
     assert.equal(result.fallbackFrom, "image");
   } finally {
     global.fetch = originalFetch;
-    await fs.unlink(tempFile).catch(() => {});
+    await ignoreCleanupError(fs.unlink(tempFile), {
+      label: "media send full-url temp file cleanup",
+      reason: "the temp file may already be removed by the test or platform cleanup",
+    });
   }
 });
 
@@ -123,7 +127,10 @@ test("media upload accepts upload_full_url from getUploadUrl responses", async (
     assert.equal(result.kind, "image");
   } finally {
     global.fetch = originalFetch;
-    await fs.unlink(tempFile).catch(() => {});
+    await ignoreCleanupError(fs.unlink(tempFile), {
+      label: "media send temp file cleanup",
+      reason: "the temp file may already be removed by the test or platform cleanup",
+    });
   }
 });
 
@@ -190,6 +197,9 @@ test("media upload falls back to alternate media api when primary stack still ha
     assert.equal(result.uploadStrategy, "fallback");
   } finally {
     global.fetch = originalFetch;
-    await fs.unlink(tempFile).catch(() => {});
+    await ignoreCleanupError(fs.unlink(tempFile), {
+      label: "media send fallback temp file cleanup",
+      reason: "the temp file may already be removed by the test or platform cleanup",
+    });
   }
 });

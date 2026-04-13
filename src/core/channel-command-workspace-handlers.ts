@@ -16,6 +16,7 @@ import type {
 } from "./channel-command-context";
 import { buildChannelCommandContext } from "./channel-command-context";
 import type { ParsedChannelCommand } from "./channel-command-router";
+import { ignoreBestEffortError } from "./error-handling";
 import type { NormalizedIncomingMessage, ThreadBindingRef } from "./runtime-types";
 
 const WINDOWS_DRIVE_PATH_RE = /^[A-Za-z]:\//;
@@ -273,11 +274,14 @@ function createWorkspaceCommandHandlers({
       } catch (error) {
         // This notice is only a courtesy. If the chat send itself also fails,
         // we still want the next normal message to retry reread naturally.
-        await channelAdapter.sendText({
+        await ignoreBestEffortError(channelAdapter.sendText({
           userId: normalized.senderId,
           text: `重读失败：${error instanceof Error ? error.message : String(error || "unknown error")}`,
           contextToken: normalized.contextToken,
-        }).catch(() => {});
+        }), {
+          label: "workspace reread failure notice",
+          reason: "the main reread failure already determines the user-visible outcome",
+        });
       }
     },
 

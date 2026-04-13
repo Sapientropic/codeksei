@@ -22,6 +22,7 @@ import {
 } from "../shared/shared-common";
 import { collectSharedStatusSnapshot } from "../shared/shared-status";
 import { hashReplyText } from "../runtime/stream-delivery/trace-abandonment";
+import { ignoreBestEffortError } from "../core/error-handling";
 import { sanitizeSmokeText, writeLiveSmokeRecord } from "./live-smoke-records";
 
 type SmokeKind = "approval" | "attach" | "reply";
@@ -228,14 +229,20 @@ async function ensureSharedHealthy(context: SharedProcessContext): Promise<void>
 }
 
 async function restartManagedBridge(context: SharedProcessContext): Promise<void> {
-  await stopManagedProcess(context.supervisorPidFile, {
+  await ignoreBestEffortError(stopManagedProcess(context.supervisorPidFile, {
     expectedSubstrings: ["shared-supervisor"],
     label: "shared supervisor",
-  }).catch(() => {});
-  await stopManagedProcess(context.bridgePidFile, {
+  }), {
+    label: "shared supervisor stop",
+    reason: "live smoke restarts should keep going even when the old process already exited",
+  });
+  await ignoreBestEffortError(stopManagedProcess(context.bridgePidFile, {
     expectedSubstrings: ["start", "checkin"],
     label: "shared codeksei bridge",
-  }).catch(() => {});
+  }), {
+    label: "shared bridge stop",
+    reason: "live smoke restarts should keep going even when the old process already exited",
+  });
   await ensureManagedBridge({ restartUnhealthy: true });
   await ensureManagedSupervisor({ intervalMinutes: 5 });
 }

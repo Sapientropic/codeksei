@@ -1,65 +1,47 @@
-// @ts-check
-
 import { normalizeText } from "./visible-text";
 
-/**
- * @typedef {{
- *   userId: string,
- *   contextToken: string,
- *   provider: string,
- * }} ReplyTarget
- */
+interface ReplyTarget {
+  userId: string;
+  contextToken: string;
+  provider: string;
+}
 
-/**
- * @typedef {{
- *   threadId: string,
- *   bindingKey: string,
- *   replyTarget: ReplyTarget | null,
- * }} ReplyTargetState
- */
+interface ReplyTargetState {
+  threadId: string;
+  bindingKey: string;
+  replyTarget: ReplyTarget | null;
+}
 
-/**
- * @typedef {{
- *   findBindingForThreadId(threadId: string): { bindingKey?: string } | null,
- * }} ReplyTargetSessionStore
- */
+interface ReplyTargetSessionStore {
+  findBindingForThreadId(threadId: string): { bindingKey?: string } | null;
+}
 
-/**
- * @param {unknown} value
- * @returns {ReplyTarget | null}
- */
-function normalizeReplyTarget(value: any) {
-  const userId = String(value && typeof value === "object" && "userId" in value ? value.userId : "").trim();
-  const contextToken = String(
-    value && typeof value === "object" && "contextToken" in value ? value.contextToken : ""
-  ).trim();
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function normalizeReplyTarget(value: unknown): ReplyTarget | null {
+  const record = asRecord(value);
+  const userId = normalizeText(record.userId);
+  const contextToken = normalizeText(record.contextToken);
   if (!userId || !contextToken) {
     return null;
   }
   return {
     userId,
     contextToken,
-    provider: normalizeText(value && typeof value === "object" && "provider" in value ? value.provider : ""),
+    provider: normalizeText(record.provider),
   };
 }
 
-/**
- * @param {{
- *   sessionStore: ReplyTargetSessionStore,
- * }} options
- */
-function createReplyTargetRegistry({ sessionStore }: any) {
-  /** @type {Map<string, ReplyTarget>} */
-  const replyTargetByBindingKey = new Map();
-  /** @type {Map<string, ReplyTarget[]>} */
-  const pendingReplyTargetsByThreadId = new Map();
+function createReplyTargetRegistry({ sessionStore }: { sessionStore: ReplyTargetSessionStore }) {
+  const replyTargetByBindingKey = new Map<string, ReplyTarget>();
+  const pendingReplyTargetsByThreadId = new Map<string, ReplyTarget[]>();
 
   return {
-    /**
-     * @param {string} bindingKey
-     * @param {unknown} target
-     */
-    setReplyTarget(bindingKey: any, target: any) {
+    setReplyTarget(bindingKey: unknown, target: unknown): void {
       const normalizedBindingKey = normalizeText(bindingKey);
       const normalizedTarget = normalizeReplyTarget(target);
       if (!normalizedBindingKey || !normalizedTarget) {
@@ -68,11 +50,7 @@ function createReplyTargetRegistry({ sessionStore }: any) {
       replyTargetByBindingKey.set(normalizedBindingKey, normalizedTarget);
     },
 
-    /**
-     * @param {string} threadId
-     * @param {unknown} target
-     */
-    queueReplyTargetForThread(threadId: any, target: any) {
+    queueReplyTargetForThread(threadId: unknown, target: unknown): void {
       const normalizedThreadId = normalizeText(threadId);
       const normalizedTarget = normalizeReplyTarget(target);
       if (!normalizedThreadId || !normalizedTarget) {
@@ -83,18 +61,7 @@ function createReplyTargetRegistry({ sessionStore }: any) {
       pendingReplyTargetsByThreadId.set(normalizedThreadId, queue);
     },
 
-    /**
-     * Keep reply-target recovery order stable: first consume the thread-local
-     * queue captured from the incoming message, then restore the binding key
-     * from the persisted session map, and only then fall back to the latest
-     * reply target cached for that binding. Reordering these steps would risk
-     * reviving an older target ahead of the message that actually reopened the
-     * thread.
-     *
-     * @param {ReplyTargetState} state
-     * @returns {ReplyTarget | null}
-     */
-    attachReplyTarget(state: any) {
+    attachReplyTarget(state: ReplyTargetState): ReplyTarget | null {
       if (!state.replyTarget) {
         const queue = pendingReplyTargetsByThreadId.get(state.threadId) || [];
         if (queue.length) {

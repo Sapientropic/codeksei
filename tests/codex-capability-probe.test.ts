@@ -22,7 +22,7 @@ test("probeCodexAppServerCapabilities flags missing --listen support from app-se
       signal: null,
       output: [],
       pid: 123,
-    })) as any,
+    })) as unknown as typeof import("node:child_process").spawnSync,
   });
 
   assert.equal(probe.canInvokeAppServer, true);
@@ -40,7 +40,7 @@ test("probeCodexAppServerCapabilities reports spawn-not-found failures with a hi
       output: [],
       pid: 0,
       error: new Error("spawn ENOENT"),
-    })) as any,
+    })) as unknown as typeof import("node:child_process").spawnSync,
   });
 
   assert.equal(probe.canInvokeAppServer, false);

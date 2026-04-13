@@ -1,3 +1,4 @@
+const { normalizeText }: typeof import("../../src/core/text-normalization") = require("../../src/core/text-normalization");
 const fs: typeof import("node:fs") = require("node:fs");
 const http: typeof import("node:http") = require("node:http");
 const path: typeof import("node:path") = require("node:path");
@@ -538,10 +539,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function isPidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -593,3 +590,4 @@ module.exports = {
   terminatePid,
   waitForCondition,
 };
+

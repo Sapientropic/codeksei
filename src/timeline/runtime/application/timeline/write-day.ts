@@ -43,11 +43,11 @@ async function writeTimelineDay(
     };
 
     const saved = mode === "replace"
-      ? store.replaceDay(common as any)
+      ? store.replaceDay(common)
       : store.mergeDay({
         ...common,
         dropEventIds: Array.isArray(payload.dropEventIds) ? payload.dropEventIds : [],
-      } as any);
+      });
 
     if (payload.finalize) {
       store.finalizeDay(date);

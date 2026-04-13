@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
+import { ignoreCleanupError } from "../../../core/error-handling";
 
 const SESSION_STORE_LOCK_TIMEOUT_MS = 5_000;
 const SESSION_STORE_LOCK_STALE_MS = 30_000;
@@ -16,7 +17,10 @@ export async function withSessionStoreLock<T>(lockFilePath: string, work: () => 
         return await work();
       } finally {
         await closeFileHandle(handle);
-        await fs.rm(lockFilePath, { force: true }).catch(() => {});
+        await ignoreCleanupError(fs.rm(lockFilePath, { force: true }), {
+          label: "session store lock release",
+          reason: "lock cleanup should not fail when the lock file is already gone after work completed",
+        });
       }
     } catch (error) {
       await closeFileHandle(handle);
@@ -24,7 +28,10 @@ export async function withSessionStoreLock<T>(lockFilePath: string, work: () => 
         throw error;
       }
       if (await shouldBreakStaleSessionStoreLock(lockFilePath)) {
-        await fs.rm(lockFilePath, { force: true }).catch(() => {});
+        await ignoreCleanupError(fs.rm(lockFilePath, { force: true }), {
+          label: "session store stale lock cleanup",
+          reason: "stale lock eviction is best-effort before retrying lock acquisition",
+        });
         continue;
       }
       if (Date.now() - startedAt >= SESSION_STORE_LOCK_TIMEOUT_MS) {

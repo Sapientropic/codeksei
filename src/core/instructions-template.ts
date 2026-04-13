@@ -1,11 +1,12 @@
+import { normalizeText } from "./text-normalization";
 import {
   resolveConfiguredPersonName,
   resolvePromptPersonEn,
   resolvePromptPersonZh,
 } from "./person-reference";
 
-function resolveUserPronoun(gender: any) {
-  const normalized = String(gender || "").trim().toLowerCase();
+function resolveUserPronoun(gender: unknown): string {
+  const normalized = normalizeText(gender).toLowerCase();
   if (normalized === "male" || normalized === "man" || normalized === "m" || normalized === "男") {
     return "他";
   }
@@ -15,7 +16,7 @@ function resolveUserPronoun(gender: any) {
   return "她";
 }
 
-function renderInstructionTemplate(template: any, config: any = {}) {
+function renderInstructionTemplate(template: unknown, config: Record<string, unknown> = {}): string {
   const userName = resolveConfiguredPersonName(config);
   const pronoun = resolveUserPronoun(config?.userGender);
   const personZh = resolvePromptPersonZh(config);

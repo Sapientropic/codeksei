@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 import { execFileSync, spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as http from "node:http";
@@ -313,10 +314,6 @@ function sleep(ms: unknown): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, numberOrDefault(ms, 0)));
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function numberOrDefault(value: unknown, fallback: number): number {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
@@ -337,3 +334,4 @@ export type {
   ManagedStopResult,
   SharedProcessContext,
 };
+

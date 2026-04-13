@@ -1,3 +1,4 @@
+import { normalizeText } from "../../../core/text-normalization";
 import * as crypto from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
@@ -439,10 +440,6 @@ function formatErrorMessage(error: unknown): string {
   return String(error || "");
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function normalizeContentType(value: unknown): string {
   if (typeof value !== "string") {
     return "";
@@ -454,3 +451,4 @@ function normalizeContentType(value: unknown): string {
 export {
   persistIncomingWeixinAttachments,
 };
+

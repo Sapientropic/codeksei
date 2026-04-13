@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 import { isPlainObject, readManagedJsonStateFile, writeManagedJsonStateFile } from "../state/json-state";
 import type {
   SharedBridgeHeartbeatClassification,
@@ -142,10 +143,6 @@ function normalizeCount(value: unknown): number {
   return Number.isInteger(numeric) && numeric >= 0 ? numeric : 0;
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function validateHeartbeatRecord(value: unknown): true | string {
   if (!isPlainObject(value)) {
     return "shared bridge heartbeat must be an object";
@@ -199,3 +196,4 @@ export {
   readSharedBridgeHeartbeat,
   writeSharedBridgeHeartbeat,
 };
+

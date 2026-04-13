@@ -23,6 +23,7 @@ import {
   normalizeText,
   parseSemanticJson,
 } from "./review-semantic-normalize";
+import { ignoreCleanupError } from "../core/error-handling";
 
 export interface RuntimeSemanticClient {
   onMessage(listener: (message: unknown) => void): () => void;
@@ -63,7 +64,10 @@ export async function runCodexSemanticReview(
     const text = await completion;
     return parseSemanticJson(text);
   } finally {
-    await client.close().catch(() => {});
+    await ignoreCleanupError(client.close(), {
+      label: "semantic review client close",
+      reason: "client teardown should not mask the semantic review result",
+    });
   }
 }
 

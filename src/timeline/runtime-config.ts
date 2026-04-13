@@ -1,3 +1,4 @@
+import { normalizeText } from "../core/text-normalization";
 import * as path from "node:path";
 import { readPrefixedEnv, readPrefixedIntEnv, resolveStateDir } from "../core/branding";
 import { resolveTimelineStateFiles } from "../core/timezone";
@@ -71,10 +72,6 @@ function resolveConfiguredTimelineLocale(rawValue: unknown): TimelineLocale {
   );
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function normalizePath(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -86,3 +83,4 @@ export {
 export type {
   TimelineRuntimeConfig,
 };
+

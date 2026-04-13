@@ -1,7 +1,7 @@
 import type { JSX, RefObject } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { DataSet, Timeline } from "vis-timeline/standalone";
+import { DataSet, Timeline, type TimelineOptions, type TimelineTimeAxisOption } from "vis-timeline/standalone";
 
 import type { TimelineTooltip, TimelineView } from "../../contracts";
 
@@ -17,14 +17,31 @@ interface UseVisTimelineArgs {
 
 interface UseTimelineZoomArgs {
   timeline: TimelineView;
-  timelineRef: RefObject<any>;
+  timelineRef: RefObject<Timeline | null>;
 }
 
 interface TimelineTooltipPortalProps {
   tooltipRef: RefObject<HTMLDivElement | null>;
 }
 
-const TIMELINE_ZOOM_LEVELS = [
+interface TimelinePointerEventLike {
+  clientX?: number;
+  clientY?: number;
+  pageX?: number;
+  pageY?: number;
+  target?: EventTarget | null;
+}
+
+interface TimelineMoveProperties {
+  item?: string | number;
+  event?: TimelinePointerEventLike;
+}
+
+interface TimelineTooltipCarrier {
+  tooltip?: TimelineTooltip | null;
+}
+
+const TIMELINE_ZOOM_LEVELS: Array<{ durationMs: number; timeAxis: TimelineTimeAxisOption }> = [
   { durationMs: 24 * 60 * 60 * 1000, timeAxis: { scale: "hour", step: 4 } },
   { durationMs: 18 * 60 * 60 * 1000, timeAxis: { scale: "hour", step: 3 } },
   { durationMs: 12 * 60 * 60 * 1000, timeAxis: { scale: "hour", step: 2 } },
@@ -62,7 +79,7 @@ function useVisTimeline({
   timeline,
   tooltipRef,
 }: UseVisTimelineArgs): void {
-  const timelineRef = useRef<any>(null);
+  const timelineRef = useRef<Timeline | null>(null);
   const { initialTimeAxis, resetZoom, bindWheelZoom } = useTimelineZoom({
     timeline,
     timelineRef,
@@ -80,7 +97,7 @@ function useVisTimeline({
 
     const items = new DataSet(timeline.items || []);
     const groups = Array.isArray(timeline.groups) && timeline.groups.length ? new DataSet(timeline.groups) : null;
-    const baseOptions: any = {
+    const baseOptions: TimelineOptions = {
       stack: false,
       horizontalScroll: false,
       orientation: "top",
@@ -103,8 +120,8 @@ function useVisTimeline({
 
     resetZoom();
 
-    const handleMove = (properties: any) => {
-      const item: any = properties?.item ? items.get(String(properties.item)) : null;
+    const handleMove = (properties: TimelineMoveProperties) => {
+      const item = properties?.item ? items.get(String(properties.item)) as TimelineTooltipCarrier | null : null;
       renderTimelineTooltip(tooltipRef.current, item?.tooltip || null, properties?.event);
     };
     const handleHide = () => renderTimelineTooltip(tooltipRef.current, null);
@@ -247,7 +264,7 @@ function TimelineTooltipPortal({ tooltipRef }: TimelineTooltipPortalProps): JSX.
 function renderTimelineTooltip(
   element: HTMLDivElement | null,
   tooltip: TimelineTooltip | null,
-  event?: any,
+  event?: TimelinePointerEventLike,
 ): void {
   if (!element) {
     return;
@@ -280,8 +297,14 @@ function renderTimelineTooltip(
   if (event) {
     const viewportPadding = 12;
     const offset = 10;
-    const clientX = Number.isFinite(event.clientX) ? event.clientX : event.pageX - window.scrollX;
-    const clientY = Number.isFinite(event.clientY) ? event.clientY : event.pageY - window.scrollY;
+    const pageX = Number.isFinite(event.pageX) ? Number(event.pageX) : undefined;
+    const pageY = Number.isFinite(event.pageY) ? Number(event.pageY) : undefined;
+    const clientX = Number.isFinite(event.clientX)
+      ? Number(event.clientX)
+      : (typeof pageX === "number" ? pageX - window.scrollX : window.innerWidth / 2);
+    const clientY = Number.isFinite(event.clientY)
+      ? Number(event.clientY)
+      : (typeof pageY === "number" ? pageY - window.scrollY : window.innerHeight / 2);
     const rect = element.getBoundingClientRect();
     const maxLeft = Math.max(viewportPadding, window.innerWidth - rect.width - viewportPadding);
     const preferredTop = clientY + offset;
@@ -295,7 +318,7 @@ function renderTimelineTooltip(
   }
 }
 
-function resolveTooltipAccentFromEvent(event: any): string {
+function resolveTooltipAccentFromEvent(event: TimelinePointerEventLike | undefined): string {
   const target = event?.target;
   if (!(target instanceof Element)) {
     return "";

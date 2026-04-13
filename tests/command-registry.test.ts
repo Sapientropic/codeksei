@@ -20,8 +20,8 @@ test("terminal help prefers codeksei CLI syntax and keeps repo scripts in a sepa
 
 test("timeline write help labels the command as a low-level batch/json entry", () => {
   const action = listCommandGroups()
-    .flatMap((group: any) => group.actions)
-    .find((item: any) => item.action === "timeline.write");
+    .flatMap((group: { actions: Array<{ action: string; summary: string }> }) => group.actions)
+    .find((item: { action: string; summary: string }) => item.action === "timeline.write");
 
   assert.ok(action);
   assert.match(action.summary, /批量/u);

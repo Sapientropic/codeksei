@@ -1,3 +1,4 @@
+import { normalizeText } from "../../../core/text-normalization";
 import type { NormalizedIncomingMessage, UnknownRecord } from "../../../core/runtime-types";
 import { listWeixinAccounts, resolveSelectedAccount } from "./account-store";
 import { loadPersistedContextTokens, persistContextToken } from "./context-token-store";
@@ -158,10 +159,7 @@ export function createWeixinUpdateState(config: WeixinConfig) {
   };
 }
 
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object";
 }
+

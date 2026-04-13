@@ -1,9 +1,6 @@
+import { normalizeText } from "./text-normalization";
 const LEGACY_TIMELINE_TIMEZONE = "Asia/Shanghai";
 const DEFAULT_FALLBACK_TIMEZONE = "UTC";
-
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
 
 function normalizeTimezone(value: unknown): string {
   const raw = normalizeText(value);
@@ -31,3 +28,4 @@ export {
   normalizeText,
   normalizeTimezone,
 };
+
