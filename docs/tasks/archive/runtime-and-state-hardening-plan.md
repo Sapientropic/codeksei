@@ -2,7 +2,7 @@
 > Archived snapshot。自 2026-04-12 起，这份文档只保留**上一阶段 runtime/state hardening 的历史记录**。
 > 
 > 当前唯一 active 升级计划请看：
-> [`architecture-and-quality-upgrade-plan.md`](./architecture-and-quality-upgrade-plan.md)
+> [`../architecture-and-quality-upgrade-plan.md`](../architecture-and-quality-upgrade-plan.md)
 >
 > 下文保留的是当时阶段的结论、批次与验收轨迹，用于追溯，不再充当当前入口。
 
@@ -17,7 +17,7 @@
 - 当时已经存在的 runtime / state hardening 主线
 - 2026-04-12 之前这一轮 hardening 的问题、批次与实施轨迹
 
-当前 active 升级计划、后续 batch、开 issue 与 PR 收口，都应回到 [`architecture-and-quality-upgrade-plan.md`](./architecture-and-quality-upgrade-plan.md)。
+当前 active 升级计划、后续 batch、开 issue 与 PR 收口，都应回到 [`../architecture-and-quality-upgrade-plan.md`](../architecture-and-quality-upgrade-plan.md)。
 
 ## 当前结论
 

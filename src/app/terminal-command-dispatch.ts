@@ -85,7 +85,7 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
     await runReviewCommand(context.config, manifest.kind as ReviewKind, context.leafArgs);
   },
   "reminder.write": async (_manifest, context) => {
-    await runReminderWriteCommand(context.config as ReminderWriteConfig, context.leafArgs);
+    await runReminderWriteCommand(context.config as unknown as ReminderWriteConfig, context.leafArgs);
   },
   "diary.write": async (_manifest, context) => {
     await runDiaryWriteCommand(context.config as DiaryWriteConfig, context.leafArgs);

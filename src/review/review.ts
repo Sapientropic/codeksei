@@ -1,7 +1,10 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { normalizeReviewSchemaConfig } from "../contracts/config-files";
+import {
+  normalizeReviewSchemaConfig,
+  type NormalizedWorkspaceSchemaConfig,
+} from "../contracts/config-files";
 import { loadJsonConfig } from "../core/config-loader";
 import { LEGACY_TIMELINE_TIMEZONE } from "../core/timezone";
 import {
@@ -61,16 +64,16 @@ interface ReviewSchemaWorkspaceProfile {
   reviews?: Record<string, Record<string, unknown>>;
 }
 
-function loadReviewSchemaConfig(config: Record<string, unknown> = {}): Record<string, unknown> {
+function loadReviewSchemaConfig(config: Record<string, unknown> = {}): NormalizedWorkspaceSchemaConfig {
   const filePath = normalizeText(config.reviewSchemaConfigFile);
   if (!filePath) {
-    return {};
+    return { workspaces: {} };
   }
-  return loadJsonConfig({
+  return loadJsonConfig<NormalizedWorkspaceSchemaConfig>({
     filePath,
     label: "review schema",
     normalize: normalizeReviewSchemaConfig,
-    fallback: {},
+    fallback: { workspaces: {} },
     missing: "fallback",
     invalid: "throw",
   });

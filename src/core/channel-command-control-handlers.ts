@@ -1,4 +1,5 @@
 import { findModelByQuery } from "../adapters/runtime/codex/model-catalog";
+import type { NormalizedModelCatalogEntry } from "../adapters/runtime/codex/model-catalog";
 import type { ChannelAdapterLike, RuntimeAdapterLike, SessionStoreWriterLike } from "./app-service-contract";
 import type {
   ChannelCommandRuntimeAdapter,
@@ -10,12 +11,10 @@ import { buildChannelCommandContext } from "./channel-command-context";
 import type { ParsedChannelCommand } from "./channel-command-router";
 import type { NormalizedIncomingMessage, PendingApprovalState } from "./runtime-types";
 
-interface AvailableModelCatalogView {
-  models: Array<{ model: string }>;
-}
-
 interface ControlCommandSessionStore extends ChannelCommandSessionStore {
-  getAvailableModelCatalog(): AvailableModelCatalogView | null;
+  getAvailableModelCatalog(): {
+    models: Array<Pick<NormalizedModelCatalogEntry, "model">>;
+  } | null;
   getCodexParamsForWorkspace(bindingKey: string, workspaceRoot: string): { model?: string };
 }
 

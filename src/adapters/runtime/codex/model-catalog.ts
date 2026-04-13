@@ -1,113 +1,112 @@
-// @ts-check
+type PlainObject = Record<string, unknown>;
 
-/**
- * @typedef {{
- *   id?: unknown,
- *   model?: unknown,
- *   displayName?: unknown,
- *   display_name?: unknown,
- *   supportedReasoningEfforts?: unknown,
- *   supported_reasoning_efforts?: unknown,
- *   defaultReasoningEffort?: unknown,
- *   default_reasoning_effort?: unknown,
- *   isDefault?: unknown,
- *   is_default?: unknown,
- * }} RawModelEntry
- */
+export interface RawModelCatalogEntry extends PlainObject {
+  id?: unknown;
+  model?: unknown;
+  displayName?: unknown;
+  display_name?: unknown;
+  supportedReasoningEfforts?: unknown;
+  supported_reasoning_efforts?: unknown;
+  defaultReasoningEffort?: unknown;
+  default_reasoning_effort?: unknown;
+  isDefault?: unknown;
+  is_default?: unknown;
+}
 
-/**
- * @typedef {{
- *   id: string,
- *   model: string,
- *   displayName: string,
- *   supportedReasoningEfforts: string[],
- *   defaultReasoningEffort: string,
- *   isDefault: boolean,
- * }} NormalizedModelEntry
- */
+export interface RawModelCatalogListResponse extends PlainObject {
+  result?: {
+    data?: unknown;
+  } & PlainObject;
+  data?: unknown;
+}
 
-function extractModelCatalogFromListResponse(response: any) {
-  const candidates = Array.isArray(response?.result?.data)
-    ? response.result.data
-    : Array.isArray(response?.data)
-      ? response.data
+export interface NormalizedModelCatalogEntry {
+  id: string;
+  model: string;
+  displayName: string;
+  supportedReasoningEfforts: string[];
+  defaultReasoningEffort: string;
+  isDefault: boolean;
+}
+
+export interface AvailableModelCatalogView {
+  models: NormalizedModelCatalogEntry[];
+  updatedAt: string;
+}
+
+export function extractModelCatalogFromListResponse(response: unknown): NormalizedModelCatalogEntry[] {
+  const source = isPlainObject(response) ? response as RawModelCatalogListResponse : {};
+  const result = isPlainObject(source.result) ? source.result : {};
+  const candidates = Array.isArray(result.data)
+    ? result.data
+    : Array.isArray(source.data)
+      ? source.data
       : [];
   return normalizeModelCatalog(candidates);
 }
 
-function resolveEffectiveModelForEffort(models: any, currentModel: any) {
-  if (!Array.isArray(models) || !models.length) {
+export function resolveEffectiveModelForEffort(
+  models: unknown,
+  currentModel: unknown,
+): NormalizedModelCatalogEntry | null {
+  const normalizedModels = normalizeModelCatalog(models);
+  if (!normalizedModels.length) {
     return null;
   }
   const normalizedCurrent = normalizeText(currentModel).toLowerCase();
   if (normalizedCurrent) {
-    const matched = findModelByQuery(models, normalizedCurrent);
+    const matched = findModelByQuery(normalizedModels, normalizedCurrent);
     if (matched) {
       return matched;
     }
   }
-  return models.find((item: any) => item.isDefault) || models[0];
+  return normalizedModels.find((item) => item.isDefault) || normalizedModels[0] || null;
 }
 
-function findModelByQuery(models: any, query: any) {
+export function findModelByQuery(models: unknown, query: unknown): NormalizedModelCatalogEntry | null {
   const normalizedQuery = normalizeText(query).toLowerCase();
-  if (!normalizedQuery || !Array.isArray(models)) {
+  if (!normalizedQuery) {
     return null;
   }
-  return models.find((item: any) => (
-    normalizeText(item?.model).toLowerCase() === normalizedQuery
-    || normalizeText(item?.id).toLowerCase() === normalizedQuery
+  const normalizedModels = normalizeModelCatalog(models);
+  return normalizedModels.find((item) => (
+    item.model.toLowerCase() === normalizedQuery
+    || item.id.toLowerCase() === normalizedQuery
   )) || null;
 }
 
-function normalizeModelCatalog(models: any) {
+export function normalizeModelCatalog(models: unknown): NormalizedModelCatalogEntry[] {
   if (!Array.isArray(models)) {
     return [];
   }
-  /** @type {NormalizedModelEntry[]} */
-  const normalized = [];
-  const seen = new Set();
-  for (const model of models) {
-    if (!model || typeof model !== "object") {
+  const normalized: NormalizedModelCatalogEntry[] = [];
+  const seen = new Set<string>();
+  for (const rawModel of models) {
+    if (!isPlainObject(rawModel)) {
       continue;
     }
-    const modelId = normalizeText(model.model);
-    const id = normalizeText(model.id);
-    const normalizedModel = modelId || id;
-    if (!normalizedModel) {
+    const model = normalizeSingleModel(rawModel);
+    if (!model) {
       continue;
     }
-    const dedupeKey = normalizedModel.toLowerCase();
+    const dedupeKey = model.model.toLowerCase();
     if (seen.has(dedupeKey)) {
       continue;
     }
     seen.add(dedupeKey);
-    normalized.push({
-      id,
-      model: normalizedModel,
-      displayName: normalizeText(model.displayName || model.display_name),
-      supportedReasoningEfforts: normalizeReasoningEfforts(
-        model.supportedReasoningEfforts || model.supported_reasoning_efforts
-      ),
-      defaultReasoningEffort: normalizeText(model.defaultReasoningEffort || model.default_reasoning_effort),
-      isDefault: !!(model.isDefault || model.is_default),
-    });
+    normalized.push(model);
   }
   return normalized;
 }
 
-function normalizeReasoningEfforts(efforts: any) {
+export function normalizeReasoningEfforts(efforts: unknown): string[] {
   if (!Array.isArray(efforts)) {
     return [];
   }
-  const result = [];
-  const seen = new Set();
+  const result: string[] = [];
+  const seen = new Set<string>();
   for (const effort of efforts) {
-    const normalized = normalizeText(
-      typeof effort === "string"
-        ? effort
-        : effort?.reasoningEffort || effort?.reasoning_effort
-    );
+    const normalized = normalizeSingleReasoningEffort(effort);
     if (!normalized) {
       continue;
     }
@@ -121,14 +120,43 @@ function normalizeReasoningEfforts(efforts: any) {
   return result;
 }
 
-function normalizeText(value: any) {
+export function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-export {
-  extractModelCatalogFromListResponse,
-  findModelByQuery,
-  normalizeModelCatalog,
-  normalizeText,
-  resolveEffectiveModelForEffort,
+function normalizeSingleModel(model: RawModelCatalogEntry): NormalizedModelCatalogEntry | null {
+  const modelId = normalizeText(model.model);
+  const id = normalizeText(model.id);
+  const normalizedModel = modelId || id;
+  if (!normalizedModel) {
+    return null;
+  }
+  return {
+    id,
+    model: normalizedModel,
+    displayName: normalizeText(model.displayName || model.display_name),
+    supportedReasoningEfforts: normalizeReasoningEfforts(
+      model.supportedReasoningEfforts || model.supported_reasoning_efforts,
+    ),
+    defaultReasoningEffort: normalizeText(model.defaultReasoningEffort || model.default_reasoning_effort),
+    isDefault: Boolean(model.isDefault || model.is_default),
+  };
+}
+
+function normalizeSingleReasoningEffort(effort: unknown): string {
+  if (typeof effort === "string") {
+    return normalizeText(effort);
+  }
+  if (!isPlainObject(effort)) {
+    return "";
+  }
+  return normalizeText(effort.reasoningEffort || effort.reasoning_effort);
+}
+
+function isPlainObject(value: unknown): value is PlainObject {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+export type {
+  PlainObject as ModelCatalogPlainObject,
 };

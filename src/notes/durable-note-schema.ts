@@ -1,7 +1,10 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { normalizeDurableNoteSchemaConfig } from "../contracts/config-files";
+import {
+  normalizeDurableNoteSchemaConfig,
+  type NormalizedWorkspaceSchemaConfig,
+} from "../contracts/config-files";
 import { loadJsonConfig } from "../core/config-loader";
 import { listTrackedProjects } from "../core/project-radar";
 import {
@@ -86,16 +89,16 @@ export type DurableNoteRoutingInspection =
     availableProjects?: string[];
   };
 
-function loadDurableNoteSchemaConfig(config: DurableNoteConfig = {}): Record<string, unknown> {
+function loadDurableNoteSchemaConfig(config: DurableNoteConfig = {}): NormalizedWorkspaceSchemaConfig {
   const filePath = normalizeText(config.durableNoteSchemaConfigFile);
   if (!filePath) {
-    return {};
+    return { workspaces: {} };
   }
-  return loadJsonConfig({
+  return loadJsonConfig<NormalizedWorkspaceSchemaConfig>({
     filePath,
     label: "durable note schema",
     normalize: normalizeDurableNoteSchemaConfig,
-    fallback: {},
+    fallback: { workspaces: {} },
     missing: "fallback",
     invalid: "throw",
   });

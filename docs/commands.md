@@ -204,5 +204,7 @@ maintainer 仍需额外补一次真实账号 smoke：
   assisted smoke。脚本会等待 pending approval 落盘、自动重启 bridge，然后等待 `/yes` 之后 approval 清空和最终 delivered hash。
 - 这三条脚本都会在 `shared-wechat.log` / `shared-app-server.log` 里写 `[codeksei-smoke] stage=...` checkpoint，排查时优先从这些 marker 往后看。
 - `[⚠️ 需确认]` 这组真实 smoke 依赖可用的 WeChat 登录态、绑定 thread 和能触发 approval 的活跃 Codex runtime；环境不满足时脚本会直接报错，而不是静默跳过。
+- recorded 结果入口统一看：[docs/maintainer/live-smoke.md](./maintainer/live-smoke.md)
+- 如果这页仍写着“尚无 recorded live smoke 证据”，说明当前只证明了仓内自动化基线，还没有把真实环境证明持续收口到稳定入口。
 
 这页只管“怎么使用这些入口”；维护与发布流程留在本地维护材料里。

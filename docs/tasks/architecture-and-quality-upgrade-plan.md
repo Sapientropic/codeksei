@@ -1,97 +1,101 @@
-# Codeksei Architecture And Quality Upgrade Plan
+# Codeksei 四热点类型收口与 Live Smoke 证据面计划
 
 ## 这份文档负责什么
 
 这是 `codeksei` 当前唯一的 active engineering roadmap。
 
-它只负责仍在推进的结构与质量收口，不再复述上一阶段已经完成的
-runtime/state hardening 历史。历史批次、旧验收口径与实现轨迹，统一留在
-[`runtime-and-state-hardening-plan.md`](./runtime-and-state-hardening-plan.md)。
+当前阶段只收口三件事：
+
+- 4 个高杠杆热点文件的类型债
+- maintainer live smoke 的 recorded 结果入口
+- `docs/tasks/` 的 active / archive / local notes 分层
+
+上一阶段 runtime/state hardening 的历史记录已归档到：
+[`archive/runtime-and-state-hardening-plan.md`](./archive/runtime-and-state-hardening-plan.md)
+
+目录入口统一看：
+[`README.md`](./README.md)
 
 ## 当前目标（2026-04-13）
 
-本轮 active work 只有 3 条：
+- `src/contracts/runtime-events.ts`
+- `src/contracts/config-files.ts`
+- `src/app/reminder-write-cli.ts`
+- `src/adapters/runtime/codex/model-catalog.ts`
 
-- 修复 `docs/tasks/` 真相层断链，恢复一个真实存在的 active roadmap 入口
-- 把 4 个高风险边界文件的显式 `any` 收到 `0`
-- 统一 `check` / `verify` / maintainer real smoke 的证据口径，避免把仓内 fake-harness 证明写成 live 集成证明
+这些文件都属于 runtime / config / reminder / codex model catalog 的高杠杆边界。
+本轮目标是把它们的显式 `any` 收到 `0`，并把相关 consumer 改成复用同一份 contract 类型。
+
+同时补一条稳定文档入口：
+
+- `docs/maintainer/live-smoke.md`
+
+它只负责 recorded maintainer live smoke 结果，不把仓内 fake-harness proof 写成 live 现场证明。
 
 ## 活跃主线
 
-### 1. Truth Surface Repair
+### 1. Boundary Typing Follow-up
 
-目标：
+范围：
 
-- `docs/tasks/` 对当前入口、历史快照、已完成计划的表达不再互相打架
-- 新人从 README / architecture / tasks 进入时，能立刻分清：
-  - 当前活跃计划在哪里
-  - 历史 hardening 在哪里
-  - 哪些 smoke 是仓内自动化，哪些是 maintainer live smoke
-
-完成定义：
-
-- `runtime-and-state-hardening-plan.md` 顶部明确标成 archived snapshot
-- 本文件成为唯一 active roadmap
-- 文档测试能直接断言 forward link 存在且可达
-
-### 2. Boundary Typing Follow-up
-
-目标：
-
-- 只收口 4 个最关键的热点边界文件，不做全仓清债运动
-
-本轮范围：
-
-- `src/contracts/session-state.ts`
-- `src/core/system-message-dispatcher.ts`
-- `src/core/approval-command-policy.ts`
-- `src/integrations/timeline/state-sync.ts`
-
-约束：
-
-- persisted JSON shape 不变
-- public CLI、script name、env name 不变
-- shared-mode、approval continuity、timeline timezone 现有语义不翻转
+- `src/contracts/runtime-events.ts`
+- `src/contracts/config-files.ts`
+- `src/app/reminder-write-cli.ts`
+- `src/adapters/runtime/codex/model-catalog.ts`
 
 完成定义：
 
 - 上述 4 个文件显式 `any = 0`
-- 相关 targeted tests 通过
+- 相关 consumer 改用导出的类型真相层，不再各自复制平行 shape
+- persisted JSON shape、public CLI / script / env name 不变
+- targeted tests 通过
 
-### 3. Evidence Stratification
+### 2. Live Smoke Evidence Surface
 
 目标：
 
-- 默认质量门与真实集成验证的证明边界清楚可见
+- maintainer assisted live smoke 有一个 repo-tracked、持续更新、可审计的稳定入口
 
 稳定口径：
 
 - `npm run check`：默认快速质量门
-- `npm run verify`：包含 built `dist` + fake Codex / fake Weixin 的仓内 integration proof
-- `npm run smoke:shared:real:*`：maintainer-only assisted live smoke，不并入默认 CI
+- `npm run verify`：built `dist` + fake Codex / fake Weixin 的仓内 integration proof
+- `npm run smoke:shared:real:*`：maintainer-only assisted live smoke
+- `docs/maintainer/live-smoke.md`：最近一次 recorded live smoke 结果入口
 
 完成定义：
 
-- `docs/architecture.md` 与 `docs/commands.md` 都按这三层表述
-- docs contract tests 能防止“fake 自动化被误写成真实 smoke”
+- `src/maintainer/shared-real-smoke.ts` 支持 `--record`
+- archive 落到 `docs/maintainer/live-smoke/archive/`
+- `docs/commands.md` 与 `docs/release.md` 都指向这个入口
+- 没有 recorded run 时，文档明确写“尚无 recorded live smoke 证据”
+
+### 3. Tasks Truth Surface Repair
+
+目标：
+
+- `docs/tasks/` 只保留一个 active roadmap 入口
+- 历史计划进入 archive
+- `*.local.md` 继续视为本地维护材料，不进入公开索引
+
+完成定义：
+
+- `docs/tasks/README.md` 成为目录入口
+- `runtime-and-state-hardening-plan.md` 迁到 `docs/tasks/archive/`
+- docs truth tests 能断言 active roadmap、archive snapshot、live smoke 入口都可达
 
 ## 本轮不做
 
 - 不把 real smoke 自动化进 `verify` 或 CI
-- 不引入 repo-wide `any` budget、inventory 或评分层
-- 不顺手扩大到 `config-files.ts`、`runtime-events.ts`、`reminder-write-cli.ts`、`model-catalog.ts`
+- 不扩大成 repo-wide `any` budget / inventory / 评分层
+- 不改 public CLI 名称、script 名称、env 名称
+- 不改 persisted JSON schema
 
 ## 验收
-
-本轮默认验收命令：
 
 - `npm run check`
 - `npm run verify`
 
-并补以下回归保护：
+[⚠️ 需确认]
 
-- approval policy targeted tests
-- timeline state sync targeted tests
-- system message dispatcher direct test
-- docs truth / roadmap link contract test
-- 关键 4 文件无显式 `any` 的 guard test
+- 真实 `smoke:shared:real:*` 不在本轮自动执行；仍需 maintainer 在可用环境里至少补一次 recorded run，才能把 live 现场证明补齐。

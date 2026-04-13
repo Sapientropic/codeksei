@@ -18,37 +18,79 @@ import {
 } from "../shared/shared-common";
 import { collectSharedStatusSnapshot } from "../shared/shared-status";
 import { hashReplyText } from "../runtime/stream-delivery/trace-abandonment";
+import { sanitizeSmokeText, writeLiveSmokeRecord } from "./live-smoke-records";
 
 type SmokeKind = "approval" | "attach" | "reply";
 type ReplyMode = "both" | "settled" | "stream";
 
 interface SmokeOptions {
+  notes: string;
+  operator: string;
+  record: boolean;
+  replyMode: ReplyMode;
   timeoutMs: number;
   workspaceRoot: string;
-  replyMode: ReplyMode;
+}
+
+interface SmokeRunEvidence {
+  checkpoints: string[];
+  evidenceSummary: string;
 }
 
 async function main(): Promise<void> {
   const kind = normalizeKind(process.argv[2]);
   if (!kind) {
-    throw new Error("用法: node ./dist/src/maintainer/shared-real-smoke.js <attach|reply|approval> [--timeout-ms 120000] [--workspace-root PATH] [--mode stream|settled|both]");
+    throw new Error("用法: node ./dist/src/maintainer/shared-real-smoke.js <attach|reply|approval> [--timeout-ms 120000] [--workspace-root PATH] [--mode stream|settled|both] [--record] [--operator <name>] [--notes \"...\"]");
   }
 
   const options = parseOptions(process.argv.slice(3));
-  switch (kind) {
-    case "attach":
-      await runAttachSmoke(options);
-      return;
-    case "reply":
-      await runReplySmoke(options);
-      return;
-    case "approval":
-      await runApprovalSmoke(options);
-      return;
+  const recordingRoot = resolveRecordingRoot();
+  try {
+    const evidence = await runSmoke(kind, options);
+    if (options.record) {
+      const output = writeLiveSmokeRecord(recordingRoot, {
+        checkpoints: evidence.checkpoints,
+        commit: resolveGitCommit(recordingRoot),
+        evidenceSummary: evidence.evidenceSummary,
+        kind,
+        mode: kind === "reply" ? options.replyMode : "",
+        notes: options.notes,
+        operator: options.operator,
+        recordedAt: new Date().toISOString(),
+        result: "passed",
+      });
+      console.log(`recorded live smoke: ${path.relative(recordingRoot, output.archivePath)}`);
+    }
+  } catch (error) {
+    if (options.record) {
+      const output = writeLiveSmokeRecord(recordingRoot, {
+        commit: resolveGitCommit(recordingRoot),
+        evidenceSummary: buildFailureSummary(error),
+        kind,
+        mode: kind === "reply" ? options.replyMode : "",
+        notes: options.notes,
+        operator: options.operator,
+        recordedAt: new Date().toISOString(),
+        result: "failed",
+      });
+      console.error(`recorded failed live smoke: ${path.relative(recordingRoot, output.archivePath)}`);
+    }
+    throw error;
   }
 }
 
-async function runAttachSmoke(options: SmokeOptions): Promise<void> {
+async function runSmoke(kind: SmokeKind, options: SmokeOptions): Promise<SmokeRunEvidence> {
+  switch (kind) {
+    case "attach":
+      return runAttachSmoke(options);
+    case "reply":
+      return runReplySmoke(options);
+    case "approval":
+      return runApprovalSmoke(options);
+  }
+}
+
+async function runAttachSmoke(options: SmokeOptions): Promise<SmokeRunEvidence> {
   const context = resolveSharedProcessContext();
   ensureLogDir(context);
   appendSmokeCheckpoint(context, "attach.prepare", { workspaceRoot: options.workspaceRoot || process.cwd() });
@@ -82,14 +124,21 @@ async function runAttachSmoke(options: SmokeOptions): Promise<void> {
       listenUrl: status.listenUrl,
     });
     console.log(`shared attach smoke ok thread=${bound.threadId} workspace=${bound.workspaceRoot}`);
+    return {
+      checkpoints: ["attach.prepare", "attach.ok"],
+      evidenceSummary: "shared:start / shared:status / shared:open 真实链路通过，一次性 open probe 记录到了当前绑定线程的 resume 调用。",
+    };
   } finally {
     openWrapper.dispose();
   }
 }
 
-async function runReplySmoke(options: SmokeOptions): Promise<void> {
+async function runReplySmoke(options: SmokeOptions): Promise<SmokeRunEvidence> {
   const context = resolveSharedProcessContext();
   const modes = options.replyMode === "both" ? (["stream", "settled"] as const) : ([options.replyMode] as const);
+  const checkpoints: string[] = [];
+  const proofSummaries: string[] = [];
+
   for (const mode of modes) {
     const previousReplyMode = process.env.CODEKSEI_WEIXIN_REPLY_MODE;
     process.env.CODEKSEI_WEIXIN_REPLY_MODE = mode;
@@ -99,19 +148,27 @@ async function runReplySmoke(options: SmokeOptions): Promise<void> {
       const nonce = `codeksei-smoke-reply-${mode}-${crypto.randomUUID().slice(0, 8)}`;
       const expectedHash = hashReplyText(nonce);
       const marker = appendSmokeCheckpoint(context, "reply.prepare", { mode, nonce, hash: expectedHash });
+      checkpoints.push(`reply.prepare:${mode}`);
       console.log(`reply smoke [${mode}]`);
       console.log(`1. 在当前绑定的微信聊天发送：请精确回复这串字符，不要加解释，不要加引号：${nonce}`);
       console.log(`2. 脚本会等待 shared-wechat.log 里出现 hash=${expectedHash} 的 delivered 记录。`);
       await waitForBridgeLog(context, marker, new RegExp(`delivered weixin reply .*mode=${mode} .*hash=${expectedHash}`), options.timeoutMs);
       appendSmokeCheckpoint(context, "reply.ok", { mode, nonce, hash: expectedHash });
+      checkpoints.push(`reply.ok:${mode}`);
+      proofSummaries.push(`${mode}=hash:${expectedHash}`);
       console.log(`reply smoke ok mode=${mode} hash=${expectedHash}`);
     } finally {
       restoreEnv("CODEKSEI_WEIXIN_REPLY_MODE", previousReplyMode);
     }
   }
+
+  return {
+    checkpoints,
+    evidenceSummary: `真实桥接日志已观察到 delivered reply：${proofSummaries.join("；")}。`,
+  };
 }
 
-async function runApprovalSmoke(options: SmokeOptions): Promise<void> {
+async function runApprovalSmoke(options: SmokeOptions): Promise<SmokeRunEvidence> {
   const context = resolveSharedProcessContext();
   await ensureSharedHealthy(context);
   const bound = resolveBoundThread(resolveWorkspaceRoot(options), { context });
@@ -151,6 +208,11 @@ async function runApprovalSmoke(options: SmokeOptions): Promise<void> {
     hash: expectedHash,
   });
   console.log(`approval smoke ok thread=${bound.threadId} hash=${expectedHash}`);
+
+  return {
+    checkpoints: ["approval.prepare", "approval.pending", "approval.restarted", "approval.ok"],
+    evidenceSummary: `已观察到 pending approval、bridge restart、approval clear，以及最终 delivered reply hash:${expectedHash}。`,
+  };
 }
 
 async function ensureSharedHealthy(context: SharedProcessContext): Promise<void> {
@@ -269,6 +331,9 @@ function parseOptions(args: string[]): SmokeOptions {
   let timeoutMs = 120_000;
   let workspaceRoot = "";
   let replyMode: ReplyMode = "both";
+  let record = false;
+  let operator = "";
+  let notes = "";
   for (let index = 0; index < args.length; index += 1) {
     const arg = String(args[index] || "");
     if (arg === "--timeout-ms") {
@@ -287,9 +352,26 @@ function parseOptions(args: string[]): SmokeOptions {
         replyMode = candidate;
       }
       index += 1;
+      continue;
+    }
+    if (arg === "--record") {
+      record = true;
+      continue;
+    }
+    if (arg === "--operator") {
+      operator = String(args[index + 1] || "");
+      index += 1;
+      continue;
+    }
+    if (arg === "--notes") {
+      notes = String(args[index + 1] || "");
+      index += 1;
     }
   }
   return {
+    notes,
+    operator,
+    record,
     timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 120_000,
     workspaceRoot,
     replyMode,
@@ -298,6 +380,31 @@ function parseOptions(args: string[]): SmokeOptions {
 
 function resolveWorkspaceRoot(options: SmokeOptions): string {
   return options.workspaceRoot || process.env.CODEKSEI_WORKSPACE_ROOT || process.cwd();
+}
+
+function resolveRecordingRoot(): string {
+  try {
+    return resolveSharedProcessContext().rootDir;
+  } catch {
+    return process.cwd();
+  }
+}
+
+function resolveGitCommit(rootDir: string): string {
+  const result = spawnSync("git", ["rev-parse", "--short", "HEAD"], {
+    cwd: rootDir,
+    encoding: "utf8",
+    windowsHide: true,
+  });
+  const normalized = typeof result.stdout === "string" ? result.stdout.trim() : "";
+  return normalized || "unknown";
+}
+
+function buildFailureSummary(error: unknown): string {
+  const summary = error instanceof Error
+    ? error.message || error.stack || "unknown error"
+    : String(error || "unknown error");
+  return `run failed: ${sanitizeSmokeText(summary) || "unknown error"}`;
 }
 
 function normalizeKind(value: unknown): SmokeKind | "" {
