@@ -275,6 +275,14 @@ More detailed references:
 - [docs/timeline-integration.md](./docs/timeline-integration.md)
 - [docs/architecture.md](./docs/architecture.md)
 
+If you maintain this repository, the current quality-gate split is:
+
+- `npm run check`: source-only guardrails and typechecks; it does not rebuild `dist/`
+- `npm run verify`: runs `check`, then explicitly rebuilds published runtime artifacts, runs built-runtime tests, and finishes with `npm run pack:dry-run`
+- `npm run build`: use this only when you intentionally want to refresh the published runtime artifacts
+
+That split is intentional: do not rely on `prepare` or implicit `npm pack` lifecycle hooks to rebuild the package for you anymore.
+
 ## Local State and Public Boundary
 
 Primary state directory:

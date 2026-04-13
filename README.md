@@ -290,6 +290,14 @@ codeksei system checkin --reset
 - [docs/timeline-integration.md](./docs/timeline-integration.md)
 - [docs/architecture.md](./docs/architecture.md)
 
+如果你在维护这个仓库，当前质量门分工是：
+
+- `npm run check`：只跑 source-level guard、typecheck 和 tests TS typecheck，不会刷新 `dist/`
+- `npm run verify`：在 `check` 之后显式 `build`，再跑 built-runtime tests 和 `npm run pack:dry-run`
+- `npm run build`：只在你明确要刷新 published runtime artifacts 时运行
+
+这条分工是刻意收口的：以后不要再依赖 `prepare` 或 `npm pack` 的隐式 lifecycle 去偷偷帮你 build。
+
 如果你是第一次读这个仓库的代码结构，先看 `docs/architecture.md`，再进具体目录会更快。
 
 ## 本地数据与公开边界

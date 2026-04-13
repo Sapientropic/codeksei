@@ -1,5 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const { buildRuntimeEntrypointArg }: typeof import("../src/contracts/runtime-entrypoints") = require("../src/contracts/runtime-entrypoints");
 
 const {
   matchesBuiltInCommandPrefix,
@@ -55,6 +56,7 @@ test("approval command policy preserves allowlist prefix matching after normaliz
 });
 
 test("approval command policy keeps npm scripts and direct CLI entrypoints in parity", () => {
+  const cliArg = buildRuntimeEntrypointArg("cli");
   for (const entry of PARITY_CASES) {
     assert.equal(
       matchesBuiltInCommandPrefix(["npm", "run", entry.scriptName, "--", ...entry.terminalTokens.slice(2)]),
@@ -62,9 +64,9 @@ test("approval command policy keeps npm scripts and direct CLI entrypoints in pa
       `${entry.label} should auto-approve through npm run`
     );
     assert.equal(
-      matchesBuiltInCommandPrefix(["node", "./dist/src/index.js", ...entry.terminalTokens]),
+      matchesBuiltInCommandPrefix(["node", cliArg, ...entry.terminalTokens]),
       true,
-      `${entry.label} should auto-approve through node ./dist/src/index.js`
+      `${entry.label} should auto-approve through node ${cliArg}`
     );
     assert.equal(
       matchesBuiltInCommandPrefix(["codeksei", ...entry.terminalTokens]),
@@ -91,8 +93,9 @@ test("approval command policy still recognizes the legacy timeline screenshot sh
 });
 
 test("approval command policy keeps Windows executable aliases in parity with repo entrypoints", () => {
+  const cliArg = buildRuntimeEntrypointArg("cli");
   assert.equal(
-    matchesBuiltInCommandPrefix(["node.exe", ".\\dist\\src\\index.js", "review", "weekly", "--week", "2026-W15"]),
+    matchesBuiltInCommandPrefix(["node.exe", cliArg.replace(/\//g, "\\"), "review", "weekly", "--week", "2026-W15"]),
     true
   );
   assert.equal(

@@ -40,9 +40,8 @@
   },
   "scripts": {
     "prebuild": "node -e \"require('node:fs').rmSync('dist',{ recursive:true, force:true })\"",
-    "copy:timeline-assets": "node ./dist/src/release/copy-timeline-assets.js",
+    "copy:timeline-assets": "tsx ./src/release/copy-timeline-assets.ts",
     "build": "tsc -p ./tsconfig.json && npm run copy:timeline-assets",
-    "prepare": "npm run build",
     "start": "node ./dist/src/index.js start",
     "start:checkin": "node ./dist/src/index.js start --checkin",
     "login": "node ./dist/src/index.js login",
@@ -80,12 +79,13 @@
     "smoke:shared:real:attach": "node ./dist/src/maintainer/shared-real-smoke.js attach",
     "smoke:shared:real:reply": "node ./dist/src/maintainer/shared-real-smoke.js reply",
     "smoke:shared:real:approval": "node ./dist/src/maintainer/shared-real-smoke.js approval",
-    "lint": "node ./dist/src/release/assert-no-authored-js-extensions.js && node ./dist/src/release/check-covered-js-entrypoints.js && node ./dist/src/release/assert-no-js-tests.js && node ./dist/src/release/assert-no-legacy-branding.js && node ./dist/src/release/assert-no-key-ts-commonjs.js && node ./dist/src/release/assert-no-typed-module-destructure.js && node ./dist/src/release/assert-no-ts-nocheck-regressions.js",
+    "lint": "tsx ./src/release/assert-no-authored-js-extensions.ts && tsx ./src/release/assert-published-runtime-artifacts.ts && tsx ./src/release/assert-no-js-tests.ts && tsx ./src/release/assert-no-legacy-branding.ts && tsx ./src/release/assert-no-key-ts-commonjs.ts && tsx ./src/release/assert-no-typed-module-destructure.ts && tsx ./src/release/assert-no-ts-nocheck-regressions.ts",
     "typecheck": "tsc -p ./tsconfig.json --noEmit --pretty false",
     "typecheck:tests:ts": "tsc -p ./tsconfig.tests.json --noEmit --pretty false",
     "typecheck:strict": "npm run typecheck",
-    "check": "npm run build && npm run lint && npm run typecheck && npm run typecheck:tests:ts",
-    "verify": "npm run check && node --experimental-strip-types --require ./tests/helpers/build-path-resolver.ts --test tests/*.test.ts"
+    "check": "npm run lint && npm run typecheck && npm run typecheck:tests:ts",
+    "pack:dry-run": "npm pack --dry-run --ignore-scripts",
+    "verify": "npm run check && npm run build && node --experimental-strip-types --require ./tests/helpers/build-path-resolver.ts --test tests/*.test.ts && npm run pack:dry-run"
   },
   "dependencies": {
     "@radix-ui/react-icons": "^1.3.2",
@@ -107,6 +107,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@types/ws": "^8.18.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.8.3"
   }
 }

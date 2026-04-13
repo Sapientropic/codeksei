@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "${ROOT}/scripts/lib/runtime-entrypoints.sh"
 ARGS=()
 
 for arg in "$@"; do
@@ -12,4 +13,4 @@ for arg in "$@"; do
 done
 
 cd "$ROOT"
-exec node ./dist/src/index.js timeline screenshot "${ARGS[@]}"
+exec node "$(codeksei_runtime_entrypoint cli)" timeline screenshot "${ARGS[@]}"

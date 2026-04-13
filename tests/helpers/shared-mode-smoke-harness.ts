@@ -3,6 +3,7 @@ const http: typeof import("node:http") = require("node:http");
 const path: typeof import("node:path") = require("node:path");
 const { spawn, spawnSync }: typeof import("node:child_process") = require("node:child_process");
 const { WebSocketServer }: typeof import("ws") = require("ws");
+const { resolveRuntimeEntrypointAbsolute }: typeof import("../../src/contracts/runtime-entrypoints") = require("../../src/contracts/runtime-entrypoints");
 import type { IncomingMessage, Server } from "node:http";
 import type { WebSocket } from "ws";
 
@@ -574,10 +575,10 @@ function closeServer(server: Server): Promise<void> {
 
 function resolveSharedEntrypoint(repoRoot: string, scriptName: string): string {
   const entrypointMap: Record<string, string> = {
-    "shared:start": path.join(repoRoot, "dist", "src", "shared", "shared-start.js"),
-    "shared:status": path.join(repoRoot, "dist", "src", "shared", "shared-status.js"),
-    "shared:open": path.join(repoRoot, "dist", "src", "shared", "shared-open.js"),
-    "shared:watchdog": path.join(repoRoot, "dist", "src", "shared", "shared-watchdog.js"),
+    "shared:start": resolveRuntimeEntrypointAbsolute(repoRoot, "sharedStart"),
+    "shared:status": resolveRuntimeEntrypointAbsolute(repoRoot, "sharedStatus"),
+    "shared:open": resolveRuntimeEntrypointAbsolute(repoRoot, "sharedOpen"),
+    "shared:watchdog": resolveRuntimeEntrypointAbsolute(repoRoot, "sharedWatchdog"),
   };
   return entrypointMap[scriptName] || "";
 }

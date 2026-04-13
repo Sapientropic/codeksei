@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as http from "node:http";
 import * as path from "node:path";
 
+import { resolvePublishedAssetFile } from "../../../../contracts/runtime-entrypoints";
 import type { TimelineRuntimeConfig } from "../../../runtime-config";
 import { getTimelineDemoFactsPath, loadTimelineSourceData } from "../../infra/timeline/timeline-source-data";
 import { buildTimelineSite } from "./build-dashboard";
@@ -364,9 +365,11 @@ function serveTimelineDevAsset(
 
 function injectHotReload(html: string, version: number): string {
   const safeVersion = Number(version) || Date.now();
+  const dashboardBundle = resolvePublishedAssetFile("timelineDashboardBundle");
+  const dashboardStylesheet = resolvePublishedAssetFile("timelineDashboardStylesheet");
   const withAssetBusters = html
-    .replace("./assets/dashboard.css", `./assets/dashboard.css?v=${safeVersion}`)
-    .replace("./assets/dashboard.js", `./assets/dashboard.js?v=${safeVersion}`);
+    .replace(`./assets/${dashboardStylesheet}`, `./assets/${dashboardStylesheet}?v=${safeVersion}`)
+    .replace(`./assets/${dashboardBundle}`, `./assets/${dashboardBundle}?v=${safeVersion}`);
   const snippet = [
     "<script>",
     "(() => {",

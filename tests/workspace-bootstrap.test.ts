@@ -5,7 +5,7 @@ const os = require("os");
 const path = require("path");
 const { resolveRepoRuntimePath } = require("./helpers/runtime-paths.ts");
 
-const { buildWorkspaceContinuityInstructions } = require(resolveRepoRuntimePath("src/workspace/workspace-bootstrap.js"));
+const { buildWorkspaceContinuityInstructions } = require(resolveRepoRuntimePath("src/workspace/workspace-bootstrap.ts"));
 
 test("workspace bootstrap includes local overlay files when present", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-bootstrap-"));

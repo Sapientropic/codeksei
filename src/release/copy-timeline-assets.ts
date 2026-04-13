@@ -2,8 +2,9 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { resolvePackageRoot } from "../core/path-utils";
 
-const repoRoot = path.resolve(__dirname, "..", "..", "..");
+const repoRoot = resolvePackageRoot(__dirname);
 const sourceRoot = path.join(repoRoot, "src", "timeline");
 const distRoot = path.join(repoRoot, "dist", "src", "timeline");
 const CODE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".d.ts"]);

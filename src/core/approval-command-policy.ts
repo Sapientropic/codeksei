@@ -6,6 +6,7 @@ import {
   findTerminalManifestByScriptName,
   type TerminalCommandManifestEntry,
 } from "../contracts/command-surface";
+import { matchesRuntimeEntrypoint } from "../contracts/runtime-entrypoints";
 
 const SHELL_EXECUTABLES = new Set(["sh", "bash", "zsh"]);
 const NODE_EXECUTABLES = new Set(["node", "node.exe"]);
@@ -145,10 +146,7 @@ function findManifestForTerminalCommand(commandTokens: string[]): TerminalComman
 }
 
 function looksLikeCodekseiBinPath(binPath: unknown): boolean {
-  const normalized = normalizeCommandArgument(binPath).replace(/\\/g, "/").toLowerCase();
-  return normalized === "./dist/src/index.js"
-    || normalized.endsWith("/dist/src/index.js")
-    || normalized === "dist/src/index.js";
+  return matchesRuntimeEntrypoint(binPath, "cli");
 }
 
 function isShellWrapper(command: unknown, flag: unknown): boolean {

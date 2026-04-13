@@ -1,4 +1,5 @@
 import { readPrefixedEnv } from "../core/branding";
+import { commandLineMentionsRuntimeEntrypoint } from "../contracts/runtime-entrypoints";
 import { runWatchdogOnce } from "./shared-watchdog";
 import {
   ensureLogDir,
@@ -74,7 +75,7 @@ function ensureSingleInstance() {
   }
 
   const commandLine = readProcessCommandLine(existingPid);
-  if (String(commandLine).toLowerCase().includes("shared-supervisor.js")) {
+  if (commandLineMentionsRuntimeEntrypoint(commandLine, "sharedSupervisor")) {
     return existingPid;
   }
   throw new Error(`refusing to reuse shared supervisor pid=${existingPid}: unexpected command line`);

@@ -9,7 +9,7 @@ const {
   ensureLiveSmokeDocs,
   sanitizeSmokeText,
   writeLiveSmokeRecord,
-} = require("../dist/src/maintainer/live-smoke-records.js");
+} = require("../src/maintainer/live-smoke-records");
 
 test("live smoke summary starts with no recorded evidence", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-live-smoke-"));

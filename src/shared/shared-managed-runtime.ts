@@ -1,5 +1,9 @@
 import * as fs from "node:fs";
 import { readPrefixedEnv } from "../core/branding";
+import {
+  buildRuntimeEntrypointArg,
+  commandLineMentionsRuntimeEntrypoint,
+} from "../contracts/runtime-entrypoints";
 import { classifySharedBridgeHeartbeat, readSharedBridgeHeartbeat } from "./shared-bridge-heartbeat";
 import { resolveBundledCodexBinary } from "../core/codex-spawn";
 import { probeCodexAppServerCapabilities } from "../adapters/runtime/codex/capability-probe";
@@ -57,7 +61,7 @@ async function waitForSharedBridgeHealthy(
 
 function startSharedBridge(): number {
   const context = resolveSharedProcessContext();
-  const pid = spawnDetachedCommand(process.execPath, ["./dist/src/index.js", "start", "--checkin"], {
+  const pid = spawnDetachedCommand(process.execPath, [buildRuntimeEntrypointArg("cli"), "start", "--checkin"], {
     logFile: context.bridgeLogFile,
     cwd: context.rootDir,
     env: {
@@ -73,7 +77,7 @@ function startSharedSupervisor({ intervalMinutes = 5 }: { intervalMinutes?: unkn
   const normalizedIntervalMinutes = Number.isFinite(Number(intervalMinutes))
     ? Number(intervalMinutes)
     : 5;
-  const args = ["./dist/src/shared/shared-supervisor.js", `--interval-minutes=${normalizedIntervalMinutes}`];
+  const args = [buildRuntimeEntrypointArg("sharedSupervisor"), `--interval-minutes=${normalizedIntervalMinutes}`];
   const pid = spawnDetachedCommand(process.execPath, args, {
     logFile: context.supervisorLogFile,
     cwd: context.rootDir,
@@ -234,7 +238,7 @@ async function ensureManagedSupervisor(
   const pid = readPidFile(context.supervisorPidFile);
   if (pid && isPidAlive(pid)) {
     const commandLine = readProcessCommandLine(pid);
-    if (!String(commandLine).toLowerCase().includes("shared-supervisor.js")) {
+    if (!commandLineMentionsRuntimeEntrypoint(commandLine, "sharedSupervisor")) {
       throw new Error(`refusing to adopt shared supervisor pid=${pid}: unexpected command line`);
     }
     return { pid, status: "already_running" };

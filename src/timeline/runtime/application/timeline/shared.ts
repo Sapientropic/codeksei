@@ -1,6 +1,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { resolvePublishedAssetFile, resolveRuntimeEntrypointAbsolute } from "../../../../contracts/runtime-entrypoints";
+import { resolvePackageRoot } from "../../../../core/path-utils";
 import type { TimelineLocale } from "../../contracts";
 import type { TimelineRuntimeConfig } from "../../../runtime-config";
 import { TimelineStore } from "../../infra/timeline/timeline-store";
@@ -31,9 +33,10 @@ function createTimelineStore(config: TimelineRuntimeConfig): TimelineStore {
 }
 
 function getTimelineDashboardBuildOptions(config: TimelineRuntimeConfig): TimelineDashboardBuildOptions {
+  const packageRoot = resolvePackageRoot(__dirname);
   return {
     siteDir: config.timelineSiteDir,
-    entryFile: path.join(__dirname, "..", "..", "timeline", "dashboard-app.js"),
+    entryFile: resolveRuntimeEntrypointAbsolute(packageRoot, "timelineDashboardAppModule"),
     cssFile: path.join(__dirname, "..", "..", "timeline", "css", "dashboard.css"),
     locale: config.timelineLocale,
   };

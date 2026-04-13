@@ -3,29 +3,50 @@ const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
+const {
+  buildRuntimeEntrypointArg,
+  resolveRuntimeEntrypointAbsolute,
+} = require("../src/contracts/runtime-entrypoints");
 
 function readScript(relativePath: string): string {
   return fs.readFileSync(path.join(__dirname, "..", relativePath), "utf8");
 }
 
-test("root shell helpers point at dist runtime entrypoints and keep key args", () => {
+test("runtime-entrypoint helper libs keep concrete published filenames in one edge location", () => {
+  const runtimeShellLib = readScript("scripts/lib/runtime-entrypoints.sh");
+  const runtimePowerShellLib = readScript("scripts/lib/runtime-entrypoints.ps1");
+
+  assert.match(runtimeShellLib, /\.\/dist\/src\/index\.js/u);
+  assert.match(runtimeShellLib, /\.\/dist\/src\/shared\/shared-supervisor\.js/u);
+  assert.match(runtimePowerShellLib, /dist\\src\\index\.js/u);
+  assert.match(runtimePowerShellLib, /dist\\src\\shared\\shared-supervisor\.js/u);
+});
+
+test("root shell helpers consume runtime-entrypoint libs instead of inlining dist paths", () => {
   const startSharedWechat = readScript("scripts/start_shared_wechat.sh");
   const openSharedWechat = readScript("scripts/open_shared_wechat_thread.sh");
   const timelineScreenshot = readScript("scripts/timeline-screenshot.sh");
-  const distStartPattern = /dist\\?\/src\\?\/index\\?\.js start --checkin/u;
 
-  assert.match(startSharedWechat, distStartPattern);
-  assert.match(startSharedWechat, /node \.\/dist\/src\/index\.js start --checkin &/u);
-  assert.match(openSharedWechat, distStartPattern);
-  assert.match(timelineScreenshot, /exec node \.\/dist\/src\/index\.js timeline screenshot "\$\{ARGS\[@\]\}"/u);
+  assert.match(startSharedWechat, /scripts\/lib\/runtime-entrypoints\.sh/u);
+  assert.match(startSharedWechat, /node "\$\(codeksei_runtime_entrypoint cli\)" start --checkin &/u);
+  assert.doesNotMatch(startSharedWechat, /ps -ax -o pid=,ppid=,command= \| awk/u);
+  assert.doesNotMatch(startSharedWechat, /node \.\/dist\/src\/index\.js start --checkin &/u);
+
+  assert.doesNotMatch(openSharedWechat, /ps -ax -o pid=,ppid=,command= \| awk/u);
+  assert.match(openSharedWechat, /READYZ_URL/u);
+
+  assert.match(timelineScreenshot, /scripts\/lib\/runtime-entrypoints\.sh/u);
+  assert.match(timelineScreenshot, /exec node "\$\(codeksei_runtime_entrypoint cli\)" timeline screenshot/u);
+  assert.doesNotMatch(timelineScreenshot, /exec node \.\/dist\/src\/index\.js/u);
 });
 
-test("root PowerShell runner points at dist shared helpers and preserves interval forwarding", () => {
+test("root PowerShell runner consumes runtime-entrypoint lib and preserves interval forwarding", () => {
   const sharedTaskRunner = readScript("scripts/shared-task-runner.ps1");
 
-  assert.match(sharedTaskRunner, /dist\\src\\shared\\shared-start\.js/u);
-  assert.match(sharedTaskRunner, /dist\\src\\shared\\shared-supervisor\.js/u);
-  assert.match(sharedTaskRunner, /dist\\src\\shared\\shared-watchdog\.js/u);
+  assert.match(sharedTaskRunner, /lib\\runtime-entrypoints\.ps1/u);
+  assert.match(sharedTaskRunner, /Resolve-CodekseiRuntimeEntrypoint "shared:start"/u);
+  assert.match(sharedTaskRunner, /Resolve-CodekseiRuntimeEntrypoint "shared:supervisor"/u);
+  assert.match(sharedTaskRunner, /Resolve-CodekseiRuntimeEntrypoint "shared:watchdog"/u);
   assert.match(sharedTaskRunner, /--interval-minutes=\$IntervalMinutes/u);
 });
 
@@ -50,7 +71,7 @@ test("root helper scripts no longer execute deleted repo-root JS wrappers", () =
 });
 
 test("dist runtime entrypoint executes main when invoked directly", () => {
-  const entrypoint = path.join(__dirname, "..", "dist", "src", "index.js");
+  const entrypoint = resolveRuntimeEntrypointAbsolute(path.join(__dirname, ".."), "cli");
   const result = spawnSync(process.execPath, [entrypoint, "help"], {
     encoding: "utf8",
   });
@@ -60,7 +81,7 @@ test("dist runtime entrypoint executes main when invoked directly", () => {
 });
 
 test("help entrypoints stay read-only and do not create the state dir", () => {
-  const entrypoint = path.join(__dirname, "..", "dist", "src", "index.js");
+  const entrypoint = resolveRuntimeEntrypointAbsolute(path.join(__dirname, ".."), "cli");
   const stateDir = path.join(fs.mkdtempSync(path.join(require("node:os").tmpdir(), "codeksei-help-root-")), "state");
   const env = { ...process.env, CODEKSEI_STATE_DIR: stateDir };
 

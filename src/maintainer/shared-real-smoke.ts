@@ -5,6 +5,10 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { spawnSync } from "node:child_process";
+import {
+  buildRuntimeEntrypointArg,
+  resolveRuntimeEntrypointAbsolute,
+} from "../contracts/runtime-entrypoints";
 import { SessionStore } from "../adapters/runtime/codex/session-store";
 import {
   ensureLogDir,
@@ -40,7 +44,7 @@ interface SmokeRunEvidence {
 async function main(): Promise<void> {
   const kind = normalizeKind(process.argv[2]);
   if (!kind) {
-    throw new Error("用法: node ./dist/src/maintainer/shared-real-smoke.js <attach|reply|approval> [--timeout-ms 120000] [--workspace-root PATH] [--mode stream|settled|both] [--record] [--operator <name>] [--notes \"...\"]");
+    throw new Error(`用法: node ${buildRuntimeEntrypointArg("maintainerLiveSmoke")} <attach|reply|approval> [--timeout-ms 120000] [--workspace-root PATH] [--mode stream|settled|both] [--record] [--operator <name>] [--notes \"...\"]`);
   }
 
   const options = parseOptions(process.argv.slice(3));
@@ -101,7 +105,7 @@ async function runAttachSmoke(options: SmokeOptions): Promise<SmokeRunEvidence> 
   const bound = resolveBoundThread(resolveWorkspaceRoot(options), { context });
   const openWrapper = createOpenProbeWrapper();
   try {
-    const result = spawnSync(process.execPath, [path.join(context.rootDir, "dist", "src", "shared", "shared-open.js")], {
+    const result = spawnSync(process.execPath, [resolveRuntimeEntrypointAbsolute(context.rootDir, "sharedOpen")], {
       cwd: context.rootDir,
       env: {
         ...process.env,

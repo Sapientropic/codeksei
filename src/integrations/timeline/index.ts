@@ -1,9 +1,10 @@
 import { spawn } from "node:child_process";
-import * as path from "node:path";
 
 import { resolveTimelineStateFiles } from "../../core/timezone";
 import { ensureTimelineStateTimezone } from "./state-sync";
 import { readPrefixedEnv } from "../../core/branding";
+import { resolvePackageRoot } from "../../core/path-utils";
+import { resolveRuntimeEntrypointAbsolute } from "../../contracts/runtime-entrypoints";
 
 
 interface TimelineIntegrationConfig extends Record<string, unknown> {
@@ -49,7 +50,7 @@ function createTimelineIntegration(config: TimelineIntegrationConfig) {
 }
 
 function resolveTimelineBinPath() {
-  return path.join(__dirname, "..", "..", "timeline", "index.js");
+  return resolveRuntimeEntrypointAbsolute(resolvePackageRoot(__dirname), "timelineCli");
 }
 
 function runTimelineCommand(

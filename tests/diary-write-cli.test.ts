@@ -3,6 +3,7 @@ const test: typeof import("node:test") = require("node:test");
 const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 const os: typeof import("node:os") = require("node:os");
 const path: typeof import("node:path") = require("node:path");
+const { buildRuntimeEntrypointArg }: typeof import("../src/contracts/runtime-entrypoints") = require("../src/contracts/runtime-entrypoints");
 
 const {
   buildDiaryEntryPayload,
@@ -121,7 +122,7 @@ test("runDiaryWriteCommand accepts fragment writes without requiring todo state"
   const originalArgv = process.argv;
   process.argv = [
     "node",
-    "./dist/src/index.js",
+    buildRuntimeEntrypointArg("cli"),
     "diary",
     "write",
     "--section",

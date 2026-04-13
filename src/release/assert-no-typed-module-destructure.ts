@@ -2,8 +2,9 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { resolvePackageRoot } from "../core/path-utils";
 
-const rootDir = path.resolve(__dirname, "..", "..", "..");
+const rootDir = resolvePackageRoot(__dirname);
 const sourceRoot = path.join(rootDir, "src");
 const TYPED_MODULE_DESTRUCTURE_PATTERN = /const\s*\{[\s\S]*?\}\s*=\s*\w+Module\s+as\s+\{/u;
 

@@ -2,6 +2,7 @@ const fs: typeof import("node:fs") = require("node:fs");
 const path: typeof import("node:path") = require("node:path");
 const test: typeof import("node:test") = require("node:test");
 const assert: typeof import("node:assert/strict") = require("node:assert/strict");
+const { resolveRuntimeEntrypoint }: typeof import("../src/contracts/runtime-entrypoints") = require("../src/contracts/runtime-entrypoints");
 
 const repoRoot = path.join(__dirname, "..");
 
@@ -22,7 +23,7 @@ test("timeline runtime stays first-party and no external timeline dependency reg
   assert.equal(fs.existsSync(path.join(repoRoot, "src", "timeline", "runtime", "index.ts")), true);
   assert.equal(fs.existsSync(path.join(repoRoot, "src", "timeline", "runtime", "timeline", "dashboard-app.tsx")), true);
   assert.equal(fs.existsSync(path.join(repoRoot, "src", "timeline", "runtime", "app", "timeline-write-cli.ts")), true);
-  assert.equal(fs.existsSync(path.join(repoRoot, "dist", "src", "timeline", "runtime", "index.js")), true);
+  assert.equal(fs.existsSync(path.join(repoRoot, resolveRuntimeEntrypoint("timelineCli"))), true);
   assert.equal(fs.existsSync(path.join(repoRoot, "src", "timeline", "runtime", "index.js")), false);
   assert.match(integrationSource, /codeksei-timeline/u);
   assert.doesNotMatch(integrationSource, /require\.resolve\("timeline-for-agent\/package\.json"\)/u);

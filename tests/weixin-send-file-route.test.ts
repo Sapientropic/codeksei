@@ -13,7 +13,7 @@ const {
   resolveRepoRuntimePath,
 } = runtimePaths;
 import type { SendWeixinMediaFileArgs } from "../src/adapters/channel/weixin/media-types";
-const adapterModulePath = resolveRepoRuntimePath("src/adapters/channel/weixin/index.js");
+const adapterModulePath = resolveRepoRuntimePath("src/adapters/channel/weixin/index.ts");
 
 function resolveRepoModule(relativePath: string): string {
   return resolveRepoRuntimeModule(relativePath);
@@ -49,7 +49,7 @@ test("v2 weixin adapter keeps media sends on the legacy stack", async () => {
   let capturedArgs: SendWeixinMediaFileArgs | null = null;
 
   try {
-    stubModule("src/adapters/channel/weixin/account-store.js", {
+    stubModule("src/adapters/channel/weixin/account-store.ts", {
       listWeixinAccounts() {
         return [];
       },
@@ -62,7 +62,7 @@ test("v2 weixin adapter keeps media sends on the legacy stack", async () => {
         };
       },
     }, originals);
-    stubModule("src/adapters/channel/weixin/context-token-store.js", {
+    stubModule("src/adapters/channel/weixin/context-token-store.ts", {
       loadPersistedContextTokens() {
         return {};
       },
@@ -70,10 +70,10 @@ test("v2 weixin adapter keeps media sends on the legacy stack", async () => {
         return { [userId]: contextToken };
       },
     }, originals);
-    stubModule("src/adapters/channel/weixin/login-v2.js", {
+    stubModule("src/adapters/channel/weixin/login-v2.ts", {
       async runV2LoginFlow() {},
     }, originals);
-    stubModule("src/adapters/channel/weixin/api-v2.js", {
+    stubModule("src/adapters/channel/weixin/api-v2.ts", {
       async getConfigV2() {
         return null;
       },
@@ -83,12 +83,12 @@ test("v2 weixin adapter keeps media sends on the legacy stack", async () => {
       async sendTextV2() {},
       async sendTypingV2() {},
     }, originals);
-    stubModule("src/adapters/channel/weixin/legacy.js", {
+    stubModule("src/adapters/channel/weixin/legacy.ts", {
       createLegacyWeixinChannelAdapter() {
         throw new Error("legacy adapter should not be constructed in this test");
       },
     }, originals);
-    stubModule("src/adapters/channel/weixin/message-utils-v2.js", {
+    stubModule("src/adapters/channel/weixin/message-utils-v2.ts", {
       createInboundFilter() {
         return {
           normalize(message: unknown) {
@@ -97,13 +97,13 @@ test("v2 weixin adapter keeps media sends on the legacy stack", async () => {
         };
       },
     }, originals);
-    stubModule("src/adapters/channel/weixin/media-send.js", {
+    stubModule("src/adapters/channel/weixin/media-send.ts", {
       async sendWeixinMediaFile(args: SendWeixinMediaFileArgs) {
         capturedArgs = args;
         return { kind: "file", fileName: "timeline.png" };
       },
     }, originals);
-    stubModule("src/adapters/channel/weixin/sync-buffer-store.js", {
+    stubModule("src/adapters/channel/weixin/sync-buffer-store.ts", {
       loadSyncBuffer() {
         return "";
       },

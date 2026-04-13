@@ -29,6 +29,3 @@ jobs:
 
       - name: Run verification suite
         run: npm run verify
-
-      - name: Verify publish packlist
-        run: npm pack --dry-run

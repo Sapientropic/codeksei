@@ -2,8 +2,9 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { resolvePackageRoot } from "../core/path-utils";
 
-const rootDir = path.resolve(__dirname, "..", "..", "..");
+const rootDir = resolvePackageRoot(__dirname);
 const testsRoot = path.join(rootDir, "tests");
 
 interface AssertNoJsTestsArgs {

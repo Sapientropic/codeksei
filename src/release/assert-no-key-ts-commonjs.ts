@@ -2,8 +2,9 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { resolvePackageRoot } from "../core/path-utils";
 
-const rootDir = path.resolve(__dirname, "..", "..", "..");
+const rootDir = resolvePackageRoot(__dirname);
 const sourceRoot = path.join(rootDir, "src");
 const inventoryPath = path.join(rootDir, "src", "release", "style-type-exception-inventory.json");
 const COMMONJS_PATTERN = /\brequire\s*\(|\bmodule\.exports\b|\bexports\./u;

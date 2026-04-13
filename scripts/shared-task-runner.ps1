@@ -7,6 +7,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot "lib\runtime-entrypoints.ps1")
 Set-Location -LiteralPath $repoRoot
 
 $stateDir = if ($env:CODEKSEI_STATE_DIR) {
@@ -37,11 +38,11 @@ $errorLogFile = if ($Mode -eq "Supervisor") {
 
 $node = (Get-Command node -ErrorAction Stop).Source
 $scriptPath = if ($Mode -eq "Start") {
-  Join-Path $repoRoot "dist\src\shared\shared-start.js"
+  Join-Path $repoRoot (Resolve-CodekseiRuntimeEntrypoint "shared:start")
 } elseif ($Mode -eq "Supervisor") {
-  Join-Path $repoRoot "dist\src\shared\shared-supervisor.js"
+  Join-Path $repoRoot (Resolve-CodekseiRuntimeEntrypoint "shared:supervisor")
 } else {
-  Join-Path $repoRoot "dist\src\shared\shared-watchdog.js"
+  Join-Path $repoRoot (Resolve-CodekseiRuntimeEntrypoint "shared:watchdog")
 }
 
 $nodeArgs = @($scriptPath)

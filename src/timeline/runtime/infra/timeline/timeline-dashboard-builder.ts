@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as esbuild from "esbuild";
 
+import { resolvePublishedAssetFile } from "../../../../contracts/runtime-entrypoints";
 import type { TimelineDashboardData, TimelineLocale } from "../../contracts";
 import { resolveTimelineLocale } from "../i18n/timeline-locale";
 import { buildTimelineViews } from "./timeline-analytics";
@@ -30,11 +31,13 @@ async function buildTimelineDashboard({
   fs.mkdirSync(siteDir, { recursive: true });
   const assetsDir = path.join(siteDir, "assets");
   fs.mkdirSync(assetsDir, { recursive: true });
+  const dashboardBundle = resolvePublishedAssetFile("timelineDashboardBundle");
+  const dashboardStylesheet = resolvePublishedAssetFile("timelineDashboardStylesheet");
 
   await esbuild.build({
     entryPoints: [entryFile],
     bundle: true,
-    outfile: path.join(assetsDir, "dashboard.js"),
+    outfile: path.join(assetsDir, dashboardBundle),
     format: "iife",
     platform: "browser",
     jsx: "automatic",
@@ -48,7 +51,7 @@ async function buildTimelineDashboard({
     target: ["chrome120", "safari17"],
   });
 
-  const bundledCssPath = path.join(assetsDir, "dashboard.css");
+  const bundledCssPath = path.join(assetsDir, dashboardStylesheet);
   if (!fs.existsSync(bundledCssPath)) {
     fs.copyFileSync(cssFile, bundledCssPath);
   }
@@ -71,11 +74,11 @@ function buildIndexHtml(locale: TimelineLocale): string {
     "  <meta charset=\"utf-8\" />",
     "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />",
     "  <title>Codeksei Timeline</title>",
-    "  <link rel=\"stylesheet\" href=\"./assets/dashboard.css\" />",
+    `  <link rel="stylesheet" href="./assets/${resolvePublishedAssetFile("timelineDashboardStylesheet")}" />`,
     "</head>",
     "<body>",
     "  <div id=\"root\"></div>",
-    "  <script src=\"./assets/dashboard.js\"></script>",
+    `  <script src="./assets/${resolvePublishedAssetFile("timelineDashboardBundle")}"></script>`,
     "</body>",
     "</html>",
   ].join("\n");

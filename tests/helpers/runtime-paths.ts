@@ -47,12 +47,29 @@ function remapSourceAbsolutePath(absolutePath: string): string {
 }
 
 function resolveBuiltModulePath(distCandidate: string): string {
+  const normalizedCandidate = normalizeBuiltModuleCandidate(distCandidate);
   const candidates = [
-    distCandidate,
-    `${distCandidate}.js`,
-    path.join(distCandidate, "index.js"),
+    normalizedCandidate,
+    `${normalizedCandidate}.js`,
+    path.join(normalizedCandidate, "index.js"),
   ];
   return candidates.find((candidate) => fs.existsSync(candidate)) || "";
+}
+
+function normalizeBuiltModuleCandidate(distCandidate: string): string {
+  if (distCandidate.endsWith(".ts")) {
+    return distCandidate.slice(0, -3);
+  }
+  if (distCandidate.endsWith(".tsx")) {
+    return distCandidate.slice(0, -4);
+  }
+  if (distCandidate.endsWith(".jsx")) {
+    return distCandidate.slice(0, -4);
+  }
+  if (distCandidate.endsWith(".js")) {
+    return distCandidate.slice(0, -3);
+  }
+  return distCandidate;
 }
 
 function normalizeForCompare(targetPath: string): string {

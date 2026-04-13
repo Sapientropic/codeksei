@@ -4,9 +4,13 @@ const fs: typeof import("node:fs") = require("node:fs");
 const os: typeof import("node:os") = require("node:os");
 const path: typeof import("node:path") = require("node:path");
 const { spawnSync }: typeof import("node:child_process") = require("node:child_process");
+const {
+  resolvePublishedAssetFile,
+  resolveRuntimeEntrypointAbsolute,
+}: typeof import("../src/contracts/runtime-entrypoints") = require("../src/contracts/runtime-entrypoints");
 
 const repoRoot = path.join(__dirname, "..");
-const timelineEntrypoint = path.join(repoRoot, "dist", "src", "timeline", "index.js");
+const timelineEntrypoint = resolveRuntimeEntrypointAbsolute(repoRoot, "timelineCli");
 
 interface TimelineCommandResult {
   status: number | null;
@@ -16,6 +20,8 @@ interface TimelineCommandResult {
 
 test("first-party timeline runtime can build a static site from the published dist tree", () => {
   const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-timeline-build-"));
+  const dashboardBundle = resolvePublishedAssetFile("timelineDashboardBundle");
+  const dashboardStylesheet = resolvePublishedAssetFile("timelineDashboardStylesheet");
   const result = runTimelineCommand(["build"], {
     CODEKSEI_STATE_DIR: stateDir,
     CODEKSEI_TIMELINE_STATE_DIR: stateDir,
@@ -24,12 +30,12 @@ test("first-party timeline runtime can build a static site from the published di
   assert.equal(result.status, 0, result.stderr || "expected timeline build to succeed");
   assert.match(result.stdout, /timeline dashboard built:/u);
   assert.equal(fs.existsSync(path.join(stateDir, "timeline", "site", "index.html")), true);
-  assert.equal(fs.existsSync(path.join(stateDir, "timeline", "site", "assets", "dashboard.js")), true);
-  assert.equal(fs.existsSync(path.join(stateDir, "timeline", "site", "assets", "dashboard.css")), true);
+  assert.equal(fs.existsSync(path.join(stateDir, "timeline", "site", "assets", dashboardBundle)), true);
+  assert.equal(fs.existsSync(path.join(stateDir, "timeline", "site", "assets", dashboardStylesheet)), true);
   assert.equal(fs.existsSync(path.join(stateDir, "timeline", "site", "dashboard-data.json")), true);
   assert.equal(fs.existsSync(path.join(repoRoot, "dist", "src", "timeline", "examples", "demo-facts.json")), true);
   assert.equal(fs.existsSync(path.join(repoRoot, "dist", "src", "timeline", "examples", "demo-facts.en.json")), true);
-  assert.equal(fs.existsSync(path.join(repoRoot, "dist", "src", "timeline", "runtime", "timeline", "css", "dashboard.css")), true);
+  assert.equal(fs.existsSync(path.join(repoRoot, "dist", "src", "timeline", "runtime", "timeline", "css", dashboardStylesheet)), true);
 });
 
 test("first-party timeline runtime honors CODEKSEI_TIMELINE_LOCALE when building demo dashboard output", () => {

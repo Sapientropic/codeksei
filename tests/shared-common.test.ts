@@ -3,6 +3,7 @@ const os: typeof import("node:os") = require("node:os");
 const path: typeof import("node:path") = require("node:path");
 const test: typeof import("node:test") = require("node:test");
 const assert: typeof import("node:assert/strict") = require("node:assert/strict");
+const { buildRuntimeEntrypointArg }: typeof import("../src/contracts/runtime-entrypoints") = require("../src/contracts/runtime-entrypoints");
 const {
   resolveSharedProcessContext,
   spawnDetachedCommand,
@@ -14,7 +15,8 @@ test("spawnDetachedCommand closes the parent log fds after a successful detached
   let nextFd = 41;
   let unrefCalled = false;
 
-  const pid = spawnDetachedCommand("node", ["./dist/src/index.js"], { logFile: "shared.log" }, {
+  const runtimeArg = buildRuntimeEntrypointArg("cli");
+  const pid = spawnDetachedCommand("node", [runtimeArg], { logFile: "shared.log" }, {
     buildSpawnInvocation(command: string, args: string[]) {
       return { command, args };
     },
@@ -28,7 +30,7 @@ test("spawnDetachedCommand closes the parent log fds after a successful detached
     },
     spawn(command: string, args: string[], options: Record<string, unknown> & { stdio: [string, number, number] }) {
       assert.equal(command, "node");
-      assert.deepEqual(args, ["./dist/src/index.js"]);
+      assert.deepEqual(args, [runtimeArg]);
       assert.deepEqual(options.stdio, ["ignore", 41, 42]);
       return {
         pid: 1234,
@@ -47,9 +49,10 @@ test("spawnDetachedCommand closes the parent log fds after a successful detached
 test("spawnDetachedCommand closes the parent log fds when spawn throws", () => {
   const closed: number[] = [];
   let nextFd = 51;
+  const runtimeArg = buildRuntimeEntrypointArg("cli");
 
   assert.throws(
-    () => spawnDetachedCommand("node", ["./dist/src/index.js"], { logFile: "shared.log" }, {
+    () => spawnDetachedCommand("node", [runtimeArg], { logFile: "shared.log" }, {
       buildSpawnInvocation(command: string, args: string[]) {
         return { command, args };
       },

@@ -3,15 +3,16 @@
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { resolvePackageRoot } from "../core/path-utils";
 
-const rootDir = path.resolve(__dirname, "..", "..", "..");
+const rootDir = resolvePackageRoot(__dirname);
 
 interface PackageJsonLike {
   files?: unknown;
   bin?: Record<string, unknown>;
 }
 
-interface CollectPublishedJsFilesArgs {
+interface CollectPublishedRuntimeArtifactsArgs {
   packageJson?: PackageJsonLike | null;
   cwd?: string;
 }
@@ -26,10 +27,10 @@ interface AssertPublishedWrappersArgs {
   cwd?: string;
 }
 
-export function collectPublishedJsFiles({
+function collectPublishedRuntimeArtifacts({
   packageJson = null,
   cwd = rootDir,
-}: CollectPublishedJsFilesArgs = {}): string[] {
+}: CollectPublishedRuntimeArtifactsArgs = {}): string[] {
   const manifest = packageJson || readPackageJson(cwd);
   const roots = Array.isArray(manifest.files) ? manifest.files : [];
   const discovered = new Set<string>();
@@ -68,7 +69,7 @@ function walkJsFiles(directory: string, cwd: string, discovered: Set<string>): v
   }
 }
 
-export function runNodeSyntaxChecks(
+function runNodeSyntaxChecks(
   files: string[],
   {
     cwd = rootDir,
@@ -84,7 +85,7 @@ export function runNodeSyntaxChecks(
   }
 }
 
-export function assertPublishedWrappersDoNotRequireSource(
+function assertPublishedRuntimeArtifactWrappersDoNotRequireSource(
   files: string[],
   { cwd = rootDir }: AssertPublishedWrappersArgs = {},
 ): void {
@@ -97,10 +98,10 @@ export function assertPublishedWrappersDoNotRequireSource(
   }
 }
 
-export function assertBinTargetsUseDist({
+function assertPublishedRuntimeArtifactBinTargetsUseDist({
   packageJson = null,
   cwd = rootDir,
-}: CollectPublishedJsFilesArgs = {}): void {
+}: CollectPublishedRuntimeArtifactsArgs = {}): void {
   const manifest = packageJson || readPackageJson(cwd);
   for (const [binName, target] of Object.entries(manifest.bin || {})) {
     const normalizedTarget = toRelativePosix(cwd, path.resolve(cwd, String(target || "")));
@@ -118,17 +119,26 @@ function toRelativePosix(cwd: string, absolutePath: string): string {
   return path.relative(cwd, absolutePath).split(path.sep).join("/");
 }
 
-export function main(): void {
-  const files = collectPublishedJsFiles();
+function main(): void {
+  const files = collectPublishedRuntimeArtifacts();
+  assertPublishedRuntimeArtifactBinTargetsUseDist();
   if (!files.length) {
-    throw new Error("No published JS files found under package.json files entries.");
+    console.log("[codeksei] published runtime artifact manifest points at dist (syntax checks skipped because dist is absent)");
+    return;
   }
-  assertBinTargetsUseDist();
-  assertPublishedWrappersDoNotRequireSource(files);
+  assertPublishedRuntimeArtifactWrappersDoNotRequireSource(files);
   runNodeSyntaxChecks(files);
-  console.log(`[codeksei] syntax-checked ${files.length} published JS files`);
+  console.log(`[codeksei] syntax-checked ${files.length} published runtime artifacts`);
 }
 
 if (require.main === module) {
   main();
 }
+
+export {
+  assertPublishedRuntimeArtifactBinTargetsUseDist,
+  assertPublishedRuntimeArtifactWrappersDoNotRequireSource,
+  collectPublishedRuntimeArtifacts,
+  main,
+  runNodeSyntaxChecks,
+};

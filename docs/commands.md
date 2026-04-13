@@ -224,5 +224,17 @@ maintainer 仍需额外补一次真实账号 smoke：
   assisted smoke。脚本会等待 pending approval 落盘、自动重启 bridge，然后等待 `/yes` 之后 approval 清空和最终 delivered hash。
 - 这三条脚本都会在 `shared-wechat.log` / `shared-app-server.log` 里写 `[codeksei-smoke] stage=...` checkpoint，排查时优先从这些 marker 往后看。
 - `[⚠️ 需确认]` 这组真实 smoke 依赖可用的 WeChat 登录态、绑定 thread 和能触发 approval 的活跃 Codex runtime；环境不满足时脚本会直接报错，而不是静默跳过。
+- 最近一次 recorded 结果入口统一看 [docs/maintainer/live-smoke.md](./maintainer/live-smoke.md)
+
+## Maintainer Quality Gates
+
+这组入口现在明确分工，不再靠 `prepare` 或 pack lifecycle 偷偷刷新发布产物。
+
+- `npm run check`
+  source-only：跑 authored-source JS guard、published runtime artifact guard、其它 lint guard、源码 typecheck、tests TS typecheck；不会重建 `dist/`
+- `npm run verify`
+  built-runtime gate：先跑 `check`，再显式 `npm run build`，然后跑 built `dist` 的仓内 tests，最后跑 `npm run pack:dry-run`
+- `npm run build`
+  只在你明确要刷新 published runtime artifacts 时使用；默认不是 `check` 的副作用
 
 这页只管“怎么使用这些入口”；维护与发布流程留在本地维护材料里。
