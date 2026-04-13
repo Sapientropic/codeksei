@@ -34,6 +34,32 @@ interface NoteSyncOptions {
   text?: unknown;
 }
 
+interface ManagedSlotOptions {
+  slot?: unknown;
+  text?: unknown;
+  style?: unknown;
+}
+
+interface UpsertSectionEntryOptions {
+  style?: "bullet" | "paragraph";
+  text?: unknown;
+  maxItems?: number;
+}
+
+interface SectionRange {
+  level: number;
+  headingStart: number;
+  contentStart: number;
+  end: number;
+}
+
+interface ParsedHeading {
+  level: number;
+  title: string;
+  index: number;
+  lineEnd: number;
+}
+
 function resolveNoteSyncTarget(config: NoteSyncConfig = {}, options: NoteSyncOptions = {}): NoteSyncTarget {
   const normalizedProject = normalizeText(options.project);
   const normalizedPath = normalizeText(options.path);
@@ -153,7 +179,7 @@ function syncNoteContent(content: unknown, options: NoteSyncOptions = {}) {
   };
 }
 
-function upsertManagedSlot(sectionBody: any, parentLevel: any, options: any = {}) {
+function upsertManagedSlot(sectionBody: unknown, parentLevel: number, options: ManagedSlotOptions = {}): string {
   const slot = normalizeText(options.slot);
   if (!slot) {
     throw new Error("slot 不能为空");
@@ -170,14 +196,14 @@ function upsertManagedSlot(sectionBody: any, parentLevel: any, options: any = {}
   return joinSectionParts(main, suffix, block);
 }
 
-function buildManagedBlock(slot: any, text: any, style: any) {
+function buildManagedBlock(slot: unknown, text: unknown, style: unknown): string {
   const markerStart = `<!-- ${SLOT_MARKER_PREFIX}:${slot}:start -->`;
   const markerEnd = `<!-- ${SLOT_MARKER_PREFIX}:${slot}:end -->`;
   const body = renderEntryText(text, style);
   return [markerStart, body, markerEnd].join("\n");
 }
 
-function buildManagedSlotPattern(slot: any) {
+function buildManagedSlotPattern(slot: unknown): RegExp {
   const normalizedSlot = escapeRegExp(slot);
   return new RegExp(
     `<!--\\s*${escapeRegExp(SLOT_MARKER_PREFIX)}:${normalizedSlot}:start\\s*-->[\\s\\S]*?<!--\\s*${escapeRegExp(SLOT_MARKER_PREFIX)}:${normalizedSlot}:end\\s*-->`,
@@ -185,7 +211,11 @@ function buildManagedSlotPattern(slot: any) {
   );
 }
 
-function upsertSectionEntry(sectionBody: any, parentLevel: any, options: any = {}) {
+function upsertSectionEntry(
+  sectionBody: unknown,
+  parentLevel: number,
+  options: UpsertSectionEntryOptions = {},
+): string {
   const { main, suffix } = splitSectionBody(sectionBody, parentLevel);
   const nextMain = options.style === "paragraph"
     ? upsertParagraph(main, options.text)
@@ -193,7 +223,7 @@ function upsertSectionEntry(sectionBody: any, parentLevel: any, options: any = {
   return joinSectionParts(nextMain, suffix);
 }
 
-function splitSectionBody(sectionBody: any, parentLevel: any) {
+function splitSectionBody(sectionBody: unknown, parentLevel: number): { main: string; suffix: string } {
   const normalizedBody = normalizeFileEnding(sectionBody);
   for (const heading of parseHeadings(normalizedBody)) {
     if (heading.level > parentLevel) {
@@ -209,7 +239,7 @@ function splitSectionBody(sectionBody: any, parentLevel: any) {
   };
 }
 
-function joinSectionParts(main: any, suffix: any, injectedBlock: string = "") {
+function joinSectionParts(main: unknown, suffix: unknown, injectedBlock: string = ""): string {
   const normalizedMain = normalizeFileEnding(main).trimEnd();
   const normalizedSuffix = normalizeFileEnding(suffix).trim();
   const normalizedBlock = normalizeFileEnding(injectedBlock).trim();
@@ -227,7 +257,7 @@ function joinSectionParts(main: any, suffix: any, injectedBlock: string = "") {
   return parts.join("\n\n").trimEnd();
 }
 
-function upsertBullet(sectionMain: any, text: any, maxItems: number = 0) {
+function upsertBullet(sectionMain: unknown, text: unknown, maxItems: number = 0): string {
   const normalizedText = normalizeBulletText(text);
   if (!normalizedText) {
     return normalizeFileEnding(sectionMain).trimEnd();
@@ -280,7 +310,7 @@ function upsertBullet(sectionMain: any, text: any, maxItems: number = 0) {
   return trimBlock(lines.join("\n"));
 }
 
-function upsertParagraph(sectionMain: any, text: any) {
+function upsertParagraph(sectionMain: unknown, text: unknown): string {
   const normalizedText = normalizeParagraphText(text);
   if (!normalizedText) {
     return normalizeFileEnding(sectionMain).trimEnd();
@@ -302,14 +332,14 @@ function upsertParagraph(sectionMain: any, text: any) {
   return `${normalizedMain}\n\n${normalizedText}`;
 }
 
-function renderEntryText(text: any, style: any) {
+function renderEntryText(text: unknown, style: unknown): string {
   if (style === "paragraph") {
     return normalizeParagraphText(text);
   }
   return `- ${normalizeBulletText(text)}`;
 }
 
-function replaceSectionBody(content: any, range: any, newBody: any) {
+function replaceSectionBody(content: string, range: SectionRange, newBody: unknown): string {
   const before = content.slice(0, range.contentStart).replace(/\s*$/u, "");
   const after = content.slice(range.end).replace(/^\s*/u, "");
   const parts = [before];
@@ -323,27 +353,28 @@ function replaceSectionBody(content: any, range: any, newBody: any) {
   return parts.filter(Boolean).join("\n\n");
 }
 
-function findSectionRange(content: any, sectionTitle: any) {
-  const headings = parseHeadings(content);
+function findSectionRange(content: unknown, sectionTitle: unknown): SectionRange | null {
+  const normalizedContent = normalizeFileEnding(content);
+  const headings = parseHeadings(normalizedContent);
   const normalizedTitle = normalizeHeadingText(sectionTitle);
-  const currentHeading = headings.find((heading: any) => normalizeHeadingText(heading.title) === normalizedTitle);
+  const currentHeading = headings.find((heading) => normalizeHeadingText(heading.title) === normalizedTitle);
   if (!currentHeading) {
     return null;
   }
-  const nextHeading = headings.find((heading: any) =>
+  const nextHeading = headings.find((heading) =>
     heading.index > currentHeading.index && heading.level <= currentHeading.level
   );
   return {
     level: currentHeading.level,
     headingStart: currentHeading.index,
     contentStart: currentHeading.lineEnd,
-    end: nextHeading ? nextHeading.index : content.length,
+    end: nextHeading ? nextHeading.index : normalizedContent.length,
   };
 }
 
-function parseHeadings(content: any) {
+function parseHeadings(content: unknown): ParsedHeading[] {
   const normalized = normalizeFileEnding(content);
-  const headings = [];
+  const headings: ParsedHeading[] = [];
   let index = 0;
   let activeFenceMarker = "";
 
@@ -396,7 +427,7 @@ function parseHeadings(content: any) {
   return headings;
 }
 
-function appendSection(content: any, sectionTitle: any) {
+function appendSection(content: unknown, sectionTitle: unknown): string {
   const normalized = normalizeFileEnding(content).replace(/\s*$/u, "");
   const heading = `## ${sectionTitle}`;
   if (!normalized) {
@@ -444,15 +475,15 @@ function normalizeParagraphText(value: unknown): string {
   return normalizeFileEnding(value).trim();
 }
 
-function normalizeHeadingText(value: any) {
+function normalizeHeadingText(value: unknown): string {
   return normalizeText(value).replace(/\s+/gu, " ").toLowerCase();
 }
 
-function normalizeComparableText(value: any) {
+function normalizeComparableText(value: unknown): string {
   return normalizeParagraphText(value).replace(/\s+/gu, " ").toLowerCase();
 }
 
-function normalizeFileEnding(value: any) {
+function normalizeFileEnding(value: unknown): string {
   return String(value || "").replace(/\r\n/g, "\n");
 }
 
@@ -465,7 +496,7 @@ function ensureTrailingNewline(value: unknown): string {
   return normalized.endsWith("\n") ? normalized : `${normalized}\n`;
 }
 
-function trimBlock(value: any) {
+function trimBlock(value: unknown): string {
   return normalizeFileEnding(value).replace(/^\s*\n/gu, "").replace(/\n\s*$/gu, "").trimEnd();
 }
 

@@ -6,6 +6,14 @@ import {
 import type { UnknownRecord } from "../../../core/runtime-types";
 import * as eventsModule from "./events";
 import { extractThreadIdFromParams } from "./message-utils";
+import {
+  collectReplyFragment,
+  createReplyFragmentCollectorState,
+  observeReplyFragmentTurnStart,
+  resolveReplyFragmentCollectorText,
+  resolveReplyFragmentCollectorTurnId,
+  shouldIgnoreReplyFragmentTurnCompletion,
+} from "./reply-fragment-collector";
 
 const { mapCodexMessageToRuntimeEvent } = eventsModule as {
   mapCodexMessageToRuntimeEvent: (message: RpcMessage) => RuntimeEvent<UnknownRecord> | null;
@@ -118,9 +126,7 @@ export function waitForTurnCompletion(
   threadId: string,
 ): Promise<WaitForTurnCompletionResult> {
   return new Promise((resolve, reject) => {
-    let activeTurnId = "";
-    const itemOrder: string[] = [];
-    const textByItemId = new Map<string, string>();
+    const collector = createReplyFragmentCollectorState();
 
     const cleanup = () => {
       unsubscribe();
@@ -141,28 +147,11 @@ export function waitForTurnCompletion(
         return;
       }
 
-      if (runtimeEvent?.type === RUNTIME_EVENT_TYPES.TURN_STARTED && !activeTurnId) {
-        activeTurnId = normalizeLogValue(runtimeEvent.payload.turnId);
+      if (observeReplyFragmentTurnStart(collector, runtimeEvent)) {
         return;
       }
 
-      if (
-        runtimeEvent?.type === RUNTIME_EVENT_TYPES.REPLY_DELTA
-        || runtimeEvent?.type === RUNTIME_EVENT_TYPES.REPLY_COMPLETED
-      ) {
-        const itemId = normalizeLogValue(runtimeEvent.payload.itemId) || `item-${itemOrder.length + 1}`;
-        if (!textByItemId.has(itemId)) {
-          itemOrder.push(itemId);
-          textByItemId.set(itemId, "");
-        }
-        const nextText = normalizeLogValue(runtimeEvent.payload.text);
-        if (nextText) {
-          if (runtimeEvent.type === RUNTIME_EVENT_TYPES.REPLY_DELTA) {
-            textByItemId.set(itemId, `${textByItemId.get(itemId) || ""}${nextText}`);
-          } else {
-            textByItemId.set(itemId, nextText);
-          }
-        }
+      if (collectReplyFragment(collector, runtimeEvent)) {
         return;
       }
 
@@ -173,18 +162,13 @@ export function waitForTurnCompletion(
       }
 
       if (runtimeEvent?.type === RUNTIME_EVENT_TYPES.TURN_COMPLETED) {
-        const completedTurnId = normalizeLogValue(runtimeEvent.payload.turnId);
-        if (activeTurnId && completedTurnId && completedTurnId !== activeTurnId) {
+        if (shouldIgnoreReplyFragmentTurnCompletion(collector, runtimeEvent)) {
           return;
         }
         cleanup();
-        const text = itemOrder
-          .slice()
-          .reverse()
-          .map((itemId) => textByItemId.get(itemId) || "")
-          .find((value) => String(value || "").trim()) || "";
+        const text = resolveReplyFragmentCollectorText(collector);
         resolve({
-          turnId: completedTurnId || activeTurnId,
+          turnId: resolveReplyFragmentCollectorTurnId(collector, runtimeEvent),
           text: String(text || "").trim() || "已完成。",
         });
       }

@@ -9,7 +9,15 @@ const { readPrefixedEnv } = brandingModule as {
   readPrefixedEnv(env: NodeJS.ProcessEnv, suffix: string): string;
 };
 
-function createTimelineIntegration(config: any) {
+interface TimelineIntegrationConfig extends Record<string, unknown> {
+  timelineStateDir?: string;
+}
+
+interface TimelineRunOptions {
+  subcommand?: string;
+}
+
+function createTimelineIntegration(config: TimelineIntegrationConfig) {
   const binPath = resolveTimelineBinPath();
   const timelineFiles = resolveTimelineStateFiles(config.timelineStateDir);
 
@@ -23,7 +31,7 @@ function createTimelineIntegration(config: any) {
         timelineDir: timelineFiles.dir,
       };
     },
-    async runSubcommand(subcommand: any, args: any[] = []) {
+    async runSubcommand(subcommand: unknown, args: unknown[] = []) {
       const normalizedSubcommand = normalizeText(subcommand);
       if (!normalizedSubcommand) {
         throw new Error("timeline 子命令不能为空");
@@ -33,7 +41,7 @@ function createTimelineIntegration(config: any) {
       // timeline-for-agent all operate on the same layout during direct,
       // nested, and migrated state-dir variants.
       return runTimelineCommand(binPath, [normalizedSubcommand, ...normalizeTimelineArgs(normalizedSubcommand, args)], {
-        TIMELINE_FOR_AGENT_STATE_DIR: config.timelineStateDir,
+        TIMELINE_FOR_AGENT_STATE_DIR: String(config.timelineStateDir || ""),
         TIMELINE_FOR_AGENT_DIR: timelineFiles.dir,
         TIMELINE_FOR_AGENT_STATE_FILE: timelineFiles.stateFile,
         TIMELINE_FOR_AGENT_TAXONOMY_FILE: timelineFiles.taxonomyFile,
@@ -54,8 +62,13 @@ function resolveTimelineBinPath() {
   return path.join(path.dirname(packageJsonPath), "bin", "timeline-for-agent.js");
 }
 
-function runTimelineCommand(binPath: any, args: any, extraEnv: any = {}, options: any = {}) {
-  return new Promise((resolve: any, reject: any) => {
+function runTimelineCommand(
+  binPath: string,
+  args: string[],
+  extraEnv: Record<string, string> = {},
+  options: TimelineRunOptions = {},
+): Promise<void> {
+  return new Promise((resolve, reject) => {
     const spawnSpec = buildTimelineSpawnSpec(binPath, args);
     const child = spawn(spawnSpec.command, spawnSpec.args, {
       stdio: ["pipe", "pipe", "pipe"],
@@ -70,13 +83,13 @@ function runTimelineCommand(binPath: any, args: any, extraEnv: any = {}, options
     let stdout = "";
     let stderr = "";
 
-    child.stdout.on("data", (chunk: any) => {
+    child.stdout.on("data", (chunk: Buffer | string) => {
       const text = chunk.toString("utf8");
       stdout += text;
       process.stdout.write(text);
     });
 
-    child.stderr.on("data", (chunk: any) => {
+    child.stderr.on("data", (chunk: Buffer | string) => {
       const text = chunk.toString("utf8");
       stderr += text;
       process.stderr.write(text);
@@ -85,7 +98,7 @@ function runTimelineCommand(binPath: any, args: any, extraEnv: any = {}, options
     wireTimelineStdin(child, args);
 
     child.once("error", reject);
-    child.once("exit", (code: any, signal: any) => {
+    child.once("exit", (code, signal) => {
       if (signal) {
         reject(new Error(`timeline 进程被信号中断: ${signal}`));
         return;
@@ -107,7 +120,7 @@ function runTimelineCommand(binPath: any, args: any, extraEnv: any = {}, options
   });
 }
 
-function buildTimelineSpawnSpec(binPath: any, args: any[] = []) {
+function buildTimelineSpawnSpec(binPath: string, args: string[] = []) {
   // Windows `cmd.exe /c "<node> <script>"` double-quotes the inner command and
   // breaks when `process.execPath` contains spaces. Spawn Node directly so the
   // timeline CLI behaves the same on Windows and Unix.
@@ -117,15 +130,15 @@ function buildTimelineSpawnSpec(binPath: any, args: any[] = []) {
   };
 }
 
-function normalizeArgs(args: any) {
+function normalizeArgs(args: unknown): string[] {
   return Array.isArray(args)
     ? args
-      .map((value: any) => String(value ?? ""))
-      .filter((value: any) => value.length > 0)
+      .map((value) => String(value ?? ""))
+      .filter((value) => value.length > 0)
     : [];
 }
 
-function normalizeTimelineArgs(subcommand: any, args: any) {
+function normalizeTimelineArgs(subcommand: string, args: unknown): string[] {
   const normalizedArgs = normalizeArgs(args).filter((value: any) => value !== "--");
   if (!["read", "write"].includes(subcommand)) {
     return normalizedArgs;
@@ -172,18 +185,19 @@ function normalizeTimelineArgs(subcommand: any, args: any) {
   // When an agent forgets npm's passthrough `--`, npm swallows `--date` and the
   // script only receives a bare YYYY-MM-DD token. Recover that common intent so
   // bridge-owned timeline commands fail less often on formatting slips.
-  if (!hasDateFlag && rewritten.length && isIsoDateToken(rewritten[0])) {
-    return ["--date", rewritten[0], ...rewritten.slice(1)];
+  const firstToken = rewritten[0];
+  if (!hasDateFlag && firstToken && isIsoDateToken(firstToken)) {
+    return ["--date", firstToken, ...rewritten.slice(1)];
   }
 
   return rewritten;
 }
 
-function isIsoDateToken(value: any) {
+function isIsoDateToken(value: unknown): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(normalizeText(value));
 }
 
-function normalizeText(value: any) {
+function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
@@ -199,7 +213,7 @@ function resolveTimelineChromePath() {
   return "";
 }
 
-function detectTimelineWriteFailure(stdout: any, stderr: any) {
+function detectTimelineWriteFailure(stdout: string, stderr: string): string {
   const output = `${stdout}\n${stderr}`;
   const statusMatch = output.match(/^\s*status:\s*(.+)\s*$/m);
   const eventsMatch = output.match(/^\s*events:\s*(\d+)\s*$/m);
@@ -211,28 +225,35 @@ function detectTimelineWriteFailure(stdout: any, stderr: any) {
   return "";
 }
 
-function extractTimelineCommandFailure(stdout: any, stderr: any) {
+function extractTimelineCommandFailure(stdout: string, stderr: string): string {
   const output = `${stderr}\n${stdout}`;
   const lines = output
     .split("\n")
-    .map((line: any) => line.trim())
+    .map((line) => line.trim())
     .filter(Boolean);
 
-  return lines.find((line: any) => line.includes("timeline 事件无效"))
-    || lines.find((line: any) => line.includes("timeline 事件不能跨天"))
-    || lines.find((line: any) => line.includes("timeline-write"))
+  return lines.find((line) => line.includes("timeline 事件无效"))
+    || lines.find((line) => line.includes("timeline 事件不能跨天"))
+    || lines.find((line) => line.includes("timeline-write"))
     || lines.at(-1)
     || "";
 }
 
-function shouldForwardTimelineStdin(args: any[] = [], stdin: any = process.stdin) {
+function shouldForwardTimelineStdin(
+  args: string[] = [],
+  stdin: NodeJS.ReadStream | NodeJS.Process["stdin"] = process.stdin,
+): boolean {
   return Array.isArray(args)
-    && args.some((value: any) => String(value || "").trim() === "--stdin")
+    && args.some((value) => String(value || "").trim() === "--stdin")
     && stdin
     && stdin.isTTY === false;
 }
 
-function wireTimelineStdin(child: any, args: any[] = [], stdin: any = process.stdin) {
+function wireTimelineStdin(
+  child: ReturnType<typeof spawn>,
+  args: string[] = [],
+  stdin: NodeJS.ReadStream | NodeJS.Process["stdin"] = process.stdin,
+): void {
   if (!child?.stdin) {
     return;
   }

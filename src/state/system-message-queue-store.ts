@@ -24,12 +24,20 @@ import type { ZodType } from "zod";
 
 const SYSTEM_MESSAGE_IN_FLIGHT_LEASE_MS = 60_000;
 
-class SystemMessageQueueStore {
-  deadLetterFilePath: any;
-  filePath: any;
-  state: Record<string, any>;
+interface SystemMessageQueueState {
+  messages: SystemMessage[];
+}
 
-  constructor({ filePath, deadLetterFilePath = "" }: any) {
+interface SystemMessageDeadLetterState {
+  entries: SystemMessageDeadLetterEntry[];
+}
+
+class SystemMessageQueueStore {
+  deadLetterFilePath: string;
+  filePath: string;
+  state: SystemMessageQueueState;
+
+  constructor({ filePath, deadLetterFilePath = "" }: { filePath: string; deadLetterFilePath?: unknown }) {
     this.filePath = filePath;
     this.deadLetterFilePath = normalizeText(deadLetterFilePath)
       || path.join(path.dirname(filePath), "system-message-dead-letter.json");
@@ -38,12 +46,12 @@ class SystemMessageQueueStore {
     this.load();
   }
 
-  ensureParentDirectory() {
+  ensureParentDirectory(): void {
     ensureParentDirectory(this.filePath);
     ensureParentDirectory(this.deadLetterFilePath);
   }
 
-  load() {
+  load(): void {
     // systemMessageQueueStateSchema is the one ingress that repairs legacy queue
     // payloads. Once data crosses that boundary, the store should sort/clone it
     // instead of re-normalizing the same record on every load/save cycle.
@@ -53,18 +61,18 @@ class SystemMessageQueueStore {
       label: "system message queue",
       schema: systemMessageQueueStateSchema as ZodType<{ messages: SystemMessage[] }>,
     });
-    const normalizedState = /** @type {{ messages?: unknown[] }} */ (parsed || {});
+    const normalizedState = parsed || {};
     const messages = Array.isArray(normalizedState.messages) ? normalizedState.messages.slice() : [];
     this.state = {
       messages: messages.sort(compareSystemMessages),
     };
   }
 
-  save() {
+  save(): void {
     this.persistMessages(this.state.messages);
   }
 
-  persistMessages(messages: any) {
+  persistMessages(messages: SystemMessage[]): SystemMessage[] {
     const nextMessages = Array.isArray(messages)
       ? messages.slice().sort(compareSystemMessages)
       : [];
@@ -73,7 +81,7 @@ class SystemMessageQueueStore {
     return nextMessages;
   }
 
-  loadDeadLetters() {
+  loadDeadLetters(): SystemMessageDeadLetterState {
     const parsed = readManagedJsonStateFile<{ entries?: SystemMessageDeadLetterEntry[] }>({
       filePath: this.deadLetterFilePath,
       fallback: { entries: [] },
@@ -83,16 +91,16 @@ class SystemMessageQueueStore {
     // Dead-letter payloads share the same single-ingress contract as the live
     // queue. Once schema parse succeeds here, stores should only clone/sort the
     // canonical entries instead of re-running per-entry repair.
-    const normalizedState = /** @type {{ entries?: import("../contracts/queue-items").SystemMessageDeadLetterEntry[] }} */ (parsed || {});
+    const normalizedState = parsed || {};
     const entries = Array.isArray(normalizedState.entries)
-      ? normalizedState.entries.slice() as SystemMessageDeadLetterEntry[]
+      ? normalizedState.entries.slice()
       : [];
     return {
       entries: entries.sort(compareSystemMessageDeadLetters),
     };
   }
 
-  saveDeadLetters(state: any) {
+  saveDeadLetters(state: SystemMessageDeadLetterState): SystemMessageDeadLetterState {
     const nextEntries = Array.isArray(state?.entries)
       ? state.entries.slice().sort(compareSystemMessageDeadLetters)
       : [];
@@ -100,11 +108,11 @@ class SystemMessageQueueStore {
     return { entries: nextEntries };
   }
 
-  listDeadLetters() {
+  listDeadLetters(): SystemMessageDeadLetterEntry[] {
     return this.loadDeadLetters().entries;
   }
 
-  enqueue(message: any) {
+  enqueue(message: unknown): SystemMessage {
     this.load();
     const normalized = normalizeSystemMessage(message);
     if (!normalized) {
@@ -116,7 +124,7 @@ class SystemMessageQueueStore {
     return normalized;
   }
 
-  takeReadyForAccount(accountId: any, { nowMs = Date.now() }: any = {}) {
+  takeReadyForAccount(accountId: unknown, { nowMs = Date.now() }: { nowMs?: number } = {}): SystemMessage[] {
     this.load();
     this.expireMessages(nowMs);
     const normalizedAccountId = normalizeText(accountId);
@@ -140,6 +148,10 @@ class SystemMessageQueueStore {
       }
 
       const leased = markSystemMessageInFlight(message, nowMs);
+      if (!leased) {
+        pending.push(message);
+        continue;
+      }
       ready.push(leased);
       pending.push(leased);
       changed = true;
@@ -152,19 +164,24 @@ class SystemMessageQueueStore {
     return ready;
   }
 
-  hasPendingForAccount(accountId: any, { nowMs = Date.now() }: any = {}) {
+  hasPendingForAccount(accountId: unknown, { nowMs = Date.now() }: { nowMs?: number } = {}): boolean {
     this.load();
     this.expireMessages(nowMs);
     const normalizedAccountId = normalizeText(accountId);
-    return this.state.messages.some((message: any) => message.accountId === normalizedAccountId);
+    return this.state.messages.some((message) => message.accountId === normalizedAccountId);
   }
 
-  defer(message: any, {
+  defer(message: unknown, {
     delayMs = 0,
     reason = "",
     countAttempt = false,
     nowMs = Date.now(),
-  }: any = {}) {
+  }: {
+    delayMs?: number;
+    reason?: unknown;
+    countAttempt?: boolean;
+    nowMs?: number;
+  } = {}) {
     this.load();
     this.expireMessages(nowMs);
     const normalized = this.findMessage(message) || normalizeSystemMessage(message);
@@ -212,8 +229,8 @@ class SystemMessageQueueStore {
     };
   }
 
-  expireMessages(nowMs: any = Date.now()) {
-    const expired = [];
+  expireMessages(nowMs: number = Date.now()): SystemMessageDeadLetterEntry[] {
+    const expired: SystemMessage[] = [];
 
     for (const message of this.state.messages) {
       if (isSystemMessageExpired(message, nowMs)) {
@@ -228,7 +245,7 @@ class SystemMessageQueueStore {
     return this.moveMessagesToDeadLetter(expired, "expired", nowMs);
   }
 
-  appendDeadLetter(message: any, reason: any, nowMs: any = Date.now()) {
+  appendDeadLetter(message: unknown, reason: unknown, nowMs: number = Date.now()): SystemMessageDeadLetterEntry | null {
     const normalizedMessage = normalizeSystemMessage(message);
     if (!normalizedMessage) {
       return null;
@@ -238,13 +255,19 @@ class SystemMessageQueueStore {
       ...normalizedMessage,
       deadLetterReason: normalizeText(reason) || "dead_letter",
       deadLetterAt: formatIsoTime(nowMs),
-    };
+    } satisfies SystemMessageDeadLetterEntry;
     upsertDeadLetterEntry(deadLetters.entries, nextEntry);
     const persisted = this.saveDeadLetters(deadLetters);
-    return persisted.entries.find((entry: any) => entry.id === nextEntry.id) || nextEntry;
+    return persisted.entries.find((entry) => entry.id === nextEntry.id) || nextEntry;
   }
 
-  deadLetter(message: any, { reason = "", nowMs = Date.now() }: any = {}) {
+  deadLetter(message: unknown, {
+    reason = "",
+    nowMs = Date.now(),
+  }: {
+    reason?: unknown;
+    nowMs?: number;
+  } = {}) {
     this.load();
     this.expireMessages(nowMs);
     const normalizedMessage = this.findMessage(message) || normalizeSystemMessage(message);
@@ -263,7 +286,7 @@ class SystemMessageQueueStore {
     };
   }
 
-  complete(message: any, { nowMs = Date.now() }: any = {}) {
+  complete(message: unknown, { nowMs = Date.now() }: { nowMs?: number } = {}) {
     this.load();
     this.expireMessages(nowMs);
     const normalizedMessage = this.findMessage(message) || normalizeSystemMessage(message);
@@ -271,7 +294,7 @@ class SystemMessageQueueStore {
       return { status: "sent", message: null };
     }
 
-    const nextMessages = this.state.messages.filter((entry: any) => entry.id !== normalizedMessage.id);
+    const nextMessages = this.state.messages.filter((entry) => entry.id !== normalizedMessage.id);
     if (nextMessages.length !== this.state.messages.length) {
       this.persistMessages(nextMessages);
     }
@@ -281,44 +304,53 @@ class SystemMessageQueueStore {
     };
   }
 
-  findMessage(message: any) {
-    const normalizedId = normalizeText(message?.id);
+  findMessage(message: unknown): SystemMessage | null {
+    const normalizedId = normalizeText(asRecord(message).id);
     if (!normalizedId) {
       return null;
     }
-    const existing = this.state.messages.find((entry: any) => entry.id === normalizedId);
+    const existing = this.state.messages.find((entry) => entry.id === normalizedId);
     return existing || null;
   }
 
-  moveMessagesToDeadLetter(messages: any, reason: any, nowMs: any = Date.now()) {
+  moveMessagesToDeadLetter(
+    messages: unknown,
+    reason: unknown,
+    nowMs: number = Date.now(),
+  ): SystemMessageDeadLetterEntry[] {
     const normalizedReason = normalizeText(reason) || "dead_letter";
     const normalizedMessages = Array.isArray(messages)
-      ? messages.filter((message: any) => Boolean(message && normalizeText(message.id)))
+      ? messages.filter((message): message is SystemMessage => Boolean(message && normalizeText(asRecord(message).id)))
       : [];
     if (!normalizedMessages.length) {
       return [];
     }
 
     const deadLetters = this.loadDeadLetters();
-    const deadLetterEntries = normalizedMessages.map((message: any) => ({
-      ...clearSystemMessageInFlight(message),
-      deadLetterReason: normalizedReason,
-      deadLetterAt: formatIsoTime(nowMs),
-    }));
+    const deadLetterEntries = normalizedMessages
+      .map((message) => {
+        const cleared = clearSystemMessageInFlight(message);
+        return cleared ? {
+          ...cleared,
+          deadLetterReason: normalizedReason,
+          deadLetterAt: formatIsoTime(nowMs),
+        } satisfies SystemMessageDeadLetterEntry : null;
+      })
+      .filter((entry): entry is SystemMessageDeadLetterEntry => Boolean(entry));
     for (const entry of deadLetterEntries) {
       upsertDeadLetterEntry(deadLetters.entries, entry);
     }
     this.saveDeadLetters(deadLetters);
 
-    const deadLetterIds = new Set(deadLetterEntries.map((entry: any) => entry.id));
-    const nextMessages = this.state.messages.filter((entry: any) => !deadLetterIds.has(entry.id));
+    const deadLetterIds = new Set(deadLetterEntries.map((entry) => entry.id));
+    const nextMessages = this.state.messages.filter((entry) => !deadLetterIds.has(entry.id));
     this.persistMessages(nextMessages);
     return deadLetterEntries;
   }
 }
 
-function upsertMessage(messages: any, nextMessage: any) {
-  const index = messages.findIndex((entry: any) => entry.id === nextMessage.id);
+function upsertMessage(messages: SystemMessage[], nextMessage: SystemMessage): void {
+  const index = messages.findIndex((entry) => entry.id === nextMessage.id);
   if (index >= 0) {
     messages[index] = nextMessage;
     return;
@@ -326,8 +358,8 @@ function upsertMessage(messages: any, nextMessage: any) {
   messages.push(nextMessage);
 }
 
-function upsertDeadLetterEntry(entries: any, nextEntry: any) {
-  const index = entries.findIndex((entry: any) => entry.id === nextEntry.id);
+function upsertDeadLetterEntry(entries: SystemMessageDeadLetterEntry[], nextEntry: SystemMessageDeadLetterEntry): void {
+  const index = entries.findIndex((entry) => entry.id === nextEntry.id);
   if (index >= 0) {
     entries[index] = nextEntry;
     return;
@@ -335,7 +367,7 @@ function upsertDeadLetterEntry(entries: any, nextEntry: any) {
   entries.push(nextEntry);
 }
 
-function isMessageInFlight(message: any, nowMs: any = Date.now()) {
+function isMessageInFlight(message: Partial<SystemMessage> | null | undefined, nowMs: number = Date.now()): boolean {
   if (normalizeText(message?.deliveryState) !== "in_flight") {
     return false;
   }
@@ -346,18 +378,24 @@ function isMessageInFlight(message: any, nowMs: any = Date.now()) {
   return inFlightAtMs + SYSTEM_MESSAGE_IN_FLIGHT_LEASE_MS > nowMs;
 }
 
-function parseIsoTime(value: any) {
+function parseIsoTime(value: unknown): number {
   const parsed = Date.parse(normalizeText(value));
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function formatIsoTime(value: any) {
+function formatIsoTime(value: unknown): string {
   const numeric = Number(value);
   return new Date(Number.isFinite(numeric) ? numeric : Date.now()).toISOString();
 }
 
-function normalizeText(value: any) {
+function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
 }
 
 export {

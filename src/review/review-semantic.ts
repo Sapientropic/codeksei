@@ -6,10 +6,64 @@ import {
 } from "../adapters/runtime/codex/message-utils";
 import { RUNTIME_EVENT_TYPES } from "../contracts/runtime-events";
 import { resolveCodexWorkspaceRoot } from "../workspace/workspace-alias";
+import {
+  collectReplyFragment,
+  createReplyFragmentCollectorState,
+  observeReplyFragmentTurnStart,
+  resolveReplyFragmentCollectorText,
+  shouldIgnoreReplyFragmentTurnCompletion,
+} from "../adapters/runtime/codex/reply-fragment-collector";
 
 const DEFAULT_TIMEOUT_MS = 120_000;
 
-async function maybeGenerateSemanticReview(config: any = {}, input: any = {}) {
+type JsonObject = Record<string, unknown>;
+
+interface SemanticReviewProfile {
+  kind?: unknown;
+  workspaceRoot?: unknown;
+}
+
+interface SemanticReviewWindow {
+  startDate?: unknown;
+  endDate?: unknown;
+}
+
+interface SemanticReviewInput extends JsonObject {
+  profile?: SemanticReviewProfile;
+  window?: SemanticReviewWindow;
+  diaryEntries?: unknown;
+  nightlyEntries?: unknown;
+  deterministicDraft?: unknown;
+  options?: JsonObject;
+}
+
+interface SemanticReviewConfig extends JsonObject {
+  reviewSemanticMode?: unknown;
+  reviewSemanticTimeoutMs?: unknown;
+  reviewSemanticModel?: unknown;
+  reviewSemanticGenerator?: ((input: SemanticGeneratorInput) => Promise<unknown>) | unknown;
+  codexEndpoint?: unknown;
+  codexCommand?: unknown;
+  stateDir?: unknown;
+  workspaceRoot?: unknown;
+}
+
+interface SemanticGeneratorInput {
+  config: SemanticReviewConfig;
+  profile: SemanticReviewProfile | undefined;
+  window: SemanticReviewWindow | undefined;
+  diaryEntries: unknown;
+  nightlyEntries: unknown;
+  deterministicDraft: unknown;
+  options: JsonObject;
+  sourcePack: JsonObject;
+}
+
+interface RuntimeSemanticClient {
+  onMessage(listener: (message: unknown) => void): () => void;
+}
+
+async function maybeGenerateSemanticReview(config: SemanticReviewConfig = {}, input: SemanticReviewInput = {}) {
   const kind = normalizeText(input?.profile?.kind);
   const mode = normalizeSemanticMode(
     input?.options?.deterministic ? "deterministic" : config.reviewSemanticMode
@@ -62,16 +116,16 @@ async function maybeGenerateSemanticReview(config: any = {}, input: any = {}) {
   }
 }
 
-async function runCodexSemanticReview(config: any = {}, input: any = {}) {
+async function runCodexSemanticReview(config: SemanticReviewConfig = {}, input: SemanticReviewInput = {}) {
   const prompt = buildSemanticPrompt(input);
   const timeoutMs = normalizeTimeout(config.reviewSemanticTimeoutMs) || DEFAULT_TIMEOUT_MS;
   const model = normalizeText(input?.options?.model || config.reviewSemanticModel);
   const workspaceRoot = resolveCodexWorkspaceRoot(input?.profile?.workspaceRoot || config.workspaceRoot || process.cwd());
   const client = new CodexRpcClient({
-    endpoint: config.codexEndpoint,
-    codexCommand: config.codexCommand,
+    endpoint: normalizeText(config.codexEndpoint),
+    codexCommand: normalizeText(config.codexCommand),
     env: process.env,
-    extraWritableRoots: [config.stateDir],
+    extraWritableRoots: normalizeText(config.stateDir) ? [normalizeText(config.stateDir)] : [],
   });
 
   try {
@@ -98,20 +152,23 @@ async function runCodexSemanticReview(config: any = {}, input: any = {}) {
   }
 }
 
-function buildSemanticGeneratorInput(config: any = {}, input: any = {}) {
+function buildSemanticGeneratorInput(
+  config: SemanticReviewConfig = {},
+  input: SemanticReviewInput = {},
+): SemanticGeneratorInput {
   return {
     config,
     profile: input.profile,
     window: input.window,
     diaryEntries: input.diaryEntries,
     nightlyEntries: input.nightlyEntries,
-    deterministicDraft: input.deterministicDraft,
-    options: input.options || {},
+    deterministicDraft: input.deterministicDraft || {},
+    options: asRecord(input.options),
     sourcePack: buildSemanticSourcePack(input),
   };
 }
 
-function buildSemanticPrompt(input: any = {}) {
+function buildSemanticPrompt(input: SemanticReviewInput = {}) {
   const kind = normalizeText(input?.profile?.kind);
   const schema = kind === "nightly"
     ? NIGHTLY_SCHEMA_PROMPT
@@ -157,8 +214,8 @@ const PERIODIC_SCHEMA_PROMPT = [
   "}",
 ].join("\n");
 
-function buildSemanticSourcePack(input: any = {}) {
-  const deterministicDraft = input.deterministicDraft || {};
+function buildSemanticSourcePack(input: SemanticReviewInput = {}): JsonObject {
+  const deterministicDraft = asRecord(input.deterministicDraft);
   const kind = normalizeText(input?.profile?.kind);
   return {
     kind,
@@ -168,13 +225,13 @@ function buildSemanticSourcePack(input: any = {}) {
       endDate: input?.window?.endDate || "",
     },
     windowFacts: Array.isArray(deterministicDraft.windowFacts) ? deterministicDraft.windowFacts : [],
-    deterministicBaseline: buildDeterministicBaseline(kind, deterministicDraft.insights || {}),
+    deterministicBaseline: buildDeterministicBaseline(kind, asRecord(deterministicDraft.insights)),
     diaryDays: compactDiaryDays(input.diaryEntries),
     nightlyDays: compactNightlyDays(input.nightlyEntries),
   };
 }
 
-function buildDeterministicBaseline(kind: any, insights: any = {}) {
+function buildDeterministicBaseline(kind: string, insights: JsonObject = {}): JsonObject {
   if (kind === "nightly") {
     return {
       progress: normalizeStringList(insights.progress, 6, 160),
@@ -195,8 +252,8 @@ function buildDeterministicBaseline(kind: any, insights: any = {}) {
   };
 }
 
-function compactDiaryDays(entries: any) {
-  return (Array.isArray(entries) ? entries : []).map((entry: any) => ({
+function compactDiaryDays(entries: unknown): Array<JsonObject> {
+  return (Array.isArray(entries) ? entries : []).map((entry) => ({
     date: normalizeText(entry?.date),
     openTodos: normalizeStringList(entry?.todo?.open, 5, 140),
     doneTodos: normalizeStringList(entry?.todo?.done, 5, 140),
@@ -204,10 +261,10 @@ function compactDiaryDays(entries: any) {
     timeline: normalizeStringList(entry?.timeline, 4, 160),
     fragment: normalizeStringList(entry?.fragment, 4, 180),
     supplement: normalizeSupplementGroups(
-      (Array.isArray(entry?.supplement) ? entry.supplement : []).map((item: any) => ({
+      (Array.isArray(entry?.supplement) ? entry.supplement : []).map((item: unknown) => ({
         date: normalizeText(entry?.date),
-        title: normalizeText(item?.title),
-        body_lines: compactBodyLines(item?.body, 3, 180),
+        title: normalizeText(asRecord(item).title),
+        body_lines: compactBodyLines(asRecord(item).body, 3, 180),
       })),
       5,
       3,
@@ -216,8 +273,8 @@ function compactDiaryDays(entries: any) {
   }));
 }
 
-function compactNightlyDays(entries: any) {
-  return (Array.isArray(entries) ? entries : []).map((entry: any) => ({
+function compactNightlyDays(entries: unknown): Array<JsonObject> {
+  return (Array.isArray(entries) ? entries : []).map((entry) => ({
     date: normalizeText(entry?.date),
     progress: normalizeStringList(entry?.progress, 4, 160),
     friction: normalizeStringList(entry?.friction, 4, 180),
@@ -228,11 +285,13 @@ function compactNightlyDays(entries: any) {
   }));
 }
 
-function waitForSemanticTurnCompletion(client: any, threadId: any, timeoutMs: any) {
-  return new Promise((resolve: any, reject: any) => {
-    let activeTurnId = "";
-    const textByItemId = new Map();
-    const itemOrder: string[] = [];
+function waitForSemanticTurnCompletion(
+  client: RuntimeSemanticClient,
+  threadId: string,
+  timeoutMs: number,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const collector = createReplyFragmentCollectorState();
 
     const cleanup = () => {
       unsubscribe();
@@ -244,8 +303,8 @@ function waitForSemanticTurnCompletion(client: any, threadId: any, timeoutMs: an
       reject(new Error(`semantic review timed out after ${timeoutMs}ms`));
     }, timeoutMs);
 
-    const unsubscribe = client.onMessage((message: any) => {
-      const params = message?.params || {};
+    const unsubscribe = client.onMessage((message: unknown) => {
+      const params = asRecord(asRecord(message).params);
       // Keep semantic review on the same normalized runtime event contract as
       // the main chat/runtime path. Otherwise upstream RPC drift gets fixed in
       // one place and silently reintroduced here.
@@ -258,8 +317,7 @@ function waitForSemanticTurnCompletion(client: any, threadId: any, timeoutMs: an
         return;
       }
 
-      if (runtimeEvent?.type === RUNTIME_EVENT_TYPES.TURN_STARTED) {
-        activeTurnId = normalizeText(runtimeEvent.payload.turnId) || activeTurnId;
+      if (observeReplyFragmentTurnStart(collector, runtimeEvent)) {
         return;
       }
 
@@ -272,23 +330,7 @@ function waitForSemanticTurnCompletion(client: any, threadId: any, timeoutMs: an
         return;
       }
 
-      if (
-        runtimeEvent?.type === RUNTIME_EVENT_TYPES.REPLY_DELTA
-        || runtimeEvent?.type === RUNTIME_EVENT_TYPES.REPLY_COMPLETED
-      ) {
-        const itemId = normalizeText(runtimeEvent.payload.itemId) || `item-${itemOrder.length + 1}`;
-        const nextText = normalizeText(runtimeEvent.payload.text);
-        if (!textByItemId.has(itemId)) {
-          itemOrder.push(itemId);
-          textByItemId.set(itemId, "");
-        }
-        if (nextText) {
-          if (runtimeEvent.type === RUNTIME_EVENT_TYPES.REPLY_DELTA) {
-            textByItemId.set(itemId, `${textByItemId.get(itemId) || ""}${nextText}`);
-          } else {
-            textByItemId.set(itemId, nextText);
-          }
-        }
+      if (collectReplyFragment(collector, runtimeEvent)) {
         return;
       }
 
@@ -299,19 +341,14 @@ function waitForSemanticTurnCompletion(client: any, threadId: any, timeoutMs: an
       }
 
       if (runtimeEvent?.type === RUNTIME_EVENT_TYPES.TURN_COMPLETED) {
-        const completedTurnId = normalizeText(runtimeEvent.payload.turnId);
-        if (activeTurnId && completedTurnId && completedTurnId !== activeTurnId) {
+        if (shouldIgnoreReplyFragmentTurnCompletion(collector, runtimeEvent)) {
           return;
         }
         cleanup();
         // Semantic review expects the terminal JSON payload. Codex can emit
         // multiple assistant messages within one turn, so concatenating every
         // message here risks mixing progress chatter into the final JSON blob.
-        const text = itemOrder
-          .slice()
-          .reverse()
-          .map((itemId: any) => textByItemId.get(itemId) || "")
-          .find((value: any) => String(value || "").trim()) || "";
+        const text = resolveReplyFragmentCollectorText(collector);
         if (!text) {
           reject(new Error("semantic review returned empty text"));
           return;
@@ -322,7 +359,7 @@ function waitForSemanticTurnCompletion(client: any, threadId: any, timeoutMs: an
   });
 }
 
-function parseSemanticJson(text: any) {
+function parseSemanticJson(text: unknown): JsonObject {
   const direct = tryParseJson(text);
   if (direct) {
     return direct;
@@ -345,32 +382,33 @@ function parseSemanticJson(text: any) {
   throw new Error("semantic review did not return valid JSON");
 }
 
-function normalizeSemanticResult(kind: any, raw: any) {
-  if (!raw || typeof raw !== "object") {
+function normalizeSemanticResult(kind: string, raw: unknown): JsonObject | null {
+  const normalizedRaw = asRecord(raw);
+  if (!Object.keys(normalizedRaw).length) {
     return null;
   }
   if (kind === "nightly") {
     return {
-      progress: normalizeStringList(raw.progress, 5, 160),
-      friction: normalizeStringList(raw.friction, 5, 220),
-      openLoops: normalizeStringList(raw.open_loops || raw.openLoops, 6, 160),
-      carryForward: normalizeStringList(raw.carry_forward || raw.carryForward, 4, 160),
-      closeout: normalizeStringList(raw.closeout, 5, 180),
-      signals: normalizeStringList(raw.signals, 5, 160),
+      progress: normalizeStringList(normalizedRaw.progress, 5, 160),
+      friction: normalizeStringList(normalizedRaw.friction, 5, 220),
+      openLoops: normalizeStringList(normalizedRaw.open_loops || normalizedRaw.openLoops, 6, 160),
+      carryForward: normalizeStringList(normalizedRaw.carry_forward || normalizedRaw.carryForward, 4, 160),
+      closeout: normalizeStringList(normalizedRaw.closeout, 5, 180),
+      signals: normalizeStringList(normalizedRaw.signals, 5, 160),
     };
   }
   return {
-    progress: normalizeStringList(raw.progress, 6, 180),
-    friction: normalizeStringList(raw.friction, 6, 220),
-    openLoops: normalizeStringList(raw.open_loops || raw.openLoops, 6, 160),
-    carryForward: normalizeStringList(raw.carry_forward || raw.carryForward, 4, 160),
-    dailySummaries: normalizeDayGroups(raw.daily_summaries || raw.dailySummaries, 31, 3, 160),
-    supplements: normalizeSupplementGroups(raw.supplement_groups || raw.supplements, 8, 4, 180),
+    progress: normalizeStringList(normalizedRaw.progress, 6, 180),
+    friction: normalizeStringList(normalizedRaw.friction, 6, 220),
+    openLoops: normalizeStringList(normalizedRaw.open_loops || normalizedRaw.openLoops, 6, 160),
+    carryForward: normalizeStringList(normalizedRaw.carry_forward || normalizedRaw.carryForward, 4, 160),
+    dailySummaries: normalizeDayGroups(normalizedRaw.daily_summaries || normalizedRaw.dailySummaries, 31, 3, 160),
+    supplements: normalizeSupplementGroups(normalizedRaw.supplement_groups || normalizedRaw.supplements, 8, 4, 180),
   };
 }
 
-function hasSemanticPayload(kind: any, data: any) {
-  if (!data || typeof data !== "object") {
+function hasSemanticPayload(kind: string, data: JsonObject | null): boolean {
+  if (!data) {
     return false;
   }
   if (kind === "nightly") {
@@ -381,7 +419,7 @@ function hasSemanticPayload(kind: any, data: any) {
       data.carryForward,
       data.closeout,
       data.signals,
-    ].some((items: any) => Array.isArray(items) && items.length);
+    ].some((items) => Array.isArray(items) && items.length);
   }
   return [
     data.progress,
@@ -390,12 +428,12 @@ function hasSemanticPayload(kind: any, data: any) {
     data.carryForward,
     data.dailySummaries,
     data.supplements,
-  ].some((items: any) => Array.isArray(items) && items.length);
+  ].some((items) => Array.isArray(items) && items.length);
 }
 
-function normalizeDayGroups(value: any, maxGroups: any, maxLines: any, maxLength: any) {
-  const groups = [];
-  const seen = new Set();
+function normalizeDayGroups(value: unknown, maxGroups: number, maxLines: number, maxLength: number) {
+  const groups: Array<{ date: string; lines: string[] }> = [];
+  const seen = new Set<string>();
   for (const item of Array.isArray(value) ? value : []) {
     const date = normalizeText(item?.date);
     const lines = normalizeStringList(item?.lines, maxLines, maxLength);
@@ -415,9 +453,9 @@ function normalizeDayGroups(value: any, maxGroups: any, maxLines: any, maxLength
   return groups;
 }
 
-function normalizeSupplementGroups(value: any, maxGroups: any, maxLines: any, maxLength: any) {
-  const groups = [];
-  const seen = new Set();
+function normalizeSupplementGroups(value: unknown, maxGroups: number, maxLines: number, maxLength: number) {
+  const groups: Array<{ date: string; title: string; body: string }> = [];
+  const seen = new Set<string>();
   for (const item of Array.isArray(value) ? value : []) {
     const date = normalizeText(item?.date);
     const title = normalizeText(item?.title);
@@ -442,9 +480,9 @@ function normalizeSupplementGroups(value: any, maxGroups: any, maxLines: any, ma
   return groups;
 }
 
-function normalizeStringList(value: any, maxItems: any, maxLength: any) {
-  const items = [];
-  const seen = new Set();
+function normalizeStringList(value: unknown, maxItems: number, maxLength: number): string[] {
+  const items: string[] = [];
+  const seen = new Set<string>();
   const rawItems = Array.isArray(value)
     ? value
     : typeof value === "string"
@@ -468,19 +506,19 @@ function normalizeStringList(value: any, maxItems: any, maxLength: any) {
   return items;
 }
 
-function compactBodyLines(value: any, maxLines: any, maxLength: any) {
+function compactBodyLines(value: unknown, maxLines: number, maxLength: number): string[] {
   return normalizeStringList(splitLines(String(value || "")), maxLines, maxLength);
 }
 
-function splitLines(value: any) {
+function splitLines(value: unknown): string[] {
   return String(value || "")
     .replace(/\r\n/g, "\n")
     .split("\n")
-    .map((line: any) => line.trim())
+    .map((line) => line.trim())
     .filter(Boolean);
 }
 
-function truncateSentence(value: any, maxLength: any) {
+function truncateSentence(value: unknown, maxLength: number): string {
   const normalized = normalizeText(value);
   if (!normalized || normalized.length <= maxLength) {
     return normalized;
@@ -488,7 +526,7 @@ function truncateSentence(value: any, maxLength: any) {
   return `${normalized.slice(0, Math.max(0, maxLength - 1)).replace(/[，。；,;:\s]+$/u, "")}…`;
 }
 
-function tryParseJson(text: any) {
+function tryParseJson(text: unknown): JsonObject | null {
   try {
     const parsed = JSON.parse(String(text || "").trim());
     return parsed && typeof parsed === "object" ? parsed : null;
@@ -497,7 +535,7 @@ function tryParseJson(text: any) {
   }
 }
 
-function extractFirstJsonObject(text: any) {
+function extractFirstJsonObject(text: unknown): string {
   const input = String(text || "");
   const start = input.indexOf("{");
   const end = input.lastIndexOf("}");
@@ -507,22 +545,28 @@ function extractFirstJsonObject(text: any) {
   return input.slice(start, end + 1);
 }
 
-function normalizeSemanticMode(value: any) {
+function normalizeSemanticMode(value: unknown): "deterministic" | "hybrid" {
   const normalized = normalizeText(value).toLowerCase();
   return normalized === "deterministic" ? "deterministic" : "hybrid";
 }
 
-function normalizeTimeout(value: any) {
+function normalizeTimeout(value: unknown): number {
   const numeric = Number(value);
   return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
 }
 
-function normalizeText(value: any) {
+function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function formatErrorMessage(error: any) {
+function formatErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error || "unknown error");
+}
+
+function asRecord(value: unknown): JsonObject {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as JsonObject
+    : {};
 }
 
 const __testing = {
