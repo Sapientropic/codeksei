@@ -28,6 +28,8 @@ const ACTION_USAGE_ARGS: Readonly<Partial<Record<CommandActionId, string>>> = Ob
   "system.checkin_config": "[--show] [--range 3-60] [--reset]",
   "system.send": "--text \"<message>\" [--user <wechat_user_id>] [--workspace /绝对路径]",
   "timeline.event": "--date YYYY-MM-DD --start HH:mm --end HH:mm --title \"标题\" (--event-node <id> | --subcategory <id>) [其他参数]",
+  "timeline.serve": "[--port 4317]",
+  "timeline.dev": "[--port 4317]",
   "timeline.screenshot": "--send [--user <wechatUserId>] [--output /绝对路径] [其他 timeline screenshot 参数]",
 });
 

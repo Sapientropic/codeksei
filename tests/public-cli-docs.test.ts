@@ -10,11 +10,13 @@ const {
 
 const readme = fs.readFileSync(path.join(__dirname, "..", "README.md"), "utf8");
 const commandsDoc = fs.readFileSync(path.join(__dirname, "..", "docs", "commands.md"), "utf8");
+const timelineIntegrationDoc = fs.readFileSync(path.join(__dirname, "..", "docs", "timeline-integration.md"), "utf8");
 
 test("README public quickstart prefers codeksei CLI while shared mode keeps repo scripts", () => {
   assert.ok(readme.includes(buildTerminalEntryUsage("app.help", "public")));
   assert.ok(readme.includes("codeksei review weekly --help"));
   assert.ok(readme.includes(buildTerminalEntryUsage("app.shared_start", "repo")));
+  assert.ok(readme.includes("./docs/timeline-integration.md"));
 });
 
 test("docs/commands keeps public CLI examples aligned with the terminal usage source", () => {
@@ -22,4 +24,12 @@ test("docs/commands keeps public CLI examples aligned with the terminal usage so
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("timeline.event", "public")));
   assert.ok(commandsDoc.includes(buildTerminalActionExample("review.weekly", { audience: "public", includeArgs: false })));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("app.shared_status", "repo")));
+  assert.ok(commandsDoc.includes("./timeline-integration.md"));
+});
+
+test("timeline integration doc is the canonical deep-dive for timeline support and agent routing", () => {
+  assert.match(timelineIntegrationDoc, /Windows、macOS、Linux 都可跑 timeline CLI/u);
+  assert.match(timelineIntegrationDoc, /Node\.js >= 22/u);
+  assert.match(timelineIntegrationDoc, /categories.*read.*event.*write.*build.*serve.*dev.*screenshot/us);
+  assert.match(timelineIntegrationDoc, /未来 MCP .*复用 `src\/timeline\/runtime\/application\/timeline/u);
 });

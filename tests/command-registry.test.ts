@@ -66,6 +66,23 @@ test("timeline screenshot leaf help keeps generic screenshots on the default ful
   assert.match(help, /codeksei timeline screenshot --send/u);
 });
 
+test("timeline serve and dev leaf help expose their own usage instead of falling back to topic help", () => {
+  const serveHelp = buildTerminalLeafHelp("timeline.serve");
+  const devHelp = buildTerminalLeafHelp("timeline.dev");
+
+  assert.match(serveHelp, /codeksei timeline serve \[--port 4317\]/u);
+  assert.match(serveHelp, /适合稳定查看/u);
+  assert.match(devHelp, /codeksei timeline dev \[--port 4317\]/u);
+  assert.match(devHelp, /自动退到 polling/u);
+});
+
+test("timeline build leaf help clarifies that browser binaries are only needed for screenshots", () => {
+  const help = buildTerminalLeafHelp("timeline.build");
+
+  assert.match(help, /codeksei timeline build/u);
+  assert.match(help, /只在 screenshot 链路里才需要/u);
+});
+
 test("diary topic help explains captured Todo start time for later timeline accuracy", () => {
   const help = buildTerminalTopicHelp("diary");
 

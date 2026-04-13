@@ -270,6 +270,7 @@ codeksei system checkin --reset
 More detailed references:
 
 - [docs/commands.md](./docs/commands.md)
+- [docs/timeline-integration.md](./docs/timeline-integration.md)
 - [docs/architecture.md](./docs/architecture.md)
 
 ## Local State and Public Boundary

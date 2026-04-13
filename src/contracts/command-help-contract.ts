@@ -220,6 +220,9 @@ const LEAF_HELP = {
       includeFlagBlock: true,
     };
   },
+  "timeline.build": () => buildTimelineLeafHelpDocument("timeline.build"),
+  "timeline.serve": () => buildTimelineLeafHelpDocument("timeline.serve"),
+  "timeline.dev": () => buildTimelineLeafHelpDocument("timeline.dev"),
   "timeline.screenshot": () => ({
     usage: [buildExample("timeline.screenshot", true)],
     bodyLabel: "说明：",
@@ -322,6 +325,55 @@ function buildReviewLeafHelpDocument(actionId: "review.nightly" | "review.weekly
     body: variant.description,
     examples: variant.examples,
     includeFlagBlock: true,
+  };
+}
+
+function buildTimelineLeafHelpDocument(
+  actionId: "timeline.build" | "timeline.serve" | "timeline.dev",
+): CommandHelpDocument {
+  const variant = {
+    "timeline.build": {
+      usage: buildTerminalActionExample("timeline.build", { audience: "public", includeArgs: true }),
+      body: [
+        "  把当前 timeline 数据构建成静态 dashboard 产物，适合写入数据后刷新页面或在发布前先验一次构建链路。",
+        "  这条命令本身不要求 Chromium/Chrome/Edge；浏览器可执行文件只在 screenshot 链路里才需要。",
+        "  运行前提仍是 Node.js >= 22，以及当前 timeline 状态目录可写。",
+      ],
+      examples: [
+        "  codeksei timeline build",
+      ],
+    },
+    "timeline.serve": {
+      usage: buildTerminalActionExample("timeline.serve", { audience: "public", includeArgs: true }),
+      body: [
+        "  启动已经构建好的 timeline 静态页面服务，适合稳定查看，不做源码或数据监听。",
+        "  `--port` 可显式指定本地端口；没传时默认沿用当前 timeline runtime 端口。",
+        "  这条命令不要求 Chromium/Chrome/Edge，可在 Windows / macOS / Linux 上直接起本地 URL 给浏览器打开。",
+      ],
+      examples: [
+        "  codeksei timeline serve",
+        "  codeksei timeline serve --port 4317",
+      ],
+    },
+    "timeline.dev": {
+      usage: buildTerminalActionExample("timeline.dev", { audience: "public", includeArgs: true }),
+      body: [
+        "  启动带自动重建和热刷新能力的 timeline 开发服务，适合调 dashboard、改数据后立刻看效果。",
+        "  `--port` 可显式指定本地端口；native watch 命中配额或平台不支持递归 watch 时，会自动退到 polling。",
+        "  运行前提仍是 Node.js >= 22；浏览器可执行文件只在 screenshot 命令里才需要。",
+      ],
+      examples: [
+        "  codeksei timeline dev",
+        "  codeksei timeline dev --port 4317",
+      ],
+    },
+  }[actionId];
+
+  return {
+    usage: [variant.usage],
+    bodyLabel: "说明：",
+    body: variant.body,
+    examples: variant.examples,
   };
 }
 

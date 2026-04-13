@@ -285,6 +285,7 @@ codeksei system checkin --reset
 更完整的命令与架构说明见：
 
 - [docs/commands.md](./docs/commands.md)
+- [docs/timeline-integration.md](./docs/timeline-integration.md)
 - [docs/architecture.md](./docs/architecture.md)
 
 如果你是第一次读这个仓库的代码结构，先看 `docs/architecture.md`，再进具体目录会更快。

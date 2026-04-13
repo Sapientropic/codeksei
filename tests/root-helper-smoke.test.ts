@@ -72,6 +72,14 @@ test("help entrypoints stay read-only and do not create the state dir", () => {
     encoding: "utf8",
     env,
   });
+  const timelineServeHelp = spawnSync(process.execPath, [entrypoint, "timeline", "serve", "--help"], {
+    encoding: "utf8",
+    env,
+  });
+  const timelineDevHelp = spawnSync(process.execPath, [entrypoint, "timeline", "dev", "--help"], {
+    encoding: "utf8",
+    env,
+  });
   const topicHelp = spawnSync(process.execPath, [entrypoint, "timeline", "--help"], {
     encoding: "utf8",
     env,
@@ -79,6 +87,10 @@ test("help entrypoints stay read-only and do not create the state dir", () => {
 
   assert.equal(rootHelp.status, 0, rootHelp.stderr || "expected root help to succeed");
   assert.equal(leafHelp.status, 0, leafHelp.stderr || "expected leaf help to succeed");
+  assert.equal(timelineServeHelp.status, 0, timelineServeHelp.stderr || "expected timeline serve help to succeed");
+  assert.equal(timelineDevHelp.status, 0, timelineDevHelp.stderr || "expected timeline dev help to succeed");
   assert.equal(topicHelp.status, 0, topicHelp.stderr || "expected topic help to succeed");
+  assert.match(timelineServeHelp.stdout, /codeksei timeline serve \[--port 4317\]/u);
+  assert.match(timelineDevHelp.stdout, /codeksei timeline dev \[--port 4317\]/u);
   assert.equal(fs.existsSync(stateDir), false);
 });

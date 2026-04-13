@@ -86,6 +86,14 @@ README、帮助文本和公开示例默认都按 `codeksei` 书写。
 - `codeksei timeline dev`
 - `codeksei timeline screenshot --send`
 
+平台前提、agent / MCP 接入顺序、结构化截图合同统一见 [timeline-integration.md](./timeline-integration.md)。
+
+支持速记：
+
+- Windows / macOS / Linux 可跑 timeline CLI
+- 要求 `Node.js >= 22`
+- Chromium / Chrome / Edge 只在 `timeline screenshot` 时需要
+
 建议：
 
 - 单条明确时间块优先用 `timeline:event`

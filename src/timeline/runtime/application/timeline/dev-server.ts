@@ -19,6 +19,14 @@ interface TimelineDevServerState {
   timer: NodeJS.Timeout | null;
 }
 
+interface TimelineDevWatcher {
+  close(): void;
+}
+
+interface TimelineDevWatcherOptions {
+  pollIntervalMs?: number;
+}
+
 async function runTimelineDevServer(
   config: TimelineRuntimeConfig,
   options: TimelineDevServerOptions = {},
@@ -83,19 +91,16 @@ async function runTimelineDevServer(
 
   const watchers = watchRoots
     .filter(Boolean)
-    .map((targetPath) => {
-      try {
-        return fs.watch(targetPath, { recursive: fs.statSync(targetPath).isDirectory() }, () => {
-          scheduleTimelineDevRebuild(state, config);
-        });
-      } catch {
-        console.warn(`timeline dev watch skipped: ${targetPath}`);
-        return null;
-      }
-    })
-    .filter((watcher): watcher is fs.FSWatcher => watcher !== null);
+    .map((targetPath) => createTimelineDevWatcher(targetPath, () => {
+      scheduleTimelineDevRebuild(state, config);
+    }))
+    .filter((watcher): watcher is TimelineDevWatcher => watcher !== null);
 
   const cleanup = (): void => {
+    if (state.timer) {
+      clearTimeout(state.timer);
+      state.timer = null;
+    }
     for (const watcher of watchers) {
       watcher.close();
     }
@@ -112,6 +117,172 @@ async function runTimelineDevServer(
     port: resolvedPort,
     url: `http://127.0.0.1:${resolvedPort}`,
   };
+}
+
+function createTimelineDevWatcher(
+  targetPath: string,
+  onChange: () => void,
+  options: TimelineDevWatcherOptions = {},
+): TimelineDevWatcher | null {
+  const normalizedPath = path.resolve(String(targetPath || "").trim());
+  if (!normalizedPath) {
+    return null;
+  }
+
+  let stats: fs.Stats;
+  try {
+    stats = fs.statSync(normalizedPath);
+  } catch {
+    console.warn(`timeline dev watch skipped: ${normalizedPath}`);
+    return null;
+  }
+
+  const startPollingFallback = (reason = ""): TimelineDevWatcher => {
+    const prefix = reason ? `timeline dev watch fallback (${reason})` : "timeline dev watch fallback";
+    console.warn(`${prefix}: ${normalizedPath}`);
+    return createPollingWatcher(normalizedPath, onChange, options);
+  };
+
+  try {
+    const watcher = fs.watch(normalizedPath, { recursive: stats.isDirectory() }, () => {
+      onChange();
+    });
+    let fallbackHandle = createNoopWatcher();
+    watcher.on("error", (error: unknown) => {
+      const fallbackReason = resolveTimelineWatchFallbackReason(error);
+      if (!fallbackReason) {
+        console.warn(`timeline dev watch error: ${normalizedPath} ${describeTimelineWatchError(error)}`);
+        return;
+      }
+      watcher.close();
+      fallbackHandle.close();
+      fallbackHandle = startPollingFallback(fallbackReason);
+    });
+
+    return {
+      close(): void {
+        watcher.close();
+        fallbackHandle.close();
+      },
+    };
+  } catch (error) {
+    const fallbackReason = resolveTimelineWatchFallbackReason(error);
+    if (fallbackReason) {
+      return startPollingFallback(fallbackReason);
+    }
+    console.warn(`timeline dev watch skipped: ${normalizedPath}`);
+    return null;
+  }
+}
+
+function createPollingWatcher(
+  targetPath: string,
+  onChange: () => void,
+  options: TimelineDevWatcherOptions = {},
+): TimelineDevWatcher {
+  let lastStamp = readWatchStamp(targetPath);
+  const pollIntervalMs = Number.isFinite(options.pollIntervalMs) && Number(options.pollIntervalMs) > 0
+    ? Number(options.pollIntervalMs)
+    : 800;
+  const timer = setInterval(() => {
+    const nextStamp = readWatchStamp(targetPath);
+    if (nextStamp !== lastStamp) {
+      lastStamp = nextStamp;
+      onChange();
+    }
+  }, pollIntervalMs);
+  timer.unref?.();
+  return {
+    close(): void {
+      clearInterval(timer);
+    },
+  };
+}
+
+function createNoopWatcher(): TimelineDevWatcher {
+  return {
+    close(): void {
+      // noop
+    },
+  };
+}
+
+function readWatchStamp(targetPath: string): string {
+  try {
+    const stats = fs.statSync(targetPath);
+    if (!stats.isDirectory()) {
+      return `${stats.mtimeMs}:${stats.size}`;
+    }
+    return String(scanDirectoryMtime(targetPath));
+  } catch {
+    return "missing";
+  }
+}
+
+function scanDirectoryMtime(rootPath: string): number {
+  let latest = 0;
+  const queue = [rootPath];
+  while (queue.length) {
+    const currentPath = queue.pop();
+    if (!currentPath) {
+      continue;
+    }
+    let entries: fs.Dirent[] = [];
+    try {
+      entries = fs.readdirSync(currentPath, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const entryPath = path.join(currentPath, entry.name);
+      let entryStats: fs.Stats;
+      try {
+        entryStats = fs.statSync(entryPath);
+      } catch {
+        continue;
+      }
+      if (entryStats.mtimeMs > latest) {
+        latest = entryStats.mtimeMs;
+      }
+      if (entry.isDirectory()) {
+        queue.push(entryPath);
+      }
+    }
+  }
+  return latest;
+}
+
+function resolveTimelineWatchFallbackReason(error: unknown): string {
+  if (isWatchLimitError(error)) {
+    return normalizeWatchErrorCode(error) || "watch-limit";
+  }
+  if (isRecursiveWatchUnsupportedError(error)) {
+    return normalizeWatchErrorCode(error) || "polling";
+  }
+  return "";
+}
+
+function isWatchLimitError(error: unknown): boolean {
+  const code = normalizeWatchErrorCode(error);
+  return code === "EMFILE" || code === "ENOSPC";
+}
+
+function isRecursiveWatchUnsupportedError(error: unknown): boolean {
+  const code = normalizeWatchErrorCode(error);
+  return code === "ERR_FEATURE_UNAVAILABLE_ON_PLATFORM";
+}
+
+function normalizeWatchErrorCode(error: unknown): string {
+  return typeof error === "object" && error !== null && "code" in error
+    ? String((error as { code?: unknown }).code || "").trim().toUpperCase()
+    : "";
+}
+
+function describeTimelineWatchError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error ?? "");
 }
 
 function scheduleTimelineDevRebuild(state: TimelineDevServerState, config: TimelineRuntimeConfig): void {
@@ -234,5 +405,9 @@ function detectMimeType(filePath: string): string {
 }
 
 export {
+  createPollingWatcher,
+  createTimelineDevWatcher,
+  isWatchLimitError,
+  readWatchStamp,
   runTimelineDevServer,
 };
