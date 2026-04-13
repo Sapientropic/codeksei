@@ -1,9 +1,9 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { CodekseiApp } from "../core/app";
 import { ensureCodekseiHomeEnv, ensureStateDirectory } from "../core/branding";
 import { loadEnvStack } from "../core/env-loader";
 import { readConfig } from "../core/config";
+import { createTerminalAppFacade, type TerminalAppFacade } from "../core/app-terminal-facade";
 import { renderInstructionTemplate } from "../core/instructions-template";
 import { createTimelineIntegration } from "../integrations/timeline";
 import { writeForeignTextDocument } from "../state/json-state";
@@ -31,7 +31,7 @@ export interface TerminalCommandContext {
   argv: string[];
   config: TerminalRuntimeConfig;
   leafArgs: string[];
-  getApp(): CodekseiApp;
+  getApp(): TerminalAppFacade;
   getTimelineIntegration(): TerminalTimelineIntegrationLike;
 }
 
@@ -48,15 +48,15 @@ export function createTerminalCommandContext(argv: string[]): TerminalCommandCon
   };
   ensureBootstrapFiles(config);
 
-  let app: CodekseiApp | null = null;
+  let app: TerminalAppFacade | null = null;
   let timelineIntegration: TerminalTimelineIntegrationLike | null = null;
   return {
     argv,
     config,
     leafArgs,
-    getApp(): CodekseiApp {
+    getApp(): TerminalAppFacade {
       if (!app) {
-        app = new CodekseiApp(config);
+        app = createTerminalAppFacade(config);
       }
       return app;
     },

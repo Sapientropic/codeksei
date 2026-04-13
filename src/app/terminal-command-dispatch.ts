@@ -9,7 +9,10 @@ import { runSystemCheckinPoller } from "./system-checkin-poller";
 import { runSystemSendCommand } from "./system-send-cli";
 import { runTimelineEventCommand } from "./timeline-event-cli";
 import { runTimelineScreenshotCommand } from "./timeline-screenshot-cli";
-import type { TerminalCommandManifestEntry } from "../contracts/command-surface";
+import type {
+  CommandRunnerId,
+  TerminalCommandManifestEntry,
+} from "../contracts/command-surface";
 import type { TerminalCommandContext } from "./terminal-command-context";
 import { buildTerminalHelpText } from "../core/command-registry";
 
@@ -30,7 +33,7 @@ export type TerminalCommandHandler = (
 ) => Promise<void>;
 
 export function listTerminalDispatchRunnerIds(): string[] {
-  return Object.keys(RUNNERS).sort();
+  return Object.keys(RUNNERS).sort() as CommandRunnerId[];
 }
 
 export async function runTerminalManifestCommand(
@@ -44,7 +47,7 @@ export async function runTerminalManifestCommand(
   await handler(manifest, context);
 }
 
-const RUNNERS: Record<string, TerminalCommandHandler> = {
+const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
   help: async () => {
     console.log(buildTerminalHelpText());
   },
@@ -76,7 +79,10 @@ const RUNNERS: Record<string, TerminalCommandHandler> = {
     await runProjectRadarCommand(context.config as ProjectRadarConfig, context.leafArgs);
   },
   "review.command": async (manifest, context) => {
-    await runReviewCommand(context.config, (manifest.kind || "") as ReviewKind, context.leafArgs);
+    if (!manifest.kind) {
+      throw new Error(`review command is missing review kind: ${manifest.command} ${manifest.subcommand}`.trim());
+    }
+    await runReviewCommand(context.config, manifest.kind as ReviewKind, context.leafArgs);
   },
   "reminder.write": async (_manifest, context) => {
     await runReminderWriteCommand(context.config as ReminderWriteConfig, context.leafArgs);
@@ -94,13 +100,16 @@ const RUNNERS: Record<string, TerminalCommandHandler> = {
     await runTimelineEventCommand(
       context.getTimelineIntegration(),
       context.config as TimelineEventConfig,
-      context.argv.slice(2),
+      context.leafArgs,
     );
   },
   "timeline.screenshot": async (_manifest, context) => {
-    await runTimelineScreenshotCommand(context.config, context.argv.slice(2));
+    await runTimelineScreenshotCommand(context.config, context.leafArgs);
   },
   "timeline.subcommand": async (manifest, context) => {
-    await context.getTimelineIntegration().runSubcommand(manifest.timelineSubcommand || "", context.argv.slice(2));
+    if (!manifest.timelineSubcommand) {
+      throw new Error(`timeline command is missing subcommand: ${manifest.command} ${manifest.subcommand}`.trim());
+    }
+    await context.getTimelineIntegration().runSubcommand(manifest.timelineSubcommand, context.leafArgs);
   },
 };

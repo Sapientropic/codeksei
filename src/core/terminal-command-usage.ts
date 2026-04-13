@@ -1,18 +1,20 @@
-import { findCommandAction, listCommandActions } from "../contracts/command-surface";
+import {
+  findCommandAction,
+  listCommandActions,
+  type CommandAction,
+  type CommandActionId,
+  type CommandEntrypointType,
+} from "../contracts/command-surface";
 
 type TerminalAudience = "public" | "repo";
 
-interface CommandActionLike {
-  action: string;
-  command: string;
-  entrypointType: string;
-  scriptName: string;
-  subcommand: string;
-  terminal: string[];
-}
+type CommandActionLike = Pick<
+  CommandAction,
+  "action" | "command" | "entrypointType" | "scriptName" | "subcommand" | "terminal"
+>;
 
 
-const ACTION_USAGE_ARGS: Readonly<Record<string, string>> = Object.freeze({
+const ACTION_USAGE_ARGS: Readonly<Partial<Record<CommandActionId, string>>> = Object.freeze({
   "channel.send_file": "--path /绝对路径",
   "diary.append": "--section todo --state open --text \"内容\"",
   "note.auto": "(--project <slug> | --scope <name>) --kind <kind> [--text \"内容\" | --stdin]",
@@ -28,7 +30,7 @@ const ACTION_USAGE_ARGS: Readonly<Record<string, string>> = Object.freeze({
   "timeline.screenshot": "--send [--user <wechatUserId>] [--output /绝对路径] [其他 timeline screenshot 参数]",
 });
 
-export function buildTerminalEntryUsage(action: CommandActionLike | string, audience: TerminalAudience): string {
+export function buildTerminalEntryUsage(action: CommandActionLike | CommandActionId | string, audience: TerminalAudience): string {
   const resolved = resolveAction(action);
   if (!resolved) {
     return audience === "repo" ? "npm run <script>" : "codeksei <command> [subcommand]";
@@ -39,7 +41,7 @@ export function buildTerminalEntryUsage(action: CommandActionLike | string, audi
 }
 
 export function buildTerminalActionExample(
-  action: CommandActionLike | string,
+  action: CommandActionLike | CommandActionId | string,
   {
     audience = "public",
     includeArgs = false,
@@ -70,7 +72,7 @@ export function listRepoScriptActions(): CommandActionLike[] {
 }
 
 function buildPublicTerminalCommand(action: CommandActionLike): string {
-  if (action.entrypointType !== "cli" || !action.command) {
+  if ((action.entrypointType as CommandEntrypointType) !== "cli" || !action.command) {
     return "";
   }
   return ["codeksei", action.command, action.subcommand].filter(Boolean).join(" ");
@@ -80,7 +82,7 @@ function buildRepoScriptAlias(action: CommandActionLike): string {
   return action.scriptName ? `npm run ${action.scriptName}` : "";
 }
 
-function resolveAction(action: CommandActionLike | string): CommandActionLike | null {
+function resolveAction(action: CommandActionLike | CommandActionId | string): CommandActionLike | null {
   if (typeof action === "string") {
     return findCommandAction(action);
   }
