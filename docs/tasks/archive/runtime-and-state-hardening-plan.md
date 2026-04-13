@@ -1,6 +1,6 @@
 > [!IMPORTANT]
 > Archived snapshot。自 2026-04-12 起，这份文档只保留**上一阶段 runtime/state hardening 的历史记录**。
-> 
+>
 > 当前唯一 active 升级计划请看：
 > [`../architecture-and-quality-upgrade-plan.md`](../architecture-and-quality-upgrade-plan.md)
 >
