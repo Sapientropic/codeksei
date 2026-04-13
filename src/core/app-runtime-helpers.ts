@@ -11,7 +11,7 @@ import {
 import type {
   PersistIncomingWeixinAttachmentsResult,
   PersistedIncomingWeixinAttachment,
-} from "../adapters/channel/weixin/media-types";
+} from "../contracts/weixin-media";
 
 const SYSTEM_MESSAGE_FAILURE_RETRY_DELAYS_MS = [30_000, 2 * 60_000, 5 * 60_000];
 

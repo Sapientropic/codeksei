@@ -14,6 +14,17 @@ const {
   listTerminalCommandManifest,
 } = require("../src/contracts/command-surface");
 const {
+  COMMAND_ACTION_DEFINITIONS,
+  COMMAND_AUDIENCE_OVERRIDES,
+  COMMAND_AUTH_OVERRIDES,
+  COMMAND_MUTABILITY_OVERRIDES,
+  COMMAND_SAFETY_OVERRIDES,
+  resolveCommandAudienceDefinition,
+  resolveCommandAuthRequirementDefinition,
+  resolveCommandMutabilityDefinition,
+  resolveCommandSafetyTierDefinition,
+} = require("../src/contracts/command-surface-definitions");
+const {
   listTerminalHelpTopics,
   listTerminalLeafHelpKeys,
 } = require("../src/contracts/command-help-contract");
@@ -135,5 +146,46 @@ test("leaf-help actions all resolve to non-empty leaf help text", () => {
   for (const leafKey of listTerminalLeafHelpKeys()) {
     assert.match(buildTerminalLeafHelp(leafKey), /\S/u);
     assert.equal(actionsById.get(leafKey)?.help?.detail, "leaf");
+  }
+});
+
+test("command classification helpers cover representative explicit and default branches", () => {
+  assert.equal(resolveCommandAudienceDefinition("app.shared_start", "script"), "operator");
+  assert.equal(resolveCommandAudienceDefinition("timeline.build", "cli"), "public");
+  assert.equal(resolveCommandAuthRequirementDefinition("timeline.screenshot"), "context_token");
+  assert.equal(resolveCommandAuthRequirementDefinition("timeline.build"), "none");
+  assert.equal(resolveCommandMutabilityDefinition("background.install"), "bootstrap");
+  assert.equal(resolveCommandMutabilityDefinition("app.help"), "read");
+  assert.equal(resolveCommandSafetyTierDefinition("timeline.write"), "warned");
+  assert.equal(resolveCommandSafetyTierDefinition("app.schema"), "open");
+});
+
+test("every command action resolves through either an explicit classification override or the documented default", () => {
+  const audienceOverrideIds = new Set(Object.keys(COMMAND_AUDIENCE_OVERRIDES));
+  const authOverrideIds = new Set(Object.keys(COMMAND_AUTH_OVERRIDES));
+  const mutabilityOverrideIds = new Set(Object.keys(COMMAND_MUTABILITY_OVERRIDES));
+  const safetyOverrideIds = new Set(Object.keys(COMMAND_SAFETY_OVERRIDES));
+
+  for (const action of COMMAND_ACTION_DEFINITIONS) {
+    const expectedAudienceDefault = action.entrypointType === "script" ? "operator" : "public";
+    const resolvedAudience = resolveCommandAudienceDefinition(action.action, action.entrypointType);
+    if (!audienceOverrideIds.has(action.action)) {
+      assert.equal(resolvedAudience, expectedAudienceDefault, `${action.action} should follow the documented audience default`);
+    }
+
+    const resolvedAuth = resolveCommandAuthRequirementDefinition(action.action);
+    if (!authOverrideIds.has(action.action)) {
+      assert.equal(resolvedAuth, "none", `${action.action} should use the default auth requirement when not overridden`);
+    }
+
+    const resolvedMutability = resolveCommandMutabilityDefinition(action.action);
+    if (!mutabilityOverrideIds.has(action.action)) {
+      assert.equal(resolvedMutability, "read", `${action.action} should use the default mutability when not overridden`);
+    }
+
+    const resolvedSafety = resolveCommandSafetyTierDefinition(action.action);
+    if (!safetyOverrideIds.has(action.action)) {
+      assert.equal(resolvedSafety, "open", `${action.action} should use the default safety tier when not overridden`);
+    }
   }
 });

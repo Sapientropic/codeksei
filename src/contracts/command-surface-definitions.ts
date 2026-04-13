@@ -1,3 +1,4 @@
+// region Type definitions
 export interface CommandGroupDefinition {
   id: string;
   label: string;
@@ -36,7 +37,9 @@ export type CommandAudienceDefinition = "operator" | "public";
 export type CommandAuthRequirementDefinition = "context_token" | "none" | "runtime_bootstrap" | "weixin_account";
 export type CommandMutabilityDefinition = "bootstrap" | "long_running" | "read" | "write";
 export type CommandSafetyTierDefinition = "open" | "operator" | "warned";
+// endregion
 
+// region Group definitions
 export const COMMAND_GROUP_DEFINITIONS = [
   { id: "introspection", label: "发现与合同" },
   { id: "lifecycle", label: "启动与诊断" },
@@ -45,7 +48,9 @@ export const COMMAND_GROUP_DEFINITIONS = [
   { id: "projects", label: "代码项目" },
   { id: "capabilities", label: "能力集成" },
 ] as const satisfies readonly CommandGroupDefinition[];
+// endregion
 
+// region Action definitions data table
 export const COMMAND_ACTION_DEFINITIONS = [
   {
     action: "app.schema",
@@ -699,7 +704,9 @@ export const COMMAND_ACTION_DEFINITIONS = [
     help: { topic: "", leafKey: "app.help", detail: "topic_only" },
   },
 ] as const satisfies readonly CommandActionDefinition[];
+// endregion
 
+// region Derived type unions
 type CommandActionDefinitionRecord = typeof COMMAND_ACTION_DEFINITIONS[number];
 type ActionWithHelp = Extract<CommandActionDefinitionRecord, { help: CommandHelpDefinition }>;
 type CliTerminalActionDefinition = Extract<CommandActionDefinitionRecord, {
@@ -737,8 +744,10 @@ export type CommandLeafHelpKey = Extract<ActionWithHelp, {
 export type CommandTopicOnlyLeafKey = Extract<ActionWithHelp, {
   help: { detail: "topic_only"; leafKey: string };
 }>["help"]["leafKey"];
+// endregion
 
-const COMMAND_AUDIENCE_BY_ACTION: Readonly<Partial<Record<CommandActionId, CommandAudienceDefinition>>> = Object.freeze({
+// region Classification tables
+export const COMMAND_AUDIENCE_OVERRIDES: Readonly<Partial<Record<CommandActionId, CommandAudienceDefinition>>> = Object.freeze({
   "app.accounts": "operator",
   "app.login": "operator",
   "app.shared_open": "operator",
@@ -753,7 +762,7 @@ const COMMAND_AUDIENCE_BY_ACTION: Readonly<Partial<Record<CommandActionId, Comma
   "system.checkin_poller": "operator",
 });
 
-const COMMAND_SAFETY_BY_ACTION: Readonly<Partial<Record<CommandActionId, CommandSafetyTierDefinition>>> = Object.freeze({
+export const COMMAND_SAFETY_OVERRIDES: Readonly<Partial<Record<CommandActionId, CommandSafetyTierDefinition>>> = Object.freeze({
   "app.accounts": "operator",
   "app.doctor": "open",
   "app.help": "open",
@@ -792,7 +801,7 @@ const COMMAND_SAFETY_BY_ACTION: Readonly<Partial<Record<CommandActionId, Command
   "timeline.write": "warned",
 });
 
-const COMMAND_MUTABILITY_BY_ACTION: Readonly<Partial<Record<CommandActionId, CommandMutabilityDefinition>>> = Object.freeze({
+export const COMMAND_MUTABILITY_OVERRIDES: Readonly<Partial<Record<CommandActionId, CommandMutabilityDefinition>>> = Object.freeze({
   "app.accounts": "bootstrap",
   "app.doctor": "read",
   "app.help": "read",
@@ -831,7 +840,7 @@ const COMMAND_MUTABILITY_BY_ACTION: Readonly<Partial<Record<CommandActionId, Com
   "timeline.write": "write",
 });
 
-const COMMAND_AUTH_BY_ACTION: Readonly<Partial<Record<CommandActionId, CommandAuthRequirementDefinition>>> = Object.freeze({
+export const COMMAND_AUTH_OVERRIDES: Readonly<Partial<Record<CommandActionId, CommandAuthRequirementDefinition>>> = Object.freeze({
   "app.accounts": "weixin_account",
   "app.login": "none",
   "app.shared_open": "runtime_bootstrap",
@@ -844,25 +853,28 @@ const COMMAND_AUTH_BY_ACTION: Readonly<Partial<Record<CommandActionId, CommandAu
   "system.send": "context_token",
   "timeline.screenshot": "context_token",
 });
+// endregion
 
+// region Resolution helpers
 export function resolveCommandAudienceDefinition(
   actionId: CommandActionId,
   entrypointType: CommandActionDefinition["entrypointType"],
 ): CommandAudienceDefinition {
-  if (COMMAND_AUDIENCE_BY_ACTION[actionId]) {
-    return COMMAND_AUDIENCE_BY_ACTION[actionId] || "public";
+  if (COMMAND_AUDIENCE_OVERRIDES[actionId]) {
+    return COMMAND_AUDIENCE_OVERRIDES[actionId] || "public";
   }
   return entrypointType === "script" ? "operator" : "public";
 }
 
 export function resolveCommandAuthRequirementDefinition(actionId: CommandActionId): CommandAuthRequirementDefinition {
-  return COMMAND_AUTH_BY_ACTION[actionId] || "none";
+  return COMMAND_AUTH_OVERRIDES[actionId] || "none";
 }
 
 export function resolveCommandMutabilityDefinition(actionId: CommandActionId): CommandMutabilityDefinition {
-  return COMMAND_MUTABILITY_BY_ACTION[actionId] || "read";
+  return COMMAND_MUTABILITY_OVERRIDES[actionId] || "read";
 }
 
 export function resolveCommandSafetyTierDefinition(actionId: CommandActionId): CommandSafetyTierDefinition {
-  return COMMAND_SAFETY_BY_ACTION[actionId] || "open";
+  return COMMAND_SAFETY_OVERRIDES[actionId] || "open";
 }
+// endregion

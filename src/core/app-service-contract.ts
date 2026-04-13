@@ -1,6 +1,7 @@
 import type { RuntimeEvent } from "../contracts/runtime-events";
 import type { ReminderQueueEntry, SystemMessage } from "../contracts/queue-items";
-import type { AvailableModelCatalogView } from "../adapters/runtime/codex/model-catalog";
+import type { CodexAppServerCapabilityProbe } from "../contracts/codex-capability";
+import type { AvailableModelCatalogView } from "../contracts/model-catalog";
 import type {
   DeliveryFailurePayload,
   HandlePreparedMessageOptions,
@@ -26,6 +27,7 @@ export interface AppRuntimeConfig extends Record<string, unknown> {
   workspaceRoot: string;
   sessionsFile: string;
   allowedUserIds?: unknown;
+  codexCommand?: string;
   codexAccessMode?: string;
   sharedBridgeHeartbeatFile?: string;
   startWithCheckin?: boolean;
@@ -141,6 +143,7 @@ export interface RuntimeAdapterLike {
   getSessionStore(): SessionStoreLike;
   initialize(): Promise<RuntimeAdapterState>;
   onEvent(listener: (event: RuntimeEvent<UnknownRecord>) => void): unknown;
+  probeAppServerCapabilities?(command: string): CodexAppServerCapabilityProbe;
   refreshThreadInstructions(args: {
     bindingKey: string;
     threadId: string;

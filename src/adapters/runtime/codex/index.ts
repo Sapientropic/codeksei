@@ -3,6 +3,7 @@ import type { RuntimeTurnSendState, UnknownRecord } from "../../../core/runtime-
 import { resolveCodexWorkspaceRoot } from "../../../workspace/workspace-alias";
 import { mapCodexMessageToRuntimeEvent } from "./events";
 import { extractThreadId, type RuntimeMessage } from "./message-utils";
+import { probeCodexAppServerCapabilities } from "../../../contracts/codex-capability";
 import { SessionStore } from "./session-store";
 import { SessionStoreWriter } from "./session-store-writer";
 import {
@@ -87,6 +88,7 @@ interface CodexRuntimeAdapter {
   respondApproval(args: RespondApprovalArgs): Promise<{ requestId: string | number; decision: "accept" | "decline" }>;
   cancelTurn(args: CancelTurnArgs): Promise<CancelTurnArgs>;
   resumeThread(args: ResumeThreadArgs): Promise<unknown>;
+  probeAppServerCapabilities(command: string): ReturnType<typeof probeCodexAppServerCapabilities>;
   refreshThreadInstructions(args: RefreshThreadInstructionsArgs): Promise<WaitForTurnCompletionResult & { threadId: string }>;
   sendTextTurn(args: SendTextTurnArgs): Promise<RuntimeTurnSendState>;
 }
@@ -146,6 +148,9 @@ export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRunt
     },
     async resumeThread({ threadId }) {
       return runtimeLifecycle.withRuntimeReconnect((runtimeClient) => runtimeClient.resumeThread({ threadId }));
+    },
+    probeAppServerCapabilities(command: string) {
+      return probeCodexAppServerCapabilities(command || config.codexCommand || "codex");
     },
     async refreshThreadInstructions({
       bindingKey = "",

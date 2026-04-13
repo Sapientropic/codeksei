@@ -2,10 +2,10 @@ import type { SessionState } from "../../../contracts/session-state";
 import {
   normalizeModelCatalog,
   type AvailableModelCatalogView,
-} from "./model-catalog";
+} from "../../../contracts/model-catalog";
 import { isRecord } from "./session-store-bindings";
 
-export type { AvailableModelCatalogView } from "./model-catalog";
+export type { AvailableModelCatalogView } from "../../../contracts/model-catalog";
 
 export function getAvailableModelCatalogFromState(state: SessionState): AvailableModelCatalogView | null {
   const raw = state.availableModelCatalog;

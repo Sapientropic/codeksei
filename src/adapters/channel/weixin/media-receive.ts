@@ -9,7 +9,7 @@ import type {
   PersistedIncomingWeixinAttachment,
   PersistedIncomingWeixinAttachmentFailure,
   WeixinMediaKind,
-} from "./media-types";
+} from "../../../contracts/weixin-media";
 
 const DEFAULT_INBOX_DIR = "inbox";
 const MAX_FILE_NAME_LENGTH = 120;

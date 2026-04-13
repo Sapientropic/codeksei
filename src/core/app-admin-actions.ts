@@ -1,4 +1,3 @@
-import { probeCodexAppServerCapabilities } from "../adapters/runtime/codex/capability-probe";
 import { writeSharedBridgeHeartbeat } from "../shared/shared-bridge-heartbeat";
 import { formatCheckinRange, resolveCheckinConfig } from "../state/checkin-config";
 import { normalizeTrimmedText } from "./approval-command-policy";
@@ -14,7 +13,7 @@ import type {
 interface PrintDoctorArgs {
   config: AppRuntimeConfig;
   channelAdapter: Pick<ChannelAdapterLike, "describe">;
-  runtimeAdapter: Pick<RuntimeAdapterLike, "describe">;
+  runtimeAdapter: Pick<RuntimeAdapterLike, "describe" | "probeAppServerCapabilities">;
   threadStateStore: Pick<ThreadStateStoreLike, "snapshot">;
   timelineIntegration: Pick<TimelineIntegrationLike, "describe">;
 }
@@ -50,7 +49,9 @@ export function collectDoctorReport({
     stateDir: config.stateDir,
     channel: channelAdapter.describe(),
     runtime: runtimeAdapter.describe(),
-    codexCapabilities: probeCodexAppServerCapabilities(config.codexCommand || "codex"),
+    codexCapabilities: typeof runtimeAdapter.probeAppServerCapabilities === "function"
+      ? runtimeAdapter.probeAppServerCapabilities(config.codexCommand || "codex")
+      : null,
     timeline: timelineIntegration.describe(),
     checkin: checkin
       ? {

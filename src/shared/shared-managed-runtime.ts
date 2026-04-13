@@ -1,12 +1,11 @@
 import * as fs from "node:fs";
-import { readPrefixedEnv } from "../core/branding";
 import {
   buildRuntimeEntrypointArg,
   commandLineMentionsRuntimeEntrypoint,
 } from "../contracts/runtime-entrypoints";
 import { classifySharedBridgeHeartbeat, readSharedBridgeHeartbeat } from "./shared-bridge-heartbeat";
-import { resolveBundledCodexBinary } from "../core/codex-spawn";
-import { probeCodexAppServerCapabilities } from "../adapters/runtime/codex/capability-probe";
+import { resolveBundledCodexBinary } from "../contracts/codex-spawn";
+import { probeCodexAppServerCapabilities } from "../contracts/codex-capability";
 import {
   ensureLogDir,
   isPidAlive,
@@ -22,6 +21,7 @@ import {
   writePidFile,
 } from "./shared-process";
 import type { SharedBridgeHealth } from "./shared-types";
+import { readPrefixedEnv } from "../core/branding";
 
 function readSharedBridgeHealth(context: SharedProcessContext = resolveSharedProcessContext()): SharedBridgeHealth {
   const pid = readPidFile(context.bridgePidFile);

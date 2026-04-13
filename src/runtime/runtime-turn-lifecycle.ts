@@ -25,7 +25,7 @@ import type {
 import type {
   IncomingWeixinAttachment,
   PersistIncomingWeixinAttachmentsResult,
-} from "../adapters/channel/weixin/media-types";
+} from "../contracts/weixin-media";
 
 type PersistedAttachmentResult = PersistIncomingWeixinAttachmentsResult;
 

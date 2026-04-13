@@ -79,32 +79,56 @@ interface TimelineItemMatchAttributes {
 
 type TimelineSiteServerHandle = Awaited<ReturnType<typeof startTimelineSiteServer>>;
 
+interface CaptureTimelineScreenshotDeps {
+  applyScreenshotControls?: typeof applyScreenshotControls;
+  buildTimelineSite?: typeof buildTimelineSite;
+  closeTimelineSiteServer?: typeof closeTimelineSiteServer;
+  launchBrowser?: (
+    config: TimelineRuntimeConfig,
+    resolveChromePath: typeof resolveChromeExecutablePath,
+  ) => Promise<Browser>;
+  resolveChromeExecutablePath?: typeof resolveChromeExecutablePath;
+  startTimelineSiteServer?: typeof startTimelineSiteServer;
+  waitForDashboardReady?: typeof waitForDashboardReady;
+}
+
 async function captureTimelineScreenshot(
   config: TimelineRuntimeConfig,
   options: TimelineScreenshotInput = {},
+  deps: CaptureTimelineScreenshotDeps = {},
 ): Promise<CaptureTimelineScreenshotResult> {
+  const buildSite = deps.buildTimelineSite || buildTimelineSite;
+  const startSiteServer = deps.startTimelineSiteServer || startTimelineSiteServer;
+  const stopSiteServer = deps.closeTimelineSiteServer || closeTimelineSiteServer;
+  const waitUntilDashboardReady = deps.waitForDashboardReady || waitForDashboardReady;
+  const applyControls = deps.applyScreenshotControls || applyScreenshotControls;
+  const resolveChromePath = deps.resolveChromeExecutablePath || resolveChromeExecutablePath;
+  const launchBrowser = deps.launchBrowser || (async (
+    runtimeConfig: TimelineRuntimeConfig,
+    resolveChromePathForRuntime: typeof resolveChromeExecutablePath,
+  ) => chromium.launch({
+    executablePath: resolveChromePathForRuntime(runtimeConfig),
+    headless: true,
+    args: [
+      "--disable-dev-shm-usage",
+      "--hide-scrollbars",
+      "--force-color-profile=srgb",
+    ],
+  }));
   const screenshotOptions = resolveTimelineScreenshotOptions(config, options);
   fs.mkdirSync(path.dirname(screenshotOptions.outputFile), { recursive: true });
 
-  await buildTimelineSite(config);
+  await buildSite(config);
 
   let server: TimelineSiteServerHandle["server"] | null = null;
   let serverInfo: TimelineSiteServerHandle["info"] | null = null;
   let browser: Browser | null = null;
   try {
-    const started = await startTimelineSiteServer(config, { port: 0 });
+    const started = await startSiteServer(config, { port: 0 });
     server = started.server;
     serverInfo = started.info;
 
-    browser = await chromium.launch({
-      executablePath: resolveChromeExecutablePath(config),
-      headless: true,
-      args: [
-        "--disable-dev-shm-usage",
-        "--hide-scrollbars",
-        "--force-color-profile=srgb",
-      ],
-    });
+    browser = await launchBrowser(config, resolveChromePath);
     const page = await browser.newPage({
       viewport: { width: screenshotOptions.width, height: screenshotOptions.height },
       deviceScaleFactor: 2,
@@ -115,8 +139,8 @@ async function captureTimelineScreenshot(
       content: buildPageScreenshotStyles(screenshotOptions.sidePadding),
     });
     await waitForDashboardShell(page);
-    await applyScreenshotControls(page, screenshotOptions);
-    await waitForDashboardReady(page, screenshotOptions.selector);
+    await applyControls(page, screenshotOptions);
+    await waitUntilDashboardReady(page, screenshotOptions.selector);
     await page.locator(screenshotOptions.selector).screenshot({
       path: screenshotOptions.outputFile,
       type: "png",
@@ -138,7 +162,7 @@ async function captureTimelineScreenshot(
       });
     }
     if (server && serverInfo) {
-      await closeTimelineSiteServer(server);
+      await stopSiteServer(server);
     }
   }
 }

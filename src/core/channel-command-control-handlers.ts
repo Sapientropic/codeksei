@@ -4,7 +4,7 @@ import {
   resolveEffectiveModelForEffort,
   type AvailableModelCatalogView,
   type NormalizedModelCatalogEntry,
-} from "../adapters/runtime/codex/model-catalog";
+} from "../contracts/model-catalog";
 import { CheckinConfigStore } from "../state/checkin-config-store";
 import {
   formatCheckinRange,
