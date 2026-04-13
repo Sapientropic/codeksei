@@ -19,6 +19,12 @@ import {
   type SharedProcessContext,
   writeJsonFile,
 } from "./shared-common";
+import type {
+  SharedHealthSnapshot,
+  SharedWatchdogAlert,
+  SharedWatchdogNotification,
+  SharedWatchdogState,
+} from "./shared-types";
 
 const ALERT_COOLDOWN_MS = 10 * 60_000;
 
@@ -28,13 +34,13 @@ function loadWatchdogConfig(): Record<string, unknown> {
   return readConfig();
 }
 
-async function runWatchdogOnce({ shouldPrintSummary = true }: any = {}) {
+async function runWatchdogOnce({ shouldPrintSummary = true }: { shouldPrintSummary?: boolean } = {}): Promise<SharedWatchdogState> {
   const sharedContext = resolveSharedProcessContext();
   const config = loadWatchdogConfig();
   ensureLogDir(sharedContext);
-  const previousState = (readJsonFile(sharedContext.watchdogStateFile) || {}) as Record<string, unknown>;
+  const previousState = (readJsonFile(sharedContext.watchdogStateFile) || null) as SharedWatchdogState | null;
   const before = await collectHealth(sharedContext);
-  const actions = [];
+  const actions: string[] = [];
   let result = "healthy";
   let errorMessage = "";
 
@@ -65,9 +71,9 @@ async function runWatchdogOnce({ shouldPrintSummary = true }: any = {}) {
     error: errorMessage,
     before,
     after,
-    lastAlertAt: normalizeText(previousState.lastAlertAt),
-    lastAlertSignature: normalizeText(previousState.lastAlertSignature),
-    lastNotification: previousState.lastNotification || null,
+    lastAlertAt: normalizeText(previousState?.lastAlertAt),
+    lastAlertSignature: normalizeText(previousState?.lastAlertSignature),
+    lastNotification: previousState?.lastNotification || null,
   };
 
   const alert = buildAlert({ result, actions, errorMessage, after, config, sharedContext });
@@ -100,7 +106,7 @@ async function main() {
   }
 }
 
-async function collectHealth(sharedContext: SharedProcessContext) {
+async function collectHealth(sharedContext: SharedProcessContext): Promise<SharedHealthSnapshot> {
   const appServerReadyPid = await resolveReadyAppServerPid(sharedContext);
   const bridge = readSharedBridgeHealth(sharedContext);
   return {
@@ -121,7 +127,21 @@ async function collectHealth(sharedContext: SharedProcessContext) {
   };
 }
 
-function buildAlert({ result, actions, errorMessage, after, config, sharedContext }: any) {
+function buildAlert({
+  result,
+  actions,
+  errorMessage,
+  after,
+  config,
+  sharedContext,
+}: {
+  result: string;
+  actions: string[];
+  errorMessage: string;
+  after: SharedHealthSnapshot;
+  config: Record<string, unknown>;
+  sharedContext: SharedProcessContext;
+}): SharedWatchdogAlert | null {
   if (result === "recovered") {
     return {
       kind: "recovered",
@@ -161,13 +181,13 @@ function buildAlert({ result, actions, errorMessage, after, config, sharedContex
   return null;
 }
 
-function shouldSendAlert(previousState: any, signature: any) {
+function shouldSendAlert(previousState: SharedWatchdogState | null, signature: unknown): boolean {
   const normalizedSignature = normalizeText(signature);
   if (!normalizedSignature) {
     return false;
   }
-  const previousSignature = normalizeText(previousState.lastAlertSignature);
-  const previousAlertAtMs = Date.parse(normalizeText(previousState.lastAlertAt));
+  const previousSignature = normalizeText(previousState?.lastAlertSignature);
+  const previousAlertAtMs = Date.parse(normalizeText(previousState?.lastAlertAt));
   if (normalizedSignature !== previousSignature) {
     return true;
   }
@@ -177,22 +197,26 @@ function shouldSendAlert(previousState: any, signature: any) {
   return Date.now() - previousAlertAtMs >= ALERT_COOLDOWN_MS;
 }
 
-async function sendVisibleAlert(config: any, text: any) {
+async function sendVisibleAlert(
+  config: Record<string, unknown>,
+  text: string,
+): Promise<Omit<SharedWatchdogNotification, "kind" | "sentAt">> {
   try {
-    const account = resolveSelectedAccount(config);
-    const sessionStore = new SessionStore({ filePath: config.sessionsFile });
+    const typedConfig = config as ReturnType<typeof readConfig>;
+    const account = resolveSelectedAccount(typedConfig);
+    const sessionStore = new SessionStore({ filePath: typedConfig.sessionsFile });
     const senderId = resolvePreferredSenderId({
-      config,
+      config: typedConfig,
       accountId: account.accountId,
       sessionStore,
     });
     const workspaceRoot = resolvePreferredWorkspaceRoot({
-      config,
+      config: typedConfig,
       accountId: account.accountId,
       senderId,
       sessionStore,
     });
-    const contextToken = loadPersistedContextTokens(config, account.accountId)?.[senderId] || "";
+    const contextToken = loadPersistedContextTokens(typedConfig, account.accountId)?.[senderId] || "";
     if (!senderId || !contextToken) {
       return {
         sent: false,
@@ -202,7 +226,7 @@ async function sendVisibleAlert(config: any, text: any) {
       };
     }
 
-    const channelAdapter = createWeixinChannelAdapter(config);
+    const channelAdapter = createWeixinChannelAdapter(typedConfig);
     await channelAdapter.sendText({
       userId: senderId,
       contextToken,
@@ -225,7 +249,7 @@ async function sendVisibleAlert(config: any, text: any) {
   }
 }
 
-function printSummary(state: any) {
+function printSummary(state: SharedWatchdogState) {
   console.log(`result=${state.result}`);
   console.log(`readyz=${state.after?.appServer?.ready ? "ok" : "down"}`);
   console.log(`shared_app_server_pid=${state.after?.appServer?.readyPid || "missing"}`);
@@ -240,19 +264,19 @@ function printSummary(state: any) {
   }
 }
 
-function formatErrorMessage(error: any) {
+function formatErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message || error.stack || String(error);
   }
   return String(error || "unknown error");
 }
 
-function normalizeText(value: any) {
+function normalizeText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
 if (require.main === module) {
-  main().catch((error: any) => {
+  main().catch((error: unknown) => {
     console.error(formatErrorMessage(error));
     process.exit(1);
   });

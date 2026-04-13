@@ -184,5 +184,19 @@ Project radar 用于回答“项目现在在哪、应该从哪里重新进去”
 - `npm run shared:open`
 - 模拟一次 runtime child close / reconnect
 - 验证 approval continuity after restart
+- 仓库内自动化基线现在还会跑 `tests/shared-mode-long-chain.test.ts`
+
+自动化 smoke 覆盖：
+
+- fake Codex app-server + fake Weixin HTTP server
+- built `dist` shared entrypoints
+- `stream` 与 `settled` 两种 reply mode
+- pending approval 持久化后 restart 再 `/yes`
+
+maintainer 仍需额外补一次真实账号 smoke：
+
+- 真实 WeChat 登录态
+- 真实 shared session attach
+- 如现场环境与 fake harness 不同，再看 `shared-wechat.log` / `shared-app-server.log` 做 follow-up
 
 这页只管“怎么使用这些入口”；维护与发布流程留在本地维护材料里。
