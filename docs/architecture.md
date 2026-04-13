@@ -24,7 +24,7 @@
 - 驱动 app poll loop
 - 协调 command router 与 app-level wiring
 - 保持 app-level wiring 与 bridge coordination
-- 把 runtime event pipeline 与 lifecycle runner 委托给独立 helper，而不是继续把串行链和启动/关闭细节堆在 `app.ts`
+- 把 runtime event pipeline、lifecycle runner、terminal façade 委托给独立 helper，而不是继续把串行链、启动/关闭细节和 terminal 能力暴露堆在 `app.ts`
 
 不负责：
 
@@ -158,7 +158,7 @@
 - `lifecycle.ts` 负责 reconnect / initialize / ready state
 - `bootstrap.ts` 负责 thread bootstrap / instruction refresh 文本
 - `diagnostics.ts` 负责 workspace diagnostics / turn completion wait
-- `session-store.ts` 继续保留 public class surface，但内部 lock / binding / approval 规则已拆到 `session-store-lock.ts`、`session-store-bindings.ts`、`session-store-approvals.ts`
+- `session-store.ts` 继续保留 public class surface，但内部 binding/workspace、approval、model catalog 已拆到独立 owner helpers，壳层只保留 refresh / mutate / persist / façade
 - `session-store.ts` 现在只暴露同步读面；持久化写入通过 `session-store-writer.ts` 的 async owner 进入 non-blocking lock
 - `rpc-client.ts` 继续承担 transport owner，但不再顺手吸收 session / shared 恢复规则
 
@@ -205,6 +205,8 @@
 当前这层的结构特征是：
 
 - note / review / timeline / state 已经形成各自可读的 typed boundary
+- `src/contracts/command-surface.ts` 只保留命令 façade；action definitions 与 rich help contract 已拆成 sibling truth layer
+- `src/review/review-draft.ts`、`src/review/review-semantic.ts`、`src/core/timezone.ts` 现在是 façade 入口，window / heuristics / render、prompt / runtime / normalize、state / config / formatting 已各自 owner 化
 - `src/app/*` 继续只做公开入口，不重新吸回领域实现
 - `src/core` / `src/runtime` 不再依赖 style/type allowlist 才能维持这些边界
 

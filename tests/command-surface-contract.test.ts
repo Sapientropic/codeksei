@@ -9,6 +9,14 @@ const {
   listCommandGroups,
   listTerminalCommandManifest,
 } = require("../src/contracts/command-surface");
+const {
+  listTerminalHelpTopics,
+  listTerminalLeafHelpKeys,
+} = require("../src/contracts/command-help-contract");
+const {
+  buildTerminalLeafHelp,
+  buildTerminalTopicHelp,
+} = require("../src/core/command-registry");
 
 test("terminal manifest declares unique command keys", () => {
   const manifest = listTerminalCommandManifest();
@@ -44,4 +52,36 @@ test("active terminal actions all point at real package scripts", () => {
     .filter((scriptName: string) => !(scriptName in scripts));
 
   assert.deepEqual(missing, []);
+});
+
+test("public CLI help topics stay aligned with the manifest help topics", () => {
+  const manifestTopics = Array.from(new Set(
+    listTerminalCommandManifest()
+      .map((entry: any) => entry.helpTopic)
+      .filter((topic: string) => topic)
+  )).sort();
+
+  assert.deepEqual(listTerminalHelpTopics(), manifestTopics);
+  for (const topic of manifestTopics) {
+    assert.match(buildTerminalTopicHelp(topic), /\S/u);
+  }
+});
+
+test("leaf-help actions all resolve to non-empty leaf help text", () => {
+  const actionsById = new Map<string, any>(
+    listCommandActions().map((action: any) => [action.action, action])
+  );
+
+  assert.deepEqual(
+    listTerminalLeafHelpKeys().sort(),
+    listCommandActions()
+      .filter((action: any) => action.help?.detail === "leaf")
+      .map((action: any) => action.help.leafKey)
+      .sort()
+  );
+
+  for (const leafKey of listTerminalLeafHelpKeys()) {
+    assert.match(buildTerminalLeafHelp(leafKey), /\S/u);
+    assert.equal(actionsById.get(leafKey)?.help?.detail, "leaf");
+  }
 });

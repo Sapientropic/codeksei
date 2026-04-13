@@ -1,7 +1,5 @@
 import {
   createEmptySessionState,
-  normalizePendingApprovalRecord,
-  normalizeSessionBinding,
   normalizeSessionState,
   sessionStoreStateSchema,
   type PendingApprovalRecord,
@@ -13,43 +11,46 @@ import {
   readManagedJsonStateFile,
   writeManagedJsonStateFile,
 } from "../../../state/json-state";
-import { normalizeModelCatalog } from "./model-catalog";
 import {
-  createEmptySessionBinding,
-  getCodexParamsMap,
-  getThreadMap,
-  getWorkspaceBootstrapThreadMap,
-  isRecord,
-  normalizeValue,
+  buildBindingKey,
+  clearThreadIdForWorkspaceInState,
+  findBindingForThreadIdInState,
+  getActiveWorkspaceRootFromState,
+  getBindingFromState,
+  getCodexParamsForWorkspaceFromState,
+  getThreadIdForWorkspaceFromState,
+  hasWorkspaceBootstrapForThreadInState,
+  listBindingsFromState,
+  listWorkspaceRootsFromState,
+  rememberWorkspaceBootstrapForThreadInState,
+  setActiveWorkspaceRootInState,
+  setCodexParamsForWorkspaceInState,
+  setThreadIdForWorkspaceInState,
+  updateBindingInState,
   type BindingRef,
   type CodexWorkspaceParams,
   type SessionBindingUpdate,
-} from "./session-store-bindings";
+} from "./session-store-binding-state";
 import {
-  getApprovalAllowlistByWorkspaceRoot,
-  isSameTokenList,
-  normalizeCommandTokens,
+  clearPendingApprovalForThreadInState,
+  getApprovalCommandAllowlistForWorkspaceFromState,
+  getPendingApprovalForThreadFromState,
+  isRecord,
+  listPendingApprovalsFromState,
+  rememberApprovalPrefixForWorkspaceInState,
+  rememberPendingApprovalForThreadInState,
   type PendingApprovalUpdate,
-} from "./session-store-approvals";
+} from "./session-store-approval-state";
+import {
+  getAvailableModelCatalogFromState,
+  setAvailableModelCatalogInState,
+  type AvailableModelCatalogView,
+} from "./session-store-model-catalog";
+import { normalizeValue } from "./session-store-bindings";
 import { withSessionStoreLock } from "./session-store-lock";
-
 
 interface SessionStoreConfig {
   filePath: string;
-}
-
-interface NormalizedModelCatalogEntry {
-  id: string;
-  model: string;
-  displayName: string;
-  supportedReasoningEfforts: string[];
-  defaultReasoningEffort: string;
-  isDefault: boolean;
-}
-
-interface AvailableModelCatalogView {
-  models: NormalizedModelCatalogEntry[];
-  updatedAt: string;
 }
 
 export class SessionStore {
@@ -111,49 +112,23 @@ export class SessionStore {
   }
 
   getBinding(bindingKey: unknown): SessionBinding | null {
-    const binding = this.refresh().bindings[normalizeValue(bindingKey)];
-    return binding ? normalizeSessionBinding(binding) : null;
+    return getBindingFromState(this.refresh(), bindingKey);
   }
 
   listBindings(): Array<SessionBinding & { bindingKey: string }> {
-    return Object.entries(this.refresh().bindings || {}).map(([bindingKey, binding]) => ({
-      bindingKey,
-      ...(binding || {}),
-    }));
+    return listBindingsFromState(this.refresh());
   }
 
   getActiveWorkspaceRoot(bindingKey: unknown): string {
-    const activeWorkspaceRoot = this.refresh().bindings[normalizeValue(bindingKey)]?.activeWorkspaceRoot;
-    return typeof activeWorkspaceRoot === "string" ? activeWorkspaceRoot : "";
+    return getActiveWorkspaceRootFromState(this.refresh(), bindingKey);
   }
 
   async updateBinding(bindingKey: unknown, nextBinding: SessionBindingUpdate): Promise<SessionBinding | null> {
-    const normalizedBindingKey = normalizeValue(bindingKey);
-    if (!normalizedBindingKey) {
-      return null;
-    }
-    return this.mutateState((state) => {
-      const current = state.bindings[normalizedBindingKey] || createEmptySessionBinding();
-      const normalizedBinding = normalizeSessionBinding({
-        ...current,
-        ...nextBinding,
-        updatedAt: new Date().toISOString(),
-      });
-      state.bindings = {
-        ...(state.bindings || {}),
-        [normalizedBindingKey]: normalizedBinding,
-      };
-      return normalizeSessionBinding(state.bindings[normalizedBindingKey]);
-    });
+    return this.mutateState((state) => updateBindingInState(state, bindingKey, nextBinding));
   }
 
   getThreadIdForWorkspace(bindingKey: unknown, workspaceRoot: unknown): string {
-    const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
-    if (!normalizedWorkspaceRoot) {
-      return "";
-    }
-    const threadId = this.refresh().bindings[normalizeValue(bindingKey)]?.threadIdByWorkspaceRoot?.[normalizedWorkspaceRoot];
-    return typeof threadId === "string" ? threadId : "";
+    return getThreadIdForWorkspaceFromState(this.refresh(), bindingKey, workspaceRoot);
   }
 
   async setThreadIdForWorkspace(
@@ -162,58 +137,11 @@ export class SessionStore {
     threadId: unknown,
     extra: Record<string, unknown> = {},
   ): Promise<SessionBinding | null> {
-    const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
-    const normalizedThreadId = normalizeValue(threadId);
-    if (!normalizedWorkspaceRoot) {
-      return this.getBinding(bindingKey);
-    }
-    const normalizedBindingKey = normalizeValue(bindingKey);
-    if (!normalizedBindingKey) {
-      return null;
-    }
-
-    return this.mutateState((state) => {
-      const current = state.bindings[normalizedBindingKey] || createEmptySessionBinding();
-      const existingWorkspaceBootstrapMap = getWorkspaceBootstrapThreadMap(current);
-      const threadIdByWorkspaceRoot = {
-        ...getThreadMap(current),
-        [normalizedWorkspaceRoot]: normalizedThreadId,
-      };
-      const workspaceBootstrapThreadIdByWorkspaceRoot = {
-        ...existingWorkspaceBootstrapMap,
-        [normalizedWorkspaceRoot]:
-          existingWorkspaceBootstrapMap[normalizedWorkspaceRoot] === normalizedThreadId
-            ? normalizedThreadId
-            : "",
-      };
-
-      const normalizedBinding = normalizeSessionBinding({
-        ...current,
-        ...extra,
-        activeWorkspaceRoot: normalizedWorkspaceRoot,
-        threadIdByWorkspaceRoot,
-        workspaceBootstrapThreadIdByWorkspaceRoot,
-        updatedAt: new Date().toISOString(),
-      });
-      state.bindings = {
-        ...(state.bindings || {}),
-        [normalizedBindingKey]: normalizedBinding,
-      };
-      return normalizeSessionBinding(state.bindings[normalizedBindingKey]);
-    });
+    return this.mutateState((state) => setThreadIdForWorkspaceInState(state, bindingKey, workspaceRoot, threadId, extra));
   }
 
   getCodexParamsForWorkspace(bindingKey: unknown, workspaceRoot: unknown): CodexWorkspaceParams {
-    const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
-    if (!normalizedWorkspaceRoot) {
-      return { model: "" };
-    }
-    const current = this.getBinding(bindingKey) || createEmptySessionBinding();
-    const codexParamsByWorkspaceRoot = getCodexParamsMap(current);
-    const entry = codexParamsByWorkspaceRoot[normalizedWorkspaceRoot];
-    return {
-      model: typeof entry?.model === "string" ? entry.model : "",
-    };
+    return getCodexParamsForWorkspaceFromState(this.refresh(), bindingKey, workspaceRoot);
   }
 
   async setCodexParamsForWorkspace(
@@ -221,123 +149,27 @@ export class SessionStore {
     workspaceRoot: unknown,
     { model = "" }: { model?: unknown },
   ): Promise<SessionBinding | null> {
-    const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
-    if (!normalizedWorkspaceRoot) {
-      return this.getBinding(bindingKey);
-    }
-    const normalizedBindingKey = normalizeValue(bindingKey);
-    if (!normalizedBindingKey) {
-      return null;
-    }
-    return this.mutateState((state) => {
-      const current = state.bindings[normalizedBindingKey] || createEmptySessionBinding();
-      const codexParamsByWorkspaceRoot = {
-        ...getCodexParamsMap(current),
-        [normalizedWorkspaceRoot]: {
-          model: normalizeValue(model),
-        },
-      };
-      const normalizedBinding = normalizeSessionBinding({
-        ...current,
-        codexParamsByWorkspaceRoot,
-        updatedAt: new Date().toISOString(),
-      });
-      state.bindings = {
-        ...(state.bindings || {}),
-        [normalizedBindingKey]: normalizedBinding,
-      };
-      return normalizeSessionBinding(state.bindings[normalizedBindingKey]);
-    });
+    return this.mutateState((state) => setCodexParamsForWorkspaceInState(state, bindingKey, workspaceRoot, { model }));
   }
 
   async clearThreadIdForWorkspace(bindingKey: unknown, workspaceRoot: unknown): Promise<SessionBinding | null> {
-    const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
-    if (!normalizedWorkspaceRoot) {
-      return this.getBinding(bindingKey);
-    }
-    const normalizedBindingKey = normalizeValue(bindingKey);
-    if (!normalizedBindingKey) {
-      return null;
-    }
-    return this.mutateState((state) => {
-      const current = state.bindings[normalizedBindingKey] || createEmptySessionBinding();
-      const threadIdByWorkspaceRoot = {
-        ...getThreadMap(current),
-        [normalizedWorkspaceRoot]: "",
-      };
-      const workspaceBootstrapThreadIdByWorkspaceRoot = {
-        ...getWorkspaceBootstrapThreadMap(current),
-        [normalizedWorkspaceRoot]: "",
-      };
-      const normalizedBinding = normalizeSessionBinding({
-        ...current,
-        threadIdByWorkspaceRoot,
-        workspaceBootstrapThreadIdByWorkspaceRoot,
-        updatedAt: new Date().toISOString(),
-      });
-      state.bindings = {
-        ...(state.bindings || {}),
-        [normalizedBindingKey]: normalizedBinding,
-      };
-      return normalizeSessionBinding(state.bindings[normalizedBindingKey]);
-    });
+    return this.mutateState((state) => clearThreadIdForWorkspaceInState(state, bindingKey, workspaceRoot));
   }
 
   async setActiveWorkspaceRoot(bindingKey: unknown, workspaceRoot: unknown): Promise<SessionBinding | null> {
-    const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
-    if (!normalizedWorkspaceRoot) {
-      return this.getBinding(bindingKey);
-    }
-    const normalizedBindingKey = normalizeValue(bindingKey);
-    if (!normalizedBindingKey) {
-      return null;
-    }
-    return this.mutateState((state) => {
-      const current = state.bindings[normalizedBindingKey] || createEmptySessionBinding();
-      const normalizedBinding = normalizeSessionBinding({
-        ...current,
-        activeWorkspaceRoot: normalizedWorkspaceRoot,
-        updatedAt: new Date().toISOString(),
-      });
-      state.bindings = {
-        ...(state.bindings || {}),
-        [normalizedBindingKey]: normalizedBinding,
-      };
-      return normalizeSessionBinding(state.bindings[normalizedBindingKey]);
-    });
+    return this.mutateState((state) => setActiveWorkspaceRootInState(state, bindingKey, workspaceRoot));
   }
 
   listWorkspaceRoots(bindingKey: unknown): string[] {
-    const current = this.getBinding(bindingKey) || createEmptySessionBinding();
-    return Object.keys(getThreadMap(current));
+    return listWorkspaceRootsFromState(this.refresh(), bindingKey);
   }
 
   findBindingForThreadId(threadId: unknown): BindingRef | null {
-    const normalizedThreadId = normalizeValue(threadId);
-    if (!normalizedThreadId) {
-      return null;
-    }
-    for (const [bindingKey, binding] of Object.entries(this.refresh().bindings || {})) {
-      for (const [workspaceRoot, candidateThreadId] of Object.entries(getThreadMap(binding))) {
-        if (candidateThreadId === normalizedThreadId) {
-          return {
-            bindingKey,
-            workspaceRoot,
-          };
-        }
-      }
-    }
-    return null;
+    return findBindingForThreadIdInState(this.refresh(), threadId);
   }
 
   hasWorkspaceBootstrapForThread(bindingKey: unknown, workspaceRoot: unknown, threadId: unknown): boolean {
-    const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
-    const normalizedThreadId = normalizeValue(threadId);
-    if (!normalizedWorkspaceRoot || !normalizedThreadId) {
-      return false;
-    }
-    const current = this.getBinding(bindingKey) || createEmptySessionBinding();
-    return getWorkspaceBootstrapThreadMap(current)[normalizedWorkspaceRoot] === normalizedThreadId;
+    return hasWorkspaceBootstrapForThreadInState(this.refresh(), bindingKey, workspaceRoot, threadId);
   }
 
   async rememberWorkspaceBootstrapForThread(
@@ -345,85 +177,23 @@ export class SessionStore {
     workspaceRoot: unknown,
     threadId: unknown,
   ): Promise<SessionBinding | null> {
-    const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
-    const normalizedThreadId = normalizeValue(threadId);
-    if (!normalizedWorkspaceRoot || !normalizedThreadId) {
-      return this.getBinding(bindingKey);
-    }
-    const normalizedBindingKey = normalizeValue(bindingKey);
-    if (!normalizedBindingKey) {
-      return null;
-    }
-    return this.mutateState((state) => {
-      const current = state.bindings[normalizedBindingKey] || createEmptySessionBinding();
-      const workspaceBootstrapThreadIdByWorkspaceRoot = {
-        ...getWorkspaceBootstrapThreadMap(current),
-        [normalizedWorkspaceRoot]: normalizedThreadId,
-      };
-      const normalizedBinding = normalizeSessionBinding({
-        ...current,
-        workspaceBootstrapThreadIdByWorkspaceRoot,
-        updatedAt: new Date().toISOString(),
-      });
-      state.bindings = {
-        ...(state.bindings || {}),
-        [normalizedBindingKey]: normalizedBinding,
-      };
-      return normalizeSessionBinding(state.bindings[normalizedBindingKey]);
-    });
+    return this.mutateState((state) => rememberWorkspaceBootstrapForThreadInState(state, bindingKey, workspaceRoot, threadId));
   }
 
   getApprovalCommandAllowlistForWorkspace(workspaceRoot: unknown): string[][] {
-    const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
-    if (!normalizedWorkspaceRoot) {
-      return [];
-    }
-    const raw = this.refresh().approvalCommandAllowlistByWorkspaceRoot?.[normalizedWorkspaceRoot];
-    if (!Array.isArray(raw)) {
-      return [];
-    }
-    return raw
-      .filter((entry): entry is string[] => Array.isArray(entry) && entry.every((part) => typeof part === "string" && Boolean(part)))
-      .map((entry) => entry.slice())
-      .filter((entry) => entry.length > 0);
+    return getApprovalCommandAllowlistForWorkspaceFromState(this.refresh(), workspaceRoot);
   }
 
   async rememberApprovalPrefixForWorkspace(workspaceRoot: unknown, commandTokens: unknown): Promise<string[][]> {
-    const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
-    const normalizedTokens = normalizeCommandTokens(commandTokens);
-    if (!normalizedWorkspaceRoot || !normalizedTokens.length) {
-      return this.getApprovalCommandAllowlistForWorkspace(workspaceRoot);
-    }
-    return this.mutateState((state) => {
-      const current = getApprovalAllowlistByWorkspaceRoot(state)[normalizedWorkspaceRoot] || [];
-      if (!current.some((entry) => isSameTokenList(entry, normalizedTokens))) {
-        current.push(normalizedTokens);
-      }
-      state.approvalCommandAllowlistByWorkspaceRoot = {
-        ...(state.approvalCommandAllowlistByWorkspaceRoot || {}),
-        [normalizedWorkspaceRoot]: current.map((entry) => entry.slice()),
-      };
-      return current.map((entry) => entry.slice());
-    });
+    return this.mutateState((state) => rememberApprovalPrefixForWorkspaceInState(state, workspaceRoot, commandTokens));
   }
 
   getPendingApprovalForThread(threadId: unknown): PendingApprovalRecord | null {
-    const normalizedThreadId = normalizeValue(threadId);
-    if (!normalizedThreadId) {
-      return null;
-    }
-    const approval = this.refresh().approvalPromptStateByThreadId?.[normalizedThreadId];
-    if (!approval || typeof approval !== "object") {
-      return null;
-    }
-    return { ...approval };
+    return getPendingApprovalForThreadFromState(this.refresh(), threadId);
   }
 
   listPendingApprovals(): Array<{ threadId: string; approval: PendingApprovalRecord }> {
-    return Object.entries(this.refresh().approvalPromptStateByThreadId || {}).map(([threadId, approval]) => ({
-      threadId,
-      approval: { ...approval },
-    }));
+    return listPendingApprovalsFromState(this.refresh());
   }
 
   async rememberPendingApprovalForThread(
@@ -434,30 +204,10 @@ export class SessionStore {
       promptedAt = "",
     }: { signature?: unknown; promptedAt?: unknown } = {},
   ): Promise<PendingApprovalRecord | null> {
-    const normalizedThreadId = normalizeValue(threadId);
-    if (!normalizedThreadId) {
-      return null;
-    }
-    return this.mutateState((state) => {
-      const existing = state.approvalPromptStateByThreadId?.[normalizedThreadId] || null;
-      const normalizedApproval = normalizePendingApprovalRecord({
-        ...(existing || {}),
-        ...(approval || {}),
-        signature: normalizeValue(signature)
-          || normalizeValue(approval?.signature)
-          || normalizeValue(existing?.signature)
-          || "",
-        promptedAt: normalizeValue(promptedAt) || normalizeValue(approval?.promptedAt) || new Date().toISOString(),
-      });
-      if (!normalizedApproval) {
-        return null;
-      }
-      state.approvalPromptStateByThreadId = {
-        ...(state.approvalPromptStateByThreadId || {}),
-        [normalizedThreadId]: normalizedApproval,
-      };
-      return normalizePendingApprovalRecord(state.approvalPromptStateByThreadId[normalizedThreadId]);
-    });
+    return this.mutateState((state) => rememberPendingApprovalForThreadInState(state, threadId, approval, {
+      signature,
+      promptedAt,
+    }));
   }
 
   getApprovalPromptState(threadId: unknown): PendingApprovalRecord | null {
@@ -483,19 +233,8 @@ export class SessionStore {
   }
 
   async clearPendingApprovalForThread(threadId: unknown): Promise<void> {
-    const normalizedThreadId = normalizeValue(threadId);
-    if (!normalizedThreadId) {
-      return;
-    }
     await this.mutateState((state) => {
-      if (!state.approvalPromptStateByThreadId?.[normalizedThreadId]) {
-        return null;
-      }
-      const next = {
-        ...(state.approvalPromptStateByThreadId || {}),
-      };
-      delete next[normalizedThreadId];
-      state.approvalPromptStateByThreadId = next;
+      clearPendingApprovalForThreadInState(state, threadId);
       return null;
     });
   }
@@ -505,36 +244,11 @@ export class SessionStore {
   }
 
   getAvailableModelCatalog(): AvailableModelCatalogView | null {
-    const raw = this.refresh().availableModelCatalog;
-    if (!isRecord(raw)) {
-      return null;
-    }
-    const models = normalizeModelCatalog(raw.models) as NormalizedModelCatalogEntry[];
-    if (!models.length) {
-      return null;
-    }
-    const updatedAt = typeof raw.updatedAt === "string" ? raw.updatedAt : "";
-    return { models, updatedAt };
+    return getAvailableModelCatalogFromState(this.refresh());
   }
 
   async setAvailableModelCatalog(models: unknown): Promise<AvailableModelCatalogView | null> {
-    const normalizedModels = normalizeModelCatalog(models) as NormalizedModelCatalogEntry[];
-    if (!normalizedModels.length) {
-      return null;
-    }
-    return this.mutateState((state) => {
-      state.availableModelCatalog = {
-        models: normalizedModels,
-        updatedAt: new Date().toISOString(),
-      };
-      const raw = state.availableModelCatalog;
-      return isRecord(raw)
-        ? {
-          models: normalizeModelCatalog(raw.models) as NormalizedModelCatalogEntry[],
-          updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : "",
-        }
-        : null;
-    });
+    return this.mutateState((state) => setAvailableModelCatalogInState(state, models));
   }
 
   buildBindingKey({
@@ -546,6 +260,6 @@ export class SessionStore {
     accountId: unknown;
     senderId: unknown;
   }): string {
-    return `${normalizeValue(workspaceId)}:${normalizeValue(accountId)}:${normalizeValue(senderId)}`;
+    return buildBindingKey({ workspaceId, accountId, senderId });
   }
 }

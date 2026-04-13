@@ -3,7 +3,7 @@ const assert: typeof import("node:assert/strict") = require("node:assert/strict"
 
 test("createTerminalCommandContext derives leafArgs and checkin from the provided argv", () => {
   const contextModulePath = require.resolve("../src/app/terminal-command-context");
-  const appModulePath = require.resolve("../src/core/app");
+  const terminalFacadeModulePath = require.resolve("../src/core/app-terminal-facade");
   const brandingModulePath = require.resolve("../src/core/branding");
   const envLoaderModulePath = require.resolve("../src/core/env-loader");
   const configModulePath = require.resolve("../src/core/config");
@@ -16,7 +16,7 @@ test("createTerminalCommandContext derives leafArgs and checkin from the provide
   const originals = new Map<string, NodeJS.Module | undefined>();
   for (const modulePath of [
     contextModulePath,
-    appModulePath,
+    terminalFacadeModulePath,
     brandingModulePath,
     envLoaderModulePath,
     configModulePath,
@@ -37,17 +37,30 @@ test("createTerminalCommandContext derives leafArgs and checkin from the provide
   process.argv = ["node", "ambient.js", "review", "weekly", "--ambient-flag", "wrong"];
 
   try {
-    require.cache[appModulePath] = {
-      id: appModulePath,
-      filename: appModulePath,
+    require.cache[terminalFacadeModulePath] = {
+      id: terminalFacadeModulePath,
+      filename: terminalFacadeModulePath,
       loaded: true,
       exports: {
-        CodekseiApp: class CodekseiAppStub {
-          config: Record<string, unknown>;
-
-          constructor(config: Record<string, unknown>) {
-            this.config = config;
-          }
+        createTerminalAppFacade(config: Record<string, unknown>) {
+          return {
+            config,
+            login() {
+              return Promise.resolve();
+            },
+            printAccounts() {
+              return undefined;
+            },
+            printDoctor() {
+              return undefined;
+            },
+            sendLocalFileToCurrentChat() {
+              return Promise.resolve();
+            },
+            start() {
+              return Promise.resolve();
+            },
+          };
         },
       },
     } as NodeJS.Module;
@@ -162,6 +175,7 @@ test("createTerminalCommandContext derives leafArgs and checkin from the provide
     }: typeof import("../src/app/terminal-command-context") = require(contextModulePath);
 
     const context = createTerminalCommandContext(["review", "weekly", "--window", "7d", "--checkin"]);
+    const app = context.getApp();
     void context.getTimelineIntegration();
 
     assert.deepEqual(context.argv, ["review", "weekly", "--window", "7d", "--checkin"]);
@@ -171,6 +185,9 @@ test("createTerminalCommandContext derives leafArgs and checkin from the provide
     assert.equal(ensureStateDirectoryCalls, 1);
     assert.equal(ensuredHomeFallbackRoot, "E:/repo/codeksei");
     assert.deepEqual(timelineIntegrationConfig, context.config);
+    assert.equal(typeof app.login, "function");
+    assert.equal(typeof app.printAccounts, "function");
+    assert.equal(typeof ((app as unknown) as Record<string, unknown>).handlePreparedMessage, "undefined");
   } finally {
     process.argv = originalArgv;
     for (const [modulePath, original] of originals.entries()) {

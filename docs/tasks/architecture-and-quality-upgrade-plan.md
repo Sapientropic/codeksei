@@ -31,6 +31,10 @@ style/type 例外的唯一真相源仍是 [`src/release/style-type-exception-inv
 - `SessionStore` 写链已收口到 `SessionStoreWriter` + async/yielding lock，不再用同步阻塞锁卡住 Node event loop
 - `CodekseiApp` 的 runtime event pipeline 与 start/shutdown lifecycle 已拆到独立 owner helper，`app-runtime-factory.ts` 也已拆成 infrastructure/workflow 两层
 - `src/**` 中 `import * as fooModule` + typed destructure 已清零，并由 release guard 持续保护
+- `command-surface` 已拆成 definitions / help contract / façade 三层，topic/leaf help 不再和 dispatch manifest 分裂成两套 owner
+- terminal command 层现在只经 `TerminalAppFacade` 取 login/accounts/start/doctor/send-file 能力，不再默认拿整只 `CodekseiApp`
+- `SessionStore` 已进一步收成 shell，binding/workspace、approval、model catalog 各自落到独立 owner helper
+- `review-draft`、`review-semantic`、`timezone` 已拆成 façade + owner modules，热点文件不再把 window/prompt/parse/state/formatting 混在一处
 - `tests/shared-mode-long-chain.test.ts` 已覆盖 built `dist` 下的 shared/open/status、approval continuity restart、以及 `stream / settled` reply mode smoke
 
 这意味着旧文档里的以下说法都已过期，不应继续当成待办：
@@ -100,6 +104,13 @@ style/type 例外的唯一真相源仍是 [`src/release/style-type-exception-inv
 - Batch R：`CodekseiApp` / factory 第三轮瘦身
 - Batch S：typed module-destructure 清债与防回流 guard
 
+### 6. 2026-04-13 第二轮 follow-up 已继续关账
+
+- Batch T：命令帮助合同与 typed manifest 收口
+- Batch U：terminal façade ownership 收口
+- Batch V：`SessionStore` shell / owner helpers 第二轮拆分
+- Batch W：`review-*` 与 `timezone` 热点文件 owner 化拆分
+
 ## 完成定义校验
 
 本轮原计划里的完成定义，当前状态如下：
@@ -150,7 +161,8 @@ style/type 例外的唯一真相源仍是 [`src/release/style-type-exception-inv
 - 已存在的 JSON state shape 没有做无迁移翻转
 - 运行时构建产物仍输出 CommonJS，没有切到运行时 ESM
 - `src/core/app.ts` 与 `src/core/app-runtime-factory.ts` 仍承担 composition root / wiring 角色
-- 上述两个入口仍是 composition root，但 runtime event pipeline、lifecycle runner、session write owner 已拆出，不应再把新的 owner 逻辑堆回顶层文件
+- 上述两个入口仍是 composition root，但 runtime event pipeline、lifecycle runner、session write owner、terminal façade 已拆出，不应再把新的 owner 逻辑堆回顶层文件
+- `src/contracts/command-surface.ts` 现在是 façade，不再继续吸收 help 文案 owner；命令帮助唯一真相层是 sibling help contract
 - `graphify` 继续只作为 bucket 信号，不作为验收门
 
 ## 后续如果再发现新债，怎么开
