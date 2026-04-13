@@ -225,8 +225,31 @@ function extractTimelineCommandFailure(stdout: string, stderr: string): string {
   return lines.find((line) => line.includes("timeline 事件无效"))
     || lines.find((line) => line.includes("timeline 事件不能跨天"))
     || lines.find((line) => line.includes("timeline-write"))
+    || lines.find((line) => /^(?:Error|TypeError|ReferenceError|SyntaxError|RangeError|AggregateError):/u.test(line))
+    || lines.find((line) => line.includes("Cannot find module"))
+    || lines.findLast((line) => isMeaningfulTimelineFailureLine(line))
     || lines.at(-1)
     || "";
+}
+
+function isMeaningfulTimelineFailureLine(line: string): boolean {
+  const normalized = normalizeText(line);
+  if (!normalized) {
+    return false;
+  }
+  if (normalized === "^" || normalized === "{" || normalized === "}") {
+    return false;
+  }
+  if (/^at\s+/u.test(normalized)) {
+    return false;
+  }
+  if (/^node:/u.test(normalized)) {
+    return false;
+  }
+  if (/^Node\.js v\d+/u.test(normalized)) {
+    return false;
+  }
+  return true;
 }
 
 function shouldForwardTimelineStdin(
@@ -258,6 +281,7 @@ export {
   createTimelineIntegration,
   detectTimelineWriteFailure,
   extractTimelineCommandFailure,
+  isMeaningfulTimelineFailureLine,
   normalizeTimelineArgs,
   shouldForwardTimelineStdin,
 };

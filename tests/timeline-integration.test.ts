@@ -25,6 +25,23 @@ test("timeline integration surfaces timeline validation details before generic e
   assert.equal(detail, "Error: timeline 事件无效: startAt 必填");
 });
 
+test("timeline integration prefers the real error over trailing Node version noise", () => {
+  const detail = extractTimelineCommandFailure("", [
+    "node:internal/modules/cjs/loader:1424",
+    "throw err;",
+    "^",
+    "",
+    "Error: Cannot find module 'E:\\\\repo\\\\node_modules\\\\timeline-for-agent\\\\bin\\\\timeline-for-agent.js'",
+    "    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)",
+    "",
+    "Node.js v24.12.0",
+  ].join("\n"));
+  assert.equal(
+    detail,
+    "Error: Cannot find module 'E:\\\\repo\\\\node_modules\\\\timeline-for-agent\\\\bin\\\\timeline-for-agent.js'",
+  );
+});
+
 test("timeline integration still recovers swallowed --date tokens", () => {
   assert.deepEqual(
     normalizeTimelineArgs("write", ["2026-04-11", "--mode=merge"]),
