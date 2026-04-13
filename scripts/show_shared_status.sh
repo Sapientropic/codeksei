@@ -8,13 +8,35 @@ LOG_DIR="${STATE_DIR}/logs"
 APP_SERVER_PID_FILE="${LOG_DIR}/shared-app-server.pid"
 WECHAT_PID_FILE="${LOG_DIR}/shared-wechat.pid"
 WECHAT_LOG_FILE="${LOG_DIR}/shared-wechat.log"
+RUNTIME="${CODEKSEI_RUNTIME:-codex}"
+CHANNEL_PROVIDER="${CODEKSEI_CHANNEL_PROVIDER:-}"
 
-if [[ "${CODEKSEI_RUNTIME:-codex}" == "hermes" || "${CODEKSEI_CHANNEL_PROVIDER:-}" == "hermes" ]]; then
+if [[ -z "${CHANNEL_PROVIDER}" ]]; then
+  if [[ "${RUNTIME}" == "hermes" ]]; then
+    CHANNEL_PROVIDER="hermes"
+  else
+    CHANNEL_PROVIDER="codeksei"
+  fi
+fi
+
+if [[ "${RUNTIME}" == "hermes" && "${CHANNEL_PROVIDER}" == "hermes" ]]; then
+  echo "profile=hosted-hermes-weixin"
   echo "mode=hosted"
   echo "runtime=hermes"
   echo "channel_provider=hermes"
   echo "channel=weixin"
   echo "shared_bridge=managed_by_host"
+  exit 0
+fi
+
+if [[ "${RUNTIME}" == "hermes" || "${CHANNEL_PROVIDER}" == "hermes" ]]; then
+  echo "profile=unsupported"
+  echo "mode=unsupported"
+  echo "runtime=${RUNTIME}"
+  echo "channel_provider=${CHANNEL_PROVIDER}"
+  echo "channel=weixin"
+  echo "supported=no"
+  echo "shared_bridge=unsupported"
   exit 0
 fi
 

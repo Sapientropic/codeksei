@@ -78,6 +78,7 @@ function readConfig(options: ReadConfigOptions = {}) {
     runtimeAccessMode: readPrefixedEnv(process.env, "RUNTIME_ACCESS_MODE")
       || readPrefixedEnv(process.env, "CODEX_ACCESS_MODE"),
     hermesCommand: readPrefixedEnv(process.env, "HERMES_COMMAND") || "hermes",
+    hermesHome: readPrefixedEnv(process.env, "HERMES_HOME") || path.join(os.homedir(), ".hermes"),
     sessionsFile: path.join(stateDir, "sessions.json"),
     workspaceBootstrapConfigFile: readPrefixedEnv(process.env, "WORKSPACE_BOOTSTRAP_CONFIG")
       || path.join(stateDir, "workspace-bootstrap.json"),
@@ -88,6 +89,7 @@ function readConfig(options: ReadConfigOptions = {}) {
     reviewSchemaConfigFile: readPrefixedEnv(process.env, "REVIEW_SCHEMA_CONFIG")
       || resolveCrossPlatformPathFromRoot(workspaceRoot, ".codex", "review-schema.json"),
     reviewSemanticMode: readPrefixedEnv(process.env, "REVIEW_SEMANTIC_MODE") || "hybrid",
+    reviewSemanticHost: readPrefixedEnv(process.env, "REVIEW_SEMANTIC_HOST") || "auto",
     reviewSemanticModel: readPrefixedEnv(process.env, "REVIEW_SEMANTIC_MODEL"),
     reviewSemanticTimeoutMs: readPrefixedIntEnv(process.env, "REVIEW_SEMANTIC_TIMEOUT_MS") || 120000,
     sharedBridgeHeartbeatFile: path.join(stateDir, "logs", "shared-wechat-heartbeat.json"),

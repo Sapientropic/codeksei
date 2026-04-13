@@ -18,12 +18,16 @@ import type {
 async function main() {
   const hostMode = resolveHostMode(process.env);
   if (hostMode.mode !== "bridge") {
+    writeStdoutLine(`profile=${hostMode.profile}`);
     writeStdoutLine(`mode=${hostMode.mode}`);
     writeStdoutLine(`runtime=${hostMode.runtime}`);
     writeStdoutLine(`channel_provider=${hostMode.channelProvider}`);
     writeStdoutLine(`channel=${hostMode.channel}`);
     writeStdoutLine(`supported=${hostMode.supported ? "yes" : "no"}`);
     writeStdoutLine(`shared_bridge=managed_by_host`);
+    writeStdoutLine(`supports_hosted_skill_install=${hostMode.capabilities.supportsHostedSkillInstall ? "yes" : "no"}`);
+    writeStdoutLine(`supports_live_hosted_smoke=${hostMode.capabilities.supportsLiveHostedSmoke ? "yes" : "no"}`);
+    writeStdoutLine(`supports_semantic_review_hybrid=${hostMode.capabilities.supportsSemanticReviewHybrid ? "yes" : "no"}`);
     if (hostMode.reason) {
       writeStdoutLine(`reason=${hostMode.reason}`);
     }

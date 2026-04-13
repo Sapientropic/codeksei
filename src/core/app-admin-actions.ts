@@ -51,9 +51,11 @@ export function collectDoctorReport({
   const hostMode = resolveHostMode(config);
   return {
     stateDir: config.stateDir,
+    profile: hostMode.profile,
     mode: hostMode.mode,
     runtimeProvider: hostMode.runtime,
     channelProvider: hostMode.channelProvider,
+    capabilities: hostMode.capabilities,
     compatibility: {
       supported: hostMode.supported,
       reason: hostMode.reason,

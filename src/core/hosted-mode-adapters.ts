@@ -87,9 +87,11 @@ export function createHostedChannelAdapter(config: Record<string, unknown>): Cha
         id: "hermes-weixin",
         kind: "channel",
         provider: "hermes",
+        profile: resolved.profile,
         mode: resolved.mode,
         supported: resolved.supported,
         channel: resolved.channel,
+        capabilities: resolved.capabilities,
       };
     },
     getKnownContextTokens() {
@@ -138,9 +140,11 @@ export function createHostedRuntimeAdapter(config: Record<string, unknown>): Hos
         id: resolved.runtime === "hermes" ? "hermes" : "unsupported-runtime",
         kind: "runtime",
         provider: resolved.runtime,
+        profile: resolved.profile,
         mode: resolved.mode,
         supported: resolved.supported,
         channelProvider: resolved.channelProvider,
+        capabilities: resolved.capabilities,
       };
     },
     getSessionStore() {

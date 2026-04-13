@@ -33,6 +33,8 @@ export interface AppRuntimeConfig extends Record<string, unknown> {
   runtimeEndpoint?: string;
   runtimeAccessMode?: string;
   hermesCommand?: string;
+  hermesHome?: string;
+  reviewSemanticHost?: string;
   sharedBridgeHeartbeatFile?: string;
   startWithCheckin?: boolean;
   checkinConfigFile?: string;

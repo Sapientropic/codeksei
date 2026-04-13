@@ -1,5 +1,6 @@
 import { runChannelSendFileCommand } from "./channel-send-file-cli";
 import { runDiaryWriteCommand } from "./diary-write-cli";
+import { runHermesOperatorCommand } from "./hermes-operator-cli";
 import { runNoteAutoCommand, runNoteMaybeCommand } from "./note-auto-cli";
 import { runNoteSyncCommand } from "./note-sync-cli";
 import { runProjectRadarCommand } from "./project-radar-cli";
@@ -92,6 +93,9 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
       data,
       text: asPrettyJsonText(data),
     };
+  },
+  "operator.hermes": async (_manifest, context) => {
+    return runHermesOperatorCommand(context.config, context.leafArgs);
   },
   login: async (_manifest, context) => {
     await context.getApp().login();

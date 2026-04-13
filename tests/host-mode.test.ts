@@ -9,6 +9,7 @@ const { createTerminalAppFacade } = require("../src/core/app-terminal-facade");
 const {
   resolveHostMode,
   resolveRepoHermesSkillAssetPath,
+  installHermesCompanionSkill,
 } = require("../src/core/host-mode");
 const { main: runSharedStart } = require("../src/shared/shared-start");
 
@@ -55,25 +56,33 @@ test("readConfig infers Hermes hosted mode from runtime", () => {
   assert.equal(config.channelProvider, "hermes");
 
   const resolved = resolveHostMode(config);
+  assert.equal(resolved.profile, "hosted-hermes-weixin");
   assert.equal(resolved.mode, "hosted");
   assert.equal(resolved.supported, true);
+  assert.equal(resolved.capabilities.supportsHostedSkillInstall, true);
 });
 
 test("doctor reports host mode and hosted Hermes diagnostics", () => {
   const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-hosted-doctor-"));
+  const hermesHome = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-hosted-hermes-home-"));
   const config = withPatchedEnv({
     CODEKSEI_STATE_DIR: stateDir,
     CODEKSEI_RUNTIME: "hermes",
     CODEKSEI_CHANNEL_PROVIDER: "hermes",
+    CODEKSEI_HERMES_HOME: hermesHome,
   }, () => readConfig());
 
+  installHermesCompanionSkill(config);
   const report = createTerminalAppFacade(config).getDoctorReport();
+  assert.equal(report.profile, "hosted-hermes-weixin");
   assert.equal(report.mode, "hosted");
   assert.equal(report.runtimeProvider, "hermes");
   assert.equal(report.channelProvider, "hermes");
   assert.equal(report.compatibility.supported, true);
+  assert.equal(report.capabilities.supportsSemanticReviewHybrid, true);
   assert.ok(report.hostedHermes);
   assert.equal(report.hostedHermes.repoSkillAsset.exists, true);
+  assert.equal(report.hostedHermes.installedSkill.inSync, true);
 });
 
 test("codeksei start fails fast in Hermes hosted mode", async () => {

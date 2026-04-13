@@ -8,9 +8,24 @@ STATE_DIR="${CODEKSEI_STATE_DIR:-$HOME/.codeksei}"
 LOG_DIR="${STATE_DIR}/logs"
 PID_FILE="${LOG_DIR}/shared-wechat.pid"
 READYZ_URL="http://127.0.0.1:${PORT}/readyz"
+RUNTIME="${CODEKSEI_RUNTIME:-codex}"
+CHANNEL_PROVIDER="${CODEKSEI_CHANNEL_PROVIDER:-}"
 
-if [[ "${CODEKSEI_RUNTIME:-codex}" == "hermes" || "${CODEKSEI_CHANNEL_PROVIDER:-}" == "hermes" ]]; then
+if [[ -z "${CHANNEL_PROVIDER}" ]]; then
+  if [[ "${RUNTIME}" == "hermes" ]]; then
+    CHANNEL_PROVIDER="hermes"
+  else
+    CHANNEL_PROVIDER="codeksei"
+  fi
+fi
+
+if [[ "${RUNTIME}" == "hermes" && "${CHANNEL_PROVIDER}" == "hermes" ]]; then
   echo "Hermes Hosted Mode 下不要启动 Codeksei 自己的 shared Weixin bridge；请改用 Hermes gateway。" >&2
+  exit 1
+fi
+
+if [[ "${RUNTIME}" == "hermes" || "${CHANNEL_PROVIDER}" == "hermes" ]]; then
+  echo "当前 host 组合不受支持：runtime=${RUNTIME} channelProvider=${CHANNEL_PROVIDER} channel=weixin" >&2
   exit 1
 fi
 

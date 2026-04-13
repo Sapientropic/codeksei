@@ -107,12 +107,27 @@ const TOPIC_HELP = {
 // help are marked topic_only in command-surface-definitions instead of silently
 // reusing a generic leaf renderer.
 const LEAF_HELP = {
+  "operator.hermes": () => ({
+    usage: [buildTerminalActionExample("operator.hermes", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  这是 Hermes Hosted Mode 的 operator 入口。",
+      "  install-skill：把仓内 codeksei-companion skill 同步到 ~/.hermes/skills/",
+      "  status：查看 Hermes 命令、Weixin 账号、skill 同步状态与 hosted semantic review 可用性。",
+      "  smoke：做 hosted 前置检查与 skill parity 检查，不伪造 live Weixin 成功。",
+    ],
+    examples: [
+      "  codeksei operator hermes install-skill",
+      "  codeksei operator hermes status",
+      "  codeksei operator hermes smoke",
+    ],
+  }),
   "app.doctor": () => ({
     usage: [buildTerminalActionExample("app.doctor", { audience: "public", includeArgs: true })],
     bodyLabel: "说明：",
     body: [
       "  输出当前 public CLI 相关的运行时快照，包括 host mode、runtime/channel provider、timeline 描述与 thread state 摘要。",
-      "  Hermes hosted mode 下会额外检查 hermes 命令、仓内 skill 资产，以及本机 Hermes Weixin 配置痕迹。",
+      "  Hermes hosted mode 下会额外检查 hermes 命令、仓内 skill 资产是否已同步、本机 Hermes Weixin 配置痕迹，以及 hosted semantic review 可用性。",
       "  非 TTY 下默认走 JSON envelope；TTY 下默认走文本。",
     ],
   }),

@@ -20,6 +20,7 @@ const ACTION_USAGE_ARGS: Readonly<Partial<Record<CommandActionId, string>>> = Ob
   "note.auto": "(--project <slug> | --scope <name>) --kind <kind> [--text \"内容\" | --stdin]",
   "note.maybe": "[--project <slug> | --scope <name>] [--kind <kind>] [--json]",
   "note.sync": "(--project <slug> | --path <path>) --section <标题> [--text \"内容\" | --stdin] [--style bullet|paragraph] [--slot <id>] [--max-items N]",
+  "operator.hermes": "<install-skill|status|smoke>",
   "project.radar": "[--list] [--project <slug>] [--json] [--commits 5] [--changes 20]",
   "reminder.create": "--delay 30m --text \"提醒内容\"",
   "review.monthly": "[--month YYYY-MM] [--date YYYY-MM-DD] [--stdout] [--deterministic] [--model <id>]",

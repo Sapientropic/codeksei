@@ -19,7 +19,7 @@
 边界：
 
 - `Bridge Mode` 下，Codeksei 自己托管 bridge / shared 线程
-- `Hermes Hosted Mode` 下，宿主控制命令交给 Hermes；Codeksei 主要暴露 timeline / diary / reminder / review / note / project radar / doctor / schema
+- `Hermes Hosted Mode` 下，宿主控制命令交给 Hermes；Codeksei 主要暴露 timeline / diary / reminder / review / note / project radar / doctor / schema，并提供 Hermes operator 入口做 skill/status/smoke
 
 ## 命名
 
@@ -52,6 +52,9 @@ operator / bootstrap：
 
 - `codeksei operator help`
 - `codeksei operator schema`
+- `codeksei operator hermes install-skill`
+- `codeksei operator hermes status`
+- `codeksei operator hermes smoke`
 - `codeksei login` `Bridge Mode only`
 - `codeksei accounts` `Bridge Mode only`
 - `codeksei start` `Bridge Mode only`
@@ -76,6 +79,7 @@ operator / bootstrap：
 
 - `codeksei help` / `codeksei schema` 默认只暴露 public finite command surface
 - `codeksei operator help` / `codeksei operator schema` 才会显示 bootstrap、shared、background、maintainer 入口
+- `codeksei operator hermes <install-skill|status|smoke>` 是 Hermes Hosted Mode 的 operator surface
 - 非 TTY 默认返回 JSON envelope；TTY 默认返回 text
 - `stdout` 留给结果数据，`stderr` 留给诊断与 debug 信息
 - 全局参数统一支持：`--format json|text`、`--verbose`、`--workspace-root /absolute/path`
@@ -209,6 +213,7 @@ Durable note 负责把值得长期记住的判断、偏好和项目脉络，放�
 说明：
 
 - 默认走 hybrid review：脚本保骨架，runtime 语义生成器做结构化提炼
+- `CODEKSEI_REVIEW_SEMANTIC_HOST=auto|codex|hermes|deterministic` 可显式指定语义宿主；默认 `auto`
 - 不传 `--date/--week/--month` 时，当前日期按统一 timezone contract 推断
 - 失败或超时会回退 deterministic
 - nightly 是周/月复盘的前置压缩层
@@ -258,6 +263,7 @@ maintainer 仍需额外补一次真实账号 smoke：
 - 这三条脚本都会在 `shared-wechat.log` / `shared-app-server.log` 里写 `[codeksei-smoke] stage=...` checkpoint，排查时优先从这些 marker 往后看。
 - `[⚠️ 需确认]` 这组真实 smoke 依赖可用的 WeChat 登录态、绑定 thread 和能触发 approval 的活跃 Codex runtime；环境不满足时脚本会直接报错，而不是静默跳过。
 - Hermes Hosted Mode 的真实验证不走这套 shared smoke；那条线要验证的是 Hermes gateway + Hermes Weixin + Codeksei companion skill。
+- Hosted operator 侧的前置检查入口是 `codeksei operator hermes smoke`；它只验证 Hermes CLI / Weixin account / skill parity / hosted semantic review 准备度，不伪造 live Weixin 成功。
 - 最近一次 recorded 结果入口统一看 [docs/maintainer/live-smoke.md](./maintainer/live-smoke.md)
 
 ## Maintainer Quality Gates

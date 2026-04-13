@@ -9,9 +9,9 @@ import {
   normalizeText,
 } from "./review-semantic-normalize";
 import {
-  runCodexSemanticReview,
   waitForSemanticTurnCompletion,
 } from "./review-semantic-runtime";
+import { resolveSemanticReviewHostAdapter } from "./review-semantic-host";
 
 const DEFAULT_TIMEOUT_MS = 120_000;
 
@@ -20,11 +20,14 @@ async function maybeGenerateSemanticReview(config: SemanticReviewConfig = {}, in
   const mode = normalizeSemanticMode(
     input?.options?.deterministic ? "deterministic" : config.reviewSemanticMode
   );
-  if (!kind || mode === "deterministic") {
+  const hostAdapter = resolveSemanticReviewHostAdapter(config);
+  if (!kind || mode === "deterministic" || !hostAdapter) {
     return {
       used: false,
       source: "deterministic",
-      reason: mode === "deterministic" ? "disabled" : "missing-kind",
+      reason: mode === "deterministic"
+        ? "disabled"
+        : (!kind ? "missing-kind" : "host-disabled"),
       data: null,
     };
   }
@@ -42,7 +45,7 @@ async function maybeGenerateSemanticReview(config: SemanticReviewConfig = {}, in
   try {
     const raw = typeof config.reviewSemanticGenerator === "function"
       ? await config.reviewSemanticGenerator(buildSemanticGeneratorInput(config, input))
-      : await runCodexSemanticReview(config, input, normalizeTimeout(config.reviewSemanticTimeoutMs) || DEFAULT_TIMEOUT_MS);
+      : await hostAdapter.run(config, input, normalizeTimeout(config.reviewSemanticTimeoutMs) || DEFAULT_TIMEOUT_MS);
     const data = normalizeSemanticResult(kind, raw);
     if (!data || !hasSemanticPayload(kind, data)) {
       return {
@@ -54,7 +57,7 @@ async function maybeGenerateSemanticReview(config: SemanticReviewConfig = {}, in
     }
     return {
       used: true,
-      source: typeof config.reviewSemanticGenerator === "function" ? "injected" : "codex",
+      source: typeof config.reviewSemanticGenerator === "function" ? "injected" : hostAdapter.host,
       reason: "",
       data,
     };

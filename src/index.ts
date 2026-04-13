@@ -77,7 +77,10 @@ function parseCommandIntent(argv: string[]): ParsedCommandIntent {
 }
 
 function runReadonlyHelpPath({ command, subcommand, manifest, helpFlag }: ParsedCommandIntent): CommandExecutionResult | null {
-  if (command === "operator" && (!subcommand || subcommand === "help" || helpFlag)) {
+  if (
+    command === "operator"
+    && (!subcommand || subcommand === "help" || (helpFlag && !manifest))
+  ) {
     return {
       data: buildCommandSchema({ audience: "operator", command: "", subcommand: "" }),
       text: buildOperatorHelpText(),

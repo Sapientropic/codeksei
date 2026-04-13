@@ -39,6 +39,7 @@ test("schema splits public and operator surfaces", () => {
   const operatorActions = asCommandList(asRecord(operatorPayload.data).commands).map((entry) => entry.action);
   assert.ok(operatorActions.includes("app.start"));
   assert.ok(operatorActions.includes("app.shared_start"));
+  assert.ok(operatorActions.includes("operator.hermes"));
 });
 
 test("operator discovery aliases return operator surface instead of internal errors", () => {

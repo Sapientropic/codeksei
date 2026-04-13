@@ -131,6 +131,9 @@ function buildActionSchema(action: CommandAction): Record<string, unknown> {
       command: flags,
       global: listGlobalCliFlags(),
     },
+    subcommands: action.action === "operator.hermes"
+      ? ["install-skill", "status", "smoke"]
+      : undefined,
   };
 }
 

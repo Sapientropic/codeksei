@@ -78,8 +78,10 @@ git clone https://github.com/Sapientropic/codeksei.git
 cd codeksei
 npm install
 codeksei doctor
-# 然后把 templates/hermes/skills/codeksei-companion/SKILL.md
-# 安装到你的 Hermes skills 目录，再由 Hermes gateway / Weixin 使用
+codeksei operator hermes install-skill
+codeksei operator hermes status
+codeksei operator hermes smoke
+# 然后再由 Hermes gateway / Weixin 使用
 ```
 
 - `先试基础 CLI`：看命令面、确认本机环境、感受产品边界
@@ -214,6 +216,7 @@ CODEKSEI_ACCOUNT_ID=
 CODEKSEI_RUNTIME_ENDPOINT=ws://127.0.0.1:8765
 CODEKSEI_RUNTIME_COMMAND=codex
 CODEKSEI_HERMES_COMMAND=hermes
+CODEKSEI_REVIEW_SEMANTIC_HOST=auto
 CODEKSEI_CODEX_ENDPOINT=ws://127.0.0.1:8765
 CODEKSEI_WEIXIN_ADAPTER=v2
 CODEKSEI_WEIXIN_REPLY_MODE=stream
@@ -241,6 +244,7 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - `CODEKSEI_WEIXIN_REPLY_MODE=settled` 仍表示“等整轮收口后再发”：只发送最新的可见最终回复
 - `CODEKSEI_RUNTIME` / `CODEKSEI_CHANNEL_PROVIDER` 决定当前是 `Bridge Mode` 还是 `Hermes Hosted Mode`
 - `CODEKSEI_RUNTIME_ENDPOINT` / `CODEKSEI_RUNTIME_COMMAND` 是新的 host-neutral runtime 入口；旧的 `CODEKSEI_CODEX_*` 变量仍保留兼容
+- `CODEKSEI_REVIEW_SEMANTIC_HOST=auto|codex|hermes|deterministic` 可显式指定 review hybrid 语义宿主；默认 `auto`
 - `CODEKSEI_USER_NAME` 决定对话里怎么称呼你，不参与消息路由
 - `CODEKSEI_ALLOWED_USER_IDS` 必须填写微信桥实际观测到的 sender id；最简单的做法是先跑 `codeksei accounts`，如果你当前就在仓库工作树里，也可以直接用 `npm run accounts`
 - 微信 persona / continuity instructions 默认来自仓库里的 `templates/weixin-instructions.md`，如需本地覆盖可在状态目录放 `weixin-instructions.local.md`
@@ -263,7 +267,11 @@ Codeksei 自己负责 Weixin bridge 和共享线程。
 不要执行 `codeksei start` 或 `npm run shared:*`。
 
 - 由 Hermes 负责 gateway / agent loop / Weixin
-- 由 Codeksei CLI + repo 内 skill 资产提供 companion workflows
+- 由 Codeksei CLI + 官方受管的 Hermes skill 提供 companion workflows
+- 推荐先执行：
+  `codeksei operator hermes install-skill`
+  `codeksei operator hermes status`
+  `codeksei operator hermes smoke`
 
 ### 4. Bridge Mode 扫码登录
 
