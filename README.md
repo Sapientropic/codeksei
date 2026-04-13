@@ -188,7 +188,7 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - `CODEKSEI_TIMEZONE` 可选；若显式设置，它会统一驱动 reminder / diary / review / timeline 的本地时间解释
 - 如果不设 `CODEKSEI_TIMEZONE`，Codeksei 会优先沿用 timeline state 里已声明的非 legacy timezone；否则回退到系统时区
 - 旧的 `Asia/Shanghai` legacy timeline state 在需要时会在下一次 timeline 命令时自动迁移到当前统一 timezone
-- `CODEKSEI_TIMELINE_STATE_DIR` 默认是 timeline-for-agent 的 state root；当前主布局会在它下面使用 `timeline/*.json`
+- `CODEKSEI_TIMELINE_STATE_DIR` 默认指向 Codeksei timeline 数据根；当前主布局会在它下面使用 `timeline/*.json`
 - `.env` 只应放在你的本地工作目录或状态目录里，不要提交进仓库
 
 ### 3. 扫码登录
@@ -320,11 +320,6 @@ codeksei system checkin --reset
 默认 persona / operations 模板继续跟仓库一起发布在 `templates/`；状态目录里的 `*.local.md` 只负责你本机的 overlay，不再充当唯一真相源。
 
 这个仓库和 npm 包默认只放代码、脚本、模板与文档，不应包含你的账号、会话、日志、个人 `.env` 或本地业务数据。
-
-## Timeline 可单独复用
-
-Codeksei 的时间轴能力建立在 [`timeline-for-agent`](https://github.com/WenXiaoWendy/timeline-for-agent) 之上。  
-如果你只想要 timeline，而不需要微信桥接与生活助理能力，也可以直接单独使用上游项目。
 
 ## Upstream Acknowledgement
 

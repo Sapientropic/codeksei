@@ -180,7 +180,7 @@ Notes:
 - `CODEKSEI_TIMEZONE` is optional; when set, it becomes the single local-time contract for reminder / diary / review / timeline flows
 - If `CODEKSEI_TIMEZONE` is unset, Codeksei first reuses any non-legacy timezone already declared by the timeline state; otherwise it falls back to the system timezone
 - Legacy `Asia/Shanghai` timeline state can be auto-migrated to the unified timezone the next time you run a timeline command
-- `CODEKSEI_TIMELINE_STATE_DIR` is the timeline-for-agent state root; the current primary layout stores runtime files under `timeline/*.json`
+- `CODEKSEI_TIMELINE_STATE_DIR` points at the Codeksei timeline data root; the current primary layout stores runtime files under `timeline/*.json`
 - Keep `.env` local; do not commit it into the repository
 
 ### 3. Login
@@ -303,11 +303,6 @@ If you set `CODEKSEI_DIARY_DIR` or `CODEKSEI_TIMELINE_STATE_DIR`, business data 
 The default persona / operations templates still ship from the repository under `templates/`; `*.local.md` files in the state directory are overlays for your own machine, not the only source of truth.
 
 The repository and npm package are meant to contain code, scripts, templates, and docs only. Your accounts, sessions, logs, personal `.env`, and local business data should stay outside version control.
-
-## Timeline Can Be Used Separately
-
-Codeksei builds its timeline layer on top of [`timeline-for-agent`](https://github.com/WenXiaoWendy/timeline-for-agent).  
-If you only want the timeline runtime and not the WeChat/companion stack, you can use that upstream project directly.
 
 ## Upstream Acknowledgement
 

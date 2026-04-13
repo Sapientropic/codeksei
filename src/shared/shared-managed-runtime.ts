@@ -92,10 +92,10 @@ async function ensureSharedAppServer(): Promise<{ pid: number; status: string }>
 
   const env: Record<string, string> = {
     CODEKSEI_STATE_DIR: context.stateDir,
-    TIMELINE_FOR_AGENT_STATE_DIR: context.stateDir,
+    CODEKSEI_TIMELINE_STATE_DIR: context.stateDir,
   };
-  if (!process.env.TIMELINE_FOR_AGENT_CHROME_PATH) {
-    env.TIMELINE_FOR_AGENT_CHROME_PATH =
+  if (!process.env.CODEKSEI_SCREENSHOT_CHROME_PATH && !process.env.TIMELINE_FOR_AGENT_CHROME_PATH) {
+    env.CODEKSEI_SCREENSHOT_CHROME_PATH =
       readPrefixedEnv(process.env, "SCREENSHOT_CHROME_PATH")
       || (process.platform === "darwin"
         ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"

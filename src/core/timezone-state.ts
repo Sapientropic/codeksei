@@ -86,9 +86,9 @@ function resolveTimelineStateFiles(timelineStateDir: string = ""): TimelineState
 
   const baseDir = path.resolve(normalizedDir);
   const nestedDir = path.join(baseDir, "timeline");
-  // timeline-for-agent's canonical layout is <stateDir>/timeline/*.json. We
-  // still detect legacy direct files for migration, but a fresh root should
-  // default to the nested layout so bootstrap, state sync, and the runtime all
+  // Codeksei timeline state lives under <stateDir>/timeline/*.json. We still
+  // detect legacy direct files for migration, but a fresh root should default
+  // to the nested layout so bootstrap, state sync, and the runtime all
   // converge on the same paths.
   const candidates = [nestedDir, baseDir];
   const existingDir = candidates.find(hasAnyTimelineStateFile) || nestedDir;
@@ -150,9 +150,9 @@ function readProposals(
 }
 
 function readJsonFile(filePath: string): TimelineStateDocument | null {
-  // Timeline state/taxonomy/facts are foreign documents produced by another
-  // workflow. Parse them gently and let that workflow own recovery instead of
-  // moving files aside as if codeksei fully owned their schema.
+  // Timeline state/taxonomy/facts are first-party Codeksei data, but we still
+  // parse them gently here so timezone discovery never mutates user history or
+  // turns a recoverable JSON problem into a second write path.
   return readForeignJsonDocument<Record<string, unknown> | null>(filePath, { fallback: null });
 }
 

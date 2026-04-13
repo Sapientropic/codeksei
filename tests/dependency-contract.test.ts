@@ -5,20 +5,22 @@ const assert: typeof import("node:assert/strict") = require("node:assert/strict"
 
 const repoRoot = path.join(__dirname, "..");
 
-test("timeline-for-agent dependency stays pinned to the maintained fork tag", () => {
+test("timeline runtime stays first-party and no external timeline dependency regresses", () => {
   const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")) as {
     dependencies?: Record<string, string>;
   };
   const packageLock = JSON.parse(fs.readFileSync(path.join(repoRoot, "package-lock.json"), "utf8")) as {
     packages?: Record<string, { resolved?: string }>;
   };
+  const integrationSource = fs.readFileSync(
+    path.join(repoRoot, "src", "integrations", "timeline", "index.ts"),
+    "utf8",
+  );
 
-  assert.equal(
-    packageJson.dependencies?.["timeline-for-agent"],
-    "github:Sapientropic/timeline-for-agent#codeksei-2026-04-13-17ff1f2",
-  );
-  assert.match(
-    String(packageLock.packages?.["node_modules/timeline-for-agent"]?.resolved || ""),
-    /Sapientropic\/timeline-for-agent\.git#17ff1f2f6684a20eb5da216f4e4c41a2d778c5db/u,
-  );
+  assert.equal(packageJson.dependencies?.["timeline-for-agent"], undefined);
+  assert.equal(packageLock.packages?.["node_modules/timeline-for-agent"], undefined);
+  assert.equal(fs.existsSync(path.join(repoRoot, "src", "timeline", "runtime", "index.js")), true);
+  assert.equal(fs.existsSync(path.join(repoRoot, "dist", "src", "timeline", "runtime", "index.js")), true);
+  assert.match(integrationSource, /codeksei-timeline/u);
+  assert.doesNotMatch(integrationSource, /require\.resolve\("timeline-for-agent\/package\.json"\)/u);
 });

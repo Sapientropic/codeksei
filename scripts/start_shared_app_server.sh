@@ -15,9 +15,9 @@ function lookup_listen_pid() {
 
 mkdir -p "${LOG_DIR}"
 export CODEKSEI_STATE_DIR="${STATE_DIR}"
-export TIMELINE_FOR_AGENT_STATE_DIR="${STATE_DIR}"
-if [[ -z "${TIMELINE_FOR_AGENT_CHROME_PATH:-}" ]]; then
-  export TIMELINE_FOR_AGENT_CHROME_PATH="${CODEKSEI_SCREENSHOT_CHROME_PATH:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
+export CODEKSEI_TIMELINE_STATE_DIR="${STATE_DIR}"
+if [[ -z "${CODEKSEI_SCREENSHOT_CHROME_PATH:-}" ]]; then
+  export CODEKSEI_SCREENSHOT_CHROME_PATH="${TIMELINE_FOR_AGENT_CHROME_PATH:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 fi
 
 if [[ -f "${PID_FILE}" ]]; then

@@ -272,9 +272,10 @@ function writeTimelineSnapshot(paths: TimelineStateFiles, snapshot: TimelineSnap
 }
 
 function writeJsonFile(filePath: string, value: unknown): void {
-  // Timeline state files belong to the upstream timeline domain. We still
-  // write them atomically, but we do not quarantine "corrupt" files here the
-  // way we do for bridge-managed runtime state.
+  // Timeline state files are now first-party Codeksei data. We still keep
+  // timezone sync narrow: write atomically, but do not quarantine files here
+  // the way bridge-managed runtime queues do, so one migration helper cannot
+  // silently take ownership of broader timeline recovery semantics.
   writeForeignJsonDocument(filePath, value);
 }
 

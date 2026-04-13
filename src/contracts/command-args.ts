@@ -143,7 +143,7 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
     flags: [
       COMMON_HELP_FLAG,
       { name: "useStdin", keys: ["--stdin"], type: "boolean", defaultValue: false, description: "从标准输入读取 note" },
-      { name: "finalize", keys: ["--finalize"], type: "boolean", defaultValue: false, description: "按 timeline-for-agent finalize 语义写入" },
+      { name: "finalize", keys: ["--finalize"], type: "boolean", defaultValue: false, description: "写入后把目标日期标记为 final" },
       { name: "date", keys: ["--date"], type: "string", defaultValue: "", required: true, placeholder: "YYYY-MM-DD", description: "目标日期" },
       { name: "start", keys: ["--start"], type: "string", defaultValue: "", required: true, description: "开始时间 HH:mm 或完整时间戳" },
       { name: "end", keys: ["--end"], type: "string", defaultValue: "", required: true, description: "结束时间 HH:mm 或完整时间戳" },

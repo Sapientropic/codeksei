@@ -40,7 +40,8 @@
   },
   "scripts": {
     "prebuild": "node -e \"require('node:fs').rmSync('dist',{ recursive:true, force:true })\"",
-    "build": "tsc -p ./tsconfig.json",
+    "copy:timeline-assets": "node ./scripts/copy-timeline-runtime-assets.js",
+    "build": "tsc -p ./tsconfig.json && npm run copy:timeline-assets",
     "prepare": "npm run build",
     "start": "node ./dist/src/index.js start",
     "start:checkin": "node ./dist/src/index.js start --checkin",
@@ -87,9 +88,16 @@
     "verify": "npm run check && node --experimental-strip-types --require ./tests/helpers/build-path-resolver.ts --test tests/*.test.ts"
   },
   "dependencies": {
+    "@radix-ui/react-icons": "^1.3.2",
+    "@radix-ui/react-select": "^2.2.6",
     "dotenv": "^16.4.7",
+    "esbuild": "^0.28.0",
+    "playwright-core": "^1.59.1",
     "qrcode-terminal": "0.12.0",
-    "timeline-for-agent": "github:Sapientropic/timeline-for-agent#codeksei-2026-04-13-17ff1f2",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "recharts": "^3.8.1",
+    "vis-timeline": "^8.5.0",
     "ws": "^8.19.0",
     "zod": "^3.24.4"
   },

@@ -38,7 +38,6 @@ function readConfig() {
     allowedUserIds: readPrefixedListEnv(process.env, "ALLOWED_USER_IDS"),
     channel: readPrefixedEnv(process.env, "CHANNEL") || "weixin",
     runtime: readPrefixedEnv(process.env, "RUNTIME") || "codex",
-    timelineCommand: readPrefixedEnv(process.env, "TIMELINE_COMMAND") || "timeline-for-agent",
     accountId: readPrefixedEnv(process.env, "ACCOUNT_ID"),
     weixinBaseUrl: readPrefixedEnv(process.env, "WEIXIN_BASE_URL") || "https://ilinkai.weixin.qq.com",
     weixinCdnBaseUrl: readPrefixedEnv(process.env, "WEIXIN_CDN_BASE_URL") || "https://novac2c.cdn.weixin.qq.com/c2c",

@@ -21,7 +21,7 @@ function createTimelineIntegration(config: TimelineIntegrationConfig) {
   return {
     describe() {
       return {
-        id: "timeline-for-agent",
+        id: "codeksei-timeline",
         kind: "integration",
         command: `${process.execPath} ${binPath}`,
         stateDir: config.timelineStateDir,
@@ -34,19 +34,13 @@ function createTimelineIntegration(config: TimelineIntegrationConfig) {
         throw new Error("timeline 子命令不能为空");
       }
       ensureTimelineStateTimezone(config);
-      // Pass the fully resolved files so Codeksei, state sync, and
-      // timeline-for-agent all operate on the same layout during direct,
-      // nested, and migrated state-dir variants.
+      // Pass the resolved state root into the first-party timeline runtime so
+      // direct commands, screenshot workers, and timezone sync all stay on the
+      // same nested timeline/*.json layout.
       return runTimelineCommand(binPath, [normalizedSubcommand, ...normalizeTimelineArgs(normalizedSubcommand, args)], {
-        TIMELINE_FOR_AGENT_STATE_DIR: String(config.timelineStateDir || ""),
-        TIMELINE_FOR_AGENT_DIR: timelineFiles.dir,
-        TIMELINE_FOR_AGENT_STATE_FILE: timelineFiles.stateFile,
-        TIMELINE_FOR_AGENT_TAXONOMY_FILE: timelineFiles.taxonomyFile,
-        TIMELINE_FOR_AGENT_FACTS_FILE: timelineFiles.factsFile,
-        TIMELINE_FOR_AGENT_DB_FILE: path.join(timelineFiles.dir, "timeline-db.json"),
-        TIMELINE_FOR_AGENT_SITE_DIR: path.join(timelineFiles.dir, "site"),
-        TIMELINE_FOR_AGENT_WRITE_LOCK_DIR: path.join(timelineFiles.dir, "timeline-write.lock"),
-        TIMELINE_FOR_AGENT_CHROME_PATH: resolveTimelineChromePath(),
+        CODEKSEI_STATE_DIR: normalizeText(config.stateDir),
+        CODEKSEI_TIMELINE_STATE_DIR: String(config.timelineStateDir || ""),
+        CODEKSEI_SCREENSHOT_CHROME_PATH: resolveTimelineChromePath(),
       }, {
         subcommand: normalizedSubcommand,
       });
@@ -55,8 +49,7 @@ function createTimelineIntegration(config: TimelineIntegrationConfig) {
 }
 
 function resolveTimelineBinPath() {
-  const packageJsonPath = require.resolve("timeline-for-agent/package.json");
-  return path.join(path.dirname(packageJsonPath), "bin", "timeline-for-agent.js");
+  return path.join(__dirname, "..", "..", "timeline", "index.js");
 }
 
 function runTimelineCommand(
@@ -199,8 +192,8 @@ function normalizeText(value: unknown): string {
 }
 
 function resolveTimelineChromePath() {
-  const configured = normalizeText(process.env.TIMELINE_FOR_AGENT_CHROME_PATH)
-    || normalizeText(readPrefixedEnv(process.env, "SCREENSHOT_CHROME_PATH"));
+  const configured = normalizeText(readPrefixedEnv(process.env, "SCREENSHOT_CHROME_PATH"))
+    || normalizeText(process.env.TIMELINE_FOR_AGENT_CHROME_PATH);
   if (configured) {
     return configured;
   }
