@@ -1,4 +1,4 @@
-import { normalizeText } from "../core/text-normalization";
+import { normalizeText } from "./text-normalization";
 type PlainObject = Record<string, unknown>;
 
 export interface NormalizedBootstrapFileCandidate extends PlainObject {

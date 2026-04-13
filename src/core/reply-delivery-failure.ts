@@ -3,6 +3,7 @@ import {
   normalizeCommandArgument,
   normalizeTrimmedText,
 } from "./approval-command-policy";
+import { logError } from "./logging";
 
 interface RuntimeAdapterLike {
   getSessionStore(): {
@@ -57,7 +58,7 @@ async function handleReplyDeliveryFailure({
   const linked = sessionStore.findBindingForThreadId(normalizedThreadId);
   const workspaceRoot = normalizeTrimmedText(linked?.workspaceRoot);
 
-  console.error(
+  logError(
     `[codeksei] reply delivery degraded `
     + `thread=${normalizedThreadId} turn=${normalizedTurnId || "(pending)"} `
     + `workspace=${workspaceRoot || "(unknown)"} `

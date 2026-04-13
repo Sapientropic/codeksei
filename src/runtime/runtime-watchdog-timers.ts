@@ -5,6 +5,7 @@ import {
 } from "../contracts/runtime-events";
 import { ignoreBestEffortError } from "../core/error-handling";
 import type { ChannelAdapterLike, RuntimeAdapterLike, StreamDeliveryLike, ThreadStateStoreLike } from "../core/app-service-contract";
+import { logError } from "../core/logging";
 import { operatorMessages, userFacingMessages } from "../core/message-catalog";
 import type {
   PreparedRuntimeMessage,
@@ -221,7 +222,7 @@ export function refreshTurnSettlementWatchdog(
     // Once a reply has already started streaming, hanging forever is worse
     // than surfacing a partial answer. We only trip this guard after a long
     // quiet period to avoid fighting normal long-running tool calls.
-    console.error(operatorMessages.runtimeSettlementWatchdogExpired(threadId, turnId, workspaceRoot));
+    logError(operatorMessages.runtimeSettlementWatchdogExpired(threadId, turnId, workspaceRoot));
     await dependencies.streamDelivery.finalizeAbandonedTurn({
       threadId,
       turnId,

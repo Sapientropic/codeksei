@@ -18,6 +18,11 @@ const rules = [
     reason: "shared-managed-runtime should not depend on adapter implementations directly",
   },
   {
+    sourcePrefix: "src/shared/",
+    disallowedPattern: /\.\.\/core\/(?:branding|codex-spawn|path-utils|text-normalization)\b/u,
+    reason: "shared should consume neutral env/text/path/spawn helpers from contracts owners",
+  },
+  {
     sourcePrefix: "src/runtime/",
     disallowedPattern: /\.\.\/adapters\/channel\//u,
     reason: "runtime should consume channel attachment contracts instead of adapter internals",

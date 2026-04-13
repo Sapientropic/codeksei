@@ -1,5 +1,6 @@
 import { RUNTIME_EVENT_TYPES, type RuntimeEvent } from "../contracts/runtime-events";
 import { ignoreBestEffortError } from "../core/error-handling";
+import { logInfo, logWarn } from "../core/logging";
 import type {
   ChannelAdapterLike,
   RuntimeAdapterLike,
@@ -66,7 +67,7 @@ export async function handleApprovalRequested(
         signature: promptSignature,
         promptedAt: promptState.promptedAt || new Date().toISOString(),
       });
-      console.log(
+      logInfo(
         `[codeksei] approval prompt deduped thread=${eventThreadId} requestId=${approval.requestId}`,
       );
       return true;
@@ -143,12 +144,12 @@ export async function sendApprovalPrompt(
 ): Promise<void> {
   const target = dependencies.resolveReplyTargetForBinding(bindingKey);
   if (!target) {
-    console.warn(
+    logWarn(
       `[codeksei] approval prompt skipped binding=${bindingKey} requestId=${approval?.requestId || ""} reason=no_reply_target`,
     );
     return;
   }
-  console.log(
+  logInfo(
     `[codeksei] approval prompt sending binding=${bindingKey} user=${target.userId} requestId=${approval?.requestId || ""}`,
   );
   await ignoreBestEffortError(dependencies.channelAdapter.sendTyping({
@@ -165,7 +166,7 @@ export async function sendApprovalPrompt(
     contextToken: target.contextToken,
     preserveBlock: true,
   });
-  console.log(
+  logInfo(
     `[codeksei] approval prompt delivered binding=${bindingKey} user=${target.userId} requestId=${approval?.requestId || ""}`,
   );
 }

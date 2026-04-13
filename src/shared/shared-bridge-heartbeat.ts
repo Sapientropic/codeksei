@@ -1,4 +1,4 @@
-import { normalizeText } from "../core/text-normalization";
+import { normalizeText } from "../contracts/text-normalization";
 import { isPlainObject, readManagedJsonStateFile, writeManagedJsonStateFile } from "../state/json-state";
 import type {
   SharedBridgeHeartbeatClassification,

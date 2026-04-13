@@ -46,6 +46,16 @@ const rules: Array<{
     reason: "shared helpers should not absorb app or domain workflow logic",
   },
   {
+    sourcePrefix: "src/shared/",
+    forbiddenPrefixes: [
+      "src/core/branding.ts",
+      "src/core/codex-spawn.ts",
+      "src/core/path-utils.ts",
+      "src/core/text-normalization.ts",
+    ],
+    reason: "shared should consume neutral env/text/path/spawn helpers from contracts owners",
+  },
+  {
     sourcePrefix: "src/shared/shared-managed-runtime.ts",
     forbiddenPrefixes: ["src/adapters/"],
     reason: "shared-managed-runtime should not depend on adapter implementation logic",

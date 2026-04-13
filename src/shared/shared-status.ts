@@ -1,5 +1,6 @@
-import { normalizeText } from "../core/text-normalization";
+import { normalizeText } from "../contracts/text-normalization";
 import * as http from "node:http";
+import { writeStderrLine, writeStdoutLine } from "../core/terminal-output";
 import {
   isPidAlive,
   readJsonFile,
@@ -15,15 +16,15 @@ import type {
 
 async function main() {
   const snapshot = await collectSharedStatusSnapshot();
-  console.log(`listen=${snapshot.listenUrl}`);
+  writeStdoutLine(`listen=${snapshot.listenUrl}`);
   printPidState("shared_supervisor_pid", snapshot.supervisorPid);
   printPidState("shared_app_server_pid", snapshot.appServerPid);
   printPidState("shared_codeksei_pid", snapshot.bridgePid);
-  console.log(`shared_bridge_heartbeat=${snapshot.bridgeHealth.classification.status}`);
-  console.log(`shared_bridge_heartbeat_at=${snapshot.bridgeHealth.classification.updatedAt || "missing"}`);
-  console.log(`shared_watchdog_last_run=${normalizeText(snapshot.watchdogState?.lastRunAt) || "missing"}`);
-  console.log(`shared_watchdog_last_result=${normalizeText(snapshot.watchdogState?.result) || "missing"}`);
-  console.log(`readyz=${snapshot.ready ? "ok" : "down"}`);
+  writeStdoutLine(`shared_bridge_heartbeat=${snapshot.bridgeHealth.classification.status}`);
+  writeStdoutLine(`shared_bridge_heartbeat_at=${snapshot.bridgeHealth.classification.updatedAt || "missing"}`);
+  writeStdoutLine(`shared_watchdog_last_run=${normalizeText(snapshot.watchdogState?.lastRunAt) || "missing"}`);
+  writeStdoutLine(`shared_watchdog_last_result=${normalizeText(snapshot.watchdogState?.result) || "missing"}`);
+  writeStdoutLine(`readyz=${snapshot.ready ? "ok" : "down"}`);
 }
 
 async function collectSharedStatusSnapshot(): Promise<SharedStatusSnapshot> {
@@ -45,14 +46,14 @@ async function collectSharedStatusSnapshot(): Promise<SharedStatusSnapshot> {
 
 function printPidState(label: string, pid: number) {
   if (!pid) {
-    console.log(`${label}=missing`);
+    writeStdoutLine(`${label}=missing`);
     return;
   }
   if (!isPidAlive(pid)) {
-    console.log(`${label}=stale`);
+    writeStdoutLine(`${label}=stale`);
     return;
   }
-  console.log(`${label}=${pid}`);
+  writeStdoutLine(`${label}=${pid}`);
 }
 
 function checkReadyz(): Promise<boolean> {
@@ -81,7 +82,7 @@ function checkReadyz(): Promise<boolean> {
 
 if (require.main === module) {
   main().catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message || error.stack || String(error) : String(error));
+    writeStderrLine(error instanceof Error ? error.message || error.stack || String(error) : String(error));
     process.exit(1);
   });
 }

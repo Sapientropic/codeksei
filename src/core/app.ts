@@ -37,6 +37,7 @@ import {
   resolveAppWorkspaceRoot,
   resolveReplyTargetForBinding,
 } from "./app-target-resolution";
+import { logError } from "./logging";
 
 type AppConfig = AppRuntimeConfig;
 
@@ -98,7 +99,7 @@ export class CodekseiApp {
       },
       logRuntimeEventFailure: (event, error) => {
         const message = error instanceof Error ? error.stack || error.message : String(error);
-        console.error(`[codeksei] runtime event handling failed type=${event?.type || "(unknown)"} ${message}`);
+        logError(`[codeksei] runtime event handling failed type=${event?.type || "(unknown)"} ${message}`);
       },
     });
   }

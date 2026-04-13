@@ -16,6 +16,7 @@ import {
   shouldIgnoreReplyFragmentTurnCompletion,
 } from "./reply-fragment-collector";
 import { appendCodexCapabilityHint } from "./capability-probe";
+import { logError } from "../../../core/logging";
 
 
 interface RpcMessageParams extends UnknownRecord {
@@ -196,7 +197,7 @@ function logInvalidWorkspaceError({
   if (!isInvalidWorkspaceError(error)) {
     return;
   }
-  console.error(
+  logError(
     `[codeksei] codex ${operation} invalid workspace cwd `
     + `thread=${normalizeLogValue(threadId) || "(new)"} `
     + `binding=${normalizeLogValue(bindingKey) || "(none)"} `

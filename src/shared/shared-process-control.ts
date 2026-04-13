@@ -1,8 +1,8 @@
-import { normalizeText } from "../core/text-normalization";
+import { normalizeText } from "../contracts/text-normalization";
 import { execFileSync, spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as http from "node:http";
-import { buildSpawnInvocation } from "../core/codex-spawn";
+import { buildSpawnInvocation } from "../contracts/codex-spawn";
 import {
   resolveSharedProcessContext,
   type SharedProcessContext,

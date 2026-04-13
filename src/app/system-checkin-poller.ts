@@ -2,11 +2,12 @@ import { normalizeText } from "../core/text-normalization";
 import * as crypto from "node:crypto";
 
 import { SessionStore } from "../adapters/runtime/codex/session-store";
+import { PACKAGE_NAME, readPrefixedEnv } from "../contracts/app-env";
 import { resolvePromptPersonEn } from "../core/person-reference";
 import type { AppRuntimeConfig } from "../core/app-service-contract";
+import { logInfo } from "../core/logging";
 import { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } from "../workspace/default-targets";
 import { resolveSelectedAccount } from "../adapters/channel/weixin/account-store";
-import { PACKAGE_NAME, readPrefixedEnv } from "../core/branding";
 import { SystemMessageQueueStore } from "../state/system-message-queue-store";
 import { formatCheckinRange, resolveCheckinConfig } from "../state/checkin-config";
 const INTERNAL_CHECKIN_TRIGGER_TEMPLATE = "Take a quiet look at whether now is a good moment to reach out to %PERSON%. You may stay silent, send one short WeChat message, update diary/timeline, or take another useful backstage action. If no user-visible message should be sent, output exactly SILENT. If you do send a message, output only the message text.";
@@ -25,24 +26,24 @@ async function runSystemCheckinPoller(config: CheckinPollerConfig) {
   const target = resolvePollerTarget({ config, account, sessionStore });
   let lastRangeLabel = "";
 
-  console.log(`[${PACKAGE_NAME}] checkin poller ready user=${target.senderId} workspace=${target.workspaceRoot}`);
+  logInfo(`[${PACKAGE_NAME}] checkin poller ready user=${target.senderId} workspace=${target.workspaceRoot}`);
 
   while (true) {
     const intervalConfig = resolvePollerIntervalConfig(config);
     const rangeLabel = `${formatCheckinRange(intervalConfig)} source=${intervalConfig.source}`;
     if (rangeLabel !== lastRangeLabel) {
-      console.log(`[${PACKAGE_NAME}] checkin interval range ${rangeLabel}`);
+      logInfo(`[${PACKAGE_NAME}] checkin interval range ${rangeLabel}`);
       lastRangeLabel = rangeLabel;
     }
     const minIntervalMs = intervalConfig.minIntervalMs;
     const maxIntervalMs = intervalConfig.maxIntervalMs;
     const delayMs = pickRandomDelayMs(minIntervalMs, maxIntervalMs);
     const wakeAt = new Date(Date.now() + delayMs).toISOString();
-    console.log(`[${PACKAGE_NAME}] next checkin in ${Math.round(delayMs / 60000)}m at ${wakeAt}`);
+    logInfo(`[${PACKAGE_NAME}] next checkin in ${Math.round(delayMs / 60000)}m at ${wakeAt}`);
     await sleep(delayMs);
 
     if (queue.hasPendingForAccount(account.accountId)) {
-      console.log(`[${PACKAGE_NAME}] checkin skipped: pending system message still in queue`);
+      logInfo(`[${PACKAGE_NAME}] checkin skipped: pending system message still in queue`);
       continue;
     }
 
@@ -55,7 +56,7 @@ async function runSystemCheckinPoller(config: CheckinPollerConfig) {
       kind: "checkin",
       createdAt: new Date().toISOString(),
     });
-    console.log(`[${PACKAGE_NAME}] checkin queued id=${queued.id}`);
+    logInfo(`[${PACKAGE_NAME}] checkin queued id=${queued.id}`);
   }
 }
 

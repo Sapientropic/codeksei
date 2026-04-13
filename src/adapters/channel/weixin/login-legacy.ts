@@ -1,4 +1,5 @@
 import { redactSensitiveText } from "./redact";
+import { writeStdoutLine } from "../../../core/terminal-output";
 import {
   ACTIVE_LOGIN_TTL_MS,
   MAX_QR_REFRESH_COUNT,
@@ -80,9 +81,9 @@ async function waitForLegacyWeixinLogin({
   let scannedPrinted = false;
   let refreshCount = 1;
 
-  console.log("使用微信扫描以下二维码，以完成连接：\n");
+  writeStdoutLine("使用微信扫描以下二维码，以完成连接：\n");
   printQrCode(qrResponse.qrcode_img_content);
-  console.log("\n等待连接结果...\n");
+  writeStdoutLine("\n等待连接结果...\n");
 
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -94,7 +95,7 @@ async function waitForLegacyWeixinLogin({
       if (refreshCount > MAX_QR_REFRESH_COUNT) {
         throw new Error("二维码多次过期，请重新执行 login");
       }
-      console.log(`二维码已过期，正在刷新...(${refreshCount}/${MAX_QR_REFRESH_COUNT})\n`);
+      writeStdoutLine(`二维码已过期，正在刷新...(${refreshCount}/${MAX_QR_REFRESH_COUNT})\n`);
       printQrCode(qrResponse.qrcode_img_content);
     }
 
@@ -117,7 +118,7 @@ async function waitForLegacyWeixinLogin({
         if (refreshCount > MAX_QR_REFRESH_COUNT) {
           throw new Error("二维码多次过期，请重新执行 login");
         }
-        console.log(`二维码已过期，正在刷新...(${refreshCount}/${MAX_QR_REFRESH_COUNT})\n`);
+        writeStdoutLine(`二维码已过期，正在刷新...(${refreshCount}/${MAX_QR_REFRESH_COUNT})\n`);
         printQrCode(qrResponse.qrcode_img_content);
         break;
       case "confirmed":
@@ -139,7 +140,7 @@ async function waitForLegacyWeixinLogin({
 }
 
 async function runLegacyLoginFlow(config: LegacyLoginConfig): Promise<void> {
-  console.log("[codeksei] 正在启动微信扫码登录（legacy）...");
+  writeStdoutLine("[codeksei] 正在启动微信扫码登录（legacy）...");
   const result = await waitForLegacyWeixinLogin({
     apiBaseUrl: String(config.weixinBaseUrl || ""),
     botType: String(config.weixinQrBotType || ""),

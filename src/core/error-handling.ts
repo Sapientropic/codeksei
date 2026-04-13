@@ -1,4 +1,5 @@
 import { normalizeText } from "./text-normalization";
+import { logWarn } from "./logging";
 
 interface SuppressedErrorOptions {
   label: string;
@@ -37,7 +38,7 @@ export function logSuppressedError(
   }: SuppressedErrorOptions,
 ): void {
   const message = normalizeText(formatErrorMessage(error)) || "unknown error";
-  console.warn(`[codeksei] suppressed ${label} reason=${reason} error=${message}`);
+  logWarn(`[codeksei] suppressed ${label} reason=${reason} error=${message}`);
 }
 
 export async function ignoreCleanupError<T>(

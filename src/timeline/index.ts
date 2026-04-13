@@ -1,5 +1,6 @@
 import { normalizeText } from "../core/text-normalization";
 import { readConfig } from "../core/config";
+import { writeJson, writeStderrLine, writeStdoutLine } from "../core/terminal-output";
 import { runTimelineBuildCommand } from "./runtime/app/timeline-build-cli";
 import { buildTimelineCategoriesHelp, runTimelineCategoriesCommand } from "./runtime/app/timeline-categories-cli";
 import { runTimelineDevCommand } from "./runtime/app/timeline-dev-cli";
@@ -46,7 +47,7 @@ async function main(
 }
 
 function printHelp(): void {
-  console.log(`
+  writeStdoutLine(`
 Usage: codeksei timeline <command>
 
 Commands:
@@ -66,22 +67,22 @@ function renderTimelineCommandResult(command: string, result: unknown): void {
   if (result == null) {
     switch (command) {
       case "categories":
-        console.log(buildTimelineCategoriesHelp());
+        writeStdoutLine(buildTimelineCategoriesHelp());
         return;
       case "proposals":
-        console.log(buildTimelineProposalsHelp());
+        writeStdoutLine(buildTimelineProposalsHelp());
         return;
       case "read":
-        console.log(buildTimelineReadHelp());
+        writeStdoutLine(buildTimelineReadHelp());
         return;
       case "write":
-        console.log(buildTimelineWriteHelp());
+        writeStdoutLine(buildTimelineWriteHelp());
         return;
       case "serve":
-        console.log("Usage: codeksei timeline serve [--port 4317]");
+        writeStdoutLine("Usage: codeksei timeline serve [--port 4317]");
         return;
       case "dev":
-        console.log("Usage: codeksei timeline dev [--port 4317]");
+        writeStdoutLine("Usage: codeksei timeline dev [--port 4317]");
         return;
       default:
         return;
@@ -91,38 +92,38 @@ function renderTimelineCommandResult(command: string, result: unknown): void {
     const siteDir = typeof result === "object" && result && "siteDir" in result
       ? String((result as { siteDir?: unknown }).siteDir || "")
       : "";
-    console.log(`timeline dashboard built: ${siteDir}`);
+    writeStdoutLine(`timeline dashboard built: ${siteDir}`);
     return;
   }
   if (command === "serve") {
     const url = typeof result === "object" && result && "url" in result
       ? String((result as { url?: unknown }).url || "")
       : "";
-    console.log(`timeline dashboard: ${url}`);
+    writeStdoutLine(`timeline dashboard: ${url}`);
     return;
   }
   if (command === "dev") {
     const url = typeof result === "object" && result && "url" in result
       ? String((result as { url?: unknown }).url || "")
       : "";
-    console.log(`timeline dev: ${url}`);
+    writeStdoutLine(`timeline dev: ${url}`);
     return;
   }
   if (command === "write") {
     const payload = result as { date?: unknown; mode?: unknown; eventCount?: unknown; status?: unknown };
-    console.log(`timeline written: ${String(payload.date || "")}`);
-    console.log(`mode: ${String(payload.mode || "")}`);
-    console.log(`events: ${String(payload.eventCount || 0)}`);
-    console.log(`status: ${String(payload.status || "")}`);
+    writeStdoutLine(`timeline written: ${String(payload.date || "")}`);
+    writeStdoutLine(`mode: ${String(payload.mode || "")}`);
+    writeStdoutLine(`events: ${String(payload.eventCount || 0)}`);
+    writeStdoutLine(`status: ${String(payload.status || "")}`);
     return;
   }
-  console.log(JSON.stringify(result, null, 2));
+  writeJson(result);
 }
 
 if (require.main === module) {
   void main().catch((error: unknown) => {
     const message = error instanceof Error ? error.stack || error.message : String(error);
-    console.error(message);
+    writeStderrLine(message);
     process.exitCode = 1;
   });
 }

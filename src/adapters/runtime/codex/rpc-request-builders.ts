@@ -1,4 +1,4 @@
-import { readPrefixedEnv } from "../../../core/branding";
+import { readPrefixedEnv } from "../../../contracts/app-env";
 
 
 export const DEFAULT_CODEX_COMMAND = "codex";

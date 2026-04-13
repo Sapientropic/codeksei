@@ -1,6 +1,7 @@
 import * as path from "node:path";
 
 import type { TimelineScreenshotOptions } from "../contracts";
+import { writeStdoutLine } from "../../../core/terminal-output";
 import type { TimelineRuntimeConfig } from "../../runtime-config";
 import {
   captureTimelineScreenshot,
@@ -34,7 +35,7 @@ async function runTimelineScreenshotCommand(config: TimelineRuntimeConfig): Prom
     return;
   }
   const result = await captureTimelineScreenshot(config, options);
-  console.log(`timeline screenshot saved: ${result.outputFile}`);
+  writeStdoutLine(`timeline screenshot saved: ${result.outputFile}`);
 }
 
 function parseArgs(args: string[], config: TimelineRuntimeConfig): TimelineScreenshotCliParseResult {
@@ -126,7 +127,7 @@ function requireValue(token: string, value: string | undefined): string {
 }
 
 function printHelp() {
-  console.log(`
+  writeStdoutLine(`
 用法: codeksei timeline screenshot [--output ./timeline-shot.png] [--selector timeline|analytics|events|CSS]
 
 截图前视图调整:

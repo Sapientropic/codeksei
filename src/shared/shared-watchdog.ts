@@ -1,12 +1,13 @@
-import { normalizeText } from "../core/text-normalization";
+import { ensureCodekseiHomeEnv } from "../contracts/app-env";
+import { resolvePackageRoot } from "../contracts/path-utils";
+import { normalizeText } from "../contracts/text-normalization";
 import { createWeixinChannelAdapter } from "../adapters/channel/weixin";
 import { resolveSelectedAccount } from "../adapters/channel/weixin/account-store";
 import { loadPersistedContextTokens } from "../adapters/channel/weixin/context-token-store";
 import { SessionStore } from "../adapters/runtime/codex/session-store";
-import { ensureCodekseiHomeEnv } from "../core/branding";
 import { readConfig } from "../core/config";
 import { loadEnvStack } from "../core/env-loader";
-import { resolvePackageRoot } from "../core/path-utils";
+import { writeStderrLine, writeStdoutLine } from "../core/terminal-output";
 import { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } from "../workspace/default-targets";
 import {
   ensureLogDir,
@@ -251,17 +252,17 @@ async function sendVisibleAlert(
 }
 
 function printSummary(state: SharedWatchdogState) {
-  console.log(`result=${state.result}`);
-  console.log(`readyz=${state.after?.appServer?.ready ? "ok" : "down"}`);
-  console.log(`shared_app_server_pid=${state.after?.appServer?.readyPid || "missing"}`);
-  console.log(`shared_codeksei_pid=${state.after?.bridge?.pid || "missing"}`);
-  console.log(`shared_bridge_heartbeat=${state.after?.bridge?.heartbeatStatus || "missing"}`);
-  console.log(`shared_bridge_heartbeat_at=${state.after?.bridge?.heartbeatUpdatedAt || "missing"}`);
+  writeStdoutLine(`result=${state.result}`);
+  writeStdoutLine(`readyz=${state.after?.appServer?.ready ? "ok" : "down"}`);
+  writeStdoutLine(`shared_app_server_pid=${state.after?.appServer?.readyPid || "missing"}`);
+  writeStdoutLine(`shared_codeksei_pid=${state.after?.bridge?.pid || "missing"}`);
+  writeStdoutLine(`shared_bridge_heartbeat=${state.after?.bridge?.heartbeatStatus || "missing"}`);
+  writeStdoutLine(`shared_bridge_heartbeat_at=${state.after?.bridge?.heartbeatUpdatedAt || "missing"}`);
   if (Array.isArray(state.actions) && state.actions.length) {
-    console.log(`actions=${state.actions.join(" | ")}`);
+    writeStdoutLine(`actions=${state.actions.join(" | ")}`);
   }
   if (normalizeText(state.error)) {
-    console.log(`error=${state.error}`);
+    writeStdoutLine(`error=${state.error}`);
   }
 }
 
@@ -274,7 +275,7 @@ function formatErrorMessage(error: unknown): string {
 
 if (require.main === module) {
   main().catch((error: unknown) => {
-    console.error(formatErrorMessage(error));
+    writeStderrLine(formatErrorMessage(error));
     process.exit(1);
   });
 }

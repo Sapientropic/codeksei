@@ -9,6 +9,8 @@ import type {
   ThreadStateStoreLike,
   TimelineIntegrationLike,
 } from "./app-service-contract";
+import { logError } from "./logging";
+import { writeJson } from "./terminal-output";
 
 interface PrintDoctorArgs {
   config: AppRuntimeConfig;
@@ -25,13 +27,13 @@ export function printDoctorReport({
   threadStateStore,
   timelineIntegration,
 }: PrintDoctorArgs): void {
-  console.log(JSON.stringify(collectDoctorReport({
+  writeJson(collectDoctorReport({
     config,
     channelAdapter,
     runtimeAdapter,
     threadStateStore,
     timelineIntegration,
-  }), null, 2));
+  }));
 }
 
 export function collectDoctorReport({
@@ -85,6 +87,6 @@ export function updateBridgeHeartbeatFile({
   try {
     writeSharedBridgeHeartbeat(filePath, patch);
   } catch (error) {
-    console.error(`[codeksei] bridge heartbeat write failed: ${formatErrorMessage(error)}`);
+    logError(`[codeksei] bridge heartbeat write failed: ${formatErrorMessage(error)}`);
   }
 }

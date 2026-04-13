@@ -1,5 +1,6 @@
-import { readPrefixedEnv } from "../core/branding";
+import { readPrefixedEnv } from "../contracts/app-env";
 import { commandLineMentionsRuntimeEntrypoint } from "../contracts/runtime-entrypoints";
+import { logInfo } from "../core/logging";
 import { runWatchdogOnce } from "./shared-watchdog";
 import {
   ensureLogDir,
@@ -60,7 +61,7 @@ function buildStateSignature(state: SharedWatchdogState) {
 
 function logLine(message: unknown) {
   const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] ${message}`);
+  logInfo(`[${timestamp}] ${message}`);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

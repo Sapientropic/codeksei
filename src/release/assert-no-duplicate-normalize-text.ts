@@ -11,7 +11,7 @@ import {
   walkRepoTsFiles,
 } from "./structural-debt-guard";
 
-const canonicalFile = "src/core/text-normalization.ts";
+const canonicalFile = "src/contracts/text-normalization.ts";
 
 export function assertNoDuplicateNormalizeText(): void {
   const inventory = readStructuralDebtInventory();

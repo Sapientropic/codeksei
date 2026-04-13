@@ -1,6 +1,7 @@
 import * as crypto from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { logWarn } from "../../../core/logging";
 import { getUploadUrl, sendMessage } from "./api";
 import { getUploadUrlV2, sendMessageV2 } from "./api-v2";
 import { getMimeFromFilename } from "./media-mime";
@@ -458,7 +459,7 @@ async function sendFileFallback({
       if (!isMissingUploadParamError(error) || index >= strategies.length - 1) {
         throw error;
       }
-      console.warn(
+      logWarn(
         `[codeksei] weixin media upload fallback `
         + `file=${path.basename(filePath)} reason=${formatErrorMessage(error)}`,
       );

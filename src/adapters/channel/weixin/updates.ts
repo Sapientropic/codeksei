@@ -1,5 +1,6 @@
 import { normalizeText } from "../../../core/text-normalization";
 import type { NormalizedIncomingMessage, UnknownRecord } from "../../../core/runtime-types";
+import { writeStdoutLine } from "../../../core/terminal-output";
 import { listWeixinAccounts, resolveSelectedAccount } from "./account-store";
 import { loadPersistedContextTokens, persistContextToken } from "./context-token-store";
 import { getUpdatesV2 } from "./api-v2";
@@ -112,18 +113,18 @@ export function createWeixinUpdateState(config: WeixinConfig) {
   function printAccounts(): void {
     const accounts = listWeixinAccounts(config);
     if (!accounts.length) {
-      console.log("当前没有已保存的微信账号。先执行 `npm run login`。");
+      writeStdoutLine("当前没有已保存的微信账号。先执行 `npm run login`。");
       return;
     }
-    console.log("已保存账号：");
+    writeStdoutLine("已保存账号：");
     for (const account of accounts) {
-      console.log(`- ${account.accountId}`);
-      console.log(`  userId: ${account.userId || "(unknown)"}`);
-      console.log(`  baseUrl: ${account.baseUrl || config.weixinBaseUrl}`);
+      writeStdoutLine(`- ${account.accountId}`);
+      writeStdoutLine(`  userId: ${account.userId || "(unknown)"}`);
+      writeStdoutLine(`  baseUrl: ${account.baseUrl || config.weixinBaseUrl}`);
       if (account.routeTag) {
-        console.log(`  routeTag: ${account.routeTag}`);
+        writeStdoutLine(`  routeTag: ${account.routeTag}`);
       }
-      console.log(`  savedAt: ${account.savedAt || "(unknown)"}`);
+      writeStdoutLine(`  savedAt: ${account.savedAt || "(unknown)"}`);
     }
   }
 

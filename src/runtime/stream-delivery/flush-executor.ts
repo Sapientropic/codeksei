@@ -1,5 +1,6 @@
 import * as crypto from "crypto";
 import type { ChannelAdapterLike } from "../../core/app-service-contract";
+import { logError, logInfo, logWarn } from "../../core/logging";
 import type { DeliveryFailurePayload, ReplyTarget } from "../../core/runtime-types";
 import { computeVisibleDeliveryDelta } from "./delta-merge";
 import {
@@ -69,7 +70,7 @@ export async function executeStreamFlush(
   if (sanitized.suppress) {
     state.sentText = sanitized.text;
     state.lastDeliveredVisibleText = sanitized.text;
-    console.log(
+    logInfo(
       `[codeksei] suppressed system reply `
       + `thread=${state.threadId} turn=${state.turnId || "(pending)"} `
       + `preview=${JSON.stringify(plainText.slice(0, 80))}`
@@ -122,7 +123,7 @@ export async function executeStreamFlush(
   const deliveryDedupKey = buildSettledWeixinDeliveryKey(state, safeText);
   if (deliveryDedupKey && wasRecentlyDelivered(context.recentSettledWeixinDeliveries, deliveryDedupKey)) {
     state.sentText = safeText;
-    console.warn(`[codeksei] suppress duplicate weixin delivery thread=${state.threadId}`);
+    logWarn(`[codeksei] suppress duplicate weixin delivery thread=${state.threadId}`);
     return;
   }
 
@@ -169,7 +170,7 @@ export async function executeStreamFlush(
       if (deliveryDedupKey) {
         rememberRecentDelivery(context.recentSettledWeixinDeliveries, deliveryDedupKey);
       }
-      console.log(
+      logInfo(
         `[codeksei] delivered weixin reply `
         + `thread=${state.threadId} turn=${state.turnId || "(pending)"} `
         + `mode=${prefersSettledDelivery(state) ? "settled" : (prefersStreamingDelivery(state) ? "stream" : "other")} `
@@ -181,7 +182,7 @@ export async function executeStreamFlush(
       }
       context.logDeliveryTrace("failed", tracePayload, error);
       const errorMessage = error instanceof Error ? error.message : String(error || "");
-      console.error(`[codeksei] failed to deliver reply thread=${state.threadId}: ${errorMessage}`);
+      logError(`[codeksei] failed to deliver reply thread=${state.threadId}: ${errorMessage}`);
       handleStreamDeliveryFailure(context, state, error);
     }
   });
@@ -211,6 +212,6 @@ export function handleStreamDeliveryFailure(
     const callbackErrorMessage = callbackError instanceof Error
       ? callbackError.message
       : String(callbackError || "");
-    console.error(`[codeksei] delivery failure callback crashed thread=${state.threadId}: ${callbackErrorMessage}`);
+    logError(`[codeksei] delivery failure callback crashed thread=${state.threadId}: ${callbackErrorMessage}`);
   });
 }

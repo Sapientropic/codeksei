@@ -43,7 +43,13 @@ function remapSourceAbsolutePath(absolutePath: string): string {
   }
   const distCandidate = path.join(distRoot, path.relative(repoRoot, absolutePath));
   const resolvedDistPath = resolveBuiltModulePath(distCandidate);
-  return resolvedDistPath || distCandidate;
+  if (resolvedDistPath) {
+    return resolvedDistPath;
+  }
+  // Prefer built output when it exists so verify keeps exercising the shipped
+  // shape, but fall back to source during targeted local tests for newly added
+  // modules that have not been built yet.
+  return resolveSourceModulePath(absolutePath) || distCandidate;
 }
 
 function resolveBuiltModulePath(distCandidate: string): string {
@@ -70,6 +76,19 @@ function normalizeBuiltModuleCandidate(distCandidate: string): string {
     return distCandidate.slice(0, -3);
   }
   return distCandidate;
+}
+
+function resolveSourceModulePath(sourceCandidate: string): string {
+  const candidates = [
+    sourceCandidate,
+    `${sourceCandidate}.ts`,
+    `${sourceCandidate}.tsx`,
+    `${sourceCandidate}.js`,
+    path.join(sourceCandidate, "index.ts"),
+    path.join(sourceCandidate, "index.tsx"),
+    path.join(sourceCandidate, "index.js"),
+  ];
+  return candidates.find((candidate) => fs.existsSync(candidate)) || "";
 }
 
 function normalizeForCompare(targetPath: string): string {

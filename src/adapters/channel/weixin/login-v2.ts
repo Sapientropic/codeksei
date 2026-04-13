@@ -4,6 +4,7 @@ import {
   normalizeRouteTag,
 } from "./protocol";
 import { redactSensitiveText } from "./redact";
+import { writeStdoutLine } from "../../../core/terminal-output";
 import {
   ACTIVE_LOGIN_TTL_MS,
   MAX_QR_REFRESH_COUNT,
@@ -110,9 +111,9 @@ async function waitForV2WeixinLogin({
   let scannedPrinted = false;
   let pollBaseUrl = apiBaseUrl;
 
-  console.log("使用微信扫描以下二维码，以完成连接：\n");
+  writeStdoutLine("使用微信扫描以下二维码，以完成连接：\n");
   printQrCode(qrResponse.qrcode_img_content);
-  console.log("\n等待连接结果...\n");
+  writeStdoutLine("\n等待连接结果...\n");
 
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -204,7 +205,7 @@ async function refreshQrCode({
     throw new Error("二维码多次过期，请重新执行 login");
   }
   const qrResponse = await fetchQrCode({ apiBaseUrl, botType, routeTag, clientVersion });
-  console.log(`${reason}(${nextRefreshCount}/${MAX_QR_REFRESH_COUNT})\n`);
+  writeStdoutLine(`${reason}(${nextRefreshCount}/${MAX_QR_REFRESH_COUNT})\n`);
   printQrCode(qrResponse.qrcode_img_content);
   return {
     qrResponse,
@@ -235,7 +236,7 @@ async function runV2LoginFlow(config: V2LoginConfig): Promise<void> {
   const routeTag = normalizeRouteTag(config.weixinRouteTag);
   const clientVersion = normalizeProtocolClientVersion(config.weixinProtocolClientVersion);
   const routeTagLabel = routeTag ? ` routeTag=${routeTag}` : "";
-  console.log(`[codeksei] 正在启动微信扫码登录（v2）...${routeTagLabel}`);
+  writeStdoutLine(`[codeksei] 正在启动微信扫码登录（v2）...${routeTagLabel}`);
   const result = await waitForV2WeixinLogin({
     apiBaseUrl: String(config.weixinBaseUrl || ""),
     botType: String(config.weixinQrBotType || ""),

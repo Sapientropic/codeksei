@@ -1,5 +1,6 @@
 import { normalizeTrimmedText } from "./approval-command-policy";
 import type { ChannelAccount, ChannelAdapterLike } from "./app-service-contract";
+import { logError } from "./logging";
 
 
 interface LongPollSystemMessageDispatcher {
@@ -162,7 +163,7 @@ export async function runAppPollLoop({
         consecutiveFailures,
         lastError: errorMessage,
       });
-      console.error(`[codeksei] poll failed: ${errorMessage}`);
+      logError(`[codeksei] poll failed: ${errorMessage}`);
       await sleep(consecutiveFailures >= maxConsecutiveFailures ? backoffDelayMs : retryDelayMs);
     }
   }

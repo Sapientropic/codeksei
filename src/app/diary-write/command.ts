@@ -1,8 +1,9 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { PACKAGE_NAME } from "../../contracts/app-env";
 import { LEGACY_TIMELINE_TIMEZONE } from "../../core/timezone";
+import { logWarn } from "../../core/logging";
 import { writeForeignTextDocument } from "../../state/json-state";
-import { PACKAGE_NAME } from "../../core/branding";
 import type { CommandExecutionResult } from "../../contracts/cli-contract";
 import { runCliMutation } from "../../core/cli-mutation";
 import { parseArgs, resolveBody, type DiaryWriteOptions } from "./args";
@@ -78,7 +79,7 @@ export async function runDiaryWriteCommand(config: DiaryWriteConfig, args: strin
         timelineText: options.timelineText,
       });
       if (timelineResolution.mode === "point_in_time") {
-        console.warn(
+        logWarn(
           `[${PACKAGE_NAME}] diary:write todo-done call omitted --timeline-text and no captured Todo start time was found; `
           + "synthesized only a point-in-time diary fact. Prefer opening the live Todo earlier, or pass exact cutover wording via --timeline-text."
         );

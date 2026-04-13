@@ -1,6 +1,6 @@
 import { normalizeText } from "../core/text-normalization";
 import * as path from "node:path";
-import { readPrefixedEnv, readPrefixedIntEnv, resolveStateDir } from "../core/branding";
+import { readPrefixedEnv, readPrefixedIntEnv, resolveStateDir } from "../contracts/app-env";
 import { resolveTimelineStateFiles } from "../core/timezone";
 import type { TimelineLocale } from "./runtime/contracts";
 import { resolveTimelineLocale } from "./runtime/infra/i18n/timeline-locale";

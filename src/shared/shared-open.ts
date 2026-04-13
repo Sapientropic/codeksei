@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
+import { readPrefixedEnv } from "../contracts/app-env";
 import { formatErrorMessage } from "../core/error-handling";
-import { readPrefixedEnv } from "../core/branding";
+import { writeStderrLine } from "../core/terminal-output";
 import { resolveCodexWorkspaceRoot } from "../workspace/workspace-alias";
 import {
   buildSpawnInvocation,
@@ -48,7 +49,7 @@ async function main() {
 
 if (require.main === module) {
   main().catch((error: unknown) => {
-    console.error(formatErrorMessage(error));
+    writeStderrLine(formatErrorMessage(error));
     process.exit(1);
   });
 }

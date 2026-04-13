@@ -3,6 +3,7 @@ import {
   buildRuntimeEntrypointArg,
   commandLineMentionsRuntimeEntrypoint,
 } from "../contracts/runtime-entrypoints";
+import { readPrefixedEnv } from "../contracts/app-env";
 import { classifySharedBridgeHeartbeat, readSharedBridgeHeartbeat } from "./shared-bridge-heartbeat";
 import { resolveBundledCodexBinary } from "../contracts/codex-spawn";
 import { probeCodexAppServerCapabilities } from "../contracts/codex-capability";
@@ -21,7 +22,6 @@ import {
   writePidFile,
 } from "./shared-process";
 import type { SharedBridgeHealth } from "./shared-types";
-import { readPrefixedEnv } from "../core/branding";
 
 function readSharedBridgeHealth(context: SharedProcessContext = resolveSharedProcessContext()): SharedBridgeHealth {
   const pid = readPidFile(context.bridgePidFile);

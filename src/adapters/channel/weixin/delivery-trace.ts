@@ -1,4 +1,5 @@
 import * as crypto from "node:crypto";
+import { logError, logInfo } from "../../../core/logging";
 
 const SEND_RETRY_DELAYS_MS = [900, 1800];
 const AMBIGUOUS_SEND_RETRY_DELAYS_MS = [1200];
@@ -131,10 +132,10 @@ export function logWeixinSendTrace(stage: string, trace: TraceContext): void {
   ].filter(Boolean);
   if (trace.error) {
     parts.push(`error=${JSON.stringify(String(trace.error || ""))}`);
-    console.error(parts.join(" "));
+    logError(parts.join(" "));
     return;
   }
-  console.log(parts.join(" "));
+  logInfo(parts.join(" "));
 }
 
 export function hashTraceText(text: unknown): string {

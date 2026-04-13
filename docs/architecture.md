@@ -11,7 +11,7 @@
 - repo-tracked authored source 里的 `.js/.jsx/.mjs` 已清零；timeline first-party runtime 也回到同一条 TS build 主链
 - 构建产物仍输出 CommonJS，但源码内部已经不再靠 `require / module.exports / export {}` 过渡态维持结构
 - timeline build 现在只复制非代码资产（如 CSS / examples），不再把 source runtime 整树原样复制进 `dist`
-- 跨模块共享的基础 helper 现在统一收口到 `src/core/text-normalization.ts`、`src/core/error-handling.ts`、`src/core/message-catalog.ts`
+- 跨模块共享的基础 helper 现在统一收口到 `src/contracts/text-normalization.ts`、`src/core/error-handling.ts`、`src/core/message-catalog.ts`
 - `npm run check` 现在会直接守 bare `.catch(() => {})`、重复 `normalizeText`、冗余 `typedXxx`、`!:` 和 explicit `any` 这类结构债，不再只靠 review 口头约束
 
 这一页只解释当前稳定结构，不复述实现细节清单。
@@ -46,7 +46,7 @@
 这些 helper 现在是跨层共享的稳定入口：
 
 - `text-normalization.ts`
-  repo 唯一 canonical `normalizeText` 与相关文本归一化 helper；同语义 trim-or-empty 不再允许在模块里各自复制
+  `src/contracts/text-normalization.ts` 是 repo 唯一 canonical `normalizeText` owner；`src/core/text-normalization.ts` 仅保留兼容 re-export，避免 shared/contracts 再反向依赖 core
 - `error-handling.ts`
   best-effort / cleanup 失败的显式 suppressed-error 路径；teardown 不再靠 bare catch 静默吞掉
 - `message-catalog.ts`

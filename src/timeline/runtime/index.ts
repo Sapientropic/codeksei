@@ -4,6 +4,7 @@ import * as path from "node:path";
 
 import { readConfig } from "../../core/config";
 import { loadEnvStack } from "../../core/env-loader";
+import { writeStderrLine } from "../../core/terminal-output";
 import { main as runTimelineCli } from "../index";
 
 function ensureDefaultConfigDirectory(): void {
@@ -20,7 +21,7 @@ async function main(argv: string[] = process.argv): Promise<void> {
 if (require.main === module) {
   void main().catch((error: unknown) => {
     const message = error instanceof Error ? error.stack || error.message : String(error);
-    console.error(message);
+    writeStderrLine(message);
     process.exitCode = 1;
   });
 }

@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { ZodType } from "zod";
+import { logWarn } from "../core/logging";
 
 type JsonValidationResult = true | string | Error | undefined;
 type JsonValidator = ((value: unknown) => JsonValidationResult) | null;
@@ -60,7 +61,7 @@ export function readManagedJsonStateFile<T>({
       return cloneJsonValue(fallback);
     }
     const backupPath = isolateCorruptStateFile(filePath);
-    console.warn(
+    logWarn(
       `[codeksei] ${label} invalid; ${backupPath ? `moved to ${backupPath}` : "kept original file in place"}`
       + ` (${formatErrorMessage(error)})`
     );

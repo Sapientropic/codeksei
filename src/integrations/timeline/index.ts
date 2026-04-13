@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 
 import { resolveTimelineStateFiles } from "../../core/timezone";
 import { ensureTimelineStateTimezone } from "./state-sync";
-import { readPrefixedEnv } from "../../core/branding";
+import { readPrefixedEnv } from "../../contracts/app-env";
 import { resolvePackageRoot } from "../../core/path-utils";
 import { resolveRuntimeEntrypointAbsolute } from "../../contracts/runtime-entrypoints";
 

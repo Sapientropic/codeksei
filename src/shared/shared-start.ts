@@ -1,6 +1,7 @@
-import { readPrefixedEnv } from "../core/branding";
+import { readPrefixedEnv } from "../contracts/app-env";
 import { formatErrorMessage } from "../core/error-handling";
 import { operatorMessages } from "../core/message-catalog";
+import { writeStderrLine, writeStdoutLine } from "../core/terminal-output";
 import {
   ensureManagedAppServer,
   ensureManagedBridge,
@@ -29,18 +30,18 @@ function parseIntervalMinutes() {
 async function main() {
   const sharedContext = resolveSharedProcessContext();
   const appServer = await ensureManagedAppServer({ restartUnhealthy: true });
-  console.log(operatorMessages.sharedStartAppServer(appServer.status, appServer.pid, sharedContext.listenUrl));
+  writeStdoutLine(operatorMessages.sharedStartAppServer(appServer.status, appServer.pid, sharedContext.listenUrl));
 
   const bridge = await ensureManagedBridge({ restartUnhealthy: true });
-  console.log(operatorMessages.sharedStartBridge(bridge.status, bridge.pid));
+  writeStdoutLine(operatorMessages.sharedStartBridge(bridge.status, bridge.pid));
 
   const supervisor = await ensureManagedSupervisor({ intervalMinutes: parseIntervalMinutes() });
-  console.log(operatorMessages.sharedStartSupervisor(supervisor.status, supervisor.pid));
+  writeStdoutLine(operatorMessages.sharedStartSupervisor(supervisor.status, supervisor.pid));
 }
 
 if (require.main === module) {
   main().catch((error: unknown) => {
-    console.error(formatErrorMessage(error));
+    writeStderrLine(formatErrorMessage(error));
     process.exit(1);
   });
 }

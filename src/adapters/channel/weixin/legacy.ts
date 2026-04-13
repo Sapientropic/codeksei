@@ -1,4 +1,5 @@
 import * as crypto from "node:crypto";
+import { writeStdoutLine } from "../../../core/terminal-output";
 
 import { getConfig, getUpdates, sendMessage, sendTyping } from "./api";
 import {
@@ -151,18 +152,18 @@ function createLegacyWeixinChannelAdapter(config: LegacyWeixinConfig) {
     printAccounts() {
       const accounts = listWeixinAccounts(config) as LegacyWeixinAccount[];
       if (!accounts.length) {
-        console.log("当前没有已保存的微信账号。先执行 `npm run login`。");
+        writeStdoutLine("当前没有已保存的微信账号。先执行 `npm run login`。");
         return;
       }
-      console.log("已保存账号：");
+      writeStdoutLine("已保存账号：");
       for (const account of accounts) {
-        console.log(`- ${account.accountId}`);
-        console.log(`  userId: ${account.userId || "(unknown)"}`);
-        console.log(`  baseUrl: ${account.baseUrl || config.weixinBaseUrl}`);
+        writeStdoutLine(`- ${account.accountId}`);
+        writeStdoutLine(`  userId: ${account.userId || "(unknown)"}`);
+        writeStdoutLine(`  baseUrl: ${account.baseUrl || config.weixinBaseUrl}`);
         if (account.routeTag) {
-          console.log(`  routeTag: ${account.routeTag}`);
+          writeStdoutLine(`  routeTag: ${account.routeTag}`);
         }
-        console.log(`  savedAt: ${account.savedAt || "(unknown)"}`);
+        writeStdoutLine(`  savedAt: ${account.savedAt || "(unknown)"}`);
       }
     },
     resolveAccount() {

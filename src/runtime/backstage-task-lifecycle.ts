@@ -10,6 +10,7 @@ import type {
   TimelineScreenshotQueueLike,
 } from "../core/app-service-contract";
 import { ignoreBestEffortError } from "../core/error-handling";
+import { logError, logWarn } from "../core/logging";
 import { operatorMessages, userFacingMessages } from "../core/message-catalog";
 import type {
   HandlePreparedMessageOptions,
@@ -148,7 +149,7 @@ export class BackstageTaskLifecycle {
             countAttempt: false,
           });
           if (deferred?.status === "dead_letter") {
-            console.warn(
+            logWarn(
               `[codeksei] backstage message dead-lettered id=${message.id} reason=${dispatchResult.reason}`,
             );
           }
@@ -156,7 +157,7 @@ export class BackstageTaskLifecycle {
         }
         case "dead_letter":
           dispatcher?.deadLetter(message, { reason: dispatchResult.reason });
-          console.warn(
+          logWarn(
             `[codeksei] backstage message dead-lettered id=${message.id} reason=${dispatchResult.reason || "dead_letter"}`,
           );
           break;
@@ -168,7 +169,7 @@ export class BackstageTaskLifecycle {
             countAttempt: true,
           });
           if (deferred?.status === "dead_letter") {
-            console.warn(
+            logWarn(
               `[codeksei] backstage message dead-lettered id=${message.id} reason=${this.normalizeText(dispatchResult?.reason) || "runtime_send_failed"}`,
             );
           }
@@ -189,7 +190,7 @@ export class BackstageTaskLifecycle {
         });
       } catch (error) {
         const messageText = error instanceof Error ? error.message : String(error || "unknown error");
-        console.error(operatorMessages.timelineScreenshotJobFailed(job.id, messageText));
+        logError(operatorMessages.timelineScreenshotJobFailed(job.id, messageText));
         // The job has already failed locally. Clearing typing state and sending
         // the user-facing failure notice are best-effort cleanup steps only.
         await ignoreBestEffortError(this.channelAdapter.sendTyping({

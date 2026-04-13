@@ -20,6 +20,7 @@ import type {
 import { buildWeixinHelpText } from "./command-registry";
 import { buildChannelCommandContext } from "./channel-command-context";
 import type { ParsedChannelCommand } from "./channel-command-router";
+import { logInfo } from "./logging";
 import type { NormalizedIncomingMessage, PendingApprovalState } from "./runtime-types";
 
 interface ControlCommandSessionStore extends ChannelCommandSessionStore {
@@ -94,7 +95,7 @@ function createControlCommandHandlers({
       }
 
       const decision = command.name === "no" ? "decline" : "accept";
-      console.log(
+      logInfo(
         `[codeksei] approval response requested thread=${threadId} requestId=${approval.requestId} decision=${decision} workspace=${workspaceRoot}`
       );
       await runtimeAdapter.respondApproval({
@@ -102,7 +103,7 @@ function createControlCommandHandlers({
         decision,
       });
       await clearPendingApproval(sessionWriter, threadId);
-      console.log(
+      logInfo(
         `[codeksei] approval response delivered thread=${threadId} requestId=${approval.requestId} decision=${decision}`
       );
       if (command.name === "always" && decision === "accept") {

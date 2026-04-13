@@ -9,6 +9,7 @@ import type {
 } from "./app-service-contract";
 import { formatErrorMessage, runAppPollLoop } from "./app-poll-loop";
 import { createShutdownController } from "./app-runtime-helpers";
+import { logError, logInfo } from "./logging";
 import { SystemMessageDispatcher } from "./system-message-dispatcher";
 
 const RETRY_DELAY_MS = 2_000;
@@ -84,24 +85,24 @@ export async function runCodekseiAppLifecycle({
     lastError: "",
   });
 
-  console.log("[codeksei] bootstrap ok");
-  console.log(`[codeksei] channel=${channelAdapter.describe().id}`);
-  console.log(`[codeksei] runtime=${runtimeAdapter.describe().id}`);
-  console.log(`[codeksei] timeline=${timelineIntegration.describe().id}`);
-  console.log(`[codeksei] account=${account.accountId}`);
-  console.log(`[codeksei] baseUrl=${account.baseUrl}`);
-  console.log(`[codeksei] workspaceRoot=${config.workspaceRoot}`);
-  console.log(`[codeksei] knownContextTokens=${knownContextTokens}`);
-  console.log(`[codeksei] syncBuffer=${syncBuffer ? "ready" : "empty"}`);
-  console.log(`[codeksei] weixinReplyMode=${String(config.weixinReplyMode || "")}`);
-  console.log(`[codeksei] weixinDeliveryTrace=${config.weixinDeliveryTrace ? "on" : "off"}`);
-  console.log(`[codeksei] codexEndpoint=${runtimeState.endpoint}`);
-  console.log(`[codeksei] codexModels=${runtimeState.models.length}`);
-  console.log("[codeksei] 最小消息链路已启动，正在等待微信消息。");
+  logInfo("[codeksei] bootstrap ok");
+  logInfo(`[codeksei] channel=${channelAdapter.describe().id}`);
+  logInfo(`[codeksei] runtime=${runtimeAdapter.describe().id}`);
+  logInfo(`[codeksei] timeline=${timelineIntegration.describe().id}`);
+  logInfo(`[codeksei] account=${account.accountId}`);
+  logInfo(`[codeksei] baseUrl=${account.baseUrl}`);
+  logInfo(`[codeksei] workspaceRoot=${config.workspaceRoot}`);
+  logInfo(`[codeksei] knownContextTokens=${knownContextTokens}`);
+  logInfo(`[codeksei] syncBuffer=${syncBuffer ? "ready" : "empty"}`);
+  logInfo(`[codeksei] weixinReplyMode=${String(config.weixinReplyMode || "")}`);
+  logInfo(`[codeksei] weixinDeliveryTrace=${config.weixinDeliveryTrace ? "on" : "off"}`);
+  logInfo(`[codeksei] codexEndpoint=${runtimeState.endpoint}`);
+  logInfo(`[codeksei] codexModels=${runtimeState.models.length}`);
+  logInfo("[codeksei] 最小消息链路已启动，正在等待微信消息。");
   if (config.startWithCheckin) {
-    console.log("[codeksei] checkin: enabled");
+    logInfo("[codeksei] checkin: enabled");
     void runSystemCheckinPoller(config).catch((error) => {
-      console.error(`[codeksei] checkin poller stopped: ${error instanceof Error ? error.message : String(error)}`);
+      logError(`[codeksei] checkin poller stopped: ${error instanceof Error ? error.message : String(error)}`);
     });
   }
 

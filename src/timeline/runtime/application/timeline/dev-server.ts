@@ -3,6 +3,7 @@ import * as http from "node:http";
 import * as path from "node:path";
 
 import { resolvePublishedAssetFile } from "../../../../contracts/runtime-entrypoints";
+import { logError, logInfo, logWarn } from "../../../../core/logging";
 import type { TimelineRuntimeConfig } from "../../../runtime-config";
 import { getTimelineDemoFactsPath, loadTimelineSourceData } from "../../infra/timeline/timeline-source-data";
 import { buildTimelineSite } from "./build-dashboard";
@@ -134,13 +135,13 @@ function createTimelineDevWatcher(
   try {
     stats = fs.statSync(normalizedPath);
   } catch {
-    console.warn(`timeline dev watch skipped: ${normalizedPath}`);
+    logWarn(`timeline dev watch skipped: ${normalizedPath}`);
     return null;
   }
 
   const startPollingFallback = (reason = ""): TimelineDevWatcher => {
     const prefix = reason ? `timeline dev watch fallback (${reason})` : "timeline dev watch fallback";
-    console.warn(`${prefix}: ${normalizedPath}`);
+    logWarn(`${prefix}: ${normalizedPath}`);
     return createPollingWatcher(normalizedPath, onChange, options);
   };
 
@@ -152,7 +153,7 @@ function createTimelineDevWatcher(
     watcher.on("error", (error: unknown) => {
       const fallbackReason = resolveTimelineWatchFallbackReason(error);
       if (!fallbackReason) {
-        console.warn(`timeline dev watch error: ${normalizedPath} ${describeTimelineWatchError(error)}`);
+        logWarn(`timeline dev watch error: ${normalizedPath} ${describeTimelineWatchError(error)}`);
         return;
       }
       watcher.close();
@@ -171,7 +172,7 @@ function createTimelineDevWatcher(
     if (fallbackReason) {
       return startPollingFallback(fallbackReason);
     }
-    console.warn(`timeline dev watch skipped: ${normalizedPath}`);
+    logWarn(`timeline dev watch skipped: ${normalizedPath}`);
     return null;
   }
 }
@@ -293,7 +294,7 @@ function scheduleTimelineDevRebuild(state: TimelineDevServerState, config: Timel
   state.timer = setTimeout(() => {
     state.timer = null;
     rebuildTimelineDevSite(state, config).catch((error) => {
-      console.error("timeline dev rebuild failed:", error instanceof Error ? error.message : String(error));
+      logError("timeline dev rebuild failed:", error instanceof Error ? error.message : String(error));
     });
   }, 120);
 }
@@ -314,7 +315,7 @@ async function rebuildTimelineDevSite(
     for (const client of state.clients) {
       client.write(`data: ${JSON.stringify({ version: state.version })}\n\n`);
     }
-    console.log(`timeline dev rebuilt: ${new Date(state.version).toLocaleTimeString("zh-CN", { hour12: false })}`);
+    logInfo(`timeline dev rebuilt: ${new Date(state.version).toLocaleTimeString("zh-CN", { hour12: false })}`);
   } finally {
     state.building = false;
     if (state.pending) {

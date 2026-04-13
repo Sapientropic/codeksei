@@ -11,6 +11,7 @@ import type {
   ReplyTarget,
   UnknownRecord,
 } from "../core/runtime-types";
+import { logError, logInfo } from "../core/logging";
 import {
   normalizeWeixinReplyMode,
   type FlushTrigger,
@@ -195,10 +196,10 @@ export class StreamDelivery {
     if (error) {
       const errorMessage = error instanceof Error ? error.message : String(error || "");
       parts.push(`error=${JSON.stringify(errorMessage)}`);
-      console.error(parts.join(" "));
+      logError(parts.join(" "));
       return;
     }
-    console.log(parts.join(" "));
+    logInfo(parts.join(" "));
   }
 }
 

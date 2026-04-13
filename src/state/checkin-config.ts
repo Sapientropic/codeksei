@@ -1,4 +1,4 @@
-import { readPrefixedEnv } from "../core/branding";
+import { readPrefixedEnv } from "../contracts/app-env";
 import type { CheckinConfig } from "../contracts/checkin-config";
 import { CheckinConfigStore } from "./checkin-config-store";
 

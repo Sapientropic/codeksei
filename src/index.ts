@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { PACKAGE_NAME } from "./core/branding";
+import { PACKAGE_NAME } from "./contracts/app-env";
 import type { CommandExecutionResult, GlobalCliOptions } from "./contracts/cli-contract";
 import { findTerminalCommandManifest } from "./contracts/command-surface";
 import {
@@ -19,6 +19,7 @@ import {
   parseGlobalCliOptions,
   resolveGlobalCliOptions,
 } from "./core/cli-contract";
+import { logError } from "./core/logging";
 import { createTerminalCommandContext } from "./app/terminal-command-context";
 import { runTerminalManifestCommand } from "./app/terminal-command-dispatch";
 import type { TerminalCommandManifestEntry } from "./contracts/command-surface";
@@ -147,19 +148,19 @@ function installRuntimeErrorHooks(cli: GlobalCliOptions): void {
 
   process.on("unhandledRejection", (reason: unknown) => {
     const message = formatCliErrorMessage(reason);
-    console.error(`[${PACKAGE_NAME}] unhandled rejection ${message}`);
+    logError(`[${PACKAGE_NAME}] unhandled rejection ${message}`);
     if (cli.verbose || cli.debug) {
       const detail = reason instanceof Error ? reason.stack || reason.message : String(reason);
-      console.error(detail);
+      logError(detail);
     }
   });
 
   process.on("uncaughtException", (error: unknown) => {
     const message = formatCliErrorMessage(error);
-    console.error(`[${PACKAGE_NAME}] uncaught exception ${message}`);
+    logError(`[${PACKAGE_NAME}] uncaught exception ${message}`);
     if (cli.verbose || cli.debug) {
       const detail = error instanceof Error ? error.stack || error.message : String(error);
-      console.error(detail);
+      logError(detail);
     }
     process.exitCode = 1;
   });

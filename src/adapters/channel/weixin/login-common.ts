@@ -1,4 +1,5 @@
 import * as qrcodeTerminal from "qrcode-terminal";
+import { writeStdoutLine } from "../../../core/terminal-output";
 
 import {
   deleteWeixinAccount,
@@ -25,10 +26,10 @@ function ensureTrailingSlash(url: string): string {
 function printQrCode(url: string): void {
   try {
     qrcodeTerminal.generate(url, { small: true });
-    console.log("如果二维码未能成功展示，请用浏览器打开以下链接扫码：");
-    console.log(url);
+    writeStdoutLine("如果二维码未能成功展示，请用浏览器打开以下链接扫码：");
+    writeStdoutLine(url);
   } catch {
-    console.log(url);
+    writeStdoutLine(url);
   }
 }
 
@@ -48,7 +49,7 @@ function cleanupStaleAccountsForUserId(
   for (const staleAccount of staleAccounts) {
     deleteWeixinAccount(config, staleAccount.accountId);
     clearPersistedContextTokens(config, staleAccount.accountId);
-    console.log(`[codeksei] removed stale account ${staleAccount.accountId} for userId ${activeUserId}`);
+    writeStdoutLine(`[codeksei] removed stale account ${staleAccount.accountId} for userId ${activeUserId}`);
   }
   return staleAccounts;
 }
@@ -56,12 +57,12 @@ function cleanupStaleAccountsForUserId(
 function finishWeixinLogin(config: WeixinAccountConfig, result: WeixinLoginResult): WeixinAccountRecord {
   const account = saveWeixinAccount(config, result.accountId, result);
   cleanupStaleAccountsForUserId(config, account);
-  console.log("\n✅ 与微信连接成功！");
-  console.log(`accountId: ${account.accountId}`);
-  console.log(`userId: ${account.userId || "(unknown)"}`);
-  console.log(`baseUrl: ${account.baseUrl}`);
+  writeStdoutLine("\n✅ 与微信连接成功！");
+  writeStdoutLine(`accountId: ${account.accountId}`);
+  writeStdoutLine(`userId: ${account.userId || "(unknown)"}`);
+  writeStdoutLine(`baseUrl: ${account.baseUrl}`);
   if (account.routeTag) {
-    console.log(`routeTag: ${account.routeTag}`);
+    writeStdoutLine(`routeTag: ${account.routeTag}`);
   }
   return account;
 }

@@ -1,11 +1,11 @@
-import { normalizeText } from "../core/text-normalization";
+import { normalizeText } from "../contracts/text-normalization";
 import * as fs from "node:fs";
 import { resolveSelectedAccount } from "../adapters/channel/weixin/account-store";
 import { SessionStore } from "../adapters/runtime/codex/session-store";
 import {
   normalizeDisplayPath,
   resolveCrossPlatformPath,
-} from "../core/path-utils";
+} from "../contracts/path-utils";
 import {
   resolveSharedProcessContext,
   type SharedProcessContext,

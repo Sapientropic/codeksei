@@ -1,8 +1,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { ensureStateDirectory, readPrefixedBoolEnv, readPrefixedEnv, resolveStateDir } from "../core/branding";
+import { ensureStateDirectory, readPrefixedBoolEnv, readPrefixedEnv, resolveStateDir } from "../contracts/app-env";
+import { resolvePackageRoot } from "../contracts/path-utils";
 import { loadEnvStack } from "../core/env-loader";
-import { resolvePackageRoot } from "../core/path-utils";
 import { DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS } from "./shared-bridge-heartbeat";
 import type { SharedProcessContext } from "./shared-types";
 
