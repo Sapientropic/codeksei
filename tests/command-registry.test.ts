@@ -59,6 +59,13 @@ test("review leaf help uses codeksei syntax", () => {
   assert.doesNotMatch(help, /npm run review:weekly/u);
 });
 
+test("timeline screenshot leaf help keeps generic screenshots on the default full-page path", () => {
+  const help = buildTerminalLeafHelp("timeline.screenshot");
+
+  assert.match(help, /默认就是整页/u);
+  assert.match(help, /codeksei timeline screenshot --send/u);
+});
+
 test("diary topic help explains captured Todo start time for later timeline accuracy", () => {
   const help = buildTerminalTopicHelp("diary");
 

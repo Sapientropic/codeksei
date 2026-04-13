@@ -226,8 +226,10 @@ const LEAF_HELP = {
     body: [
       "  这条命令只负责把截图任务排进本地队列，真正截图和发送由正在运行的微信 bridge 异步执行。",
       "  queued 不等于“已经发到微信”；只有 bridge 真正送达后，用户那边才会看到图片或文件。",
+      "  泛泛地说“截个图”时，默认就是整页；只有明确说时间轴/分析区/事件列表这类局部区域时，才额外传 --selector。",
     ],
     examples: [
+      "  codeksei timeline screenshot --send",
       "  codeksei timeline screenshot --send --selector timeline",
     ],
     includeFlagBlock: true,
