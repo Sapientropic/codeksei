@@ -299,6 +299,21 @@ function createTestAppHarness({
     enqueue(message) {
       return message;
     },
+    complete() {
+      return { status: "sent", message: null };
+    },
+    deadLetter() {
+      return { status: "dead_letter", message: null };
+    },
+    defer() {
+      return { status: "deferred", message: null };
+    },
+    hasPendingForAccount() {
+      return false;
+    },
+    takeReadyForAccount() {
+      return [];
+    },
   };
 
   const timelineScreenshotQueue: TimelineScreenshotQueueLike = {

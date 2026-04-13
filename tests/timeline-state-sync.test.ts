@@ -129,3 +129,36 @@ test("timeline state sync bootstraps timezone metadata for an empty state dir", 
   assert.equal(state.timezone, "Europe/Paris");
   assert.deepEqual(state.facts, {});
 });
+
+test("timeline state sync lets explicit timezone override migrate a custom timezone", () => {
+  const dirPath = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-timeline-explicit-"));
+  writeTimelineSnapshot(dirPath, {
+    timezone: "America/New_York",
+    facts: {
+      "2026-04-10": {
+        status: "draft",
+        updatedAt: "2026-04-10T01:00:00.000Z",
+        source: null,
+        events: [{
+          id: "evt-2",
+          startAt: "2026-04-10T09:30:00-04:00",
+          endAt: "2026-04-10T10:00:00-04:00",
+          title: "explicit override event",
+        }],
+      },
+    },
+  });
+
+  ensureTimelineStateTimezone({
+    timelineStateDir: dirPath,
+    timezone: "America/Los_Angeles",
+    timezoneSource: "env",
+    timezoneExplicit: true,
+  });
+
+  const state = readTimelineState(dirPath);
+  assert.equal(state.timezone, "America/Los_Angeles");
+  const migratedDay = state.facts["2026-04-10"];
+  assert.ok(migratedDay);
+  assert.equal(migratedDay.events[0]?.id, "evt-2");
+});

@@ -185,9 +185,10 @@
 - `shared-process.ts` 退回 barrel
 - `shared-watchdog.ts`、`shared-status.ts`、`shared-supervisor.ts` 共享 `SharedBridgeHealth`、`SharedWatchdogState`、`ManagedStopResult` 等显式类型，而不是继续走高风险 `any`
 
-运行时恢复链当前默认还有一条真实 smoke 保护：
+运行时恢复链当前默认还有一条仓内 automated smoke 保护：
 
-- `tests/shared-mode-long-chain.test.ts` 会走 built `dist` 入口与 fake Codex app-server / fake Weixin HTTP server，覆盖 `shared:start -> shared:status -> shared:open`、approval continuity after restart，以及 `stream / settled` reply mode 的真实 adapter 链路
+- `tests/shared-mode-long-chain.test.ts` 会走 built `dist` 入口与 fake Codex app-server / fake Weixin HTTP server，覆盖 `shared:start -> shared:status -> shared:open`、approval continuity after restart，以及 `stream / settled` reply mode 的 adapter 链路
+- 这条自动化链路证明的是仓内 integration surface，不等于真实账号 / 真实网络 / 真实 runtime 环境下的 live smoke；后者继续由 maintainer `smoke:shared:real:*` assisted smoke 补证
 
 ## 8. Integrations And Operational Layer
 

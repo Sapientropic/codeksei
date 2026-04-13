@@ -2,6 +2,38 @@ import { z } from "zod";
 
 type PlainObject = Record<string, unknown>;
 
+export interface RawSessionBinding extends PlainObject {
+  workspaceId?: unknown;
+  accountId?: unknown;
+  senderId?: unknown;
+  activeWorkspaceRoot?: unknown;
+  updatedAt?: unknown;
+  threadIdByWorkspaceRoot?: unknown;
+  codexParamsByWorkspaceRoot?: unknown;
+  workspaceBootstrapThreadIdByWorkspaceRoot?: unknown;
+}
+
+export interface RawPendingApprovalRecord extends PlainObject {
+  requestId?: unknown;
+  reason?: unknown;
+  command?: unknown;
+  commandTokens?: unknown;
+  signature?: unknown;
+  promptedAt?: unknown;
+}
+
+export interface RawAvailableModelCatalog extends PlainObject {
+  models?: unknown;
+  updatedAt?: unknown;
+}
+
+export interface RawSessionState extends PlainObject {
+  bindings?: unknown;
+  approvalCommandAllowlistByWorkspaceRoot?: unknown;
+  approvalPromptStateByThreadId?: unknown;
+  availableModelCatalog?: unknown;
+}
+
 export interface PendingApprovalRecord {
   requestId: string;
   reason: string;
@@ -50,7 +82,7 @@ export function createEmptySessionState(): SessionState {
 }
 
 export function normalizeSessionState(state: unknown): SessionState {
-  const source = isPlainObject(state) ? state : {};
+  const source = asRawSessionState(state);
   return {
     ...source,
     ...createEmptySessionState(),
@@ -64,48 +96,49 @@ export function normalizeSessionState(state: unknown): SessionState {
 }
 
 export function validateSessionStoreState(state: unknown): true | string {
+  const source = asRawSessionState(state);
   if (!isPlainObject(state)) {
     return "session store top-level state must be an object";
   }
-  if ("bindings" in state && !isPlainObject(state.bindings)) {
+  if ("bindings" in source && !isPlainObject(source.bindings)) {
     return "session store bindings must be an object";
   }
-  for (const [bindingKey, binding] of Object.entries(state.bindings || {})) {
+  for (const [bindingKey, binding] of objectEntries(source.bindings)) {
     const error = validateBinding(binding, bindingKey);
     if (error) {
       return error;
     }
   }
   if (
-    "approvalCommandAllowlistByWorkspaceRoot" in state
-    && !isPlainObject(state.approvalCommandAllowlistByWorkspaceRoot)
+    "approvalCommandAllowlistByWorkspaceRoot" in source
+    && !isPlainObject(source.approvalCommandAllowlistByWorkspaceRoot)
   ) {
     return "session store approvalCommandAllowlistByWorkspaceRoot must be an object";
   }
-  for (const [workspaceRoot, entries] of Object.entries(state.approvalCommandAllowlistByWorkspaceRoot || {})) {
+  for (const [workspaceRoot, entries] of objectEntries(source.approvalCommandAllowlistByWorkspaceRoot)) {
     if (!Array.isArray(entries)) {
       return `session store allowlist for workspace ${workspaceRoot} must be an array`;
     }
     for (let index = 0; index < entries.length; index += 1) {
-      if (!Array.isArray(entries[index]) || entries[index].some((part: any) => typeof part !== "string")) {
+      if (!isStringArray(entries[index])) {
         return `session store allowlist ${workspaceRoot}[${index}] must be string[]`;
       }
     }
   }
   if (
-    "approvalPromptStateByThreadId" in state
-    && !isPlainObject(state.approvalPromptStateByThreadId)
+    "approvalPromptStateByThreadId" in source
+    && !isPlainObject(source.approvalPromptStateByThreadId)
   ) {
     return "session store approvalPromptStateByThreadId must be an object";
   }
-  for (const [threadId, approval] of Object.entries(state.approvalPromptStateByThreadId || {})) {
+  for (const [threadId, approval] of objectEntries(source.approvalPromptStateByThreadId)) {
     const error = validatePendingApprovalRecord(approval, threadId);
     if (error) {
       return error;
     }
   }
-  if ("availableModelCatalog" in state) {
-    const error = validateAvailableModelCatalog(state.availableModelCatalog);
+  if ("availableModelCatalog" in source) {
+    const error = validateAvailableModelCatalog(source.availableModelCatalog);
     if (error) {
       return error;
     }
@@ -113,7 +146,10 @@ export function validateSessionStoreState(state: unknown): true | string {
   return true;
 }
 
-export const sessionStoreStateSchema = z.unknown().transform((value: any, ctx: any) => {
+export const sessionStoreStateSchema = z.unknown().transform((
+  value: unknown,
+  ctx: z.RefinementCtx,
+): SessionState | typeof z.NEVER => {
   const validation = validateSessionStoreState(value);
   if (validation !== true) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: validation });
@@ -123,7 +159,7 @@ export const sessionStoreStateSchema = z.unknown().transform((value: any, ctx: a
 });
 
 export function normalizeSessionBinding(binding: unknown): SessionBinding {
-  const source = isPlainObject(binding) ? binding : {};
+  const source = asRawSessionBinding(binding);
   return {
     ...source,
     workspaceId: normalizeText(source.workspaceId),
@@ -140,110 +176,101 @@ export function normalizeSessionBinding(binding: unknown): SessionBinding {
 }
 
 function normalizeBindings(value: unknown): Record<string, SessionBinding> {
-  if (!isPlainObject(value)) {
-    return {};
+  const bindings: Record<string, SessionBinding> = {};
+  for (const [bindingKey, binding] of objectEntries(value)) {
+    const normalizedBindingKey = normalizeText(bindingKey);
+    if (!normalizedBindingKey) {
+      continue;
+    }
+    bindings[normalizedBindingKey] = normalizeSessionBinding(binding);
   }
-  return Object.fromEntries(
-    Object.entries(value)
-      .map(([bindingKey, binding]: any) => [normalizeText(bindingKey), normalizeSessionBinding(binding)])
-      .filter(([bindingKey]: any) => Boolean(bindingKey)),
-  );
+  return bindings;
 }
 
 function normalizeCodexParamsMap(value: unknown): Record<string, { model: string }> {
-  if (!isPlainObject(value)) {
-    return {};
+  const result: Record<string, { model: string }> = {};
+  for (const [workspaceRoot, params] of objectEntries(value)) {
+    const normalizedWorkspaceRoot = normalizeText(workspaceRoot);
+    if (!normalizedWorkspaceRoot) {
+      continue;
+    }
+    const source = asPlainObject(params);
+    result[normalizedWorkspaceRoot] = {
+      model: normalizeText(source.model),
+    };
   }
-  return Object.fromEntries(
-    Object.entries(value)
-      .map(([workspaceRoot, params]: any) => {
-        const normalizedWorkspaceRoot = normalizeText(workspaceRoot);
-        if (!normalizedWorkspaceRoot) {
-          return null;
-        }
-        const source = isPlainObject(params) ? params : {};
-        return [normalizedWorkspaceRoot, {
-          model: normalizeText(source.model),
-        }];
-      })
-      .filter((entry: any): entry is [string, { model: string }] => Boolean(entry)),
-  );
+  return result;
 }
 
 function normalizeStringMap(value: unknown): Record<string, string> {
-  if (!isPlainObject(value)) {
-    return {};
+  const result: Record<string, string> = {};
+  for (const [key, entryValue] of objectEntries(value)) {
+    const normalizedKey = normalizeText(key);
+    if (!normalizedKey) {
+      continue;
+    }
+    result[normalizedKey] = normalizeText(entryValue);
   }
-  return Object.fromEntries(
-    Object.entries(value)
-      .map(([key, entryValue]: any) => [normalizeText(key), normalizeText(entryValue)])
-      .filter(([key]: any) => Boolean(key)),
-  );
+  return result;
 }
 
 function normalizeApprovalAllowlistMap(value: unknown): Record<string, string[][]> {
-  if (!isPlainObject(value)) {
-    return {};
+  const result: Record<string, string[][]> = {};
+  for (const [workspaceRoot, entries] of objectEntries(value)) {
+    const normalizedWorkspaceRoot = normalizeText(workspaceRoot);
+    if (!normalizedWorkspaceRoot) {
+      continue;
+    }
+    result[normalizedWorkspaceRoot] = normalizeApprovalAllowlistEntries(entries);
   }
-  return Object.fromEntries(
-    Object.entries(value)
-      .map(([workspaceRoot, entries]: any) => {
-        const normalizedWorkspaceRoot = normalizeText(workspaceRoot);
-        if (!normalizedWorkspaceRoot) {
-          return null;
-        }
-        return [normalizedWorkspaceRoot, normalizeApprovalAllowlistEntries(entries)];
-      })
-      .filter((entry: any): entry is [string, string[][]] => Boolean(entry)),
-  );
+  return result;
 }
 
 function normalizeApprovalAllowlistEntries(value: unknown): string[][] {
-  return Array.isArray(value)
-    ? value
-      .map((entry: any) => normalizeCommandTokens(entry))
-      .filter((entry: any) => entry.length)
-    : [];
+  const entries: string[][] = [];
+  if (!Array.isArray(value)) {
+    return entries;
+  }
+  for (const entry of value) {
+    const normalizedEntry = normalizeCommandTokens(entry);
+    if (normalizedEntry.length) {
+      entries.push(normalizedEntry);
+    }
+  }
+  return entries;
 }
 
 function normalizePendingApprovalMap(value: unknown): Record<string, PendingApprovalRecord> {
-  if (!isPlainObject(value)) {
-    return {};
+  const result: Record<string, PendingApprovalRecord> = {};
+  for (const [threadId, approval] of objectEntries(value)) {
+    const normalizedThreadId = normalizeText(threadId);
+    const normalizedApproval = normalizePendingApprovalRecord(approval);
+    if (!normalizedThreadId || !normalizedApproval) {
+      continue;
+    }
+    result[normalizedThreadId] = normalizedApproval;
   }
-  return Object.fromEntries(
-    Object.entries(value)
-      .map(([threadId, approval]: any) => {
-        const normalizedThreadId = normalizeText(threadId);
-        const normalizedApproval = normalizePendingApprovalRecord(approval);
-        if (!normalizedThreadId || !normalizedApproval) {
-          return null;
-        }
-        return [normalizedThreadId, normalizedApproval];
-      })
-      .filter((entry: any): entry is [string, PendingApprovalRecord] => Boolean(entry)),
-  );
+  return result;
 }
 
 export function normalizePendingApprovalRecord(value: unknown): PendingApprovalRecord | null {
-  if (!isPlainObject(value)) {
-    return null;
-  }
-  const requestId = normalizeRequestId(value.requestId);
+  const source = asRawPendingApprovalRecord(value);
+  const requestId = normalizeRequestId(source.requestId);
   if (!requestId) {
     return null;
   }
   return {
     requestId,
-    reason: normalizeText(value.reason),
-    command: normalizeText(value.command),
-    commandTokens: normalizeCommandTokens(value.commandTokens),
-    signature: normalizeText(value.signature),
-    promptedAt: normalizeIsoTimestamp(value.promptedAt),
+    reason: normalizeText(source.reason),
+    command: normalizeText(source.command),
+    commandTokens: normalizeCommandTokens(source.commandTokens),
+    signature: normalizeText(source.signature),
+    promptedAt: normalizeIsoTimestamp(source.promptedAt),
   };
 }
 
 function normalizeAvailableModelCatalog(value: unknown): AvailableModelCatalog {
-  const source = isPlainObject(value) ? value : {};
+  const source = asRawAvailableModelCatalog(value);
   return {
     ...source,
     models: Array.isArray(source.models) ? source.models.slice() : [],
@@ -252,32 +279,34 @@ function normalizeAvailableModelCatalog(value: unknown): AvailableModelCatalog {
 }
 
 function validateBinding(binding: unknown, bindingKey: string): string {
+  const source = asRawSessionBinding(binding);
   if (!isPlainObject(binding)) {
     return `session store binding ${bindingKey} must be an object`;
   }
-  for (const key of ["workspaceId", "accountId", "senderId", "activeWorkspaceRoot", "updatedAt"]) {
-    if (key in binding && typeof binding[key] !== "string") {
+  for (const key of ["workspaceId", "accountId", "senderId", "activeWorkspaceRoot", "updatedAt"] as const) {
+    if (key in source && typeof source[key] !== "string") {
       return `session store binding ${bindingKey}.${key} must be a string`;
     }
   }
-  for (const key of ["threadIdByWorkspaceRoot", "workspaceBootstrapThreadIdByWorkspaceRoot"]) {
-    const mapValue = binding[key];
-    if (typeof mapValue !== "undefined") {
-      if (!isPlainObject(mapValue)) {
-        return `session store binding ${bindingKey}.${key} must be an object`;
-      }
-      for (const [mapKey, mapEntryValue] of Object.entries(mapValue)) {
-        if (typeof mapKey !== "string" || typeof mapEntryValue !== "string") {
-          return `session store binding ${bindingKey}.${key} entries must be string:string`;
-        }
+  for (const key of ["threadIdByWorkspaceRoot", "workspaceBootstrapThreadIdByWorkspaceRoot"] as const) {
+    const mapValue = source[key];
+    if (typeof mapValue === "undefined") {
+      continue;
+    }
+    if (!isPlainObject(mapValue)) {
+      return `session store binding ${bindingKey}.${key} must be an object`;
+    }
+    for (const [mapKey, mapEntryValue] of objectEntries(mapValue)) {
+      if (typeof mapKey !== "string" || typeof mapEntryValue !== "string") {
+        return `session store binding ${bindingKey}.${key} entries must be string:string`;
       }
     }
   }
-  if ("codexParamsByWorkspaceRoot" in binding) {
-    if (!isPlainObject(binding.codexParamsByWorkspaceRoot)) {
+  if ("codexParamsByWorkspaceRoot" in source) {
+    if (!isPlainObject(source.codexParamsByWorkspaceRoot)) {
       return `session store binding ${bindingKey}.codexParamsByWorkspaceRoot must be an object`;
     }
-    for (const [workspaceRoot, params] of Object.entries(binding.codexParamsByWorkspaceRoot)) {
+    for (const [workspaceRoot, params] of objectEntries(source.codexParamsByWorkspaceRoot)) {
       if (typeof workspaceRoot !== "string" || !isPlainObject(params)) {
         return `session store binding ${bindingKey}.codexParamsByWorkspaceRoot entries must be object values`;
       }
@@ -290,50 +319,64 @@ function validateBinding(binding: unknown, bindingKey: string): string {
 }
 
 function validatePendingApprovalRecord(value: unknown, threadId: string): string {
+  const source = asRawPendingApprovalRecord(value);
   if (!isPlainObject(value)) {
     return `session store approvalPromptStateByThreadId.${threadId} must be an object`;
   }
-  if (!normalizeRequestId(value.requestId)) {
+  if (!normalizeRequestId(source.requestId)) {
     return `session store approvalPromptStateByThreadId.${threadId}.requestId must be a non-empty string`;
   }
-  for (const key of ["reason", "command", "signature", "promptedAt"]) {
-    if (key in value && typeof value[key] !== "string") {
+  for (const key of ["reason", "command", "signature", "promptedAt"] as const) {
+    if (key in source && typeof source[key] !== "string") {
       return `session store approvalPromptStateByThreadId.${threadId}.${key} must be a string`;
     }
   }
-  if ("commandTokens" in value) {
-    if (!Array.isArray(value.commandTokens) || value.commandTokens.some((part: any) => typeof part !== "string")) {
-      return `session store approvalPromptStateByThreadId.${threadId}.commandTokens must be string[]`;
-    }
+  if ("commandTokens" in source && !isStringArray(source.commandTokens)) {
+    return `session store approvalPromptStateByThreadId.${threadId}.commandTokens must be string[]`;
   }
   return "";
 }
 
 function validateAvailableModelCatalog(value: unknown): string {
+  const source = asRawAvailableModelCatalog(value);
   if (!isPlainObject(value)) {
     return "session store availableModelCatalog must be an object";
   }
-  if ("models" in value && !Array.isArray(value.models)) {
+  if ("models" in source && !Array.isArray(source.models)) {
     return "session store availableModelCatalog.models must be an array";
   }
-  if ("updatedAt" in value && typeof value.updatedAt !== "string") {
+  if ("updatedAt" in source && typeof source.updatedAt !== "string") {
     return "session store availableModelCatalog.updatedAt must be a string";
   }
   return "";
 }
 
-export function listPendingApprovalEntries(state: Partial<SessionState> | null | undefined): Array<{ threadId: string; approval: PendingApprovalRecord }> {
-  return Object.entries(normalizePendingApprovalMap(state?.approvalPromptStateByThreadId))
-    .map(([threadId, approval]: any) => ({
+export function listPendingApprovalEntries(
+  state: Partial<SessionState> | null | undefined,
+): Array<{ threadId: string; approval: PendingApprovalRecord }> {
+  const entries: Array<{ threadId: string; approval: PendingApprovalRecord }> = [];
+  const pendingApprovalMap = normalizePendingApprovalMap(state?.approvalPromptStateByThreadId);
+  for (const [threadId, approval] of Object.entries(pendingApprovalMap)) {
+    entries.push({
       threadId,
       approval,
-    }));
+    });
+  }
+  return entries;
 }
 
 function normalizeCommandTokens(tokens: unknown): string[] {
-  return Array.isArray(tokens)
-    ? tokens.map((token: any) => normalizeText(token)).filter(Boolean)
-    : [];
+  const normalizedTokens: string[] = [];
+  if (!Array.isArray(tokens)) {
+    return normalizedTokens;
+  }
+  for (const token of tokens) {
+    const normalizedToken = normalizeText(token);
+    if (normalizedToken) {
+      normalizedTokens.push(normalizedToken);
+    }
+  }
+  return normalizedTokens;
 }
 
 function normalizeRequestId(value: unknown): string {
@@ -359,6 +402,34 @@ function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function objectEntries(value: unknown): Array<[string, unknown]> {
+  return isPlainObject(value) ? Object.entries(value) : [];
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+}
+
 function isPlainObject(value: unknown): value is PlainObject {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function asPlainObject(value: unknown): PlainObject {
+  return isPlainObject(value) ? value : {};
+}
+
+function asRawSessionBinding(value: unknown): RawSessionBinding {
+  return isPlainObject(value) ? value as RawSessionBinding : {};
+}
+
+function asRawPendingApprovalRecord(value: unknown): RawPendingApprovalRecord {
+  return isPlainObject(value) ? value as RawPendingApprovalRecord : {};
+}
+
+function asRawAvailableModelCatalog(value: unknown): RawAvailableModelCatalog {
+  return isPlainObject(value) ? value as RawAvailableModelCatalog : {};
+}
+
+function asRawSessionState(value: unknown): RawSessionState {
+  return isPlainObject(value) ? value as RawSessionState : {};
 }

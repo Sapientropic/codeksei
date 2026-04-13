@@ -8,14 +8,56 @@ import {
   loadTimelineStateSnapshot,
   normalizeTimezone,
 } from "../../core/timezone";
+import type { TimelineStateFiles } from "../../core/timezone-state";
 
-function ensureTimelineStateTimezone(config: any = {}) {
+interface TimelineStateSyncConfig {
+  timelineStateDir?: string;
+  timezone?: unknown;
+  timezoneExplicit?: boolean;
+}
+
+interface TimelineSourceRecord extends Record<string, unknown> {
+  threadId?: unknown;
+  workspaceRoot?: unknown;
+  transcriptMessageCount?: unknown;
+}
+
+interface TimelineDayRecord extends Record<string, unknown> {
+  status?: unknown;
+  updatedAt?: unknown;
+  source?: unknown;
+  events?: unknown;
+}
+
+type TimelineEvent = Record<string, unknown> | unknown[] | string | number | boolean | null;
+
+interface TimelineNormalizedSource {
+  threadId: string;
+  workspaceRoot: string;
+  transcriptMessageCount: number;
+}
+
+interface TimelineNormalizedDay {
+  status: "final" | "draft";
+  updatedAt: string;
+  source: TimelineNormalizedSource | null;
+  events: TimelineEvent[];
+}
+
+interface TimelineSnapshotWritePayload {
+  timezone: string;
+  taxonomy: Record<string, unknown>;
+  facts: Record<string, TimelineNormalizedDay>;
+  proposals: unknown[];
+}
+
+function ensureTimelineStateTimezone(config: TimelineStateSyncConfig = {}): void {
   const desiredTimezone = normalizeTimezone(config.timezone);
   if (!desiredTimezone) {
     return;
   }
 
-  const snapshot = loadTimelineStateSnapshot(config.timelineStateDir);
+  const snapshot = loadTimelineStateSnapshot(normalizeText(config.timelineStateDir));
   if (!snapshot.paths.dir) {
     return;
   }
@@ -33,7 +75,7 @@ function ensureTimelineStateTimezone(config: any = {}) {
       writeTimelineSnapshot(snapshot.paths, {
         timezone: desiredTimezone,
         taxonomy: snapshot.taxonomy,
-        facts: snapshot.facts,
+        facts: regroupFactsByTimezone(snapshot.facts, desiredTimezone),
         proposals: snapshot.proposals,
       });
     }
@@ -52,7 +94,15 @@ function ensureTimelineStateTimezone(config: any = {}) {
   });
 }
 
-function shouldSyncTimezone({ currentTimezone, desiredTimezone, config = {} }: any) {
+function shouldSyncTimezone({
+  currentTimezone,
+  desiredTimezone,
+  config = {},
+}: {
+  currentTimezone: string;
+  desiredTimezone: string;
+  config?: TimelineStateSyncConfig;
+}): boolean {
   if (!desiredTimezone) {
     return false;
   }
@@ -64,25 +114,24 @@ function shouldSyncTimezone({ currentTimezone, desiredTimezone, config = {} }: a
   }
 
   // Explicit env selection is authoritative. Without it, only auto-migrate
-  // from the old hard-coded default so we do not silently rewrite an already
-  // customized timeline timezone just because this machine has a different OS
-  // setting today.
-  const timezoneExplicit = Boolean(
-    config && typeof config === "object" && "timezoneExplicit" in config && config.timezoneExplicit
-  );
-  if (timezoneExplicit) {
+  // from the old hard-coded default so we do not silently rewrite a customized
+  // timeline timezone just because this machine has a different OS setting.
+  if (Boolean(config.timezoneExplicit)) {
     return true;
   }
 
   return currentTimezone === LEGACY_TIMELINE_TIMEZONE;
 }
 
-function regroupFactsByTimezone(facts: any, timezone: any) {
-  const buckets = new Map();
+function regroupFactsByTimezone(
+  facts: Record<string, unknown>,
+  timezone: string,
+): Record<string, TimelineNormalizedDay> {
+  const buckets = new Map<string, TimelineNormalizedDay>();
 
   for (const [originalDate, rawDay] of Object.entries(facts || {})) {
-    const day = isRecord(rawDay) ? rawDay : {};
-    const events = Array.isArray(day.events) ? day.events : [];
+    const day = asTimelineDayRecord(rawDay);
+    const events = readTimelineEvents(day.events);
     if (!events.length) {
       mergeDayBucket(buckets, originalDate, day, []);
       continue;
@@ -94,25 +143,27 @@ function regroupFactsByTimezone(facts: any, timezone: any) {
     }
   }
 
-  const output: Record<string, any> = {};
-  for (const [date, day] of Array.from(buckets.entries()).sort(([left]: any, [right]: any) => left.localeCompare(right))) {
-    const sortedEvents = Array.isArray(day.events)
-      ? [...day.events].sort(compareEventsByStart)
-      : [];
+  const output: Record<string, TimelineNormalizedDay> = {};
+  for (const [date, day] of Array.from(buckets.entries()).sort(([left], [right]) => left.localeCompare(right))) {
     if (!normalizeText(date)) {
       continue;
     }
     output[date] = {
-      status: day.status === "final" ? "final" : "draft",
-      updatedAt: day.updatedAt || "",
-      source: day.source || null,
-      events: sortedEvents,
+      status: day.status,
+      updatedAt: day.updatedAt,
+      source: day.source,
+      events: [...day.events].sort(compareEventsByStart),
     };
   }
   return output;
 }
 
-function mergeDayBucket(buckets: any, date: any, sourceDay: any, events: any) {
+function mergeDayBucket(
+  buckets: Map<string, TimelineNormalizedDay>,
+  date: unknown,
+  sourceDay: TimelineDayRecord,
+  events: TimelineEvent[],
+): void {
   const normalizedDate = normalizeText(date);
   if (!normalizedDate) {
     return;
@@ -125,33 +176,33 @@ function mergeDayBucket(buckets: any, date: any, sourceDay: any, events: any) {
     events: [],
   };
 
-  current.status = current.status === "final" && sourceDay?.status === "final" ? "final" : "draft";
-  current.updatedAt = pickLatestTimestamp(current.updatedAt, sourceDay?.updatedAt);
-  current.source = mergeSource(current.source, sourceDay?.source);
+  current.status = current.status === "final" && isFinalStatus(sourceDay.status) ? "final" : "draft";
+  current.updatedAt = pickLatestTimestamp(current.updatedAt, sourceDay.updatedAt);
+  current.source = mergeSource(current.source, sourceDay.source);
   current.events.push(...events);
   buckets.set(normalizedDate, current);
 }
 
-function mergeSource(current: any, incoming: any) {
-  const left = normalizeSource(current);
+function mergeSource(
+  current: TimelineNormalizedSource | null,
+  incoming: unknown,
+): TimelineNormalizedSource | null {
   const right = normalizeSource(incoming);
-  if (!left) {
+  if (!current) {
     return right;
   }
   if (!right) {
-    return left;
+    return current;
   }
-  return JSON.stringify(left) === JSON.stringify(right) ? left : null;
+  return JSON.stringify(current) === JSON.stringify(right) ? current : null;
 }
 
-function normalizeSource(source: any) {
-  if (!source || typeof source !== "object") {
-    return null;
-  }
-  const threadId = normalizeText(source.threadId);
-  const workspaceRoot = normalizeText(source.workspaceRoot);
-  const transcriptMessageCount = Number.isFinite(Number(source.transcriptMessageCount))
-    ? Number(source.transcriptMessageCount)
+function normalizeSource(source: unknown): TimelineNormalizedSource | null {
+  const record = asTimelineSourceRecord(source);
+  const threadId = normalizeText(record.threadId);
+  const workspaceRoot = normalizeText(record.workspaceRoot);
+  const transcriptMessageCount = Number.isFinite(Number(record.transcriptMessageCount))
+    ? Number(record.transcriptMessageCount)
     : 0;
   if (!threadId && !workspaceRoot && transcriptMessageCount <= 0) {
     return null;
@@ -163,31 +214,33 @@ function normalizeSource(source: any) {
   };
 }
 
-function pickLatestTimestamp(left: any, right: any) {
-  const leftValue = Date.parse(normalizeText(left));
-  const rightValue = Date.parse(normalizeText(right));
+function pickLatestTimestamp(left: unknown, right: unknown): string {
+  const normalizedLeft = normalizeText(left);
+  const normalizedRight = normalizeText(right);
+  const leftValue = Date.parse(normalizedLeft);
+  const rightValue = Date.parse(normalizedRight);
   if (Number.isFinite(leftValue) && Number.isFinite(rightValue)) {
-    return leftValue >= rightValue ? normalizeText(left) : normalizeText(right);
+    return leftValue >= rightValue ? normalizedLeft : normalizedRight;
   }
-  return normalizeText(right) || normalizeText(left);
+  return normalizedRight || normalizedLeft;
 }
 
-function resolveEventBucketDate(event: any, timezone: any) {
-  return formatDateInTimezone(event?.startAt, timezone)
-    || formatDateInTimezone(event?.endAt, timezone)
+function resolveEventBucketDate(event: TimelineEvent, timezone: string): string {
+  return formatDateInTimezone(readEventField(event, "startAt"), timezone)
+    || formatDateInTimezone(readEventField(event, "endAt"), timezone)
     || "";
 }
 
-function compareEventsByStart(left: any, right: any) {
-  const leftTime = Date.parse(left?.startAt || "");
-  const rightTime = Date.parse(right?.startAt || "");
+function compareEventsByStart(left: TimelineEvent, right: TimelineEvent): number {
+  const leftTime = Date.parse(normalizeText(readEventField(left, "startAt")));
+  const rightTime = Date.parse(normalizeText(readEventField(right, "startAt")));
   if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) {
     return leftTime - rightTime;
   }
-  return String(left?.id || "").localeCompare(String(right?.id || ""));
+  return String(readEventField(left, "id") || "").localeCompare(String(readEventField(right, "id") || ""));
 }
 
-function initializeTimelineSnapshot(paths: any, timezone: any) {
+function initializeTimelineSnapshot(paths: TimelineStateFiles, timezone: string): void {
   writeTimelineSnapshot(paths, {
     timezone,
     taxonomy: {},
@@ -196,7 +249,7 @@ function initializeTimelineSnapshot(paths: any, timezone: any) {
   });
 }
 
-function writeTimelineSnapshot(paths: any, snapshot: any) {
+function writeTimelineSnapshot(paths: TimelineStateFiles, snapshot: TimelineSnapshotWritePayload): void {
   fs.mkdirSync(paths.dir, { recursive: true });
   writeJsonFile(paths.stateFile, {
     version: 1,
@@ -218,19 +271,51 @@ function writeTimelineSnapshot(paths: any, snapshot: any) {
   });
 }
 
-function writeJsonFile(filePath: any, value: any) {
+function writeJsonFile(filePath: string, value: unknown): void {
   // Timeline state files belong to the upstream timeline domain. We still
   // write them atomically, but we do not quarantine "corrupt" files here the
   // way we do for bridge-managed runtime state.
   writeForeignJsonDocument(filePath, value);
 }
 
-function normalizeText(value: any) {
-  return typeof value === "string" ? value.trim() : "";
+function readTimelineEvents(value: unknown): TimelineEvent[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter(isTimelineEvent);
+}
+
+function readEventField(event: TimelineEvent, key: string): unknown {
+  return isRecord(event) ? event[key] : undefined;
+}
+
+function isFinalStatus(value: unknown): boolean {
+  return normalizeText(value) === "final";
+}
+
+function isTimelineEvent(value: unknown): value is TimelineEvent {
+  return value === null
+    || Array.isArray(value)
+    || isRecord(value)
+    || typeof value === "string"
+    || typeof value === "number"
+    || typeof value === "boolean";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function asTimelineDayRecord(value: unknown): TimelineDayRecord {
+  return isRecord(value) ? value as TimelineDayRecord : {};
+}
+
+function asTimelineSourceRecord(value: unknown): TimelineSourceRecord {
+  return isRecord(value) ? value as TimelineSourceRecord : {};
+}
+
+function normalizeText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 export {

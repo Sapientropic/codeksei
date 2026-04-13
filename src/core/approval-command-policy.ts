@@ -4,6 +4,7 @@ import * as path from "node:path";
 import {
   findTerminalCommandManifest,
   findTerminalManifestByScriptName,
+  type TerminalCommandManifestEntry,
 } from "../contracts/command-surface";
 
 const SHELL_EXECUTABLES = new Set(["sh", "bash", "zsh"]);
@@ -14,9 +15,15 @@ const TERMINAL_BIN_EXECUTABLES = new Set([
   "codeksei.js",
 ]);
 
-function buildApprovalPromptText(approval: any) {
-  const reasonText = normalizeTrimmedText(approval?.reason);
-  const commandText = normalizeTrimmedText(approval?.command);
+interface ApprovalRequestLike {
+  reason?: unknown;
+  command?: unknown;
+  commandTokens?: unknown;
+}
+
+function buildApprovalPromptText(approval: ApprovalRequestLike): string {
+  const reasonText = normalizeTrimmedText(approval.reason);
+  const commandText = normalizeTrimmedText(approval.command);
   const sections = ["Codex 请求授权"];
 
   if (reasonText && reasonText !== commandText) {
@@ -39,12 +46,10 @@ function buildApprovalPromptText(approval: any) {
   return sections.join("\n\n");
 }
 
-function buildApprovalPromptSignature(approval: any) {
-  const reasonText = normalizeTrimmedText(approval?.reason);
-  const commandText = normalizeTrimmedText(approval?.command);
-  const commandTokens = Array.isArray(approval?.commandTokens)
-    ? approval.commandTokens.map((token: any) => normalizeCommandArgument(token)).filter(Boolean)
-    : [];
+function buildApprovalPromptSignature(approval: ApprovalRequestLike): string {
+  const reasonText = normalizeTrimmedText(approval.reason);
+  const commandText = normalizeTrimmedText(approval.command);
+  const commandTokens = normalizeCommandTokens(approval.commandTokens);
   return JSON.stringify({
     reason: reasonText,
     command: commandText,
@@ -52,22 +57,20 @@ function buildApprovalPromptSignature(approval: any) {
   });
 }
 
-function matchesCommandPrefix(commandTokens: any, allowlist: any) {
-  const normalizedCommandTokens = Array.isArray(commandTokens)
-    ? commandTokens.map((part: any) => normalizeCommandArgument(part)).filter(Boolean)
-    : [];
+function matchesCommandPrefix(commandTokens: unknown, allowlist: unknown): boolean {
+  const normalizedCommandTokens = normalizeCommandTokens(commandTokens);
   if (!normalizedCommandTokens.length || !Array.isArray(allowlist) || !allowlist.length) {
     return false;
   }
-  return allowlist.some((prefix: any) => {
-    if (!Array.isArray(prefix) || !prefix.length || prefix.length > normalizedCommandTokens.length) {
+  return allowlist.some((prefix) => {
+    if (!isStringArray(prefix) || !prefix.length || prefix.length > normalizedCommandTokens.length) {
       return false;
     }
-    return prefix.every((part: any, index: any) => normalizeCommandArgument(part) === normalizedCommandTokens[index]);
+    return prefix.every((part, index) => normalizeCommandArgument(part) === normalizedCommandTokens[index]);
   });
 }
 
-function matchesBuiltInCommandPrefix(commandTokens: any) {
+function matchesBuiltInCommandPrefix(commandTokens: unknown): boolean {
   const normalized = normalizeCommandTokensForMatching(commandTokens);
   if (!normalized.length) {
     return false;
@@ -83,21 +86,19 @@ function matchesBuiltInCommandPrefix(commandTokens: any) {
   }
 
   const manifest = resolveBuiltInTerminalManifest(normalized);
-  return Boolean(manifest?.approval?.autoApprove);
+  return Boolean(manifest?.approval.autoApprove);
 }
 
-function normalizeCommandTokensForMatching(commandTokens: any) {
-  const normalized = Array.isArray(commandTokens)
-    ? commandTokens.map((part: any) => normalizeCommandArgument(part)).filter(Boolean)
-    : [];
+function normalizeCommandTokensForMatching(commandTokens: unknown): string[] {
+  const normalized = normalizeCommandTokens(commandTokens);
   if (normalized.length >= 3 && isShellWrapper(normalized[0], normalized[1])) {
     return splitCommandLine(normalized.slice(2).join(" "));
   }
   return normalized;
 }
 
-function resolveBuiltInTerminalManifest(commandTokens: any) {
-  if (!Array.isArray(commandTokens) || !commandTokens.length) {
+function resolveBuiltInTerminalManifest(commandTokens: string[]): TerminalCommandManifestEntry | null {
+  if (!commandTokens.length) {
     return null;
   }
 
@@ -116,8 +117,8 @@ function resolveBuiltInTerminalManifest(commandTokens: any) {
   return null;
 }
 
-function resolveManifestFromNpmRun(commandTokens: any) {
-  if (!Array.isArray(commandTokens) || commandTokens[0] !== "npm") {
+function resolveManifestFromNpmRun(commandTokens: string[]): TerminalCommandManifestEntry | null {
+  if (commandTokens[0] !== "npm") {
     return null;
   }
   const runIndex = commandTokens.indexOf("run");
@@ -127,12 +128,12 @@ function resolveManifestFromNpmRun(commandTokens: any) {
   return findManifestForPackageScript(commandTokens[runIndex + 1]);
 }
 
-function findManifestForPackageScript(scriptName: any) {
+function findManifestForPackageScript(scriptName: unknown): TerminalCommandManifestEntry | null {
   return findTerminalManifestByScriptName(scriptName);
 }
 
-function findManifestForTerminalCommand(commandTokens: any) {
-  if (!Array.isArray(commandTokens) || !commandTokens.length) {
+function findManifestForTerminalCommand(commandTokens: string[]): TerminalCommandManifestEntry | null {
+  if (!commandTokens.length) {
     return null;
   }
   const command = normalizeCommandArgument(commandTokens[0]).toLowerCase();
@@ -143,27 +144,27 @@ function findManifestForTerminalCommand(commandTokens: any) {
   return findTerminalCommandManifest(command, subcommand);
 }
 
-function looksLikeCodekseiBinPath(binPath: any) {
+function looksLikeCodekseiBinPath(binPath: unknown): boolean {
   const normalized = normalizeCommandArgument(binPath).replace(/\\/g, "/").toLowerCase();
   return normalized === "./dist/src/index.js"
     || normalized.endsWith("/dist/src/index.js")
     || normalized === "dist/src/index.js";
 }
 
-function isShellWrapper(command: any, flag: any) {
+function isShellWrapper(command: unknown, flag: unknown): boolean {
   const executable = path.basename(normalizeCommandArgument(command)).toLowerCase();
   return SHELL_EXECUTABLES.has(executable) && flag === "-lc";
 }
 
-function matchesBuiltInShellScript(scriptPath: any) {
+function matchesBuiltInShellScript(scriptPath: unknown): boolean {
   const basename = path.basename(normalizeCommandArgument(scriptPath)).toLowerCase();
   return basename === "timeline-screenshot.sh";
 }
 
-function splitCommandLine(input: any) {
-  const tokens = [];
+function splitCommandLine(input: unknown): string[] {
+  const tokens: string[] = [];
   let current = "";
-  let quote = null;
+  let quote: "\"" | "'" | null = null;
   let escaped = false;
 
   for (const char of String(input || "")) {
@@ -188,7 +189,7 @@ function splitCommandLine(input: any) {
       quote = char;
       continue;
     }
-    if (/\s/.test(char)) {
+    if (/\s/u.test(char)) {
       if (current) {
         tokens.push(current);
         current = "";
@@ -204,12 +205,30 @@ function splitCommandLine(input: any) {
   return tokens;
 }
 
-function normalizeCommandArgument(value: any) {
+function normalizeCommandTokens(commandTokens: unknown): string[] {
+  const normalized: string[] = [];
+  if (!Array.isArray(commandTokens)) {
+    return normalized;
+  }
+  for (const part of commandTokens) {
+    const normalizedPart = normalizeCommandArgument(part);
+    if (normalizedPart) {
+      normalized.push(normalizedPart);
+    }
+  }
+  return normalized;
+}
+
+function normalizeCommandArgument(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function normalizeTrimmedText(value: any) {
+function normalizeTrimmedText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string");
 }
 
 export {

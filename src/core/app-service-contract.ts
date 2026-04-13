@@ -190,6 +190,23 @@ export interface ReminderQueueLike {
 
 export interface SystemMessageQueueLike {
   enqueue(message: Record<string, unknown>): void;
+  complete(message: SystemMessage, options?: { nowMs?: number }): {
+    status: string;
+    message?: SystemMessage | null;
+  };
+  deadLetter(message: SystemMessage, options?: { reason?: string; nowMs?: number }): {
+    status: string;
+    message?: SystemMessage | null;
+  };
+  defer(
+    message: SystemMessage,
+    options?: { delayMs?: number; reason?: string; countAttempt?: boolean; nowMs?: number },
+  ): {
+    status: string;
+    message?: SystemMessage | null;
+  } | null;
+  hasPendingForAccount(accountId: string): boolean;
+  takeReadyForAccount(accountId: string, options?: { nowMs?: number }): SystemMessage[];
 }
 
 export interface TimelineScreenshotQueueLike {
