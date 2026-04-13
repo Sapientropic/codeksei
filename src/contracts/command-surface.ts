@@ -1,4 +1,4 @@
-type CommandEntrypointType = "cli" | "script" | "weixin";
+export type CommandEntrypointType = "cli" | "script" | "weixin";
 
 interface CommandGroupMeta {
   id: string;
@@ -10,11 +10,11 @@ interface CommandHelp {
   leafKey: string;
 }
 
-interface CommandApproval {
+export interface CommandApproval {
   autoApprove: boolean;
 }
 
-interface CommandAction {
+export interface CommandAction {
   action: string;
   groupId: string;
   summary: string;
@@ -57,7 +57,7 @@ interface CommandActionInput {
   };
 }
 
-interface TerminalCommandManifestEntry {
+export interface TerminalCommandManifestEntry {
   key: string;
   command: string;
   subcommand: string;
@@ -72,7 +72,7 @@ interface TerminalCommandManifestEntry {
   entrypointType: string;
 }
 
-interface CommandGroup {
+export interface CommandGroup {
   id: string;
   label: string;
   actions: CommandAction[];

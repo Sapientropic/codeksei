@@ -195,8 +195,13 @@ Project radar 用于回答“项目现在在哪、应该从哪里重新进去”
 
 maintainer 仍需额外补一次真实账号 smoke：
 
-- 真实 WeChat 登录态
-- 真实 shared session attach
-- 如现场环境与 fake harness 不同，再看 `shared-wechat.log` / `shared-app-server.log` 做 follow-up
+- `npm run smoke:shared:real:attach`
+  验证 shared:start / shared:status / shared:open 这条真实 env 链路；会用一次性 open probe 包装器确认 `resume <thread> --remote ...` 真的按当前绑定 thread 组装出来。
+- `npm run smoke:shared:real:reply -- --mode stream|settled|both`
+  assisted smoke。脚本会生成 nonce 和发送文案，维护者在真实微信里发出后，脚本从 `shared-wechat.log` 里等待 `delivered weixin reply ... hash=...`。
+- `npm run smoke:shared:real:approval`
+  assisted smoke。脚本会等待 pending approval 落盘、自动重启 bridge，然后等待 `/yes` 之后 approval 清空和最终 delivered hash。
+- 这三条脚本都会在 `shared-wechat.log` / `shared-app-server.log` 里写 `[codeksei-smoke] stage=...` checkpoint，排查时优先从这些 marker 往后看。
+- `[⚠️ 需确认]` 这组真实 smoke 依赖可用的 WeChat 登录态、绑定 thread 和能触发 approval 的活跃 Codex runtime；环境不满足时脚本会直接报错，而不是静默跳过。
 
 这页只管“怎么使用这些入口”；维护与发布流程留在本地维护材料里。
