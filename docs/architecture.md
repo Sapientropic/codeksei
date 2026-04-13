@@ -11,6 +11,8 @@
 - repo-tracked authored source 里的 `.js/.jsx/.mjs` 已清零；timeline first-party runtime 也回到同一条 TS build 主链
 - 构建产物仍输出 CommonJS，但源码内部已经不再靠 `require / module.exports / export {}` 过渡态维持结构
 - timeline build 现在只复制非代码资产（如 CSS / examples），不再把 source runtime 整树原样复制进 `dist`
+- 跨模块共享的基础 helper 现在统一收口到 `src/core/text-normalization.ts`、`src/core/error-handling.ts`、`src/core/message-catalog.ts`
+- `npm run check` 现在会直接守 bare `.catch(() => {})`、重复 `normalizeText`、冗余 `typedXxx`、`!:` 和 explicit `any` 这类结构债，不再只靠 review 口头约束
 
 这一页只解释当前稳定结构，不复述实现细节清单。
 
@@ -27,6 +29,7 @@
 - 协调 command router 与 app-level wiring
 - 保持 app-level wiring 与 bridge coordination
 - 把 runtime event pipeline、lifecycle runner、terminal façade 委托给独立 helper，而不是继续把串行链、启动/关闭细节和 terminal 能力暴露堆在 `app.ts`
+- `CodekseiApp` 现在是 thin façade：状态位 + `readonly services`，再把 admin / target resolution / runtime delegate 分别下沉到 `app-admin-actions.ts`、`app-target-resolution.ts`、`app-runtime-delegates.ts`
 
 不负责：
 
@@ -37,6 +40,17 @@
 - review / notes 的实现逻辑
 
 一句话理解：`src/core` 负责“把系统接起来”，不再负责“把状态怎么存、workspace 怎么找、复用说明怎么拼”。
+
+## 1.1 Cross-Cutting Core Contracts
+
+这些 helper 现在是跨层共享的稳定入口：
+
+- `text-normalization.ts`
+  repo 唯一 canonical `normalizeText` 与相关文本归一化 helper；同语义 trim-or-empty 不再允许在模块里各自复制
+- `error-handling.ts`
+  best-effort / cleanup 失败的显式 suppressed-error 路径；teardown 不再靠 bare catch 静默吞掉
+- `message-catalog.ts`
+  用户面与运维面文案策略入口：用户可见 CLI / WeChat / runtime failure 保持中文，operator / maintainer diagnostics 与 shared status line 保持英文
 
 ## 2. Runtime Subsystem
 

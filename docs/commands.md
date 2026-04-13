@@ -19,6 +19,11 @@
 
 README、帮助文本和公开示例默认都按 `codeksei` 书写。
 
+表层文案约定：
+
+- 用户可见的 CLI / WeChat / runtime failure 提示默认中文
+- operator / maintainer diagnostics、shared status line 默认英文
+
 ## 终端主入口
 
 首次使用时，先记住这一组主入口即可。
@@ -232,6 +237,7 @@ maintainer 仍需额外补一次真实账号 smoke：
 
 - `npm run check`
   source-only：跑 authored-source JS guard、published runtime artifact guard、其它 lint guard、源码 typecheck、tests TS typecheck；不会重建 `dist/`
+  这里已经直接覆盖 duplicate helper、bare empty catch、redundant `typedXxx`、`!:`、explicit `any` 等结构债 guard
 - `npm run verify`
   built-runtime gate：先跑 `check`，再显式 `npm run build`，然后跑 built `dist` 的仓内 tests，最后跑 `npm run pack:dry-run`
 - `npm run build`
