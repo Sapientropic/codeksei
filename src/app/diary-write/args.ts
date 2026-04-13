@@ -3,6 +3,9 @@ import { parseCliArgs } from "../../core/cli-args";
 import { normalizeBody } from "./shared";
 
 interface DiaryWriteOptions extends Record<string, unknown> {
+  dryRun?: boolean;
+  help?: boolean;
+  idempotencyKey?: string;
   text?: unknown;
   title?: unknown;
   date?: string;

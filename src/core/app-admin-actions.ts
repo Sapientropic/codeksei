@@ -26,11 +26,27 @@ export function printDoctorReport({
   threadStateStore,
   timelineIntegration,
 }: PrintDoctorArgs): void {
+  console.log(JSON.stringify(collectDoctorReport({
+    config,
+    channelAdapter,
+    runtimeAdapter,
+    threadStateStore,
+    timelineIntegration,
+  }), null, 2));
+}
+
+export function collectDoctorReport({
+  config,
+  channelAdapter,
+  runtimeAdapter,
+  threadStateStore,
+  timelineIntegration,
+}: PrintDoctorArgs): Record<string, unknown> {
   const checkinConfigFile = normalizeTrimmedText(config.checkinConfigFile);
   const checkin = checkinConfigFile
     ? resolveCheckinConfig({ filePath: checkinConfigFile })
     : null;
-  console.log(JSON.stringify({
+  return {
     stateDir: config.stateDir,
     channel: channelAdapter.describe(),
     runtime: runtimeAdapter.describe(),
@@ -43,7 +59,7 @@ export function printDoctorReport({
       }
       : null,
     threads: threadStateStore.snapshot(),
-  }, null, 2));
+  };
 }
 
 export async function loginChannel(channelAdapter: Pick<ChannelAdapterLike, "login">): Promise<void> {

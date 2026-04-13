@@ -7,11 +7,16 @@ import {
 import { resolveTimezoneConfig } from "./timezone";
 import { readPrefixedBoolEnv, readPrefixedEnv, readPrefixedIntEnv, readPrefixedListEnv, resolveAppHome, resolveStateDir } from "./branding";
 
+interface ReadConfigOptions {
+  workspaceRoot?: string;
+}
 
-function readConfig() {
+function readConfig(options: ReadConfigOptions = {}) {
   const packageRoot = resolvePackageRoot(__dirname);
   const stateDir = resolveStateDir({ env: process.env });
-  const workspaceRoot = readPrefixedEnv(process.env, "WORKSPACE_ROOT") || process.cwd();
+  const workspaceRoot = options.workspaceRoot
+    || readPrefixedEnv(process.env, "WORKSPACE_ROOT")
+    || process.cwd();
   const timelineStateDir = readPrefixedEnv(process.env, "TIMELINE_STATE_DIR") || stateDir;
   const timezoneConfig = resolveTimezoneConfig({
     explicitTimezone: readPrefixedEnv(process.env, "TIMEZONE"),
@@ -54,6 +59,7 @@ function readConfig() {
     systemMessageQueueFile: path.join(stateDir, "system-message-queue.json"),
     systemMessageDeadLetterFile: path.join(stateDir, "system-message-dead-letter.json"),
     timelineScreenshotQueueFile: path.join(stateDir, "timeline-screenshot-queue.json"),
+    cliIdempotencyLedgerFile: path.join(stateDir, "cli-idempotency-ledger.json"),
     weixinInstructionsFile: readPrefixedEnv(process.env, "WEIXIN_INSTRUCTIONS_FILE")
       || path.join(packageRoot, "templates", "weixin-instructions.md"),
     weixinInstructionsOverlayFile: readPrefixedEnv(process.env, "WEIXIN_INSTRUCTIONS_OVERLAY_FILE")

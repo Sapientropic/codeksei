@@ -1,10 +1,14 @@
 import { getCommandArgsSchema } from "../contracts/command-args";
+import type { CommandExecutionResult } from "../contracts/cli-contract";
 import { parseCliArgs } from "../core/cli-args";
 import { buildTerminalLeafHelp } from "../core/command-registry";
+import { runCliMutation } from "../core/cli-mutation";
 import { resolveNoteSyncTarget, syncNoteFile } from "../notes/note-sync";
 
 interface NoteSyncOptions {
+  dryRun: boolean;
   help: boolean;
+  idempotencyKey: string;
   project: string;
   path: string;
   section: string;
@@ -30,8 +34,10 @@ interface NoteSyncResult {
 async function runNoteSyncCommand(config: unknown, args: string[] = []) {
   const options = parseNoteSyncArgs(args);
   if (options.help) {
-    console.log(buildTerminalLeafHelp("note.sync"));
-    return;
+    return {
+      data: null,
+      text: buildTerminalLeafHelp("note.sync"),
+    } satisfies CommandExecutionResult;
   }
 
   const text = await resolveBody(options);
@@ -43,17 +49,69 @@ async function runNoteSyncCommand(config: unknown, args: string[] = []) {
     config as Parameters<typeof resolveNoteSyncTarget>[0],
     options,
   );
-  const result = syncNoteFile({
-    filePath: target.filePath,
-    section: options.section,
-    text,
-    style: options.style,
-    slot: options.slot,
-    maxItems: options.maxItems,
-  });
+  return runCliMutation<Record<string, unknown>>({
+    commandKey: "note.sync",
+    config: normalizeConfig(config),
+    configSource: {
+      workspaceRoot: normalizeConfig(config).workspaceRoot || "",
+    },
+    dryRun: options.dryRun,
+    dryRunResult: {
+      data: {
+        filePath: target.filePath,
+        label: target.label,
+        section: options.section,
+        style: options.style || "bullet",
+        slot: options.slot,
+      },
+      text: [
+        "note sync dry-run",
+        `file: ${target.filePath}`,
+        `section: ${options.section}`,
+      ].join("\n"),
+    },
+    execute: async () => {
+      const result = syncNoteFile({
+        filePath: target.filePath,
+        section: options.section,
+        text,
+        style: options.style,
+        slot: options.slot,
+        maxItems: options.maxItems,
+      });
 
-  const action = result.changed ? "updated" : "noop";
-  console.log(`note ${action}: ${result.filePath} [${options.section}]`);
+      const action = result.changed ? "updated" : "noop";
+      return {
+        data: {
+          action,
+          filePath: result.filePath,
+          section: options.section,
+          target,
+        },
+        text: `note ${action}: ${result.filePath} [${options.section}]`,
+      };
+    },
+    idempotencyKey: options.idempotencyKey,
+    request: {
+      filePath: target.filePath,
+      maxItems: options.maxItems,
+      section: options.section,
+      slot: options.slot,
+      style: options.style,
+      text,
+    },
+    resolvedTargets: {
+      filePath: target.filePath,
+      label: target.label,
+      section: options.section,
+    },
+    sideEffects: [
+      {
+        kind: "write_note",
+        target: target.filePath,
+      },
+    ],
+  });
 }
 
 function parseNoteSyncArgs(args: string[]): NoteSyncOptions {
@@ -87,3 +145,7 @@ export {
   parseNoteSyncArgs,
   runNoteSyncCommand,
 };
+
+function normalizeConfig(config: unknown): Record<string, unknown> {
+  return config && typeof config === "object" ? { ...config } : {};
+}

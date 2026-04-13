@@ -28,12 +28,20 @@ README、帮助文本和公开示例默认都按 `codeksei` 书写。
 
 首次使用时，先记住这一组主入口即可。
 
-最常用（公共 CLI）：
+public CLI：
 
-- `codeksei login`
-- `codeksei accounts`
 - `codeksei doctor`
 - `codeksei help`
+- `codeksei schema`
+
+operator / bootstrap：
+
+- `codeksei operator help`
+- `codeksei operator schema`
+- `codeksei login`
+- `codeksei accounts`
+- `codeksei start`
+- `codeksei system checkin-poller`
 
 仓库脚本 / shared 模式：
 
@@ -52,8 +60,13 @@ README、帮助文本和公开示例默认都按 `codeksei` 书写。
 
 说明：
 
+- `codeksei help` / `codeksei schema` 默认只暴露 public finite command surface
+- `codeksei operator help` / `codeksei operator schema` 才会显示 bootstrap、shared、background、maintainer 入口
+- 非 TTY 默认返回 JSON envelope；TTY 默认返回 text
+- `stdout` 留给结果数据，`stderr` 留给诊断与 debug 信息
+- 全局参数统一支持：`--format json|text`、`--verbose`、`--workspace-root /absolute/path`
 - 日常使用默认走共享模式，让微信入口和终端执行落在同一条线上
-- `codeksei start` / `npm run start:checkin` 更适合最小链路调试
+- `codeksei start` / `npm run start:checkin` 更适合 operator 调试，不再视作默认 public discovery 面
 
 ## 微信命令
 

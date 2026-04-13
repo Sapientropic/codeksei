@@ -1,19 +1,20 @@
 import type { TimelineRuntimeConfig } from "../../runtime-config";
 import { listTimelineCategories } from "../application/timeline/list-categories";
+import type { TimelineCategoriesResult } from "../contracts";
 
-async function runTimelineCategoriesCommand(config: TimelineRuntimeConfig): Promise<void> {
-  const args = process.argv.slice(3);
+async function runTimelineCategoriesCommand(
+  config: TimelineRuntimeConfig,
+  args: string[] = process.argv.slice(3),
+): Promise<TimelineCategoriesResult | null> {
   if (args.includes("--help") || args.includes("-h")) {
-    printHelp();
-    return;
+    return null;
   }
 
-  const result = await listTimelineCategories(config);
-  console.log(JSON.stringify(result, null, 2));
+  return listTimelineCategories(config);
 }
 
-function printHelp() {
-  console.log(`
+function buildTimelineCategoriesHelp() {
+  return `
 用法: codeksei timeline categories
 
 用途:
@@ -23,7 +24,7 @@ function printHelp() {
 说明:
   - 这里只返回受控 taxonomy 摘要，不返回整库原始 state
   - 如果不确定是否需要新增 eventNode，先看 categories
-`);
+`;
 }
 
-export { runTimelineCategoriesCommand };
+export { buildTimelineCategoriesHelp, runTimelineCategoriesCommand };

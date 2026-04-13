@@ -8,13 +8,14 @@ const {
   listCommandGroups,
 } = require("../src/core/command-registry");
 
-test("terminal help prefers codeksei CLI syntax and keeps repo scripts in a separate section", () => {
+test("terminal help prefers codeksei CLI syntax and keeps operator surfaces out of public help", () => {
   const help = buildTerminalHelpText();
 
   assert.match(help, /用法: codeksei <command> \[subcommand\]/u);
   assert.match(help, /codeksei review weekly/u);
-  assert.match(help, /仓库脚本 \/ shared 模式/u);
-  assert.match(help, /npm run shared:start/u);
+  assert.match(help, /codeksei schema/u);
+  assert.match(help, /codeksei operator help/u);
+  assert.doesNotMatch(help, /npm run shared:start/u);
   assert.doesNotMatch(help, /用法: npm run/u);
 });
 

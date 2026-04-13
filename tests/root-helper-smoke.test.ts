@@ -77,7 +77,9 @@ test("dist runtime entrypoint executes main when invoked directly", () => {
   });
 
   assert.equal(result.status, 0, result.stderr || "expected help command to succeed");
-  assert.match(result.stdout, /用法: codeksei <command> \[subcommand\]/u);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.ok, true);
+  assert.equal(payload.data.type, "command_collection");
 });
 
 test("help entrypoints stay read-only and do not create the state dir", () => {
@@ -111,7 +113,9 @@ test("help entrypoints stay read-only and do not create the state dir", () => {
   assert.equal(timelineServeHelp.status, 0, timelineServeHelp.stderr || "expected timeline serve help to succeed");
   assert.equal(timelineDevHelp.status, 0, timelineDevHelp.stderr || "expected timeline dev help to succeed");
   assert.equal(topicHelp.status, 0, topicHelp.stderr || "expected topic help to succeed");
-  assert.match(timelineServeHelp.stdout, /codeksei timeline serve \[--port 4317\]/u);
-  assert.match(timelineDevHelp.stdout, /codeksei timeline dev \[--port 4317\]/u);
+  const timelineServePayload = JSON.parse(timelineServeHelp.stdout);
+  const timelineDevPayload = JSON.parse(timelineDevHelp.stdout);
+  assert.match(timelineServePayload.data.helpText, /codeksei timeline serve \[--port 4317\]/u);
+  assert.match(timelineDevPayload.data.helpText, /codeksei timeline dev \[--port 4317\]/u);
   assert.equal(fs.existsSync(stateDir), false);
 });

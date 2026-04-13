@@ -48,6 +48,9 @@ test("createTerminalCommandContext derives leafArgs and checkin from the provide
             login() {
               return Promise.resolve();
             },
+            getDoctorReport() {
+              return {};
+            },
             printAccounts() {
               return undefined;
             },
@@ -174,7 +177,35 @@ test("createTerminalCommandContext derives leafArgs and checkin from the provide
       createTerminalCommandContext,
     }: typeof import("../src/app/terminal-command-context") = require(contextModulePath);
 
-    const context = createTerminalCommandContext(["review", "weekly", "--window", "7d", "--checkin"]);
+    const context = createTerminalCommandContext(
+      ["review", "weekly", "--window", "7d", "--checkin"],
+      {
+        debug: false,
+        format: "text",
+        stdinIsTty: true,
+        stdoutIsTty: true,
+        verbose: false,
+        workspaceRoot: "",
+      },
+      {
+        action: "review.weekly",
+        approval: { autoApprove: true },
+        argsSchemaKey: "review",
+        audience: "public",
+        authRequirement: "none",
+        command: "review",
+        entrypointType: "cli",
+        helpTopic: "review",
+        key: "review weekly",
+        kind: "weekly",
+        mutability: "write",
+        runner: "review.command",
+        safetyTier: "warned",
+        scriptName: "review:weekly",
+        subcommand: "weekly",
+        timelineSubcommand: "",
+      },
+    );
     const app = context.getApp();
     void context.getTimelineIntegration();
 

@@ -9,9 +9,12 @@ import { createTimelineIntegration } from "../integrations/timeline";
 import { writeForeignTextDocument } from "../state/json-state";
 import { resolvePackageRoot } from "../core/path-utils";
 import { resolveConfiguredPersonName } from "../core/person-reference";
+import type { GlobalCliOptions } from "../contracts/cli-contract";
+import type { TerminalCommandManifestEntry } from "../contracts/command-surface";
 
 
 export interface TerminalRuntimeConfig extends Record<string, unknown> {
+  cliIdempotencyLedgerFile?: string;
   sessionsFile: string;
   stateDir: string;
   checkinConfigFile?: string;
@@ -30,19 +33,25 @@ export interface TerminalTimelineIntegrationLike {
 
 export interface TerminalCommandContext {
   argv: string[];
+  cli: GlobalCliOptions;
   config: TerminalRuntimeConfig;
   leafArgs: string[];
   getApp(): TerminalAppFacade;
   getTimelineIntegration(): TerminalTimelineIntegrationLike;
 }
 
-export function createTerminalCommandContext(argv: string[]): TerminalCommandContext {
+export function createTerminalCommandContext(
+  argv: string[],
+  cli: GlobalCliOptions,
+  manifest: TerminalCommandManifestEntry | null = null,
+): TerminalCommandContext {
   loadEnvStack();
   ensureStateDirectory();
   ensureCodekseiHomeEnv({ fallbackRoot: resolvePackageRoot(__dirname) });
 
-  const leafArgs = Array.isArray(argv) ? argv.slice(2) : [];
-  const baseConfig = readConfig();
+  const consumedArgCount = manifest?.subcommand ? 2 : 1;
+  const leafArgs = Array.isArray(argv) ? argv.slice(consumedArgCount) : [];
+  const baseConfig = readConfig({ workspaceRoot: cli.workspaceRoot });
   const config: TerminalRuntimeConfig = {
     ...baseConfig,
     startWithCheckin: Boolean(baseConfig.startWithCheckin || hasArgFlag(argv, "--checkin")),
@@ -53,6 +62,7 @@ export function createTerminalCommandContext(argv: string[]): TerminalCommandCon
   let timelineIntegration: TerminalTimelineIntegrationLike | null = null;
   return {
     argv,
+    cli,
     config,
     leafArgs,
     getApp(): TerminalAppFacade {

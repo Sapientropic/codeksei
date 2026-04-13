@@ -1,0 +1,46 @@
+export type CliAudience = "operator" | "public";
+export type CliAuthRequirement = "context_token" | "none" | "runtime_bootstrap" | "weixin_account";
+export type CliFormat = "json" | "text";
+export type CliMutability = "bootstrap" | "long_running" | "read" | "write";
+export type CliOkStatus = true | "partial";
+export type CliSafetyTier = "open" | "operator" | "warned";
+
+export interface CommandErrorShape {
+  code: string;
+  message: string;
+  retryable: boolean;
+  hint?: string | undefined;
+  context?: Record<string, unknown> | undefined;
+}
+
+export interface CommandEnvelope<T = unknown> {
+  ok: CliOkStatus | false;
+  data?: T | undefined;
+  error?: CommandErrorShape | undefined;
+  meta?: Record<string, unknown> | undefined;
+  next?: string[] | undefined;
+}
+
+export interface CommandExecutionResult<T = unknown> {
+  ok?: CliOkStatus | undefined;
+  data?: T | undefined;
+  text?: string | undefined;
+  meta?: Record<string, unknown> | undefined;
+  next?: string[] | undefined;
+}
+
+export interface GlobalCliOptions {
+  debug: boolean;
+  format: CliFormat;
+  stdinIsTty: boolean;
+  stdoutIsTty: boolean;
+  verbose: boolean;
+  workspaceRoot: string;
+}
+
+export interface ParsedGlobalCliOptions {
+  argv: string[];
+  format?: CliFormat | undefined;
+  verbose: boolean;
+  workspaceRoot: string;
+}

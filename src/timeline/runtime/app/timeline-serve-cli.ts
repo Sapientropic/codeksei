@@ -1,21 +1,36 @@
 import type { TimelineRuntimeConfig } from "../../runtime-config";
+import { getCommandArgsSchema } from "../../../contracts/command-args";
+import { parseCliArgs } from "../../../core/cli-args";
 import { startTimelineSiteServer } from "../application/timeline/serve-site";
 
-async function runTimelineServeCommand(config: TimelineRuntimeConfig): Promise<void> {
-  const port = parsePort(process.argv.slice(3), config.timelinePort);
-  const { info } = await startTimelineSiteServer(config, { port });
-  console.log(`timeline dashboard: ${info.url}`);
+interface TimelineServeCliOptions extends Record<string, unknown> {
+  help: boolean;
+  port: string;
 }
 
-function parsePort(args: string[], fallback: number): number {
-  for (let index = 0; index < args.length; index += 1) {
-    if (args[index] !== "--port") {
-      continue;
-    }
-    const value = Number.parseInt(String(args[index + 1] || ""), 10);
-    return Number.isFinite(value) && value > 0 ? value : fallback;
+async function runTimelineServeCommand(
+  config: TimelineRuntimeConfig,
+  args: string[] = process.argv.slice(3),
+): Promise<{ port: number; url: string } | null> {
+  const options = parseTimelineServeArgs(args);
+  if (options.help) {
+    return null;
+  }
+  const port = parsePort(options.port, config.timelinePort);
+  const { info } = await startTimelineSiteServer(config, { port });
+  return info;
+}
+
+function parseTimelineServeArgs(args: string[]): TimelineServeCliOptions {
+  return parseCliArgs<TimelineServeCliOptions>(args, getCommandArgsSchema("timelineServe"));
+}
+
+function parsePort(value: string, fallback: number): number {
+  const parsed = Number.parseInt(String(value || ""), 10);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
   }
   return fallback;
 }
 
-export { runTimelineServeCommand };
+export { parseTimelineServeArgs, runTimelineServeCommand };

@@ -10,6 +10,7 @@ import {
   buildTerminalActionExample,
   buildTerminalEntryUsage,
 } from "../core/terminal-command-usage";
+import { listGlobalCliFlags } from "../core/cli-contract";
 
 export interface CommandHelpDocument {
   usage: readonly string[];
@@ -106,10 +107,21 @@ const TOPIC_HELP = {
 // help are marked topic_only in command-surface-definitions instead of silently
 // reusing a generic leaf renderer.
 const LEAF_HELP = {
+  "app.doctor": () => ({
+    usage: [buildTerminalActionExample("app.doctor", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  输出当前 public CLI 相关的运行时快照，包括状态目录、channel/runtime 描述、timeline 描述与 thread state 摘要。",
+      "  非 TTY 下默认走 JSON envelope；TTY 下默认走文本。",
+    ],
+  }),
   "channel.send_file": () => ({
     usage: [buildExample("channel.send_file", true)],
     bodyLabel: "说明：",
-    body: ["  将本地文件作为附件发回当前微信聊天。"],
+    body: [
+      "  将本地文件作为附件发回当前微信聊天。",
+      "  默认会解析当前唯一稳定 sender；若目标不唯一，会直接返回 target_resolution_required。",
+    ],
     examples: [`  ${buildExample("channel.send_file")}`],
     includeFlagBlock: true,
   }),
@@ -180,8 +192,39 @@ const LEAF_HELP = {
   "review.nightly": (context) => buildReviewLeafHelpDocument("review.nightly", context),
   "review.weekly": (context) => buildReviewLeafHelpDocument("review.weekly", context),
   "review.monthly": (context) => buildReviewLeafHelpDocument("review.monthly", context),
+  "reminder.create": () => ({
+    usage: [buildExample("reminder.create", true)],
+    bodyLabel: "说明：",
+    body: [
+      "  创建提醒并放入本地 reminder queue。",
+      "  默认会解析唯一稳定 sender，并检查对应 context_token；缺失时直接报 auth_required。",
+    ],
+    examples: [
+      "  codeksei reminder write --delay 30m --text \"起身喝水\"",
+      "  codeksei reminder write --at 2026-04-07 21:30 --text \"收今晚的日记\"",
+    ],
+    includeFlagBlock: true,
+  }),
+  "diary.append": () => ({
+    usage: [buildExample("diary.append", true)],
+    bodyLabel: "说明：",
+    body: [
+      "  追加一条日记记录。",
+      "  todo done 若省略 --timeline-text，会优先复用同一 Todo 捕获的开始时间补出时间块；只有找不到开始时间时才退回单点事实。",
+    ],
+    examples: [
+      "  codeksei diary write --section todo --state open --text \"继续收口 codeksei CLI plan\"",
+      "  codeksei diary write --section supplement --title \"CLI contract\" --text \"统一 stdout/stderr/exit code 约束。\"",
+    ],
+    includeFlagBlock: true,
+  }),
   "system.send": () => ({
     usage: [buildExample("system.send", true)],
+    bodyLabel: "说明：",
+    body: [
+      "  向内部 system queue 写一条不可见触发消息。",
+      "  --workspace 和 --user 可以显式传；没传时只会接受唯一稳定默认值，否则直接报 target_resolution_required。",
+    ],
     examples: [
       "  codeksei system send --text \"提醒她今天早点睡\" --workspace \"$(pwd)\"",
     ],
@@ -221,6 +264,54 @@ const LEAF_HELP = {
       includeFlagBlock: true,
     };
   },
+  "timeline.write": () => ({
+    usage: [buildTerminalActionExample("timeline.write", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  按批量或原始 JSON 写入 timeline day payload。",
+      "  建议先用 timeline read / categories 确认目标日期与分类，再决定 merge 或 replace。",
+      "  --json 与 --stdin 都要求传完整 JSON 对象，不接受裸数组。",
+    ],
+    examples: [
+      "  codeksei timeline write --date 2026-04-05 --json '{\"events\":[...]}'",
+      "  cat payload.json | codeksei timeline write --date 2026-04-05 --stdin",
+    ],
+    includeFlagBlock: true,
+  }),
+  "timeline.read": () => ({
+    usage: [buildTerminalActionExample("timeline.read", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  读取某一天当前已有的时间轴事件。",
+      "  只返回受控的 day payload 摘要，不回传完整原始 state。修改前先 read 是默认建议路径。",
+    ],
+    examples: [
+      "  codeksei timeline read --date 2026-04-05",
+    ],
+    includeFlagBlock: true,
+  }),
+  "timeline.categories": () => ({
+    usage: [buildTerminalEntryUsage("timeline.categories", "public")],
+    bodyLabel: "说明：",
+    body: [
+      "  读取当前可用的 category / subcategory / eventNode 摘要。",
+      "  不确定该复用哪个分类时，先看 categories，再决定 event 或 write 的 payload。",
+    ],
+    includeFlagBlock: true,
+  }),
+  "timeline.proposals": () => ({
+    usage: [buildTerminalActionExample("timeline.proposals", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  查看 timeline 写入过程中累计出来的 eventNode proposals。",
+      "  可用 --date 缩到单日，方便排查某天新增了哪些候选节点。",
+    ],
+    examples: [
+      "  codeksei timeline proposals",
+      "  codeksei timeline proposals --date 2026-04-05",
+    ],
+    includeFlagBlock: true,
+  }),
   "timeline.build": () => buildTimelineLeafHelpDocument("timeline.build"),
   "timeline.serve": () => buildTimelineLeafHelpDocument("timeline.serve"),
   "timeline.dev": () => buildTimelineLeafHelpDocument("timeline.dev"),
@@ -424,7 +515,8 @@ function renderHelpDocument(document: CommandHelpDocument, argsSchemaKey: string
 
 function renderFlagBlock(schemaKey: unknown): string {
   const flags = listCommandArgFlagsForHelp(String(schemaKey || "")).filter((flag) => flag.name !== "help");
-  if (!flags.length) {
+  const globalFlags = listGlobalCliFlags();
+  if (!flags.length && !globalFlags.length) {
     return "";
   }
   const lines = ["参数："];
@@ -439,6 +531,11 @@ function renderFlagBlock(schemaKey: unknown): string {
     }
     const description = [suffixParts.join("；"), flag.description].filter(Boolean).join("；");
     lines.push(`  ${keys}${description ? `  ${description}` : ""}`);
+  }
+  for (const flag of globalFlags) {
+    const keys = Array.isArray(flag.keys) ? flag.keys.join(", ") : "";
+    const suffix = flag.placeholder ? `  ${flag.placeholder}；${flag.description}` : `  ${flag.description}`;
+    lines.push(`  ${keys}${suffix}`);
   }
   return lines.join("\n");
 }

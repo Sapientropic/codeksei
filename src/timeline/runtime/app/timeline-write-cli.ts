@@ -1,8 +1,10 @@
 import type { TimelineMergeDayInput } from "../contracts";
 import type { TimelineRuntimeConfig } from "../../runtime-config";
+import { getCommandArgsSchema } from "../../../contracts/command-args";
+import { parseCliArgs } from "../../../core/cli-args";
 import { writeTimelineDay } from "../application/timeline/write-day";
 
-interface TimelineWriteCliOptions {
+interface TimelineWriteCliOptions extends Record<string, unknown> {
   help: boolean;
   date: string;
   json: string;
@@ -11,11 +13,13 @@ interface TimelineWriteCliOptions {
   useStdin: boolean;
 }
 
-async function runTimelineWriteCommand(config: TimelineRuntimeConfig): Promise<void> {
-  const options = parseArgs(process.argv.slice(3));
+async function runTimelineWriteCommand(
+  config: TimelineRuntimeConfig,
+  args: string[] = process.argv.slice(3),
+): Promise<{ date: string; mode: string; eventCount: number; status: string } | null> {
+  const options = parseTimelineWriteArgs(args);
   if (options.help) {
-    printHelp();
-    return;
+    return null;
   }
 
   const body = await resolveBody(options);
@@ -30,57 +34,11 @@ async function runTimelineWriteCommand(config: TimelineRuntimeConfig): Promise<v
     mode: options.mode || payload.mode || "merge",
     finalize: options.finalize,
   });
-
-  console.log(`timeline written: ${result.date}`);
-  console.log(`mode: ${result.mode}`);
-  console.log(`events: ${result.eventCount}`);
-  console.log(`status: ${result.status}`);
+  return result;
 }
 
-function parseArgs(args: string[]): TimelineWriteCliOptions {
-  const options: TimelineWriteCliOptions = {
-    help: false,
-    date: "",
-    json: "",
-    mode: "",
-    finalize: false,
-    useStdin: false,
-  };
-
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = String(args[index] || "").trim();
-    if (!arg) {
-      continue;
-    }
-    if (arg === "--help" || arg === "-h") {
-      options.help = true;
-      continue;
-    }
-    if (arg === "--finalize") {
-      options.finalize = true;
-      continue;
-    }
-    if (arg === "--stdin") {
-      options.useStdin = true;
-      continue;
-    }
-    const value = String(args[index + 1] || "");
-    if (!value || value.startsWith("--")) {
-      throw new Error(`参数缺少值: ${arg}`);
-    }
-    if (arg === "--date") {
-      options.date = value.trim();
-    } else if (arg === "--json") {
-      options.json = value.trim();
-    } else if (arg === "--mode") {
-      options.mode = value.trim();
-    } else {
-      throw new Error(`未知参数: ${arg}`);
-    }
-    index += 1;
-  }
-
-  return options;
+function parseTimelineWriteArgs(args: string[]): TimelineWriteCliOptions {
+  return parseCliArgs<TimelineWriteCliOptions>(args, getCommandArgsSchema("timelineWrite"));
 }
 
 async function resolveBody(options: TimelineWriteCliOptions): Promise<string> {
@@ -117,8 +75,8 @@ function readStdin(): Promise<string> {
   });
 }
 
-function printHelp() {
-  console.log(`
+function buildTimelineWriteHelp() {
+  return `
 用法: codeksei timeline write --date YYYY-MM-DD [--mode merge|replace] [--json '{"events":[...]}']
   或: cat payload.json | codeksei timeline write --date YYYY-MM-DD --stdin
 
@@ -160,7 +118,7 @@ function printHelp() {
       }
     ]
   }
-`);
+`;
 }
 
-export { runTimelineWriteCommand };
+export { buildTimelineWriteHelp, parseTimelineWriteArgs, resolveBody, runTimelineWriteCommand };

@@ -32,7 +32,13 @@ export interface CommandActionDefinition {
   approval?: CommandApprovalDefinition;
 }
 
+export type CommandAudienceDefinition = "operator" | "public";
+export type CommandAuthRequirementDefinition = "context_token" | "none" | "runtime_bootstrap" | "weixin_account";
+export type CommandMutabilityDefinition = "bootstrap" | "long_running" | "read" | "write";
+export type CommandSafetyTierDefinition = "open" | "operator" | "warned";
+
 export const COMMAND_GROUP_DEFINITIONS = [
+  { id: "introspection", label: "发现与合同" },
   { id: "lifecycle", label: "启动与诊断" },
   { id: "workspace", label: "项目与线程" },
   { id: "approval", label: "授权与控制" },
@@ -41,6 +47,44 @@ export const COMMAND_GROUP_DEFINITIONS = [
 ] as const satisfies readonly CommandGroupDefinition[];
 
 export const COMMAND_ACTION_DEFINITIONS = [
+  {
+    action: "app.schema",
+    groupId: "introspection",
+    summary: "查看当前 public CLI contract schema",
+    terminal: ["schema"],
+    weixin: [],
+    status: "active",
+    entrypointType: "cli",
+    command: "schema",
+    runner: "schema",
+    help: { topic: "", leafKey: "app.schema", detail: "topic_only" },
+  },
+  {
+    action: "operator.help",
+    groupId: "introspection",
+    summary: "查看 operator / bootstrap command surface",
+    terminal: ["operator help"],
+    weixin: [],
+    status: "active",
+    entrypointType: "cli",
+    command: "operator",
+    subcommand: "help",
+    runner: "operator.help",
+    help: { topic: "", leafKey: "operator.help", detail: "topic_only" },
+  },
+  {
+    action: "operator.schema",
+    groupId: "introspection",
+    summary: "查看 operator / bootstrap command schema",
+    terminal: ["operator schema"],
+    weixin: [],
+    status: "active",
+    entrypointType: "cli",
+    command: "operator",
+    subcommand: "schema",
+    runner: "operator.schema",
+    help: { topic: "", leafKey: "operator.schema", detail: "topic_only" },
+  },
   {
     action: "app.login",
     groupId: "lifecycle",
@@ -148,6 +192,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
     scriptName: "doctor",
     command: "doctor",
     runner: "doctor",
+    help: { topic: "system", leafKey: "app.doctor", detail: "leaf" },
   },
   {
     action: "system.send",
@@ -485,7 +530,8 @@ export const COMMAND_ACTION_DEFINITIONS = [
     command: "timeline",
     subcommand: "write",
     runner: "timeline.subcommand",
-    help: { topic: "timeline", leafKey: "timeline.write", detail: "topic_only" },
+    argsSchemaKey: "timelineWrite",
+    help: { topic: "timeline", leafKey: "timeline.write", detail: "leaf" },
     timelineSubcommand: "write",
     approval: { autoApprove: true },
   },
@@ -501,7 +547,8 @@ export const COMMAND_ACTION_DEFINITIONS = [
     command: "timeline",
     subcommand: "read",
     runner: "timeline.subcommand",
-    help: { topic: "timeline", leafKey: "timeline.read", detail: "topic_only" },
+    argsSchemaKey: "timelineRead",
+    help: { topic: "timeline", leafKey: "timeline.read", detail: "leaf" },
     timelineSubcommand: "read",
     approval: { autoApprove: true },
   },
@@ -517,7 +564,8 @@ export const COMMAND_ACTION_DEFINITIONS = [
     command: "timeline",
     subcommand: "categories",
     runner: "timeline.subcommand",
-    help: { topic: "timeline", leafKey: "timeline.categories", detail: "topic_only" },
+    argsSchemaKey: "timelineCategories",
+    help: { topic: "timeline", leafKey: "timeline.categories", detail: "leaf" },
     timelineSubcommand: "categories",
     approval: { autoApprove: true },
   },
@@ -533,7 +581,8 @@ export const COMMAND_ACTION_DEFINITIONS = [
     command: "timeline",
     subcommand: "proposals",
     runner: "timeline.subcommand",
-    help: { topic: "timeline", leafKey: "timeline.proposals", detail: "topic_only" },
+    argsSchemaKey: "timelineProposals",
+    help: { topic: "timeline", leafKey: "timeline.proposals", detail: "leaf" },
     timelineSubcommand: "proposals",
     approval: { autoApprove: true },
   },
@@ -549,6 +598,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
     command: "timeline",
     subcommand: "build",
     runner: "timeline.subcommand",
+    argsSchemaKey: "timelineBuild",
     help: { topic: "timeline", leafKey: "timeline.build", detail: "leaf" },
     timelineSubcommand: "build",
     approval: { autoApprove: true },
@@ -565,6 +615,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
     command: "timeline",
     subcommand: "serve",
     runner: "timeline.subcommand",
+    argsSchemaKey: "timelineServe",
     help: { topic: "timeline", leafKey: "timeline.serve", detail: "leaf" },
     timelineSubcommand: "serve",
     approval: { autoApprove: true },
@@ -581,6 +632,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
     command: "timeline",
     subcommand: "dev",
     runner: "timeline.subcommand",
+    argsSchemaKey: "timelineDev",
     help: { topic: "timeline", leafKey: "timeline.dev", detail: "leaf" },
     timelineSubcommand: "dev",
     approval: { autoApprove: true },
@@ -614,7 +666,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
     subcommand: "write",
     runner: "reminder.write",
     argsSchemaKey: "reminderWrite",
-    help: { topic: "reminder", leafKey: "reminder.create", detail: "topic_only" },
+    help: { topic: "reminder", leafKey: "reminder.create", detail: "leaf" },
     approval: { autoApprove: true },
   },
   {
@@ -630,7 +682,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
     subcommand: "write",
     runner: "diary.write",
     argsSchemaKey: "diaryWrite",
-    help: { topic: "diary", leafKey: "diary.append", detail: "topic_only" },
+    help: { topic: "diary", leafKey: "diary.append", detail: "leaf" },
     approval: { autoApprove: true },
   },
   {
@@ -663,14 +715,18 @@ type ExtractHelpStringField<T, K extends keyof CommandHelpDefinition> = T extend
   : never;
 
 export type CommandActionId = CommandActionDefinitionRecord["action"];
+export type CommandAudience = CommandAudienceDefinition;
 export type CommandArgsSchemaKey = ExtractStringField<CommandActionDefinitionRecord, "argsSchemaKey">;
+export type CommandAuthRequirement = CommandAuthRequirementDefinition;
 export type CommandEntrypointType = CommandActionDefinitionRecord["entrypointType"];
 export type CommandGroupId = typeof COMMAND_GROUP_DEFINITIONS[number]["id"];
 export type CommandHelpDetail = CommandHelpDefinition["detail"];
 export type CommandHelpLeafKey = ExtractHelpStringField<ActionWithHelp, "leafKey">;
 export type CommandHelpTopic = ExtractHelpStringField<ActionWithHelp, "topic">;
 export type CommandKind = ExtractStringField<CommandActionDefinitionRecord, "kind">;
+export type CommandMutability = CommandMutabilityDefinition;
 export type CommandRunnerId = ExtractStringField<CommandActionDefinitionRecord, "runner">;
+export type CommandSafetyTier = CommandSafetyTierDefinition;
 export type CommandScriptName = ExtractStringField<CommandActionDefinitionRecord, "scriptName">;
 export type CommandStatus = ExtractStringField<CommandActionDefinitionRecord, "status">;
 export type CommandTimelineSubcommand = ExtractStringField<CommandActionDefinitionRecord, "timelineSubcommand">;
@@ -681,3 +737,132 @@ export type CommandLeafHelpKey = Extract<ActionWithHelp, {
 export type CommandTopicOnlyLeafKey = Extract<ActionWithHelp, {
   help: { detail: "topic_only"; leafKey: string };
 }>["help"]["leafKey"];
+
+const COMMAND_AUDIENCE_BY_ACTION: Readonly<Partial<Record<CommandActionId, CommandAudienceDefinition>>> = Object.freeze({
+  "app.accounts": "operator",
+  "app.login": "operator",
+  "app.shared_open": "operator",
+  "app.shared_start": "operator",
+  "app.shared_status": "operator",
+  "app.shared_watchdog": "operator",
+  "app.start": "operator",
+  "background.install": "operator",
+  "background.uninstall": "operator",
+  "operator.help": "operator",
+  "operator.schema": "operator",
+  "system.checkin_poller": "operator",
+});
+
+const COMMAND_SAFETY_BY_ACTION: Readonly<Partial<Record<CommandActionId, CommandSafetyTierDefinition>>> = Object.freeze({
+  "app.accounts": "operator",
+  "app.doctor": "open",
+  "app.help": "open",
+  "app.login": "operator",
+  "app.schema": "open",
+  "app.shared_open": "operator",
+  "app.shared_start": "operator",
+  "app.shared_status": "operator",
+  "app.shared_watchdog": "operator",
+  "app.start": "operator",
+  "background.install": "operator",
+  "background.uninstall": "operator",
+  "channel.send_file": "warned",
+  "diary.append": "warned",
+  "note.auto": "warned",
+  "note.maybe": "open",
+  "note.sync": "warned",
+  "operator.help": "operator",
+  "operator.schema": "operator",
+  "project.radar": "open",
+  "reminder.create": "warned",
+  "review.monthly": "warned",
+  "review.nightly": "warned",
+  "review.weekly": "warned",
+  "system.checkin_config": "warned",
+  "system.checkin_poller": "operator",
+  "system.send": "warned",
+  "timeline.build": "open",
+  "timeline.categories": "open",
+  "timeline.dev": "open",
+  "timeline.event": "warned",
+  "timeline.proposals": "open",
+  "timeline.read": "open",
+  "timeline.screenshot": "warned",
+  "timeline.serve": "open",
+  "timeline.write": "warned",
+});
+
+const COMMAND_MUTABILITY_BY_ACTION: Readonly<Partial<Record<CommandActionId, CommandMutabilityDefinition>>> = Object.freeze({
+  "app.accounts": "bootstrap",
+  "app.doctor": "read",
+  "app.help": "read",
+  "app.login": "bootstrap",
+  "app.schema": "read",
+  "app.shared_open": "bootstrap",
+  "app.shared_start": "long_running",
+  "app.shared_status": "read",
+  "app.shared_watchdog": "long_running",
+  "app.start": "long_running",
+  "background.install": "bootstrap",
+  "background.uninstall": "bootstrap",
+  "channel.send_file": "write",
+  "diary.append": "write",
+  "note.auto": "write",
+  "note.maybe": "read",
+  "note.sync": "write",
+  "operator.help": "read",
+  "operator.schema": "read",
+  "project.radar": "read",
+  "reminder.create": "write",
+  "review.monthly": "write",
+  "review.nightly": "write",
+  "review.weekly": "write",
+  "system.checkin_config": "write",
+  "system.checkin_poller": "long_running",
+  "system.send": "write",
+  "timeline.build": "read",
+  "timeline.categories": "read",
+  "timeline.dev": "long_running",
+  "timeline.event": "write",
+  "timeline.proposals": "read",
+  "timeline.read": "read",
+  "timeline.screenshot": "write",
+  "timeline.serve": "long_running",
+  "timeline.write": "write",
+});
+
+const COMMAND_AUTH_BY_ACTION: Readonly<Partial<Record<CommandActionId, CommandAuthRequirementDefinition>>> = Object.freeze({
+  "app.accounts": "weixin_account",
+  "app.login": "none",
+  "app.shared_open": "runtime_bootstrap",
+  "app.shared_start": "runtime_bootstrap",
+  "app.shared_status": "runtime_bootstrap",
+  "app.shared_watchdog": "runtime_bootstrap",
+  "app.start": "runtime_bootstrap",
+  "channel.send_file": "runtime_bootstrap",
+  "reminder.create": "context_token",
+  "system.send": "context_token",
+  "timeline.screenshot": "context_token",
+});
+
+export function resolveCommandAudienceDefinition(
+  actionId: CommandActionId,
+  entrypointType: CommandActionDefinition["entrypointType"],
+): CommandAudienceDefinition {
+  if (COMMAND_AUDIENCE_BY_ACTION[actionId]) {
+    return COMMAND_AUDIENCE_BY_ACTION[actionId] || "public";
+  }
+  return entrypointType === "script" ? "operator" : "public";
+}
+
+export function resolveCommandAuthRequirementDefinition(actionId: CommandActionId): CommandAuthRequirementDefinition {
+  return COMMAND_AUTH_BY_ACTION[actionId] || "none";
+}
+
+export function resolveCommandMutabilityDefinition(actionId: CommandActionId): CommandMutabilityDefinition {
+  return COMMAND_MUTABILITY_BY_ACTION[actionId] || "read";
+}
+
+export function resolveCommandSafetyTierDefinition(actionId: CommandActionId): CommandSafetyTierDefinition {
+  return COMMAND_SAFETY_BY_ACTION[actionId] || "open";
+}

@@ -8,13 +8,16 @@ import {
 } from "../adapters/channel/weixin/account-store";
 import { loadPersistedContextTokens } from "../adapters/channel/weixin/context-token-store";
 import { getCommandArgsSchema } from "../contracts/command-args";
+import type { CommandExecutionResult } from "../contracts/cli-contract";
 import { parseCliArgs } from "../core/cli-args";
+import { buildAuthRequiredError, buildTargetResolutionRequiredError } from "../core/cli-contract";
+import { runCliMutation } from "../core/cli-mutation";
 import {
   LEGACY_TIMELINE_TIMEZONE,
   coerceLocalDateTimeToIso,
 } from "../core/timezone";
 import { ReminderQueueStore } from "../state/reminder-queue-store";
-import { resolvePreferredSenderId } from "../workspace/default-targets";
+import { inspectPreferredSenderId } from "../workspace/default-targets";
 
 const DELAY_UNIT_MS = {
   s: 1_000,
@@ -24,6 +27,7 @@ const DELAY_UNIT_MS = {
 } as const;
 
 export interface ReminderWriteConfig extends WeixinAccountConfig {
+  cliIdempotencyLedgerFile?: string;
   allowedUserIds?: unknown;
   reminderQueueFile: string;
   sessionsFile: string;
@@ -31,6 +35,9 @@ export interface ReminderWriteConfig extends WeixinAccountConfig {
 }
 
 interface ReminderWriteOptions extends Record<string, unknown> {
+  dryRun?: boolean;
+  help?: boolean;
+  idempotencyKey?: string;
   delay?: unknown;
   at?: unknown;
   text?: unknown;
@@ -41,8 +48,14 @@ interface ReminderWriteOptions extends Record<string, unknown> {
 async function runReminderWriteCommand(
   config: ReminderWriteConfig,
   args: readonly string[] = [],
-): Promise<void> {
+): Promise<CommandExecutionResult> {
   const options = parseArgs(args);
+  if (options.help) {
+    return {
+      data: null,
+      text: buildReminderWriteHelp(timezoneLabel(config.timezone)),
+    };
+  }
   const body = await resolveBody(options);
   if (!body) {
     throw new Error("提醒内容不能为空，传 --text 或通过 stdin 输入");
@@ -58,33 +71,92 @@ async function runReminderWriteCommand(
 
   const account = resolveSelectedAccount(config);
   const sessionStore = new SessionStore({ filePath: config.sessionsFile });
-  const senderId = resolvePreferredSenderId({
+  const senderResolution = inspectPreferredSenderId({
     config,
     accountId: account.accountId,
     explicitUser: normalizeText(options.user),
     sessionStore,
   });
-  if (!senderId) {
-    throw new Error("无法确定 reminder 的微信用户，传 --user 或先让唯一活跃用户和 bot 聊过一次");
+  if (!senderResolution.value) {
+    throw buildTargetResolutionRequiredError(
+      senderResolution.ambiguous
+        ? "reminder write 无法确定唯一 sender；请显式传 --user"
+        : "reminder write 缺少可用 sender；请显式传 --user 或先完成 bootstrap",
+      { candidates: senderResolution.candidates, source: senderResolution.source },
+      "显式传 --user，或让唯一目标用户先和 bot 聊过一次。"
+    );
   }
+  const senderId = senderResolution.value;
 
   const contextTokens = loadPersistedContextTokens(config, account.accountId);
   const contextToken = normalizeText(contextTokens[senderId]);
   if (!contextToken) {
-    throw new Error(`找不到 ${senderId} 的 context_token，先让这个用户和 bot 聊过一次`);
+    throw buildAuthRequiredError(
+      `找不到 ${senderId} 的 context_token，先让这个用户和 bot 聊过一次`,
+      "让目标用户先和 bot 聊过一次，或检查当前账号的 context token 持久化状态。"
+    );
   }
 
-  const queue = new ReminderQueueStore({ filePath: config.reminderQueueFile });
-  const reminder = queue.enqueue({
-    id: crypto.randomUUID(),
-    accountId: account.accountId,
-    senderId,
-    contextToken,
-    text: body,
-    dueAtMs,
-    createdAt: new Date().toISOString(),
+  return runCliMutation<Record<string, unknown>>({
+    commandKey: "reminder.write",
+    config,
+    configSource: {
+      reminderQueueFile: config.reminderQueueFile,
+      sessionsFile: config.sessionsFile,
+      timezone,
+    },
+    dryRun: Boolean(options.dryRun),
+    dryRunResult: {
+      data: {
+        dueAtMs,
+        senderId,
+        text: body,
+      },
+      text: [
+        "reminder dry-run",
+        `sender: ${senderId}`,
+        `dueAt: ${new Date(dueAtMs).toISOString()}`,
+      ].join("\n"),
+    },
+    execute: async () => {
+      const queue = new ReminderQueueStore({ filePath: config.reminderQueueFile });
+      const reminder = queue.enqueue({
+        id: crypto.randomUUID(),
+        accountId: account.accountId,
+        senderId,
+        contextToken,
+        text: body,
+        dueAtMs,
+        createdAt: new Date().toISOString(),
+      });
+      return {
+        data: {
+          dueAtMs: reminder.dueAtMs,
+          id: reminder.id,
+          senderId: reminder.senderId,
+          text: reminder.text,
+        },
+        text: `reminder queued: ${reminder.id}`,
+      };
+    },
+    idempotencyKey: normalizeText(options.idempotencyKey),
+    request: {
+      at: options.at,
+      delay: options.delay,
+      senderId,
+      text: body,
+    },
+    resolvedTargets: {
+      senderId,
+      senderSource: senderResolution.source,
+    },
+    sideEffects: [
+      {
+        kind: "enqueue_reminder",
+        target: config.reminderQueueFile,
+      },
+    ],
   });
-  console.log(`reminder queued: ${reminder.id}`);
 }
 
 function parseArgs(args: readonly string[]): ReminderWriteOptions {
@@ -200,6 +272,22 @@ function buildAbsoluteTimeExample(timezone: string = LEGACY_TIMELINE_TIMEZONE): 
 
 function normalizeTimezone(value: unknown): string {
   return normalizeText(value) || LEGACY_TIMELINE_TIMEZONE;
+}
+
+function buildReminderWriteHelp(timezone: string): string {
+  return [
+    "用法: codeksei reminder write --delay 30m --text \"提醒内容\"",
+    "  或: codeksei reminder write --at 2026-04-07 21:30 --text \"提醒内容\"",
+    "",
+    "说明：",
+    "  创建提醒并交给本地调度层处理。",
+    `  不带 offset 的本地时间按 ${timezone} 解释。`,
+    "  默认会解析唯一稳定 sender；若不唯一会直接返回 target_resolution_required。",
+  ].join("\n");
+}
+
+function timezoneLabel(value: unknown): string {
+  return normalizeTimezone(value);
 }
 
 export {

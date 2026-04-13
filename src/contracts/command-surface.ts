@@ -3,29 +3,41 @@ import {
   COMMAND_GROUP_DEFINITIONS,
   type CommandActionDefinition,
   type CommandActionId,
+  type CommandAudience,
   type CommandArgsSchemaKey,
+  type CommandAuthRequirement,
   type CommandEntrypointType,
   type CommandGroupId,
   type CommandHelpDetail,
   type CommandHelpLeafKey,
   type CommandHelpTopic,
   type CommandKind,
+  type CommandMutability,
   type CommandRunnerId,
+  type CommandSafetyTier,
   type CommandScriptName,
   type CommandStatus,
   type CommandTimelineSubcommand,
+  resolveCommandAudienceDefinition,
+  resolveCommandAuthRequirementDefinition,
+  resolveCommandMutabilityDefinition,
+  resolveCommandSafetyTierDefinition,
 } from "./command-surface-definitions";
 
 export type {
   CommandActionId,
+  CommandAudience,
   CommandArgsSchemaKey,
+  CommandAuthRequirement,
   CommandEntrypointType,
   CommandGroupId,
   CommandHelpDetail,
   CommandHelpLeafKey,
   CommandHelpTopic,
   CommandKind,
+  CommandMutability,
   CommandRunnerId,
+  CommandSafetyTier,
   CommandScriptName,
   CommandStatus,
   CommandTimelineSubcommand,
@@ -51,6 +63,8 @@ export interface CommandApproval {
 
 export interface CommandAction {
   action: CommandActionId;
+  audience: CommandAudience;
+  authRequirement: CommandAuthRequirement;
   groupId: CommandGroupId;
   summary: string;
   terminal: string[];
@@ -63,6 +77,8 @@ export interface CommandAction {
   runner: CommandRunnerId | "";
   argsSchemaKey: CommandArgsSchemaKey | "";
   kind: CommandKind | "";
+  mutability: CommandMutability;
+  safetyTier: CommandSafetyTier;
   timelineSubcommand: CommandTimelineSubcommand | "";
   help: Readonly<CommandHelp>;
   approval: Readonly<CommandApproval>;
@@ -70,6 +86,8 @@ export interface CommandAction {
 
 export interface TerminalCommandManifestEntry {
   key: string;
+  audience: CommandAudience;
+  authRequirement: CommandAuthRequirement;
   command: string;
   subcommand: string;
   action: CommandActionId;
@@ -77,6 +95,8 @@ export interface TerminalCommandManifestEntry {
   argsSchemaKey: CommandArgsSchemaKey | "";
   helpTopic: CommandHelpTopic | "";
   kind: CommandKind | "";
+  mutability: CommandMutability;
+  safetyTier: CommandSafetyTier;
   timelineSubcommand: CommandTimelineSubcommand | "";
   scriptName: CommandScriptName | "";
   approval: CommandApproval;
@@ -108,6 +128,8 @@ const TERMINAL_COMMAND_MANIFEST = Object.freeze<readonly TerminalCommandManifest
     .filter((entry): entry is CommandAction & { runner: CommandRunnerId } => entry.entrypointType === "cli" && Boolean(entry.command) && Boolean(entry.runner))
     .map((entry): TerminalCommandManifestEntry => ({
       key: [entry.command, entry.subcommand].filter(Boolean).join(" "),
+      audience: entry.audience,
+      authRequirement: entry.authRequirement,
       command: entry.command,
       subcommand: entry.subcommand,
       action: entry.action,
@@ -115,6 +137,8 @@ const TERMINAL_COMMAND_MANIFEST = Object.freeze<readonly TerminalCommandManifest
       argsSchemaKey: entry.argsSchemaKey,
       helpTopic: entry.help.topic,
       kind: entry.kind,
+      mutability: entry.mutability,
+      safetyTier: entry.safetyTier,
       timelineSubcommand: entry.timelineSubcommand,
       scriptName: entry.scriptName,
       approval: { ...entry.approval },
@@ -131,20 +155,26 @@ const TERMINAL_COMMAND_MANIFEST_BY_SCRIPT_NAME = new Map(
 );
 
 function defineAction(entry: CommandActionDefinition): CommandAction {
+  const actionId = normalizeCommandLookupKey(entry.action) as CommandActionId;
+  const entrypointType = normalizeCommandLookupKey(entry.entrypointType) as CommandEntrypointType;
   return Object.freeze({
-    action: normalizeCommandLookupKey(entry.action) as CommandActionId,
+    action: actionId,
+    audience: resolveCommandAudienceDefinition(actionId, entry.entrypointType),
+    authRequirement: resolveCommandAuthRequirementDefinition(actionId),
     groupId: normalizeCommandLookupKey(entry.groupId) as CommandGroupId,
     summary: String(entry.summary || "").trim(),
     terminal: normalizeStringList(entry.terminal),
     weixin: normalizeStringList(entry.weixin),
     status: (normalizeCommandLookupKey(entry.status) || "active") as CommandStatus,
-    entrypointType: normalizeCommandLookupKey(entry.entrypointType) as CommandEntrypointType,
+    entrypointType,
     scriptName: String(entry.scriptName || "").trim() as CommandScriptName | "",
     command: normalizeCommandLookupKey(entry.command),
     subcommand: normalizeCommandLookupKey(entry.subcommand),
     runner: String(entry.runner || "").trim() as CommandRunnerId | "",
     argsSchemaKey: String(entry.argsSchemaKey || "").trim() as CommandArgsSchemaKey | "",
     kind: String(entry.kind || "").trim() as CommandKind | "",
+    mutability: resolveCommandMutabilityDefinition(actionId),
+    safetyTier: resolveCommandSafetyTierDefinition(actionId),
     timelineSubcommand: String(entry.timelineSubcommand || "").trim() as CommandTimelineSubcommand | "",
     help: Object.freeze({
       topic: normalizeCommandLookupKey(entry.help?.topic) as CommandHelpTopic | "",

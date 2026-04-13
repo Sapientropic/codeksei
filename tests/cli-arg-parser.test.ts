@@ -15,6 +15,8 @@ test("cli arg parser handles boolean, string, and repeated string flags", () => 
 
   assert.deepEqual(parsed, {
     help: false,
+    dryRun: false,
+    idempotencyKey: "",
     useStdin: false,
     finalize: true,
     date: "2026-04-12",
@@ -42,6 +44,8 @@ test("cli arg parser preserves passthrough timeline screenshot args while ignori
 
   assert.deepEqual(parsed, {
     help: false,
+    dryRun: false,
+    idempotencyKey: "",
     user: "wx-user",
     outputFile: "shot.png",
     forwardArgs: ["--selector", "timeline"],

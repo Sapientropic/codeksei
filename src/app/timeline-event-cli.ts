@@ -2,15 +2,21 @@ import { normalizeText } from "../core/text-normalization";
 import * as crypto from "node:crypto";
 
 import { getCommandArgsSchema } from "../contracts/command-args";
+import type { CommandExecutionResult } from "../contracts/cli-contract";
 import { buildTerminalLeafHelp } from "../core/command-registry";
+import { runCliMutation } from "../core/cli-mutation";
 import {
   LEGACY_TIMELINE_TIMEZONE,
   coerceLocalDateTimeToIso,
 } from "../core/timezone";
 import { parseCliArgs } from "../core/cli-args";
+import { runTimelineWriteCommand } from "../timeline/runtime/app/timeline-write-cli";
+import { resolveTimelineRuntimeConfig } from "../timeline/runtime-config";
 
 interface TimelineEventOptions extends Record<string, unknown> {
+  dryRun?: boolean;
   help?: boolean;
+  idempotencyKey?: string;
   useStdin?: boolean;
   finalize?: boolean;
   date?: unknown;
@@ -26,12 +32,9 @@ interface TimelineEventOptions extends Record<string, unknown> {
   tags?: unknown[];
 }
 
-interface TimelineEventConfig {
+interface TimelineEventConfig extends Record<string, unknown> {
+  cliIdempotencyLedgerFile?: string;
   timezone?: unknown;
-}
-
-interface TimelineIntegrationRunner {
-  runSubcommand(command: string, args: string[]): Promise<unknown>;
 }
 
 interface TimelineEventPayload {
@@ -48,21 +51,66 @@ interface TimelineEventPayload {
 
 
 async function runTimelineEventCommand(
-  timelineIntegration: TimelineIntegrationRunner,
-  configOrArgs: TimelineEventConfig | string[] = {},
-  argsMaybe: string[] = [],
-): Promise<void> {
-  const config: TimelineEventConfig = Array.isArray(configOrArgs) ? {} : (configOrArgs || {});
-  const args = Array.isArray(configOrArgs) ? configOrArgs : argsMaybe;
+  config: TimelineEventConfig = {},
+  args: string[] = [],
+): Promise<CommandExecutionResult> {
   const options = parseTimelineEventArgs(args);
   if (options.help) {
-    console.log(buildTerminalLeafHelp("timeline.event", { timezone: config.timezone }));
-    return;
+    return {
+      data: null,
+      text: buildTerminalLeafHelp("timeline.event", { timezone: config.timezone }),
+    };
   }
 
   const note = await resolveNote(options);
   const writeArgs = buildTimelineEventWriteArgs(options, note, config);
-  await timelineIntegration.runSubcommand("write", writeArgs);
+  const payload = extractTimelineWritePayload(writeArgs);
+  return runCliMutation<Record<string, unknown>>({
+    commandKey: "timeline.event",
+    config,
+    configSource: {
+      timezone: normalizeTimezoneConfigValue(config.timezone) || LEGACY_TIMELINE_TIMEZONE,
+    },
+    dryRun: Boolean(options.dryRun),
+    dryRunResult: {
+      data: payload,
+      text: [
+        "timeline event dry-run",
+        `date: ${String(payload.date || "")}`,
+        `mode: ${String(payload.mode || "")}`,
+      ].join("\n"),
+    },
+    execute: async () => {
+      const result = await runTimelineWriteCommand(resolveTimelineRuntimeConfig(config), writeArgs);
+      if (!result) {
+        throw new Error("timeline.event write command returned no result");
+      }
+      return {
+        data: {
+          eventPayload: payload,
+          writeResult: result,
+        },
+        text: [
+          `timeline written: ${result.date}`,
+          `mode: ${result.mode}`,
+          `events: ${result.eventCount}`,
+          `status: ${result.status}`,
+        ].join("\n"),
+      };
+    },
+    idempotencyKey: normalizeText(options.idempotencyKey),
+    request: payload,
+    resolvedTargets: {
+      date: String(payload.date || ""),
+      timelineDate: String(payload.date || ""),
+    },
+    sideEffects: [
+      {
+        kind: "write_timeline_day",
+        target: String(payload.date || ""),
+      },
+    ],
+  });
 }
 
 function parseTimelineEventArgs(args: string[]): TimelineEventOptions {
@@ -217,5 +265,36 @@ export {
 
 function normalizeTimezoneConfigValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function extractTimelineWritePayload(args: string[]): Record<string, unknown> {
+  const payload = {
+    date: "",
+    mode: "",
+    finalize: false,
+    json: "",
+  };
+  for (let index = 0; index < args.length; index += 1) {
+    const token = normalizeText(args[index]);
+    if (token === "--finalize") {
+      payload.finalize = true;
+      continue;
+    }
+    const value = String(args[index + 1] || "");
+    if (token === "--date") {
+      payload.date = value;
+    } else if (token === "--mode") {
+      payload.mode = value;
+    } else if (token === "--json") {
+      payload.json = value;
+    }
+  }
+  const parsed = payload.json ? JSON.parse(payload.json) as Record<string, unknown> : {};
+  return {
+    ...parsed,
+    date: payload.date || parsed.date || "",
+    finalize: payload.finalize,
+    mode: payload.mode || parsed.mode || "merge",
+  };
 }
 

@@ -10,12 +10,22 @@ import { runSystemCheckinPoller } from "./system-checkin-poller";
 import { runSystemSendCommand } from "./system-send-cli";
 import { runTimelineEventCommand } from "./timeline-event-cli";
 import { runTimelineScreenshotCommand } from "./timeline-screenshot-cli";
+import type { CommandExecutionResult } from "../contracts/cli-contract";
 import type {
   CommandRunnerId,
   TerminalCommandManifestEntry,
 } from "../contracts/command-surface";
 import type { TerminalCommandContext } from "./terminal-command-context";
-import { buildTerminalHelpText } from "../core/command-registry";
+import { buildCommandSchema } from "../core/command-schema";
+import { buildOperatorHelpText, buildTerminalHelpText } from "../core/command-registry";
+import { runTimelineBuildCommand } from "../timeline/runtime/app/timeline-build-cli";
+import { runTimelineCategoriesCommand } from "../timeline/runtime/app/timeline-categories-cli";
+import { runTimelineDevCommand } from "../timeline/runtime/app/timeline-dev-cli";
+import { runTimelineProposalsCommand } from "../timeline/runtime/app/timeline-proposals-cli";
+import { runTimelineReadCommand } from "../timeline/runtime/app/timeline-read-cli";
+import { runTimelineServeCommand } from "../timeline/runtime/app/timeline-serve-cli";
+import { runTimelineWriteCommand } from "../timeline/runtime/app/timeline-write-cli";
+import { resolveTimelineRuntimeConfig } from "../timeline/runtime-config";
 
 type ChannelSendFileApp = Parameters<typeof runChannelSendFileCommand>[0];
 type NoteSyncConfig = Parameters<typeof runNoteSyncCommand>[0];
@@ -25,13 +35,13 @@ type ReviewKind = Parameters<typeof runReviewCommand>[1];
 type ReminderWriteConfig = Parameters<typeof runReminderWriteCommand>[0];
 type DiaryWriteConfig = Parameters<typeof runDiaryWriteCommand>[0];
 type SystemSendConfig = Parameters<typeof runSystemSendCommand>[0];
-type TimelineEventConfig = Exclude<Parameters<typeof runTimelineEventCommand>[1], string[]>;
+type TimelineEventConfig = Parameters<typeof runTimelineEventCommand>[0];
 
 
 export type TerminalCommandHandler = (
   manifest: TerminalCommandManifestEntry,
   context: TerminalCommandContext,
-) => Promise<void>;
+) => Promise<CommandExecutionResult | void>;
 
 export function listTerminalDispatchRunnerIds(): string[] {
   return Object.keys(RUNNERS).sort() as CommandRunnerId[];
@@ -40,17 +50,48 @@ export function listTerminalDispatchRunnerIds(): string[] {
 export async function runTerminalManifestCommand(
   manifest: TerminalCommandManifestEntry,
   context: TerminalCommandContext,
-): Promise<void> {
+): Promise<CommandExecutionResult | void> {
   const handler = RUNNERS[manifest.runner];
   if (!handler) {
     throw new Error(`未知命令: ${manifest.command}${manifest.subcommand ? ` ${manifest.subcommand}` : ""}`);
   }
-  await handler(manifest, context);
+  return handler(manifest, context);
 }
 
 const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
   help: async () => {
-    console.log(buildTerminalHelpText());
+    return {
+      data: buildCommandSchema({ audience: "public", command: "", subcommand: "" }),
+      text: buildTerminalHelpText(),
+    };
+  },
+  schema: async (_manifest, context) => {
+    const data = buildCommandSchema({
+      audience: "public",
+      command: context.leafArgs[0] || "",
+      subcommand: context.leafArgs[1] || "",
+    });
+    return {
+      data,
+      text: asPrettyJsonText(data),
+    };
+  },
+  "operator.help": async () => {
+    return {
+      data: buildCommandSchema({ audience: "operator", command: "", subcommand: "" }),
+      text: buildOperatorHelpText(),
+    };
+  },
+  "operator.schema": async (_manifest, context) => {
+    const data = buildCommandSchema({
+      audience: "operator",
+      command: context.leafArgs[0] || "",
+      subcommand: context.leafArgs[1] || "",
+    });
+    return {
+      data,
+      text: asPrettyJsonText(data),
+    };
   },
   login: async (_manifest, context) => {
     await context.getApp().login();
@@ -62,58 +103,121 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
     await context.getApp().start();
   },
   doctor: async (_manifest, context) => {
-    context.getApp().printDoctor();
+    const data = context.getApp().getDoctorReport();
+    return {
+      data,
+      text: asPrettyJsonText(data),
+    };
   },
   "channel.send-file": async (_manifest, context) => {
-    await runChannelSendFileCommand(context.getApp() as ChannelSendFileApp, context.leafArgs);
+    return runChannelSendFileCommand(context.getApp() as ChannelSendFileApp, context.leafArgs, context.config);
   },
   "note.sync": async (_manifest, context) => {
-    await runNoteSyncCommand(context.config as NoteSyncConfig, context.leafArgs);
+    return runNoteSyncCommand(context.config as NoteSyncConfig, context.leafArgs);
   },
   "note.auto": async (_manifest, context) => {
-    await runNoteAutoCommand(context.config as NoteAutoConfig, context.leafArgs);
+    return runNoteAutoCommand(context.config as NoteAutoConfig, context.leafArgs);
   },
   "note.maybe": async (_manifest, context) => {
-    runNoteMaybeCommand(context.config as NoteAutoConfig, context.leafArgs);
+    return runNoteMaybeCommand(context.config as NoteAutoConfig, context.leafArgs);
   },
   "project.radar": async (_manifest, context) => {
-    await runProjectRadarCommand(context.config as ProjectRadarConfig, context.leafArgs);
+    return runProjectRadarCommand(context.config as ProjectRadarConfig, context.leafArgs);
   },
   "review.command": async (manifest, context) => {
     if (!manifest.kind) {
       throw new Error(`review command is missing review kind: ${manifest.command} ${manifest.subcommand}`.trim());
     }
-    await runReviewCommand(context.config, manifest.kind as ReviewKind, context.leafArgs);
+    return runReviewCommand(context.config, manifest.kind as ReviewKind, context.leafArgs);
   },
   "reminder.write": async (_manifest, context) => {
-    await runReminderWriteCommand(context.config as unknown as ReminderWriteConfig, context.leafArgs);
+    return runReminderWriteCommand(context.config as unknown as ReminderWriteConfig, context.leafArgs);
   },
   "diary.write": async (_manifest, context) => {
-    await runDiaryWriteCommand(context.config as DiaryWriteConfig, context.leafArgs);
+    return runDiaryWriteCommand(context.config as DiaryWriteConfig, context.leafArgs);
   },
   "system.send": async (_manifest, context) => {
-    await runSystemSendCommand(context.config as SystemSendConfig, context.leafArgs);
+    return runSystemSendCommand(context.config as SystemSendConfig, context.leafArgs);
   },
   "system.checkin-config": async (_manifest, context) => {
-    await runSystemCheckinConfigCommand(context.config, context.leafArgs);
+    return runSystemCheckinConfigCommand(context.config, context.leafArgs);
   },
   "system.checkin-poller": async (_manifest, context) => {
     await runSystemCheckinPoller(context.config);
   },
   "timeline.event": async (_manifest, context) => {
-    await runTimelineEventCommand(
-      context.getTimelineIntegration(),
+    return runTimelineEventCommand(
       context.config as TimelineEventConfig,
       context.leafArgs,
     );
   },
   "timeline.screenshot": async (_manifest, context) => {
-    await runTimelineScreenshotCommand(context.config, context.leafArgs);
+    return runTimelineScreenshotCommand(context.config, context.leafArgs);
   },
   "timeline.subcommand": async (manifest, context) => {
     if (!manifest.timelineSubcommand) {
       throw new Error(`timeline command is missing subcommand: ${manifest.command} ${manifest.subcommand}`.trim());
     }
-    await context.getTimelineIntegration().runSubcommand(manifest.timelineSubcommand, context.leafArgs);
+    const timelineConfig = resolveTimelineRuntimeConfig(context.config);
+    switch (manifest.timelineSubcommand) {
+      case "build": {
+        const data = await runTimelineBuildCommand(timelineConfig);
+        return {
+          data,
+          text: `timeline dashboard built: ${String(data.siteDir || "")}`,
+        };
+      }
+      case "categories": {
+        const data = await runTimelineCategoriesCommand(timelineConfig, context.leafArgs);
+        return data
+          ? { data, text: asPrettyJsonText(data) }
+          : undefined;
+      }
+      case "dev": {
+        const data = await runTimelineDevCommand(timelineConfig, context.leafArgs);
+        return data
+          ? { data, text: `timeline dev: ${String(data.url || "")}` }
+          : undefined;
+      }
+      case "proposals": {
+        const data = await runTimelineProposalsCommand(timelineConfig, context.leafArgs);
+        return data
+          ? { data, text: asPrettyJsonText(data) }
+          : undefined;
+      }
+      case "read": {
+        const data = await runTimelineReadCommand(timelineConfig, context.leafArgs);
+        return data
+          ? { data, text: asPrettyJsonText(data) }
+          : undefined;
+      }
+      case "serve": {
+        const data = await runTimelineServeCommand(timelineConfig, context.leafArgs);
+        return data
+          ? { data, text: `timeline dashboard: ${String(data.url || "")}` }
+          : undefined;
+      }
+      case "write": {
+        const data = await runTimelineWriteCommand(timelineConfig, context.leafArgs);
+        return data
+          ? {
+            data,
+            text: [
+              `timeline written: ${String(data.date || "")}`,
+              `mode: ${String(data.mode || "")}`,
+              `events: ${String(data.eventCount || 0)}`,
+              `status: ${String(data.status || "")}`,
+            ].join("\n"),
+          }
+          : undefined;
+      }
+      default:
+        await context.getTimelineIntegration().runSubcommand(manifest.timelineSubcommand, context.leafArgs);
+        return undefined;
+    }
   },
 };
+
+function asPrettyJsonText(value: unknown): string {
+  return JSON.stringify(value, null, 2);
+}

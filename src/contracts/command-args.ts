@@ -49,16 +49,37 @@ const COMMON_HELP_FLAG: CommandArgFlag = {
   description: "显示当前命令帮助",
 };
 
+const COMMON_DRY_RUN_FLAG: CommandArgFlag = {
+  name: "dryRun",
+  keys: ["--dry-run"],
+  type: "boolean",
+  defaultValue: false,
+  description: "只预览解析后的目标与副作用，不执行真实写入/发送",
+};
+
+const COMMON_IDEMPOTENCY_FLAG: CommandArgFlag = {
+  name: "idempotencyKey",
+  keys: ["--idempotency-key"],
+  type: "string",
+  defaultValue: "",
+  description: "为可重试的副作用命令提供稳定幂等键",
+};
+
 export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = Object.freeze({
   channelSendFile: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,
+      COMMON_DRY_RUN_FLAG,
+      COMMON_IDEMPOTENCY_FLAG,
       { name: "path", keys: ["--path"], type: "string", defaultValue: "", required: true, placeholder: "/绝对路径", description: "要发回当前微信聊天的本地文件" },
       { name: "user", keys: ["--user"], type: "string", defaultValue: "", placeholder: "<wechatUserId>", description: "可选；覆盖默认接收用户" },
     ],
   }),
   diaryWrite: createCommandArgSchema({
     flags: [
+      COMMON_HELP_FLAG,
+      COMMON_DRY_RUN_FLAG,
+      COMMON_IDEMPOTENCY_FLAG,
       { name: "text", keys: ["--text"], type: "string", defaultValue: "", description: "要写入的正文内容" },
       { name: "title", keys: ["--title"], type: "string", defaultValue: "", description: "补充记录标题" },
       { name: "date", keys: ["--date"], type: "string", defaultValue: "", placeholder: "YYYY-MM-DD", description: "目标日记日期" },
@@ -72,6 +93,8 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
   noteAuto: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,
+      COMMON_DRY_RUN_FLAG,
+      COMMON_IDEMPOTENCY_FLAG,
       { name: "json", keys: ["--json"], type: "boolean", defaultValue: false, description: "输出 JSON 而不是文本" },
       { name: "project", keys: ["--project"], type: "string", defaultValue: "", description: "tracked project slug" },
       { name: "scope", keys: ["--scope"], type: "string", defaultValue: "", description: "durable note scope" },
@@ -83,6 +106,8 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
   noteSync: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,
+      COMMON_DRY_RUN_FLAG,
+      COMMON_IDEMPOTENCY_FLAG,
       { name: "project", keys: ["--project"], type: "string", defaultValue: "", description: "tracked project slug" },
       { name: "path", keys: ["--path"], type: "string", defaultValue: "", description: "绝对路径或相对 workspace 的 note 文件" },
       { name: "section", keys: ["--section"], type: "string", defaultValue: "", required: true, description: "目标 section 标题" },
@@ -105,6 +130,9 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
   }),
   reminderWrite: createCommandArgSchema({
     flags: [
+      COMMON_HELP_FLAG,
+      COMMON_DRY_RUN_FLAG,
+      COMMON_IDEMPOTENCY_FLAG,
       { name: "delay", keys: ["--delay"], type: "string", defaultValue: "", description: "相对延迟，如 30m / 2h / 1d" },
       { name: "at", keys: ["--at"], type: "string", defaultValue: "", description: "绝对时间，按当前 timezone 解释本地时间" },
       { name: "text", keys: ["--text"], type: "string", defaultValue: "", description: "提醒正文" },
@@ -115,6 +143,8 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
   review: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,
+      COMMON_DRY_RUN_FLAG,
+      COMMON_IDEMPOTENCY_FLAG,
       { name: "stdout", keys: ["--stdout"], type: "boolean", defaultValue: false, description: "仅预览摘要，不写文件" },
       { name: "deterministic", keys: ["--deterministic"], type: "boolean", defaultValue: false, description: "禁用语义提炼，仅走 deterministic 草稿" },
       { name: "date", keys: ["--date"], type: "string", defaultValue: "", description: "参考日期" },
@@ -126,14 +156,18 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
   systemSend: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,
+      COMMON_DRY_RUN_FLAG,
+      COMMON_IDEMPOTENCY_FLAG,
       { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id" },
       { name: "text", keys: ["--text"], type: "string", defaultValue: "", required: true, description: "系统触发消息正文" },
-      { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", required: true, description: "绝对 workspace 路径" },
+      { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "显式绝对 workspace 路径；没传时尝试唯一稳定默认值" },
     ],
   }),
   systemCheckinConfig: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,
+      COMMON_DRY_RUN_FLAG,
+      COMMON_IDEMPOTENCY_FLAG,
       { name: "show", keys: ["--show"], type: "boolean", defaultValue: false, description: "显示当前 checkin 区间" },
       { name: "range", keys: ["--range"], type: "string", defaultValue: "", placeholder: "3-60", description: "设置新的 min-max 分钟区间" },
       { name: "reset", keys: ["--reset"], type: "boolean", defaultValue: false, description: "清除持久化配置并回退到 env/default" },
@@ -142,6 +176,8 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
   timelineEvent: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,
+      COMMON_DRY_RUN_FLAG,
+      COMMON_IDEMPOTENCY_FLAG,
       { name: "useStdin", keys: ["--stdin"], type: "boolean", defaultValue: false, description: "从标准输入读取 note" },
       { name: "finalize", keys: ["--finalize"], type: "boolean", defaultValue: false, description: "写入后把目标日期标记为 final" },
       { name: "date", keys: ["--date"], type: "string", defaultValue: "", required: true, placeholder: "YYYY-MM-DD", description: "目标日期" },
@@ -160,6 +196,8 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
   timelineScreenshot: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,
+      COMMON_DRY_RUN_FLAG,
+      COMMON_IDEMPOTENCY_FLAG,
       { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id" },
       { name: "outputFile", keys: ["--output"], type: "string", defaultValue: "", description: "截图输出绝对路径" },
     ],
@@ -167,6 +205,52 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       key: "forwardArgs",
       ignoreKeys: ["--send", "--demo"],
     },
+  }),
+  timelineRead: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "date", keys: ["--date"], type: "string", defaultValue: "", required: true, placeholder: "YYYY-MM-DD", description: "要读取的目标日期" },
+    ],
+  }),
+  timelineCategories: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+    ],
+  }),
+  timelineProposals: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "date", keys: ["--date"], type: "string", defaultValue: "", placeholder: "YYYY-MM-DD", description: "可选；只看某一天的 proposals" },
+    ],
+  }),
+  timelineWrite: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      COMMON_DRY_RUN_FLAG,
+      COMMON_IDEMPOTENCY_FLAG,
+      { name: "date", keys: ["--date"], type: "string", defaultValue: "", placeholder: "YYYY-MM-DD", description: "目标日期；也可在 JSON 里提供" },
+      { name: "json", keys: ["--json"], type: "string", defaultValue: "", description: "完整 JSON 对象载荷" },
+      { name: "mode", keys: ["--mode"], type: "string", defaultValue: "", description: "merge|replace" },
+      { name: "finalize", keys: ["--finalize"], type: "boolean", defaultValue: false, description: "写入后把目标日期标记为 final" },
+      { name: "useStdin", keys: ["--stdin"], type: "boolean", defaultValue: false, description: "从标准输入读取完整 JSON" },
+    ],
+  }),
+  timelineBuild: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+    ],
+  }),
+  timelineServe: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "port", keys: ["--port"], type: "string", defaultValue: "", description: "显式指定本地服务端口" },
+    ],
+  }),
+  timelineDev: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "port", keys: ["--port"], type: "string", defaultValue: "", description: "显式指定本地开发服务端口" },
+    ],
   }),
 });
 

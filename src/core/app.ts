@@ -18,6 +18,7 @@ import type {
 import { runCodekseiAppLifecycle } from "./app-lifecycle-runner";
 import { attachRuntimeEventPipeline } from "./app-runtime-event-pipeline";
 import {
+  collectDoctorReport,
   loginChannel,
   printChannelAccounts,
   printDoctorReport,
@@ -160,6 +161,16 @@ export class CodekseiApp {
 
   printDoctor(): void {
     printDoctorReport({
+      config: this.config,
+      channelAdapter: this.channelAdapter,
+      runtimeAdapter: this.runtimeAdapter,
+      timelineIntegration: this.timelineIntegration,
+      threadStateStore: this.threadStateStore,
+    });
+  }
+
+  getDoctorReport(): Record<string, unknown> {
+    return collectDoctorReport({
       config: this.config,
       channelAdapter: this.channelAdapter,
       runtimeAdapter: this.runtimeAdapter,

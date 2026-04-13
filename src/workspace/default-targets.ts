@@ -43,40 +43,26 @@ interface ResolvePreferredWorkspaceRootArgs {
   sessionStore?: WorkspaceResolutionSessionStoreLike | null;
 }
 
+export interface PreferredTargetResolution {
+  ambiguous: boolean;
+  candidates: string[];
+  reason: string;
+  source: string;
+  value: string;
+}
+
 export function resolvePreferredSenderId({
   config,
   accountId,
   explicitUser = "",
   sessionStore = null,
 }: ResolvePreferredSenderIdArgs): string {
-  const normalizedExplicitUser = normalizeText(explicitUser);
-  if (normalizedExplicitUser) {
-    return normalizedExplicitUser;
-  }
-
-  const configuredUsers = Array.isArray(config?.allowedUserIds)
-    ? config.allowedUserIds.map((value) => normalizeText(value)).filter(Boolean)
-    : [];
-  if (configuredUsers.length) {
-    return configuredUsers[0] || "";
-  }
-
-  const bindingCandidates = collectBindingSenderIds({ config, accountId, sessionStore });
-  if (bindingCandidates.length === 1) {
-    return bindingCandidates[0] || "";
-  }
-
-  // This stays as a read-only fallback: default-target inference needs the
-  // persisted sender/context-token map, but should not own any adapter write
-  // path or transport behavior.
-  const persistedUserIds = Object.keys(loadPersistedContextTokens(config, accountId) || {})
-    .map((value) => normalizeText(value))
-    .filter(Boolean);
-  if (persistedUserIds.length === 1) {
-    return persistedUserIds[0] || "";
-  }
-
-  return "";
+  return inspectPreferredSenderId({
+    config,
+    accountId,
+    explicitUser,
+    sessionStore,
+  }).value;
 }
 
 export function resolvePreferredWorkspaceRoot({
@@ -86,9 +72,121 @@ export function resolvePreferredWorkspaceRoot({
   explicitWorkspace = "",
   sessionStore = null,
 }: ResolvePreferredWorkspaceRootArgs): string {
+  return inspectPreferredWorkspaceRoot({
+    config,
+    accountId,
+    senderId,
+    explicitWorkspace,
+    sessionStore,
+  }).value;
+}
+
+export function inspectPreferredSenderId({
+  config,
+  accountId,
+  explicitUser = "",
+  sessionStore = null,
+}: ResolvePreferredSenderIdArgs): PreferredTargetResolution {
+  const normalizedExplicitUser = normalizeText(explicitUser);
+  if (normalizedExplicitUser) {
+    return {
+      ambiguous: false,
+      candidates: [normalizedExplicitUser],
+      reason: "explicit_user",
+      source: "explicit_user",
+      value: normalizedExplicitUser,
+    };
+  }
+
+  const configuredUsers = Array.isArray(config?.allowedUserIds)
+    ? config.allowedUserIds.map((value) => normalizeText(value)).filter(Boolean)
+    : [];
+  if (configuredUsers.length === 1) {
+    return {
+      ambiguous: false,
+      candidates: configuredUsers,
+      reason: "unique_config_allowed_user",
+      source: "config.allowedUserIds",
+      value: configuredUsers[0] || "",
+    };
+  }
+  if (configuredUsers.length > 1) {
+    return {
+      ambiguous: true,
+      candidates: configuredUsers,
+      reason: "multiple_config_allowed_users",
+      source: "config.allowedUserIds",
+      value: "",
+    };
+  }
+
+  const bindingCandidates = collectBindingSenderIds({ config, accountId, sessionStore });
+  if (bindingCandidates.length === 1) {
+    return {
+      ambiguous: false,
+      candidates: bindingCandidates,
+      reason: "unique_session_binding",
+      source: "session.bindings",
+      value: bindingCandidates[0] || "",
+    };
+  }
+  if (bindingCandidates.length > 1) {
+    return {
+      ambiguous: true,
+      candidates: bindingCandidates,
+      reason: "multiple_session_bindings",
+      source: "session.bindings",
+      value: "",
+    };
+  }
+
+  const persistedUserIds = Object.keys(loadPersistedContextTokens(config, accountId) || {})
+    .map((value) => normalizeText(value))
+    .filter(Boolean);
+  if (persistedUserIds.length === 1) {
+    return {
+      ambiguous: false,
+      candidates: persistedUserIds,
+      reason: "unique_context_token",
+      source: "context_tokens",
+      value: persistedUserIds[0] || "",
+    };
+  }
+  if (persistedUserIds.length > 1) {
+    return {
+      ambiguous: true,
+      candidates: persistedUserIds,
+      reason: "multiple_context_tokens",
+      source: "context_tokens",
+      value: "",
+    };
+  }
+
+  return {
+    ambiguous: false,
+    candidates: [],
+    reason: "missing_sender",
+    source: "",
+    value: "",
+  };
+}
+
+export function inspectPreferredWorkspaceRoot({
+  config,
+  accountId,
+  senderId = "",
+  explicitWorkspace = "",
+  sessionStore = null,
+}: ResolvePreferredWorkspaceRootArgs): PreferredTargetResolution {
   const normalizedExplicitWorkspace = normalizeText(explicitWorkspace);
   if (normalizedExplicitWorkspace) {
-    return normalizedExplicitWorkspace;
+    return {
+      ambiguous: false,
+      candidates: [normalizedExplicitWorkspace],
+      reason: "explicit_workspace",
+      source: "explicit_workspace",
+      value: normalizedExplicitWorkspace,
+    };
   }
 
   const normalizedSenderId = normalizeText(senderId);
@@ -105,22 +203,75 @@ export function resolvePreferredWorkspaceRoot({
     });
     const activeWorkspaceRoot = normalizeText(store.getActiveWorkspaceRoot(bindingKey));
     if (activeWorkspaceRoot) {
-      return activeWorkspaceRoot;
+      return {
+        ambiguous: false,
+        candidates: [activeWorkspaceRoot],
+        reason: "active_binding_workspace",
+        source: "session.activeWorkspaceRoot",
+        value: activeWorkspaceRoot,
+      };
     }
 
     const binding = store.getBinding(bindingKey);
     const boundWorkspaceRoots = collectWorkspaceRoots(binding);
     if (boundWorkspaceRoots.length === 1) {
-      return boundWorkspaceRoots[0] || "";
+      return {
+        ambiguous: false,
+        candidates: boundWorkspaceRoots,
+        reason: "unique_binding_workspace",
+        source: "session.bindingWorkspaceRoots",
+        value: boundWorkspaceRoots[0] || "",
+      };
+    }
+    if (boundWorkspaceRoots.length > 1) {
+      return {
+        ambiguous: true,
+        candidates: boundWorkspaceRoots,
+        reason: "multiple_binding_workspaces",
+        source: "session.bindingWorkspaceRoots",
+        value: "",
+      };
     }
   }
 
   const globalWorkspaceCandidates = collectBindingWorkspaceRoots({ config, accountId, sessionStore: store });
   if (globalWorkspaceCandidates.length === 1) {
-    return globalWorkspaceCandidates[0] || "";
+    return {
+      ambiguous: false,
+      candidates: globalWorkspaceCandidates,
+      reason: "unique_workspace_binding",
+      source: "session.workspaceBindings",
+      value: globalWorkspaceCandidates[0] || "",
+    };
+  }
+  if (globalWorkspaceCandidates.length > 1) {
+    return {
+      ambiguous: true,
+      candidates: globalWorkspaceCandidates,
+      reason: "multiple_workspace_bindings",
+      source: "session.workspaceBindings",
+      value: "",
+    };
   }
 
-  return normalizeText(config?.workspaceRoot);
+  const configuredWorkspaceRoot = normalizeText(config?.workspaceRoot);
+  if (configuredWorkspaceRoot) {
+    return {
+      ambiguous: false,
+      candidates: [configuredWorkspaceRoot],
+      reason: "config_workspace_root",
+      source: "config.workspaceRoot",
+      value: configuredWorkspaceRoot,
+    };
+  }
+
+  return {
+    ambiguous: false,
+    candidates: [],
+    reason: "missing_workspace",
+    source: "",
+    value: "",
+  };
 }
 
 function collectBindingSenderIds({

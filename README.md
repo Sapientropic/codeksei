@@ -37,6 +37,7 @@
 ```bash
 npm install -g codeksei
 codeksei help
+codeksei schema
 codeksei review weekly --help
 ```
 
@@ -51,6 +52,7 @@ npm run shared:start
 ```
 
 - `先试基础 CLI`：看命令面、确认本机环境、感受产品边界
+- `需要 bootstrap / operator 命令时`：再用 `codeksei operator help` 或仓库里的 `npm run ...`
 - `再进共享模式`：体验它真正的连续性、主动分忧、提醒和项目接续
 - `试完给反馈`：欢迎到 [GitHub Issues](https://github.com/Sapientropic/codeksei/issues) 告诉我们哪里最有用、哪里最别扭、哪里应该更主动或更克制
 
@@ -109,6 +111,21 @@ npm run shared:start
 
 ## 快速开始
 
+### CLI contract 速记
+
+- `codeksei help`
+  默认只展示 public finite CLI，不再把 shared / maintainer / background 入口混在一起
+- `codeksei schema`
+  输出当前 public CLI 的结构化 contract，适合 agent / 自动化读取
+- `codeksei operator help`
+  查看 bootstrap、shared、background、maintainer 这类 operator surface
+- `codeksei operator schema`
+  输出 operator / bootstrap command surface 的结构化 schema
+- 非 TTY 默认 JSON envelope，TTY 默认 text
+- `stderr` 留给诊断；`stdout` 留给结果数据
+- 统一全局参数：
+  `--format json|text`、`--verbose`、`--workspace-root /absolute/path`
+
 ### 1. 先选安装方式
 
 如果你想按本文完整使用共享模式，先 clone 仓库，再跑 shared / background 脚本：
@@ -124,6 +141,7 @@ npm install
 ```bash
 npm install -g codeksei
 codeksei help
+codeksei schema
 codeksei review weekly --help
 ```
 

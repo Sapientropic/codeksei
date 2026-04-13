@@ -3,6 +3,7 @@ import type { AppRuntimeConfig } from "./app-service-contract";
 import type { SendLocalFileRequest } from "./runtime-types";
 
 export interface TerminalAppFacade {
+  getDoctorReport(): Record<string, unknown>;
   login(): Promise<void>;
   printAccounts(): void;
   printDoctor(): void;
@@ -13,6 +14,7 @@ export interface TerminalAppFacade {
 export function createTerminalAppFacade(config: AppRuntimeConfig): TerminalAppFacade {
   const app = new CodekseiApp(config);
   return {
+    getDoctorReport: () => app.getDoctorReport(),
     login: () => app.login(),
     printAccounts: () => app.printAccounts(),
     printDoctor: () => app.printDoctor(),

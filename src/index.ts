@@ -1,8 +1,24 @@
 #!/usr/bin/env node
 
 import { PACKAGE_NAME } from "./core/branding";
+import type { CommandExecutionResult, GlobalCliOptions } from "./contracts/cli-contract";
 import { findTerminalCommandManifest } from "./contracts/command-surface";
-import { buildTerminalHelpText, buildTerminalLeafHelp, buildTerminalTopicHelp, isPlannedTerminalTopic } from "./core/command-registry";
+import {
+  buildOperatorHelpText,
+  buildTerminalHelpText,
+  buildTerminalLeafHelp,
+  buildTerminalTopicHelp,
+  isPlannedTerminalTopic,
+} from "./core/command-registry";
+import { buildCommandSchema } from "./core/command-schema";
+import {
+  CliError,
+  emitCliError,
+  emitCliResult,
+  formatCliErrorMessage,
+  parseGlobalCliOptions,
+  resolveGlobalCliOptions,
+} from "./core/cli-contract";
 import { createTerminalCommandContext } from "./app/terminal-command-context";
 import { runTerminalManifestCommand } from "./app/terminal-command-dispatch";
 import type { TerminalCommandManifestEntry } from "./contracts/command-surface";
@@ -19,20 +35,32 @@ interface ParsedCommandIntent {
 let runtimeErrorHooksInstalled = false;
 
 export async function main(): Promise<void> {
-  const argv = process.argv.slice(2);
+  const parsedGlobalOptions = parseGlobalCliOptions(process.argv.slice(2));
+  const cli = resolveGlobalCliOptions(parsedGlobalOptions);
+  const argv = parsedGlobalOptions.argv;
   const intent = parseCommandIntent(argv);
-  if (runReadonlyHelpPath(intent)) {
+  const readonlyResult = runReadonlyHelpPath(intent);
+  if (readonlyResult) {
+    emitCliResult(readonlyResult, cli);
     return;
   }
 
-  installRuntimeErrorHooks();
-  const context = createTerminalCommandContext(argv);
+  installRuntimeErrorHooks(cli);
+  const context = createTerminalCommandContext(argv, cli, intent.manifest);
   if (intent.manifest) {
-    await runTerminalManifestCommand(intent.manifest, context);
+    const result = await runTerminalManifestCommand(intent.manifest, context);
+    if (result) {
+      emitCliResult(result, cli);
+    }
     return;
   }
 
-  throw new Error(`未知命令: ${intent.command}`);
+  throw new CliError({
+    code: "unknown_command",
+    exitCode: 3,
+    message: `未知命令: ${intent.command}`,
+    retryable: false,
+  });
 }
 
 function parseCommandIntent(argv: string[]): ParsedCommandIntent {
@@ -47,26 +75,49 @@ function parseCommandIntent(argv: string[]): ParsedCommandIntent {
   };
 }
 
-function runReadonlyHelpPath({ command, subcommand, manifest, helpFlag }: ParsedCommandIntent): boolean {
+function runReadonlyHelpPath({ command, subcommand, manifest, helpFlag }: ParsedCommandIntent): CommandExecutionResult | null {
+  if (command === "operator" && (!subcommand || subcommand === "help" || helpFlag)) {
+    return {
+      data: buildCommandSchema({ audience: "operator", command: "", subcommand: "" }),
+      text: buildOperatorHelpText(),
+    };
+  }
+
   if (command === "help" || command === "--help" || command === "-h") {
+    if (subcommand === "operator") {
+      return {
+        data: buildCommandSchema({ audience: "operator", command: "", subcommand: "" }),
+        text: buildOperatorHelpText(),
+      };
+    }
     const topicHelp = subcommand ? buildTerminalTopicHelp(subcommand) : "";
-    console.log(topicHelp || buildTerminalHelpText());
-    return true;
+    return {
+      data: buildCommandSchema({ audience: "public", command: subcommand, subcommand: "" }),
+      text: topicHelp || buildTerminalHelpText(),
+    };
   }
 
   if (manifest && helpFlag) {
     const leafHelp = buildTerminalLeafHelp(manifest.action);
     const topicHelp = buildTerminalTopicHelp(manifest.helpTopic || manifest.command);
-    console.log(leafHelp || topicHelp || buildTerminalHelpText());
-    return true;
+    return {
+      data: buildCommandSchema({
+        audience: manifest.audience,
+        command: manifest.command,
+        subcommand: manifest.subcommand,
+      }),
+      text: leafHelp || topicHelp || (manifest.audience === "operator" ? buildTerminalHelpText({ audience: "operator" }) : buildTerminalHelpText()),
+    };
   }
 
   if (isPlannedTerminalTopic(command) && (helpFlag || subcommand === "help" || !subcommand)) {
-    console.log(buildTerminalTopicHelp(command));
-    return true;
+    return {
+      data: buildCommandSchema({ audience: "public", command, subcommand: "" }),
+      text: buildTerminalTopicHelp(command),
+    };
   }
 
-  return false;
+  return null;
 }
 
 export function resolveTerminalCommandManifest(
@@ -79,26 +130,37 @@ export function resolveTerminalCommandManifest(
   if (exact) {
     return exact;
   }
+  if (normalizedCommand === "schema") {
+    return findTerminalCommandManifest(normalizedCommand, "");
+  }
   if (normalizedSubcommand.startsWith("-")) {
     return findTerminalCommandManifest(normalizedCommand, "");
   }
   return null;
 }
 
-function installRuntimeErrorHooks(): void {
+function installRuntimeErrorHooks(cli: GlobalCliOptions): void {
   if (runtimeErrorHooksInstalled) {
     return;
   }
   runtimeErrorHooksInstalled = true;
 
   process.on("unhandledRejection", (reason: unknown) => {
-    const message = reason instanceof Error ? reason.stack || reason.message : String(reason);
+    const message = formatCliErrorMessage(reason);
     console.error(`[${PACKAGE_NAME}] unhandled rejection ${message}`);
+    if (cli.verbose || cli.debug) {
+      const detail = reason instanceof Error ? reason.stack || reason.message : String(reason);
+      console.error(detail);
+    }
   });
 
   process.on("uncaughtException", (error: unknown) => {
-    const message = error instanceof Error ? error.stack || error.message : String(error);
+    const message = formatCliErrorMessage(error);
     console.error(`[${PACKAGE_NAME}] uncaught exception ${message}`);
+    if (cli.verbose || cli.debug) {
+      const detail = error instanceof Error ? error.stack || error.message : String(error);
+      console.error(detail);
+    }
     process.exitCode = 1;
   });
 }
@@ -109,8 +171,7 @@ function hasArgFlag(argv: string[], flag: string): boolean {
 
 if (require.main === module) {
   main().catch((error: unknown) => {
-    const message = error instanceof Error ? error.stack || error.message : String(error);
-    console.error(`[${PACKAGE_NAME}] ${message}`);
-    process.exitCode = 1;
+    const cli = resolveGlobalCliOptions(parseGlobalCliOptions(process.argv.slice(2)));
+    process.exitCode = emitCliError(error, cli);
   });
 }

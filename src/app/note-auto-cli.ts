@@ -1,4 +1,5 @@
 import { getCommandArgsSchema } from "../contracts/command-args";
+import type { CommandExecutionResult } from "../contracts/cli-contract";
 import { parseCliArgs } from "../core/cli-args";
 import { buildTerminalLeafHelp } from "../core/command-registry";
 import {
@@ -9,9 +10,12 @@ import {
   resolveDurableNoteRoute,
 } from "../notes/durable-note-schema";
 import { syncNoteFile } from "../notes/note-sync";
+import { runCliMutation } from "../core/cli-mutation";
 
 interface NoteAutoOptions {
+  dryRun: boolean;
   help: boolean;
+  idempotencyKey: string;
   json: boolean;
   project: string;
   scope: string;
@@ -34,8 +38,10 @@ interface NoteSyncResult {
 async function runNoteAutoCommand(config: unknown, args: string[] = []) {
   const options = parseNoteAutoArgs(args);
   if (options.help) {
-    console.log(buildTerminalLeafHelp("note.auto"));
-    return;
+    return {
+      data: null,
+      text: buildTerminalLeafHelp("note.auto"),
+    } satisfies CommandExecutionResult;
   }
 
   const text = await resolveBody(options);
@@ -44,36 +50,98 @@ async function runNoteAutoCommand(config: unknown, args: string[] = []) {
   }
 
   const route = resolveDurableNoteRoute(normalizeConfig(config), options);
-  const schemaResult = ensureDurableNoteSections(route.filePath, route.sections);
-  const result = syncNoteFile({
-    filePath: route.filePath,
-    section: route.section,
-    text,
-    style: route.style,
-    slot: route.slot,
-    maxItems: route.maxItems,
-  });
+  return runCliMutation<Record<string, unknown>>({
+    commandKey: "note.auto",
+    config: normalizeConfig(config),
+    configSource: {
+      durableNoteSchemaConfigFile: normalizeConfig(config).durableNoteSchemaConfigFile || "",
+      workspaceRoot: normalizeConfig(config).workspaceRoot || "",
+    },
+    dryRun: options.dryRun,
+    dryRunResult: {
+      data: {
+        family: route.family,
+        filePath: route.filePath,
+        kind: route.kind,
+        maxItems: route.maxItems,
+        section: route.section,
+        slot: route.slot,
+        style: route.style,
+      },
+      text: [
+        "note auto dry-run",
+        `file: ${route.filePath}`,
+        `section: ${route.section}`,
+        `kind: ${route.kind}`,
+      ].join("\n"),
+    },
+    execute: async () => {
+      const schemaResult = ensureDurableNoteSections(route.filePath, route.sections);
+      const result = syncNoteFile({
+        filePath: route.filePath,
+        section: route.section,
+        text,
+        style: route.style,
+        slot: route.slot,
+        maxItems: route.maxItems,
+      });
 
-  const action = result.changed ? "updated" : "noop";
-  console.log(`note auto ${action}: ${result.filePath} [${route.family}:${route.kind} -> ${route.section}]`);
-  if (schemaResult.changed) {
-    console.log(`schema ensured: ${schemaResult.filePath} (${schemaResult.createdSections.join(", ")})`);
-  }
+      const action = result.changed ? "updated" : "noop";
+      const lines = [`note auto ${action}: ${result.filePath} [${route.family}:${route.kind} -> ${route.section}]`];
+      if (schemaResult.changed) {
+        lines.push(`schema ensured: ${schemaResult.filePath} (${schemaResult.createdSections.join(", ")})`);
+      }
+
+      return {
+        data: {
+          action,
+          filePath: result.filePath,
+          kind: route.kind,
+          route,
+          schemaEnsured: schemaResult,
+        },
+        text: lines.join("\n"),
+      };
+    },
+    idempotencyKey: options.idempotencyKey,
+    request: {
+      body: text,
+      kind: route.kind,
+      section: route.section,
+      slot: route.slot,
+      style: route.style,
+    },
+    resolvedTargets: {
+      filePath: route.filePath,
+      kind: route.kind,
+      section: route.section,
+    },
+    sideEffects: [
+      {
+        kind: "write_note",
+        target: route.filePath,
+      },
+    ],
+  });
 }
 
 function runNoteMaybeCommand(config: unknown, args: string[] = []) {
   const options = parseNoteAutoArgs(args);
   if (options.help) {
-    console.log(buildTerminalLeafHelp("note.maybe"));
-    return;
+    return {
+      data: null,
+      text: buildTerminalLeafHelp("note.maybe"),
+    } satisfies CommandExecutionResult;
   }
 
   const inspection = inspectDurableNoteRouting(normalizeConfig(config), options);
-  if (options.json) {
-    console.log(JSON.stringify(inspection, null, 2));
-    return;
-  }
-  console.log(formatInspection(inspection));
+  return {
+    data: inspection,
+    meta: {
+      effectiveWorkspaceRoot: inspection.mode === "overview" ? inspection.workspaceRoot : "",
+    },
+    text: options.json ? JSON.stringify(inspection, null, 2) : formatInspection(inspection),
+  } satisfies CommandExecutionResult;
 }
 
 function parseNoteAutoArgs(args: string[]): NoteAutoOptions {
