@@ -25,7 +25,10 @@ test("first-party timeline runtime can build a static site from the published di
   assert.match(result.stdout, /timeline dashboard built:/u);
   assert.equal(fs.existsSync(path.join(stateDir, "timeline", "site", "index.html")), true);
   assert.equal(fs.existsSync(path.join(stateDir, "timeline", "site", "assets", "dashboard.js")), true);
+  assert.equal(fs.existsSync(path.join(stateDir, "timeline", "site", "assets", "dashboard.css")), true);
   assert.equal(fs.existsSync(path.join(stateDir, "timeline", "site", "dashboard-data.json")), true);
+  assert.equal(fs.existsSync(path.join(repoRoot, "dist", "src", "timeline", "examples", "demo-facts.json")), true);
+  assert.equal(fs.existsSync(path.join(repoRoot, "dist", "src", "timeline", "runtime", "timeline", "css", "dashboard.css")), true);
 });
 
 test("first-party timeline runtime covers categories, write, read, proposals, and screenshot help", () => {

@@ -1,35 +1,15 @@
-import { createRequire } from "node:module";
 import { readConfig } from "../core/config";
+import { runTimelineBuildCommand } from "./runtime/app/timeline-build-cli";
+import { runTimelineCategoriesCommand } from "./runtime/app/timeline-categories-cli";
+import { runTimelineDevCommand } from "./runtime/app/timeline-dev-cli";
+import { runTimelineProposalsCommand } from "./runtime/app/timeline-proposals-cli";
+import { runTimelineReadCommand } from "./runtime/app/timeline-read-cli";
+import { runTimelineScreenshotCommand } from "./runtime/app/timeline-screenshot-cli";
+import { runTimelineServeCommand } from "./runtime/app/timeline-serve-cli";
+import { runTimelineWriteCommand } from "./runtime/app/timeline-write-cli";
 import { resolveTimelineRuntimeConfig, type TimelineRuntimeConfig } from "./runtime-config";
 
-const runtimeRequire = createRequire(__filename);
-
 type TimelineCommandHandler = (config: TimelineRuntimeConfig) => Promise<void>;
-
-const { runTimelineBuildCommand } = runtimeRequire("./runtime/app/timeline-build-cli.js") as {
-  runTimelineBuildCommand: TimelineCommandHandler;
-};
-const { runTimelineCategoriesCommand } = runtimeRequire("./runtime/app/timeline-categories-cli.js") as {
-  runTimelineCategoriesCommand: TimelineCommandHandler;
-};
-const { runTimelineDevCommand } = runtimeRequire("./runtime/app/timeline-dev-cli.js") as {
-  runTimelineDevCommand: TimelineCommandHandler;
-};
-const { runTimelineProposalsCommand } = runtimeRequire("./runtime/app/timeline-proposals-cli.js") as {
-  runTimelineProposalsCommand: TimelineCommandHandler;
-};
-const { runTimelineReadCommand } = runtimeRequire("./runtime/app/timeline-read-cli.js") as {
-  runTimelineReadCommand: TimelineCommandHandler;
-};
-const { runTimelineScreenshotCommand } = runtimeRequire("./runtime/app/timeline-screenshot-cli.js") as {
-  runTimelineScreenshotCommand: TimelineCommandHandler;
-};
-const { runTimelineServeCommand } = runtimeRequire("./runtime/app/timeline-serve-cli.js") as {
-  runTimelineServeCommand: TimelineCommandHandler;
-};
-const { runTimelineWriteCommand } = runtimeRequire("./runtime/app/timeline-write-cli.js") as {
-  runTimelineWriteCommand: TimelineCommandHandler;
-};
 
 const COMMAND_HANDLERS: Record<string, TimelineCommandHandler> = {
   build: runTimelineBuildCommand,
@@ -42,7 +22,12 @@ const COMMAND_HANDLERS: Record<string, TimelineCommandHandler> = {
   write: runTimelineWriteCommand,
 };
 
-async function main(argv: string[] = process.argv): Promise<void> {
+type TimelineBaseConfig = Parameters<typeof resolveTimelineRuntimeConfig>[0];
+
+async function main(
+  argv: string[] = process.argv,
+  baseConfig: TimelineBaseConfig = readConfig(),
+): Promise<void> {
   const command = normalizeText(argv[2]);
   if (!command || ["help", "--help", "-h"].includes(command)) {
     printHelp();
@@ -54,7 +39,6 @@ async function main(argv: string[] = process.argv): Promise<void> {
     throw new Error(`Unknown timeline command: ${command}`);
   }
 
-  const baseConfig = readConfig();
   const timelineConfig = resolveTimelineRuntimeConfig(baseConfig);
   await handler(timelineConfig);
 }

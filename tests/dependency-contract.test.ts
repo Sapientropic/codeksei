@@ -19,8 +19,11 @@ test("timeline runtime stays first-party and no external timeline dependency reg
 
   assert.equal(packageJson.dependencies?.["timeline-for-agent"], undefined);
   assert.equal(packageLock.packages?.["node_modules/timeline-for-agent"], undefined);
-  assert.equal(fs.existsSync(path.join(repoRoot, "src", "timeline", "runtime", "index.js")), true);
+  assert.equal(fs.existsSync(path.join(repoRoot, "src", "timeline", "runtime", "index.ts")), true);
+  assert.equal(fs.existsSync(path.join(repoRoot, "src", "timeline", "runtime", "timeline", "dashboard-app.tsx")), true);
+  assert.equal(fs.existsSync(path.join(repoRoot, "src", "timeline", "runtime", "app", "timeline-write-cli.ts")), true);
   assert.equal(fs.existsSync(path.join(repoRoot, "dist", "src", "timeline", "runtime", "index.js")), true);
+  assert.equal(fs.existsSync(path.join(repoRoot, "src", "timeline", "runtime", "index.js")), false);
   assert.match(integrationSource, /codeksei-timeline/u);
   assert.doesNotMatch(integrationSource, /require\.resolve\("timeline-for-agent\/package\.json"\)/u);
 });

@@ -8,7 +8,9 @@
 - `npm run check` / `npm run verify` 默认全绿
 - TS 源码侧的 CommonJS 过渡 allowlist 已清零
 - `@ts-nocheck` allowlist 已清零
+- repo-tracked authored source 里的 `.js/.jsx/.mjs` 已清零；timeline first-party runtime 也回到同一条 TS build 主链
 - 构建产物仍输出 CommonJS，但源码内部已经不再靠 `require / module.exports / export {}` 过渡态维持结构
+- timeline build 现在只复制非代码资产（如 CSS / examples），不再把 source runtime 整树原样复制进 `dist`
 
 这一页只解释当前稳定结构，不复述实现细节清单。
 

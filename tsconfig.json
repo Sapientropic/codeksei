@@ -4,7 +4,8 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "target": "ES2023",
-    "lib": ["ES2023"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
     "types": ["node"],
     "skipLibCheck": true,
     "rootDir": ".",
@@ -12,7 +13,8 @@
     "strict": true,
     "noImplicitAny": true,
     "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true
+    "exactOptionalPropertyTypes": true,
+    "moduleDetection": "force"
   },
   "include": [
     "src/**/*"
