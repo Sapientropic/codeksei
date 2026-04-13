@@ -5,7 +5,12 @@ const assert = require("node:assert/strict");
 
 const repoRoot = path.join(__dirname, "..");
 const srcRoot = path.join(repoRoot, "src");
-const allowlist: Array<{ from: string; to: string }> = [];
+const allowlist: Array<{ from: string; to: string }> = [
+  {
+    from: "src/workspace/default-targets.ts",
+    to: "src/adapters/channel/weixin/context-token-store.ts",
+  },
+];
 const rules: Array<{
   sourcePrefix: string;
   forbiddenPrefixes: string[];
@@ -35,6 +40,21 @@ const rules: Array<{
     sourcePrefix: "src/runtime/",
     forbiddenPrefixes: ["src/review/", "src/notes/", "src/app/"],
     reason: "runtime should stay below domain logic and above app CLI wiring",
+  },
+  {
+    sourcePrefix: "src/shared/",
+    forbiddenPrefixes: ["src/app/", "src/review/", "src/notes/"],
+    reason: "shared helpers should not absorb app or domain workflow logic",
+  },
+  {
+    sourcePrefix: "src/workspace/",
+    forbiddenPrefixes: ["src/runtime/", "src/adapters/", "src/app/", "src/review/", "src/notes/"],
+    reason: "workspace continuity should stay below runtime/app wiring and outside domain logic",
+  },
+  {
+    sourcePrefix: "src/adapters/",
+    forbiddenPrefixes: ["src/app/", "src/review/", "src/notes/"],
+    reason: "adapters should not depend on app CLI or domain workflow implementations",
   },
 ];
 

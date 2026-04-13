@@ -5,19 +5,10 @@ const { RUNTIME_EVENT_TYPES }: typeof import("../src/contracts/runtime-events") 
 const { RuntimeWatchdogLifecycle }: typeof import("../src/runtime/runtime-watchdog-lifecycle") = require("../src/runtime/runtime-watchdog-lifecycle");
 const { ThreadStateStore }: typeof import("../src/runtime/thread-state-store") = require("../src/runtime/thread-state-store");
 
-test("first-event watchdog still fires after an earlier turn left a stale turn id", async () => {
+function createLifecycleHarness() {
   const textCalls: string[] = [];
   const typingStops: number[] = [];
   const threadStateStore = new ThreadStateStore();
-
-  threadStateStore.applyRuntimeEvent({
-    type: RUNTIME_EVENT_TYPES.TURN_COMPLETED,
-    payload: {
-      threadId: "thread-current",
-      turnId: "turn-old",
-    },
-  });
-
   const lifecycle = new RuntimeWatchdogLifecycle({
     buildApprovalPromptSignature() {
       return "";
@@ -64,6 +55,20 @@ test("first-event watchdog still fires after an earlier turn left a stale turn i
     firstRuntimeEventNoticeTimeoutMs: 5,
   });
 
+  return { lifecycle, textCalls, threadStateStore, typingStops };
+}
+
+test("first-event watchdog still fires after an earlier turn left a stale turn id", async () => {
+  const { lifecycle, textCalls, threadStateStore, typingStops } = createLifecycleHarness();
+
+  threadStateStore.applyRuntimeEvent({
+    type: RUNTIME_EVENT_TYPES.TURN_COMPLETED,
+    payload: {
+      threadId: "thread-current",
+      turnId: "turn-old",
+    },
+  });
+
   lifecycle.scheduleRuntimeEventWatchdog({
     bindingKey: "binding-current",
     workspaceRoot: "E:/repo/current",
@@ -79,4 +84,62 @@ test("first-event watchdog still fires after an earlier turn left a stale turn i
 
   assert.equal(textCalls.some((entry) => entry.includes("没有返回首个事件")), true);
   assert.equal(typingStops.includes(0), true);
+});
+
+test("usage telemetry does not clear the first-event watchdog", async () => {
+  const { lifecycle, textCalls } = createLifecycleHarness();
+
+  lifecycle.scheduleRuntimeEventWatchdog({
+    bindingKey: "binding-current",
+    workspaceRoot: "E:/repo/current",
+    threadId: "thread-current",
+    normalized: {
+      senderId: "user-1",
+      contextToken: "ctx-1",
+      provider: "weixin",
+    } as never,
+  });
+  lifecycle.observeRuntimeEvent({
+    type: RUNTIME_EVENT_TYPES.USAGE_UPDATED,
+    payload: {
+      threadId: "thread-current",
+    },
+  } as never);
+
+  await new Promise((resolve) => setTimeout(resolve, 40));
+
+  assert.equal(textCalls.some((entry) => entry.includes("没有返回首个事件")), true);
+});
+
+test("real first-progress events clear the first-event watchdog", () => {
+  const variants = [
+    RUNTIME_EVENT_TYPES.TURN_STARTED,
+    RUNTIME_EVENT_TYPES.APPROVAL_REQUESTED,
+    RUNTIME_EVENT_TYPES.TURN_FAILED,
+  ];
+
+  for (const eventType of variants) {
+    const { lifecycle } = createLifecycleHarness();
+    lifecycle.scheduleRuntimeEventWatchdog({
+      bindingKey: "binding-current",
+      workspaceRoot: "E:/repo/current",
+      threadId: "thread-current",
+      normalized: {
+        senderId: "user-1",
+        contextToken: "ctx-1",
+        provider: "weixin",
+      } as never,
+    });
+
+    lifecycle.observeRuntimeEvent({
+      type: eventType,
+      payload: {
+        threadId: "thread-current",
+        turnId: "turn-current",
+        requestId: "approval-1",
+      },
+    } as never);
+
+    assert.equal(lifecycle.pendingRuntimeEventWatchdogs.size, 0, `${eventType} should clear the watchdog`);
+  }
 });

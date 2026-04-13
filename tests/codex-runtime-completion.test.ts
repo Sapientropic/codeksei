@@ -108,3 +108,71 @@ test("runtime turn completion surfaces normalized failures", async () => {
 
   await assert.rejects(completion, /runtime exploded/u);
 });
+
+test("runtime turn completion treats snapshot resend as authoritative replacement", async () => {
+  const client = createFakeClient();
+  const completion = __testing.waitForTurnCompletion(client as WaitForTurnCompletionClient, "thread-1");
+
+  client.emit({
+    method: "turn/started",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-2",
+    },
+  });
+  client.emit({
+    method: "item/agentMessage/delta",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-2",
+      itemId: "item-1",
+      delta: '{"progress":["par',
+      phase: "final",
+    },
+  });
+  client.emit({
+    method: "item/agentMessage/delta",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-2",
+      itemId: "item-1",
+      item: {
+        id: "item-1",
+        text: '{"progress":["partial"]}',
+      },
+      phase: "final",
+    },
+  });
+  client.emit({
+    method: "item/completed",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-2",
+      item: {
+        id: "item-1",
+        type: "agentmessage",
+        content: [
+          {
+            type: "text",
+            text: '{"progress":["done"]}',
+          },
+        ],
+        metadata: {
+          phase: "final_answer",
+        },
+      },
+    },
+  });
+  client.emit({
+    method: "turn/completed",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-2",
+    },
+  });
+
+  assert.deepEqual(await completion, {
+    turnId: "turn-2",
+    text: '{"progress":["done"]}',
+  });
+});

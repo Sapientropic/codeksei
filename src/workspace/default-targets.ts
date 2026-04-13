@@ -65,6 +65,9 @@ export function resolvePreferredSenderId({
     return bindingCandidates[0] || "";
   }
 
+  // This stays as a read-only fallback: default-target inference needs the
+  // persisted sender/context-token map, but should not own any adapter write
+  // path or transport behavior.
   const persistedUserIds = Object.keys(loadPersistedContextTokens(config, accountId) || {})
     .map((value) => normalizeText(value))
     .filter(Boolean);

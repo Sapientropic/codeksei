@@ -25,6 +25,17 @@ export const RUNTIME_TURN_LIFECYCLE_EVENT_TYPES = Object.freeze([
   RUNTIME_EVENT_TYPES.TURN_STARTED,
   ...RUNTIME_TURN_TERMINAL_EVENT_TYPES,
 ]);
+// Only these events prove the runtime has actually started processing the
+// current turn. Usage telemetry can arrive early and must not suppress the
+// first-event watchdog's "still no progress" fallback.
+export const RUNTIME_FIRST_PROGRESS_EVENT_TYPES = Object.freeze([
+  RUNTIME_EVENT_TYPES.TURN_STARTED,
+  RUNTIME_EVENT_TYPES.REPLY_DELTA,
+  RUNTIME_EVENT_TYPES.REPLY_COMPLETED,
+  RUNTIME_EVENT_TYPES.TURN_COMPLETED,
+  RUNTIME_EVENT_TYPES.TURN_FAILED,
+  RUNTIME_EVENT_TYPES.APPROVAL_REQUESTED,
+]);
 export const RUNTIME_CORE_CONSUMER_EXPECTATIONS = Object.freeze({
   threadStateStore: Object.freeze([...RUNTIME_EVENT_TYPE_LIST]),
   runtimeWatchdogLifecycle: Object.freeze([...RUNTIME_EVENT_TYPE_LIST]),
@@ -246,6 +257,10 @@ export function isRuntimeTurnTerminalEventType(value: unknown): boolean {
 
 export function isRuntimeTurnLifecycleEventType(value: unknown): boolean {
   return RUNTIME_TURN_LIFECYCLE_EVENT_TYPES.some((entry: any) => entry === normalizeRuntimeEventType(value));
+}
+
+export function isRuntimeFirstProgressEventType(value: unknown): boolean {
+  return RUNTIME_FIRST_PROGRESS_EVENT_TYPES.some((entry: any) => entry === normalizeRuntimeEventType(value));
 }
 
 export function matchesRuntimeEventType(event: { type?: unknown } | null | undefined, type: unknown): boolean {

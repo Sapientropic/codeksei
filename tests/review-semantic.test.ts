@@ -96,3 +96,48 @@ test("semantic review rejects normalized approval requests instead of waiting fo
 
   await assert.rejects(completion, /semantic review requested approval/u);
 });
+
+test("semantic review completion keeps snapshot resend from duplicating JSON", async () => {
+  const client = createFakeClient();
+  const completion = __testing.waitForSemanticTurnCompletion(client, "thread-semantic", 1_000);
+
+  client.emit({
+    method: "turn/started",
+    params: {
+      threadId: "thread-semantic",
+      turnId: "turn-semantic-2",
+    },
+  });
+  client.emit({
+    method: "item/agentMessage/delta",
+    params: {
+      threadId: "thread-semantic",
+      turnId: "turn-semantic-2",
+      itemId: "item-1",
+      delta: '{"progress":["par',
+      phase: "final",
+    },
+  });
+  client.emit({
+    method: "item/agentMessage/delta",
+    params: {
+      threadId: "thread-semantic",
+      turnId: "turn-semantic-2",
+      itemId: "item-1",
+      item: {
+        id: "item-1",
+        text: '{"progress":["partial"]}',
+      },
+      phase: "final",
+    },
+  });
+  client.emit({
+    method: "turn/completed",
+    params: {
+      threadId: "thread-semantic",
+      turnId: "turn-semantic-2",
+    },
+  });
+
+  assert.equal(await completion, '{"progress":["partial"]}');
+});

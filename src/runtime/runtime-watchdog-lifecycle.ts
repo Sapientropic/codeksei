@@ -1,4 +1,5 @@
 import {
+  isRuntimeFirstProgressEventType,
   RUNTIME_EVENT_TYPES,
   type RuntimeEvent,
 } from "../contracts/runtime-events";
@@ -125,7 +126,9 @@ export class RuntimeWatchdogLifecycle {
 
   observeRuntimeEvent(event: RuntimeEvent<UnknownRecord>): void {
     this.confirmPendingWorkspaceBootstrap(event);
-    this.clearRuntimeEventWatchdog(event?.payload?.threadId);
+    if (isRuntimeFirstProgressEventType(event?.type)) {
+      this.clearRuntimeEventWatchdog(event?.payload?.threadId);
+    }
     this.refreshTurnSettlementWatchdog(event);
   }
 

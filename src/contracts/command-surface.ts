@@ -1,6 +1,84 @@
-// @ts-check
+type CommandEntrypointType = "cli" | "script" | "weixin";
 
-const COMMAND_GROUP_METADATA = Object.freeze([
+interface CommandGroupMeta {
+  id: string;
+  label: string;
+}
+
+interface CommandHelp {
+  topic: string;
+  leafKey: string;
+}
+
+interface CommandApproval {
+  autoApprove: boolean;
+}
+
+interface CommandAction {
+  action: string;
+  groupId: string;
+  summary: string;
+  terminal: string[];
+  weixin: string[];
+  status: string;
+  entrypointType: string;
+  scriptName: string;
+  command: string;
+  subcommand: string;
+  runner: string;
+  argsSchemaKey: string;
+  kind: string;
+  timelineSubcommand: string;
+  help: Readonly<CommandHelp>;
+  approval: Readonly<CommandApproval>;
+}
+
+interface CommandActionInput {
+  action?: unknown;
+  groupId?: unknown;
+  summary?: unknown;
+  terminal?: unknown;
+  weixin?: unknown;
+  status?: unknown;
+  entrypointType?: CommandEntrypointType | unknown;
+  scriptName?: unknown;
+  command?: unknown;
+  subcommand?: unknown;
+  runner?: unknown;
+  argsSchemaKey?: unknown;
+  kind?: unknown;
+  timelineSubcommand?: unknown;
+  help?: {
+    topic?: unknown;
+    leafKey?: unknown;
+  };
+  approval?: {
+    autoApprove?: unknown;
+  };
+}
+
+interface TerminalCommandManifestEntry {
+  key: string;
+  command: string;
+  subcommand: string;
+  action: string;
+  runner: string;
+  argsSchemaKey: string;
+  helpTopic: string;
+  kind: string;
+  timelineSubcommand: string;
+  scriptName: string;
+  approval: CommandApproval;
+  entrypointType: string;
+}
+
+interface CommandGroup {
+  id: string;
+  label: string;
+  actions: CommandAction[];
+}
+
+const COMMAND_GROUP_METADATA = Object.freeze<readonly CommandGroupMeta[]>([
   { id: "lifecycle", label: "启动与诊断" },
   { id: "workspace", label: "项目与线程" },
   { id: "approval", label: "授权与控制" },
@@ -8,7 +86,7 @@ const COMMAND_GROUP_METADATA = Object.freeze([
   { id: "capabilities", label: "能力集成" },
 ]);
 
-const COMMAND_ACTIONS = Object.freeze([
+const COMMAND_ACTIONS = Object.freeze<readonly CommandAction[]>([
   defineAction({
     action: "app.login",
     groupId: "lifecycle",
@@ -566,11 +644,13 @@ const COMMAND_ACTIONS = Object.freeze([
   }),
 ]);
 
-const COMMAND_ACTIONS_BY_ID = new Map(COMMAND_ACTIONS.map((entry: any) => [entry.action, entry]));
-const TERMINAL_COMMAND_MANIFEST = Object.freeze(
+const COMMAND_ACTIONS_BY_ID = new Map<string, CommandAction>(
+  COMMAND_ACTIONS.map((entry): [string, CommandAction] => [entry.action, entry])
+);
+const TERMINAL_COMMAND_MANIFEST = Object.freeze<readonly TerminalCommandManifestEntry[]>(
   COMMAND_ACTIONS
-    .filter((entry: any) => entry.entrypointType === "cli" && entry.command)
-    .map((entry: any) => ({
+    .filter((entry) => entry.entrypointType === "cli" && entry.command)
+    .map((entry): TerminalCommandManifestEntry => ({
       key: [entry.command, entry.subcommand].filter(Boolean).join(" "),
       command: entry.command,
       subcommand: entry.subcommand,
@@ -586,15 +666,15 @@ const TERMINAL_COMMAND_MANIFEST = Object.freeze(
     }))
 );
 const TERMINAL_COMMAND_MANIFEST_BY_KEY = new Map(
-  TERMINAL_COMMAND_MANIFEST.map((entry: any) => [entry.key, entry])
+  TERMINAL_COMMAND_MANIFEST.map((entry): [string, TerminalCommandManifestEntry] => [entry.key, entry])
 );
 const TERMINAL_COMMAND_MANIFEST_BY_SCRIPT_NAME = new Map(
   TERMINAL_COMMAND_MANIFEST
-    .filter((entry: any) => entry.scriptName)
-    .map((entry: any) => [normalizeCommandLookupKey(entry.scriptName), entry])
+    .filter((entry) => entry.scriptName)
+    .map((entry): [string, TerminalCommandManifestEntry] => [normalizeCommandLookupKey(entry.scriptName), entry])
 );
 
-function defineAction(entry: any) {
+function defineAction(entry: CommandActionInput): CommandAction {
   const normalized = {
     action: normalizeCommandLookupKey(entry.action),
     groupId: normalizeCommandLookupKey(entry.groupId),
@@ -621,51 +701,49 @@ function defineAction(entry: any) {
   return Object.freeze(normalized);
 }
 
-function normalizeStringList(value: any) {
-  return Object.freeze(
-    (Array.isArray(value) ? value : [])
-      .map((entry: any) => String(entry || "").trim())
-      .filter(Boolean)
-  );
+function normalizeStringList(value: unknown): string[] {
+  return (Array.isArray(value) ? value : [])
+    .map((entry) => String(entry || "").trim())
+    .filter(Boolean);
 }
 
-function listCommandActions() {
+function listCommandActions(): CommandAction[] {
   return COMMAND_ACTIONS.map(cloneAction);
 }
 
-function findCommandAction(action: any) {
+function findCommandAction(action: unknown): CommandAction | null {
   const entry = COMMAND_ACTIONS_BY_ID.get(normalizeCommandLookupKey(action));
   return entry ? cloneAction(entry) : null;
 }
 
-function listCommandGroups() {
-  return COMMAND_GROUP_METADATA.map((group: any) => ({
+function listCommandGroups(): CommandGroup[] {
+  return COMMAND_GROUP_METADATA.map((group) => ({
     ...group,
     actions: COMMAND_ACTIONS
-      .filter((entry: any) => entry.groupId === group.id)
+      .filter((entry) => entry.groupId === group.id)
       .map(cloneAction),
   }));
 }
 
-function listTerminalCommandManifest() {
-  return TERMINAL_COMMAND_MANIFEST.map((entry: any) => ({
+function listTerminalCommandManifest(): TerminalCommandManifestEntry[] {
+  return TERMINAL_COMMAND_MANIFEST.map((entry) => ({
     ...entry,
     approval: { ...entry.approval },
   }));
 }
 
-function findTerminalCommandManifest(command: any, subcommand: string = "") {
+function findTerminalCommandManifest(command: unknown, subcommand: string = ""): TerminalCommandManifestEntry | null {
   const key = [normalizeCommandLookupKey(command), normalizeCommandLookupKey(subcommand)].filter(Boolean).join(" ");
   const entry = TERMINAL_COMMAND_MANIFEST_BY_KEY.get(key);
   return entry ? { ...entry, approval: { ...entry.approval } } : null;
 }
 
-function findTerminalManifestByScriptName(scriptName: any) {
+function findTerminalManifestByScriptName(scriptName: unknown): TerminalCommandManifestEntry | null {
   const entry = TERMINAL_COMMAND_MANIFEST_BY_SCRIPT_NAME.get(normalizeCommandLookupKey(scriptName));
   return entry ? { ...entry, approval: { ...entry.approval } } : null;
 }
 
-function cloneAction(entry: any) {
+function cloneAction(entry: CommandAction): CommandAction {
   return {
     ...entry,
     terminal: [...entry.terminal],
@@ -675,7 +753,7 @@ function cloneAction(entry: any) {
   };
 }
 
-function normalizeCommandLookupKey(value: any) {
+function normalizeCommandLookupKey(value: unknown): string {
   // Only internal command/manifest identifiers should fold case here.
   // User-visible text stays trim-only in owner-local helpers elsewhere.
   return typeof value === "string" ? value.trim().toLowerCase() : "";

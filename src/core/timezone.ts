@@ -5,11 +5,54 @@ import { readForeignJsonDocument } from "../state/json-state";
 const LEGACY_TIMELINE_TIMEZONE = "Asia/Shanghai";
 const DEFAULT_FALLBACK_TIMEZONE = "UTC";
 
-function normalizeText(value: any) {
+interface TimelineStateFiles {
+  dir: string;
+  stateFile: string;
+  taxonomyFile: string;
+  factsFile: string;
+}
+
+interface TimelineStateDocument extends Record<string, unknown> {
+  timezone?: unknown;
+  taxonomy?: unknown;
+  facts?: unknown;
+  proposals?: unknown;
+}
+
+interface TimelineStateSnapshot {
+  paths: TimelineStateFiles;
+  hasAnyFile: boolean;
+  hasFacts: boolean;
+  timezone: string;
+  stateDoc: TimelineStateDocument | null;
+  taxonomyDoc: TimelineStateDocument | null;
+  factsDoc: TimelineStateDocument | null;
+  taxonomy: Record<string, unknown>;
+  facts: Record<string, unknown>;
+  proposals: unknown[];
+}
+
+interface TimezoneConfigResult {
+  timezone: string;
+  source: "env" | "timeline_state" | "system" | "timeline_state_legacy" | "fallback";
+  explicit: boolean;
+  timelineStateTimezone: string;
+}
+
+interface LocalDateTimeParts {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+}
+
+function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function normalizeTimezone(value: any) {
+function normalizeTimezone(value: unknown): string {
   const raw = normalizeText(value);
   if (!raw) {
     return "";
@@ -22,11 +65,17 @@ function normalizeTimezone(value: any) {
   }
 }
 
-function resolveSystemTimezone() {
+function resolveSystemTimezone(): string {
   return normalizeTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
 }
 
-function resolveTimezoneConfig({ explicitTimezone = "", timelineStateDir = "" }: any = {}) {
+function resolveTimezoneConfig({
+  explicitTimezone = "",
+  timelineStateDir = "",
+}: {
+  explicitTimezone?: unknown;
+  timelineStateDir?: string;
+} = {}): TimezoneConfigResult {
   const explicit = normalizeTimezone(explicitTimezone);
   const timelineStateTimezone = readTimelineStateTimezone(timelineStateDir);
   if (explicit) {
@@ -77,12 +126,12 @@ function resolveTimezoneConfig({ explicitTimezone = "", timelineStateDir = "" }:
   };
 }
 
-function readTimelineStateTimezone(timelineStateDir: string = "") {
+function readTimelineStateTimezone(timelineStateDir: string = ""): string {
   const snapshot = loadTimelineStateSnapshot(timelineStateDir);
   return snapshot.timezone;
 }
 
-function loadTimelineStateSnapshot(timelineStateDir: string = "") {
+function loadTimelineStateSnapshot(timelineStateDir: string = ""): TimelineStateSnapshot {
   const paths = resolveTimelineStateFiles(timelineStateDir);
   if (!paths.dir) {
     return {
@@ -120,7 +169,7 @@ function loadTimelineStateSnapshot(timelineStateDir: string = "") {
   };
 }
 
-function resolveTimelineStateFiles(timelineStateDir: string = "") {
+function resolveTimelineStateFiles(timelineStateDir: string = ""): TimelineStateFiles {
   const normalizedDir = normalizeText(timelineStateDir);
   if (!normalizedDir) {
     return {
@@ -142,17 +191,18 @@ function resolveTimelineStateFiles(timelineStateDir: string = "") {
   return buildTimelineStateFiles(existingDir);
 }
 
-function hasAnyTimelineStateFile(dirPath: any) {
-  if (!dirPath) {
+function hasAnyTimelineStateFile(dirPath: unknown): boolean {
+  const normalizedDir = normalizeText(dirPath);
+  if (!normalizedDir) {
     return false;
   }
-  const files = buildTimelineStateFiles(dirPath);
+  const files = buildTimelineStateFiles(normalizedDir);
   return fs.existsSync(files.stateFile)
     || fs.existsSync(files.taxonomyFile)
     || fs.existsSync(files.factsFile);
 }
 
-function buildTimelineStateFiles(dirPath: any) {
+function buildTimelineStateFiles(dirPath: string): TimelineStateFiles {
   return {
     dir: dirPath,
     stateFile: path.join(dirPath, "timeline-state.json"),
@@ -161,39 +211,48 @@ function buildTimelineStateFiles(dirPath: any) {
   };
 }
 
-function readTaxonomy(stateDoc: any, taxonomyDoc: any) {
+function readTaxonomy(
+  stateDoc: TimelineStateDocument | null,
+  taxonomyDoc: TimelineStateDocument | null,
+): Record<string, unknown> {
   const fromState = stateDoc?.taxonomy;
   if (fromState && typeof fromState === "object") {
-    return fromState;
+    return asRecord(fromState);
   }
   const fromTaxonomy = taxonomyDoc?.taxonomy;
-  return fromTaxonomy && typeof fromTaxonomy === "object" ? fromTaxonomy : {};
+  return fromTaxonomy && typeof fromTaxonomy === "object" ? asRecord(fromTaxonomy) : {};
 }
 
-function readFacts(stateDoc: any, factsDoc: any) {
+function readFacts(
+  stateDoc: TimelineStateDocument | null,
+  factsDoc: TimelineStateDocument | null,
+): Record<string, unknown> {
   const fromState = stateDoc?.facts;
   if (fromState && typeof fromState === "object") {
-    return fromState;
+    return asRecord(fromState);
   }
   const fromFacts = factsDoc?.facts;
-  return fromFacts && typeof fromFacts === "object" ? fromFacts : {};
+  return fromFacts && typeof fromFacts === "object" ? asRecord(fromFacts) : {};
 }
 
-function readProposals(stateDoc: any, factsDoc: any) {
+function readProposals(
+  stateDoc: TimelineStateDocument | null,
+  factsDoc: TimelineStateDocument | null,
+): unknown[] {
   if (Array.isArray(stateDoc?.proposals)) {
     return stateDoc.proposals;
   }
   return Array.isArray(factsDoc?.proposals) ? factsDoc.proposals : [];
 }
 
-function readJsonFile(filePath: string): Record<string, unknown> | null {
+function readJsonFile(filePath: string): TimelineStateDocument | null {
   // Timeline state/taxonomy/facts are foreign documents produced by another
   // workflow. Parse them gently and let that workflow own recovery instead of
   // moving files aside as if codeksei fully owned their schema.
   return readForeignJsonDocument<Record<string, unknown> | null>(filePath, { fallback: null });
 }
 
-function formatDateInTimezone(value: any, timezone: any = LEGACY_TIMELINE_TIMEZONE) {
+function formatDateInTimezone(value: unknown, timezone: unknown = LEGACY_TIMELINE_TIMEZONE): string {
   return formatInTimezone(value, timezone, "en-CA", {
     year: "numeric",
     month: "2-digit",
@@ -201,7 +260,11 @@ function formatDateInTimezone(value: any, timezone: any = LEGACY_TIMELINE_TIMEZO
   });
 }
 
-function formatTimeInTimezone(value: any, timezone: any = LEGACY_TIMELINE_TIMEZONE, locale: string = "zh-CN") {
+function formatTimeInTimezone(
+  value: unknown,
+  timezone: unknown = LEGACY_TIMELINE_TIMEZONE,
+  locale: string = "zh-CN",
+): string {
   return formatInTimezone(value, timezone, locale, {
     hour: "2-digit",
     minute: "2-digit",
@@ -210,7 +273,7 @@ function formatTimeInTimezone(value: any, timezone: any = LEGACY_TIMELINE_TIMEZO
   });
 }
 
-function formatDateTimeInTimezone(value: any, timezone: any = LEGACY_TIMELINE_TIMEZONE) {
+function formatDateTimeInTimezone(value: unknown, timezone: unknown = LEGACY_TIMELINE_TIMEZONE): string {
   return formatInTimezone(value, timezone, "sv-SE", {
     year: "numeric",
     month: "2-digit",
@@ -222,15 +285,19 @@ function formatDateTimeInTimezone(value: any, timezone: any = LEGACY_TIMELINE_TI
   }).replace(" ", "T");
 }
 
-function getCurrentDateStringInTimezone(timezone: any = LEGACY_TIMELINE_TIMEZONE, now: any = new Date()) {
+function getCurrentDateStringInTimezone(timezone: unknown = LEGACY_TIMELINE_TIMEZONE, now: Date = new Date()): string {
   return formatDateInTimezone(now, timezone);
 }
 
-function coerceLocalDateTimeToIso(value: any, {
+function coerceLocalDateTimeToIso(value: unknown, {
   timeZone = LEGACY_TIMELINE_TIMEZONE,
   defaultDate = "",
   defaultTime = "",
-}: any = {}) {
+}: {
+  timeZone?: unknown;
+  defaultDate?: string;
+  defaultTime?: string;
+} = {}): string {
   const normalized = normalizeText(value);
   if (!normalized) {
     return "";
@@ -258,7 +325,11 @@ function coerceLocalDateTimeToIso(value: any, {
   return "";
 }
 
-function buildZonedIsoString(dateString: any, timeString: any, timeZone: any = LEGACY_TIMELINE_TIMEZONE) {
+function buildZonedIsoString(
+  dateString: unknown,
+  timeString: unknown,
+  timeZone: unknown = LEGACY_TIMELINE_TIMEZONE,
+): string {
   const resolvedTimezone = normalizeTimezone(timeZone) || LEGACY_TIMELINE_TIMEZONE;
   const parts = parseLocalDateTimeParts(dateString, timeString);
   if (!parts) {
@@ -272,7 +343,7 @@ function buildZonedIsoString(dateString: any, timeString: any, timeZone: any = L
   return `${formatPartsDate(parts)}T${formatPartsTime(parts)}${formatOffsetMinutes(offsetMinutes)}`;
 }
 
-function resolveInstantFromLocalParts(parts: any, timezone: any) {
+function resolveInstantFromLocalParts(parts: LocalDateTimeParts, timezone: string): number {
   let guessMs = partsToUtcMs(parts);
   for (let attempt = 0; attempt < 6; attempt += 1) {
     const zonedParts = getLocalDateTimePartsForInstant(guessMs, timezone);
@@ -285,12 +356,12 @@ function resolveInstantFromLocalParts(parts: any, timezone: any) {
   return guessMs;
 }
 
-function getOffsetMinutesForInstant(instantMs: any, timezone: any) {
+function getOffsetMinutesForInstant(instantMs: number, timezone: string): number {
   const zonedParts = getLocalDateTimePartsForInstant(instantMs, timezone);
   return Math.round((partsToUtcMs(zonedParts) - instantMs) / 60000);
 }
 
-function getLocalDateTimePartsForInstant(instantMs: any, timezone: any) {
+function getLocalDateTimePartsForInstant(instantMs: number, timezone: string): LocalDateTimeParts {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: normalizeTimezone(timezone) || LEGACY_TIMELINE_TIMEZONE,
     year: "numeric",
@@ -319,7 +390,7 @@ function getLocalDateTimePartsForInstant(instantMs: any, timezone: any) {
   };
 }
 
-function parseLocalDateTimeParts(dateString: any, timeString: any) {
+function parseLocalDateTimeParts(dateString: unknown, timeString: unknown): LocalDateTimeParts | null {
   const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(normalizeText(dateString));
   const timeMatch = /^(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(normalizeText(timeString));
   if (!dateMatch || !timeMatch) {
@@ -341,7 +412,7 @@ function parseLocalDateTimeParts(dateString: any, timeString: any) {
   return parts;
 }
 
-function isValidDateTimeParts(parts: any) {
+function isValidDateTimeParts(parts: LocalDateTimeParts): boolean {
   if (!Number.isInteger(parts.year) || parts.year < 1) {
     return false;
   }
@@ -377,7 +448,7 @@ function isValidDateTimeParts(parts: any) {
     && probe.getUTCSeconds() === parts.second;
 }
 
-function partsToUtcMs(parts: any) {
+function partsToUtcMs(parts: LocalDateTimeParts): number {
   return Date.UTC(
     parts.year,
     parts.month - 1,
@@ -388,16 +459,16 @@ function partsToUtcMs(parts: any) {
   );
 }
 
-function formatPartsDate(parts: any) {
+function formatPartsDate(parts: LocalDateTimeParts): string {
   return `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
 }
 
-function formatPartsTime(parts: any) {
+function formatPartsTime(parts: LocalDateTimeParts): string {
   return `${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}:${String(parts.second || 0).padStart(2, "0")}`;
 }
 
-function formatOffsetMinutes(offsetMinutes: any) {
-  const normalized = Number.isFinite(offsetMinutes) ? offsetMinutes : 0;
+function formatOffsetMinutes(offsetMinutes: unknown): string {
+  const normalized = Number.isFinite(offsetMinutes) ? Number(offsetMinutes) : 0;
   const sign = normalized >= 0 ? "+" : "-";
   const absoluteMinutes = Math.abs(normalized);
   const hours = String(Math.floor(absoluteMinutes / 60)).padStart(2, "0");
@@ -405,9 +476,18 @@ function formatOffsetMinutes(offsetMinutes: any) {
   return `${sign}${hours}:${minutes}`;
 }
 
-function formatInTimezone(value: any, timezone: any, locale: any, options: any) {
+function formatInTimezone(
+  value: unknown,
+  timezone: unknown,
+  locale: string,
+  options: Intl.DateTimeFormatOptions,
+): string {
   const resolvedTimezone = normalizeTimezone(timezone) || LEGACY_TIMELINE_TIMEZONE;
-  const date = value instanceof Date ? value : new Date(value);
+  const date = value instanceof Date
+    ? value
+    : typeof value === "string" || typeof value === "number"
+      ? new Date(value)
+      : new Date(Number.NaN);
   if (Number.isNaN(date.getTime())) {
     return "";
   }
@@ -415,6 +495,12 @@ function formatInTimezone(value: any, timezone: any, locale: any, options: any) 
     timeZone: resolvedTimezone,
     ...options,
   }).format(date);
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
 }
 
 export {
