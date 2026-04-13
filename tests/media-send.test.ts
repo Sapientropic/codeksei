@@ -65,6 +65,68 @@ test("image upload falls back to generic file delivery when image upload_param i
   }
 });
 
+test("media upload accepts upload_full_url from getUploadUrl responses", async () => {
+  const tempFile = path.join(os.tmpdir(), `codeksei-media-full-url-${Date.now()}.png`);
+  await fs.writeFile(tempFile, Buffer.from("fake-png"));
+
+  const uploadMediaTypes: number[] = [];
+  const sentItems: Array<Record<string, unknown>> = [];
+  let uploadedUrl = "";
+  const originalFetch = global.fetch;
+  global.fetch = (async (input: RequestInfo | URL) => {
+    uploadedUrl = String(input);
+    return {
+      status: 200,
+      headers: {
+        get(name: string) {
+          return String(name || "").toLowerCase() === "x-encrypted-param" ? "download-param" : null;
+        },
+      },
+      async text() {
+        return "";
+      },
+    } as Response;
+  }) as typeof fetch;
+
+  try {
+    const result = await sendWeixinMediaFile({
+      filePath: tempFile,
+      to: "user-3",
+      contextToken: "ctx-3",
+      baseUrl: "http://localhost",
+      token: "token",
+      cdnBaseUrl: "http://cdn.example.com",
+      apiVariant: "legacy",
+      mediaApiOverride: {
+        async getUploadUrlImpl(params: Record<string, unknown>) {
+          uploadMediaTypes.push(Number(params.media_type));
+          return {
+            ret: 0,
+            upload_full_url: "http://cdn.example.com/upload?encrypted_query_param=upload-ok&filekey=file-1&taskid=task-1",
+          };
+        },
+        async sendMessageImpl(payload: Record<string, unknown>) {
+          const item = (payload as { body?: { msg?: { item_list?: Record<string, unknown>[] } } }).body?.msg?.item_list?.[0];
+          if (item) {
+            sentItems.push(item);
+          }
+          return { ok: true };
+        },
+      },
+    });
+
+    assert.deepEqual(uploadMediaTypes, [1]);
+    assert.match(uploadedUrl, /taskid=task-1/u);
+    assert.equal(sentItems.length, 1);
+    const sentItem = sentItems[0] as { type?: number };
+    assert.equal(sentItem.type, 2);
+    assert.equal(result.kind, "image");
+  } finally {
+    global.fetch = originalFetch;
+    await fs.unlink(tempFile).catch(() => {});
+  }
+});
+
 test("media upload falls back to alternate media api when primary stack still has no upload_param", async () => {
   const tempFile = path.join(os.tmpdir(), `codeksei-media-api-fallback-${Date.now()}.png`);
   await fs.writeFile(tempFile, Buffer.from("fake-png"));

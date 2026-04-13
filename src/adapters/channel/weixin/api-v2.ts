@@ -86,6 +86,7 @@ export interface GetUploadUrlV2Args extends Record<string, unknown> {
 
 export interface GetUploadUrlV2Response extends WeixinApiResponse {
   upload_param?: unknown;
+  upload_full_url?: unknown;
 }
 
 interface ApiPostArgs {

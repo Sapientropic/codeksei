@@ -7,6 +7,7 @@ const SENSITIVE_FIELD_NAMES = [
   "aeskey",
   "aes_key",
   "upload_param",
+  "upload_full_url",
   "encrypted_query_param",
 ];
 

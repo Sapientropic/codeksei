@@ -91,21 +91,54 @@ function buildCdnUploadUrl({
   return `${cdnBaseUrl}/upload?encrypted_query_param=${encodeURIComponent(uploadParam)}&filekey=${encodeURIComponent(filekey)}`;
 }
 
+function resolveCdnUploadUrl({
+  cdnBaseUrl,
+  uploadFullUrl,
+  uploadParam,
+  filekey,
+}: {
+  cdnBaseUrl: string;
+  uploadFullUrl?: string | undefined;
+  uploadParam?: string | undefined;
+  filekey: string;
+}): string {
+  const normalizedFullUrl = String(uploadFullUrl || "").trim();
+  if (normalizedFullUrl) {
+    return normalizedFullUrl;
+  }
+  const normalizedUploadParam = String(uploadParam || "").trim();
+  if (normalizedUploadParam) {
+    return buildCdnUploadUrl({
+      cdnBaseUrl,
+      uploadParam: normalizedUploadParam,
+      filekey,
+    });
+  }
+  throw new Error("getUploadUrl returned neither upload_full_url nor upload_param");
+}
+
 async function uploadBufferToCdn({
   buf,
+  uploadFullUrl,
   uploadParam,
   filekey,
   cdnBaseUrl,
   aeskey,
 }: {
   buf: Buffer;
-  uploadParam: string;
+  uploadFullUrl?: string | undefined;
+  uploadParam?: string | undefined;
   filekey: string;
   cdnBaseUrl: string;
   aeskey: Buffer;
 }): Promise<{ downloadParam: string }> {
   const ciphertext = encryptAesEcb(buf, aeskey);
-  const cdnUrl = buildCdnUploadUrl({ cdnBaseUrl, uploadParam, filekey });
+  const cdnUrl = resolveCdnUploadUrl({
+    cdnBaseUrl,
+    uploadFullUrl,
+    uploadParam,
+    filekey,
+  });
   const response = await fetch(cdnUrl, {
     method: "POST",
     headers: { "Content-Type": "application/octet-stream" },
@@ -149,13 +182,17 @@ async function uploadMediaToWeixin({
     aeskey: aeskey.toString("hex"),
   });
 
+  const uploadFullUrl = typeof uploadUrlResp?.upload_full_url === "string"
+    ? uploadUrlResp.upload_full_url
+    : "";
   const uploadParam = typeof uploadUrlResp?.upload_param === "string" ? uploadUrlResp.upload_param : "";
-  if (!uploadParam) {
-    throw new Error("getUploadUrl returned no upload_param");
+  if (!uploadFullUrl && !uploadParam) {
+    throw new Error("getUploadUrl returned neither upload_full_url nor upload_param");
   }
 
   const { downloadParam } = await uploadBufferToCdn({
     buf: plaintext,
+    uploadFullUrl,
     uploadParam,
     filekey,
     cdnBaseUrl,
@@ -345,7 +382,9 @@ async function sendWeixinMediaFile({
 }
 
 function isMissingUploadParamError(error: unknown): boolean {
-  return formatErrorMessage(error).includes("getUploadUrl returned no upload_param");
+  const message = formatErrorMessage(error);
+  return message.includes("getUploadUrl returned no upload_param")
+    || message.includes("getUploadUrl returned neither upload_full_url nor upload_param");
 }
 
 function resolveFallbackWeixinMediaApi(apiVariant: unknown): WeixinMediaApi | null {
