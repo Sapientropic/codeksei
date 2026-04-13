@@ -1,4 +1,4 @@
-import * as brandingModule from "../core/branding";
+import { readPrefixedEnv } from "../core/branding";
 import { runWatchdogOnce } from "./shared-watchdog";
 import {
   ensureLogDir,
@@ -11,9 +11,6 @@ import {
 } from "./shared-common";
 import type { SharedWatchdogState } from "./shared-types";
 
-const { readPrefixedEnv } = brandingModule as {
-  readPrefixedEnv: (env: NodeJS.ProcessEnv, key: string) => string;
-};
 
 const DEFAULT_INTERVAL_MINUTES = 5;
 

@@ -1,7 +1,7 @@
 import { getCommandArgsSchema } from "../contracts/command-args";
 import { parseCliArgs } from "../core/cli-args";
 import { buildTerminalLeafHelp } from "../core/command-registry";
-import * as projectRadarModule from "../core/project-radar";
+import { collectProjectRadars, listTrackedProjects, loadProjectRadarConfig } from "../core/project-radar";
 
 interface ProjectRadarOptions {
   help: boolean;
@@ -12,71 +12,9 @@ interface ProjectRadarOptions {
   changes: string;
 }
 
-interface TrackedProject {
-  slug: string;
-  title: string;
-  aliases: string[];
-  repoRoot: string;
-  notePath: string;
-  timelineLabel: string;
-}
-
-interface ProjectRadarConfig {
-  workspaceRoot: string;
-  configFile: string;
-}
-
-interface ProjectGitStatusEntry {
-  code: string;
-  path: string;
-}
-
-interface ProjectGitCommit {
-  shortHash: string;
-  committedAt: string;
-  subject: string;
-}
-
-interface ProjectRadarResult {
-  workspaceRoot: string;
-  configFile: string;
-  generatedAt: string;
-  projects: Array<{
-    slug: string;
-    title: string;
-    repoRoot: string;
-    notePath: string;
-    timelineLabel: string;
-    readFirst: Array<{ kind: string; path: string; exists: boolean }>;
-    git: {
-      ok: boolean;
-      message: string;
-      branch: string;
-      upstream: string;
-      ahead: number;
-      behind: number;
-      dirty: boolean;
-      summary: {
-        staged: number;
-        unstaged: number;
-        untracked: number;
-        conflicted: number;
-      };
-      statusEntries: ProjectGitStatusEntry[];
-      recentCommits: ProjectGitCommit[];
-    };
-  }>;
-}
-
-const {
-  collectProjectRadars,
-  listTrackedProjects,
-  loadProjectRadarConfig,
-} = projectRadarModule as {
-  collectProjectRadars: (config: unknown, options: ProjectRadarOptions) => ProjectRadarResult;
-  listTrackedProjects: (config: unknown) => TrackedProject[];
-  loadProjectRadarConfig: (config: unknown) => ProjectRadarConfig;
-};
+type ProjectRadarConfig = ReturnType<typeof loadProjectRadarConfig>;
+type TrackedProject = ReturnType<typeof listTrackedProjects>[number];
+type ProjectRadarResult = ReturnType<typeof collectProjectRadars>;
 
 async function runProjectRadarCommand(config: unknown, args: string[] = []) {
   const options = parseProjectRadarArgs(args);
@@ -86,8 +24,8 @@ async function runProjectRadarCommand(config: unknown, args: string[] = []) {
   }
 
   if (options.list) {
-    const radarConfig = loadProjectRadarConfig(config);
-    const tracked = listTrackedProjects(config);
+    const radarConfig = loadProjectRadarConfig(config as Parameters<typeof loadProjectRadarConfig>[0]);
+    const tracked = listTrackedProjects(config as Parameters<typeof listTrackedProjects>[0]);
     if (options.json) {
       console.log(JSON.stringify({
         workspaceRoot: radarConfig.workspaceRoot,
@@ -100,7 +38,10 @@ async function runProjectRadarCommand(config: unknown, args: string[] = []) {
     return;
   }
 
-  const result = collectProjectRadars(config, options);
+  const result = collectProjectRadars(
+    config as Parameters<typeof collectProjectRadars>[0],
+    options,
+  );
   if (options.json) {
     console.log(JSON.stringify(result, null, 2));
     return;
@@ -146,6 +87,9 @@ function renderProjectRadarsText(result: ProjectRadarResult): string {
     if (project.readFirst.length) {
       lines.push("readFirst:");
       for (const file of project.readFirst) {
+        if (!file) {
+          continue;
+        }
         lines.push(`- [${file.kind}] ${file.path}${file.exists ? "" : " (missing)"}`);
       }
     }

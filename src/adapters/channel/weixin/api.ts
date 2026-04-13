@@ -1,15 +1,9 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import * as redactModule from "./redact";
-import * as protocolModule from "./protocol";
+import { redactSensitiveText } from "./redact";
+import { getStableWechatUin } from "./protocol";
 import type { WeixinSendMessageRequest, WeixinUploadUrlRequest } from "./media-types";
 
-const { redactSensitiveText } = redactModule as {
-  redactSensitiveText: (value: string) => string;
-};
-const { getStableWechatUin } = protocolModule as {
-  getStableWechatUin: () => string;
-};
 
 interface WeixinBaseInfo {
   channel_version: string;

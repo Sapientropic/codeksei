@@ -1,19 +1,10 @@
-import * as legacyModule from "./legacy";
-import * as loginV2Module from "./login-v2";
-import * as mediaSendModule from "./media-send";
+import { createLegacyWeixinChannelAdapter } from "./legacy";
+import { runV2LoginFlow } from "./login-v2";
+import { sendWeixinMediaFile } from "./media-send";
 import { createWeixinDeliveryFacade, packChunksForWeixinDelivery, sendV2TextChunk } from "./delivery";
 import type { SendWeixinMediaFileArgs, SendWeixinMediaFileResult } from "./media-types";
 import { createWeixinUpdateState, type GetUpdatesResponse, type WeixinAccount, type WeixinConfig } from "./updates";
 
-const { createLegacyWeixinChannelAdapter } = legacyModule as {
-  createLegacyWeixinChannelAdapter: (config: WeixinConfig) => WeixinChannelAdapter;
-};
-const { runV2LoginFlow } = loginV2Module as {
-  runV2LoginFlow: (config: WeixinConfig) => Promise<unknown>;
-};
-const { sendWeixinMediaFile } = mediaSendModule as {
-  sendWeixinMediaFile: (args: SendWeixinMediaFileArgs) => Promise<SendWeixinMediaFileResult>;
-};
 
 interface SendTextChunksArgs {
   userId: string;

@@ -5,6 +5,7 @@ const test: typeof import("node:test") = require("node:test");
 const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 
 const { SessionStore }: typeof import("../src/adapters/runtime/codex/session-store") = require("../src/adapters/runtime/codex/session-store");
+const { SessionStoreWriter }: typeof import("../src/adapters/runtime/codex/session-store-writer") = require("../src/adapters/runtime/codex/session-store-writer");
 const { persistContextToken }: typeof import("../src/adapters/channel/weixin/context-token-store") = require("../src/adapters/channel/weixin/context-token-store");
 const { saveWeixinAccount }: typeof import("../src/adapters/channel/weixin/account-store") = require("../src/adapters/channel/weixin/account-store");
 
@@ -107,17 +108,18 @@ test("shared mode long-chain smoke covers status/open, approval continuity, and 
 
   const sessionsFile = path.join(stateDir, "sessions.json");
   const sessionStore = new SessionStore({ filePath: sessionsFile });
+  const sessionWriter = new SessionStoreWriter(sessionStore);
   const bindingKey = sessionStore.buildBindingKey({
     workspaceId: "workspace-1",
     accountId: "acct-1",
     senderId: "user-1",
   });
-  sessionStore.setThreadIdForWorkspace(bindingKey, workspaceRoot, "thread-shared", {
+  await sessionWriter.setThreadIdForWorkspace(bindingKey, workspaceRoot, "thread-shared", {
     workspaceId: "workspace-1",
     accountId: "acct-1",
     senderId: "user-1",
   });
-  sessionStore.rememberWorkspaceBootstrapForThread(bindingKey, workspaceRoot, "thread-shared");
+  await sessionWriter.rememberWorkspaceBootstrapForThread(bindingKey, workspaceRoot, "thread-shared");
 
   const baseEnv = buildSharedModeEnv(process.env, {
     CODEKSEI_STATE_DIR: stateDir,

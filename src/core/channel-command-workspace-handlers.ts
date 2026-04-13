@@ -4,6 +4,7 @@ import type {
   AppRuntimeConfig,
   ChannelAdapterLike,
   RuntimeAdapterLike,
+  SessionStoreWriterLike,
   StreamDeliveryLike,
 } from "./app-service-contract";
 import type {
@@ -29,11 +30,8 @@ type WorkspaceCommandChannelAdapter = Pick<ChannelAdapterLike, "sendText">;
 type WorkspaceCommandConfig = Pick<AppRuntimeConfig, "codexAccessMode" | "workspaceRoot">;
 
 interface WorkspaceCommandSessionStore extends ChannelCommandSessionStore {
-  clearThreadIdForWorkspace(bindingKey: string, workspaceRoot: string): unknown;
   findBindingForThreadId(threadId: string): ThreadBindingRef | null;
   getCodexParamsForWorkspace(bindingKey: string, workspaceRoot: string): { model?: string };
-  setActiveWorkspaceRoot(bindingKey: string, workspaceRoot: string): unknown;
-  setThreadIdForWorkspace(bindingKey: string, workspaceRoot: string, threadId: string): unknown;
 }
 
 interface WorkspaceCommandRuntimeAdapter extends Pick<
@@ -48,6 +46,10 @@ interface WorkspaceCommandThreadStateStore extends ChannelCommandThreadStateStor
 }
 
 type WorkspaceCommandStreamDelivery = Pick<StreamDeliveryLike, "queueReplyTargetForThread">;
+type WorkspaceCommandSessionWriter = Pick<
+  SessionStoreWriterLike,
+  "clearThreadIdForWorkspace" | "setActiveWorkspaceRoot" | "setThreadIdForWorkspace"
+>;
 
 interface WorkspaceCommandHandlers {
   bind(normalized: WorkspaceCommandMessage, command: ParsedChannelCommand): Promise<void>;
@@ -71,6 +73,7 @@ function createWorkspaceCommandHandlers({
   resolveWorkspaceRoot,
   runtimeAdapter,
   scheduleRuntimeEventWatchdog,
+  sessionWriter,
   streamDelivery,
   threadStateStore,
 }: {
@@ -79,6 +82,7 @@ function createWorkspaceCommandHandlers({
   resolveWorkspaceRoot(bindingKey: string): string;
   runtimeAdapter: WorkspaceCommandRuntimeAdapter;
   scheduleRuntimeEventWatchdog(payload: ScheduleRuntimeEventWatchdogPayload): void;
+  sessionWriter: WorkspaceCommandSessionWriter;
   streamDelivery: WorkspaceCommandStreamDelivery;
   threadStateStore: WorkspaceCommandThreadStateStore;
 }): WorkspaceCommandHandlers {
@@ -124,7 +128,8 @@ function createWorkspaceCommandHandlers({
         runtimeAdapter,
         threadStateStore,
       });
-      sessionStore.setActiveWorkspaceRoot(bindingKey, canonicalWorkspaceRoot);
+      void sessionStore;
+      await sessionWriter.setActiveWorkspaceRoot(bindingKey, canonicalWorkspaceRoot);
       await channelAdapter.sendText({
         userId: normalized.senderId,
         text: `已绑定项目。\n\nworkspace: ${canonicalWorkspaceRoot}\n下一条普通消息会按当前 workspace 检查是否需要补读稳定入口。`,
@@ -190,7 +195,8 @@ function createWorkspaceCommandHandlers({
         runtimeAdapter,
         threadStateStore,
       });
-      sessionStore.clearThreadIdForWorkspace(bindingKey, workspaceRoot);
+      void sessionStore;
+      await sessionWriter.clearThreadIdForWorkspace(bindingKey, workspaceRoot);
       await channelAdapter.sendText({
         userId: normalized.senderId,
         text: `已切到新线程草稿。\n\nworkspace: ${workspaceRoot}\n下一条普通消息会先按当前 workspace 重建上下文入口。`,
@@ -290,7 +296,7 @@ function createWorkspaceCommandHandlers({
       const knownTarget = sessionStore.findBindingForThreadId(targetThreadId);
       const workspaceRoot = knownTarget?.workspaceRoot || currentWorkspaceRoot;
       await runtimeAdapter.resumeThread({ threadId: targetThreadId });
-      sessionStore.setThreadIdForWorkspace(bindingKey, workspaceRoot, targetThreadId);
+      await sessionWriter.setThreadIdForWorkspace(bindingKey, workspaceRoot, targetThreadId);
       const switchedWorkspaceNotice = workspaceRoot !== currentWorkspaceRoot
         ? "\n已跟随这条 thread 的已知 workspace。"
         : "";

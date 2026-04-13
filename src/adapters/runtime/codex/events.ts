@@ -5,7 +5,7 @@ import {
   type RuntimeEvent,
 } from "../../../contracts/runtime-events";
 import type { UnknownRecord } from "../../../core/runtime-types";
-import * as approvalCommandPolicyModule from "../../../core/approval-command-policy";
+import { splitCommandLine } from "../../../core/approval-command-policy";
 import {
   extractAssistantDeltaFragment,
   extractAssistantPhase,
@@ -15,9 +15,6 @@ import {
   extractTurnIdFromParams,
 } from "./message-utils";
 
-const { splitCommandLine } = approvalCommandPolicyModule as {
-  splitCommandLine: (value: string) => string[];
-};
 
 interface CodexRpcMessage extends UnknownRecord {
   method?: unknown;

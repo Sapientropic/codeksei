@@ -77,9 +77,10 @@ function createInboundFilter() {
 
       return {
         provider: "weixin",
-        accountId,
-        workspaceId: config.workspaceId,
+        accountId: normalizeText(accountId),
+        workspaceId: normalizeText(config.workspaceId),
         senderId,
+        command: "message",
         chatId: senderId,
         messageId: normalizeMessageId(message),
         threadKey: normalizeText(message.session_id),

@@ -6,7 +6,7 @@ import {
   LEGACY_TIMELINE_TIMEZONE,
   coerceLocalDateTimeToIso,
 } from "../core/timezone";
-import * as cliArgsModule from "../core/cli-args";
+import { parseCliArgs } from "../core/cli-args";
 
 interface TimelineEventOptions extends Record<string, unknown> {
   help?: boolean;
@@ -45,9 +45,6 @@ interface TimelineEventPayload {
   title: string;
 }
 
-const { parseCliArgs } = cliArgsModule as {
-  parseCliArgs(args: string[], schema: unknown): TimelineEventOptions;
-};
 
 async function runTimelineEventCommand(
   timelineIntegration: TimelineIntegrationRunner,

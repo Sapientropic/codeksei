@@ -3,13 +3,7 @@ import {
   RUNTIME_EVENT_TYPES,
   type RuntimeEvent,
 } from "../contracts/runtime-events";
-import type {
-  ChannelAdapterLike,
-  RuntimeAdapterLike,
-  SessionStoreLike,
-  StreamDeliveryLike,
-  ThreadStateStoreLike,
-} from "../core/app-service-contract";
+import type { ChannelAdapterLike, RuntimeAdapterLike, StreamDeliveryLike, ThreadStateStoreLike } from "../core/app-service-contract";
 import type {
   PreparedRuntimeMessage,
   UnknownRecord,
@@ -48,7 +42,12 @@ export interface RuntimeWatchdogTimerDependencies {
   streamSettlementTimeoutMs: number;
   normalizeCommandArgument: NormalizeCommandArgument;
   normalizeText: NormalizeText;
-  clearPendingApproval: (sessionStore: SessionStoreLike, threadId: unknown) => void;
+  clearPendingApproval: (threadId: unknown) => Promise<void>;
+  rememberWorkspaceBootstrapForThread: (
+    bindingKey: string,
+    workspaceRoot: string,
+    threadId: string,
+  ) => Promise<unknown>;
   stopTypingForThread: (threadId: unknown) => Promise<void>;
 }
 
@@ -59,11 +58,6 @@ export function observeRuntimeEvent(
   pendingWorkspaceBootstrapByThreadId: Map<string, WorkspaceBootstrapEntry>,
   event: RuntimeEvent<UnknownRecord>,
 ): void {
-  confirmPendingWorkspaceBootstrap(
-    dependencies,
-    pendingWorkspaceBootstrapByThreadId,
-    event,
-  );
   if (isRuntimeFirstProgressEventType(event?.type)) {
     clearRuntimeEventWatchdog(
       dependencies.normalizeCommandArgument,
@@ -253,7 +247,7 @@ export function refreshTurnSettlementWatchdog(
       turnId,
       "这轮回复已经开始输出，但 Codex runtime 一直没有发回完成或失败事件。",
     );
-    dependencies.clearPendingApproval(dependencies.runtimeAdapter.getSessionStore(), threadId);
+    await dependencies.clearPendingApproval(threadId);
     await dependencies.stopTypingForThread(threadId);
   }, dependencies.streamSettlementTimeoutMs);
   pendingTurnSettlementWatchdogs.set(watchdogKey, { timer });
@@ -302,11 +296,11 @@ export function queuePendingWorkspaceBootstrap(
   });
 }
 
-export function confirmPendingWorkspaceBootstrap(
-  dependencies: Pick<RuntimeWatchdogTimerDependencies, "normalizeText" | "runtimeAdapter">,
+export async function confirmPendingWorkspaceBootstrap(
+  dependencies: Pick<RuntimeWatchdogTimerDependencies, "normalizeText" | "rememberWorkspaceBootstrapForThread">,
   pendingWorkspaceBootstrapByThreadId: Map<string, WorkspaceBootstrapEntry>,
   event: RuntimeEvent<UnknownRecord>,
-): void {
+): Promise<void> {
   if (!event || event.type === RUNTIME_EVENT_TYPES.USAGE_UPDATED) {
     return;
   }
@@ -322,7 +316,7 @@ export function confirmPendingWorkspaceBootstrap(
   // returns. In shared mode the runtime can still stall before emitting the
   // first real thread event, and prematurely persisting success would skip the
   // next retry's continuity bootstrap.
-  dependencies.runtimeAdapter.getSessionStore().rememberWorkspaceBootstrapForThread(
+  await dependencies.rememberWorkspaceBootstrapForThread(
     pending.bindingKey,
     pending.workspaceRoot,
     threadId,

@@ -24,6 +24,7 @@
 - 驱动 app poll loop
 - 协调 command router 与 app-level wiring
 - 保持 app-level wiring 与 bridge coordination
+- 把 runtime event pipeline 与 lifecycle runner 委托给独立 helper，而不是继续把串行链和启动/关闭细节堆在 `app.ts`
 
 不负责：
 
@@ -158,6 +159,7 @@
 - `bootstrap.ts` 负责 thread bootstrap / instruction refresh 文本
 - `diagnostics.ts` 负责 workspace diagnostics / turn completion wait
 - `session-store.ts` 继续保留 public class surface，但内部 lock / binding / approval 规则已拆到 `session-store-lock.ts`、`session-store-bindings.ts`、`session-store-approvals.ts`
+- `session-store.ts` 现在只暴露同步读面；持久化写入通过 `session-store-writer.ts` 的 async owner 进入 non-blocking lock
 - `rpc-client.ts` 继续承担 transport owner，但不再顺手吸收 session / shared 恢复规则
 
 ## 7. Shared Mode

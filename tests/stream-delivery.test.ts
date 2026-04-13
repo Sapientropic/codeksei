@@ -89,6 +89,9 @@ function createDelivery({
     getApprovalCommandAllowlistForWorkspace() {
       return [];
     },
+    getAvailableModelCatalog() {
+      return null;
+    },
     getBinding() {
       return null;
     },
@@ -107,10 +110,6 @@ function createDelivery({
     listPendingApprovals() {
       return [];
     },
-    rememberPendingApprovalForThread() {
-      return null;
-    },
-    rememberWorkspaceBootstrapForThread() {},
   };
   const delivery = new StreamDelivery({
     weixinReplyMode,
@@ -540,6 +539,9 @@ test("persistent send failure abandons the run and reports delivery degradation"
       getApprovalCommandAllowlistForWorkspace() {
         return [];
       },
+      getAvailableModelCatalog() {
+        return null;
+      },
       getBinding() {
         return null;
       },
@@ -558,10 +560,6 @@ test("persistent send failure abandons the run and reports delivery degradation"
       listPendingApprovals() {
         return [];
       },
-      rememberPendingApprovalForThread() {
-        return null;
-      },
-      rememberWorkspaceBootstrapForThread() {},
     },
     onDeliveryFailure(payload: DeliveryFailurePayload) {
       degraded.push(payload);

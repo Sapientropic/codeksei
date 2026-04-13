@@ -65,20 +65,42 @@ export interface SessionStoreLike {
   findBindingForThreadId(threadId: unknown): ThreadBindingRef | null;
   getActiveWorkspaceRoot(bindingKey: string): string;
   getApprovalCommandAllowlistForWorkspace(workspaceRoot: string): string[][];
+  getAvailableModelCatalog(): {
+    models: Array<{ model: string }>;
+    updatedAt: string;
+  } | null;
   getBinding(bindingKey: string): { senderId?: string } | null;
   getCodexParamsForWorkspace(bindingKey: string, workspaceRoot?: string): { model?: string };
   getPendingApprovalForThread(threadId: string): PendingApprovalState | null;
   getThreadIdForWorkspace(bindingKey: string, workspaceRoot: string): string;
   listBindings(): SessionBindingSnapshot[];
   listPendingApprovals(): Array<{ threadId: string; approval: PendingApprovalState }>;
+}
+
+export interface SessionStoreWriterLike {
+  clearApprovalPrompt?(threadId: unknown): Promise<void>;
+  clearPendingApprovalForThread?(threadId: unknown): Promise<void>;
+  rememberApprovalPrefixForWorkspace(workspaceRoot: string, commandTokens: string[]): Promise<string[][]>;
   rememberPendingApprovalForThread(
     threadId: unknown,
     approval: unknown,
     options?: { signature?: unknown; promptedAt?: unknown },
-  ): unknown;
-  rememberWorkspaceBootstrapForThread(bindingKey: string, workspaceRoot: string, threadId: string): void;
-  clearApprovalPrompt?(threadId: unknown): void;
-  clearPendingApprovalForThread?(threadId: unknown): void;
+  ): Promise<unknown>;
+  rememberWorkspaceBootstrapForThread(bindingKey: string, workspaceRoot: string, threadId: string): Promise<unknown>;
+  setActiveWorkspaceRoot(bindingKey: string, workspaceRoot: string): Promise<unknown>;
+  setAvailableModelCatalog?(models: unknown): Promise<unknown>;
+  setCodexParamsForWorkspace(
+    bindingKey: string,
+    workspaceRoot: string,
+    params: { model: string },
+  ): Promise<unknown>;
+  setThreadIdForWorkspace(
+    bindingKey: string,
+    workspaceRoot: string,
+    threadId: string,
+    extra?: Record<string, unknown>,
+  ): Promise<unknown>;
+  clearThreadIdForWorkspace(bindingKey: string, workspaceRoot: string): Promise<unknown>;
 }
 
 export interface ChannelAdapterLike {
@@ -222,7 +244,7 @@ export interface RuntimeTurnLifecycleLike {
 export interface RuntimeWatchdogLifecycleLike {
   clearRuntimeEventWatchdog(threadId: unknown): void;
   clearTurnSettlementWatchdog(threadId: unknown, turnId: unknown): void;
-  confirmPendingWorkspaceBootstrap(event: RuntimeEvent<UnknownRecord>): void;
+  confirmPendingWorkspaceBootstrap(event: RuntimeEvent<UnknownRecord>): Promise<void>;
   handleRuntimeEvent(event: RuntimeEvent<UnknownRecord>): Promise<void>;
   observeRuntimeEvent(event: RuntimeEvent<UnknownRecord>): void;
   queuePendingWorkspaceBootstrap(payload: {
@@ -262,6 +284,7 @@ export interface AppServices {
   runtimeAdapter: RuntimeAdapterLike;
   runtimeTurnLifecycle: RuntimeTurnLifecycleLike;
   runtimeWatchdogLifecycle: RuntimeWatchdogLifecycleLike;
+  sessionWriter: SessionStoreWriterLike;
   streamDelivery: StreamDeliveryLike;
   systemMessageDispatcherState: SystemMessageDispatcherRef;
   systemMessageQueue: SystemMessageQueueLike;

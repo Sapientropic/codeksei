@@ -1,5 +1,5 @@
 import { getCommandArgsSchema } from "../../contracts/command-args";
-import * as cliArgsModule from "../../core/cli-args";
+import { parseCliArgs } from "../../core/cli-args";
 import { normalizeBody } from "./shared";
 
 interface DiaryWriteOptions extends Record<string, unknown> {
@@ -13,9 +13,6 @@ interface DiaryWriteOptions extends Record<string, unknown> {
   useStdin?: boolean;
 }
 
-const { parseCliArgs } = cliArgsModule as {
-  parseCliArgs(args: string[], schema: unknown): DiaryWriteOptions;
-};
 
 export type { DiaryWriteOptions };
 

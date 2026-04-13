@@ -7,10 +7,10 @@ import {
   coerceLocalDateTimeToIso,
 } from "../core/timezone";
 import { resolvePreferredSenderId } from "../workspace/default-targets";
-import * as accountStoreModule from "../adapters/channel/weixin/account-store";
-import * as contextTokenStoreModule from "../adapters/channel/weixin/context-token-store";
-import * as cliArgsModule from "../core/cli-args";
-import * as reminderQueueStoreModule from "../state/reminder-queue-store";
+import { resolveSelectedAccount } from "../adapters/channel/weixin/account-store";
+import { loadPersistedContextTokens } from "../adapters/channel/weixin/context-token-store";
+import { parseCliArgs } from "../core/cli-args";
+import { ReminderQueueStore } from "../state/reminder-queue-store";
 
 const DELAY_UNIT_MS = {
   s: 1_000,
@@ -26,24 +26,6 @@ interface ReminderWriteOptions extends Record<string, unknown> {
   user?: unknown;
   useStdin?: boolean;
 }
-
-const { resolveSelectedAccount } = accountStoreModule as {
-  resolveSelectedAccount(config: Record<string, unknown>): { accountId: string };
-};
-
-const { loadPersistedContextTokens } = contextTokenStoreModule as {
-  loadPersistedContextTokens(config: Record<string, unknown>, accountId: string): Record<string, string>;
-};
-
-const { parseCliArgs } = cliArgsModule as {
-  parseCliArgs(args: string[], schema: unknown): ReminderWriteOptions;
-};
-
-const { ReminderQueueStore } = reminderQueueStoreModule as {
-  ReminderQueueStore: new (args: { filePath: string }) => {
-    enqueue(reminder: Record<string, unknown>): { id: string };
-  };
-};
 
 async function runReminderWriteCommand(config: any, args: any[] = []) {
   const options = parseArgs(args);

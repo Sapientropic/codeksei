@@ -1,32 +1,12 @@
 #!/usr/bin/env node
 
-import * as brandingModule from "./core/branding";
-import * as commandSurfaceModule from "./contracts/command-surface";
-import * as commandRegistryModule from "./core/command-registry";
+import { PACKAGE_NAME } from "./core/branding";
+import { findTerminalCommandManifest } from "./contracts/command-surface";
+import { buildTerminalHelpText, buildTerminalLeafHelp, buildTerminalTopicHelp, isPlannedTerminalTopic } from "./core/command-registry";
 import { createTerminalCommandContext } from "./app/terminal-command-context";
 import { runTerminalManifestCommand } from "./app/terminal-command-dispatch";
 import type { TerminalCommandManifestEntry } from "./contracts/command-surface";
 
-const { PACKAGE_NAME } = brandingModule as {
-  PACKAGE_NAME: string;
-};
-const { findTerminalCommandManifest } = commandSurfaceModule as {
-  findTerminalCommandManifest: (
-    command: string,
-    subcommand: string,
-  ) => TerminalCommandManifestEntry | null;
-};
-const {
-  buildTerminalHelpText,
-  buildTerminalLeafHelp,
-  buildTerminalTopicHelp,
-  isPlannedTerminalTopic,
-} = commandRegistryModule as {
-  buildTerminalHelpText: () => string;
-  buildTerminalLeafHelp: (actionId: unknown, context?: Record<string, unknown>) => string;
-  buildTerminalTopicHelp: (topic: string) => string;
-  isPlannedTerminalTopic: (command: string) => boolean;
-};
 
 interface ParsedCommandIntent {
   argv: string[];

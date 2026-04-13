@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { LEGACY_TIMELINE_TIMEZONE } from "../../core/timezone";
 import { writeForeignTextDocument } from "../../state/json-state";
-import * as brandingModule from "../../core/branding";
+import { PACKAGE_NAME } from "../../core/branding";
 import { parseArgs, resolveBody, type DiaryWriteOptions } from "./args";
 import { buildDiaryFileSkeleton, insertDiaryEntry } from "./document";
 import { buildDiaryWriteEntryPayloads, resolveTodoDoneTimelineText } from "./payloads";
@@ -19,9 +19,6 @@ interface DiaryWriteConfig extends Record<string, unknown> {
   timezone?: unknown;
 }
 
-const { PACKAGE_NAME } = brandingModule as {
-  PACKAGE_NAME: string;
-};
 
 export type { DiaryWriteConfig, DiaryWriteOptions };
 

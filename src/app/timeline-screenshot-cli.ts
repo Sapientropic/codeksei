@@ -1,7 +1,7 @@
 import * as crypto from "node:crypto";
 import * as path from "node:path";
 
-import * as accountStoreModule from "../adapters/channel/weixin/account-store";
+import { resolveSelectedAccount } from "../adapters/channel/weixin/account-store";
 import { SessionStore } from "../adapters/runtime/codex/session-store";
 import { getCommandArgsSchema } from "../contracts/command-args";
 import { parseCliArgs } from "../core/cli-args";
@@ -25,9 +25,6 @@ interface SelectedAccount {
   accountId: string;
 }
 
-const { resolveSelectedAccount } = accountStoreModule as {
-  resolveSelectedAccount: (config: unknown) => SelectedAccount;
-};
 
 async function runTimelineScreenshotCommand(config: RuntimeConfig, args: string[] = []) {
   const options = parseTimelineScreenshotArgs(args);

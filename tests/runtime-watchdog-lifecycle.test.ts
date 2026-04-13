@@ -48,6 +48,16 @@ function createLifecycleHarness() {
         };
       },
     } as never,
+    sessionWriter: {
+      clearPendingApprovalForThread: async () => undefined,
+      rememberApprovalPrefixForWorkspace: async () => [],
+      rememberPendingApprovalForThread: async () => undefined,
+      rememberWorkspaceBootstrapForThread: async () => undefined,
+      setActiveWorkspaceRoot: async () => undefined,
+      setCodexParamsForWorkspace: async () => undefined,
+      setThreadIdForWorkspace: async () => undefined,
+      clearThreadIdForWorkspace: async () => undefined,
+    },
     streamDelivery: {} as never,
     streamSettlementTimeoutMs: 1_000,
     threadStateStore,

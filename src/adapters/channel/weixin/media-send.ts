@@ -3,7 +3,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { getUploadUrl, sendMessage } from "./api";
 import { getUploadUrlV2, sendMessageV2 } from "./api-v2";
-import * as mediaMimeModule from "./media-mime";
+import { getMimeFromFilename } from "./media-mime";
 import type {
   SendWeixinMediaFileArgs,
   SendWeixinMediaFileResult,
@@ -11,9 +11,6 @@ import type {
   WeixinMediaApi,
 } from "./media-types";
 
-const { getMimeFromFilename } = mediaMimeModule as {
-  getMimeFromFilename: (filePath: string) => string;
-};
 
 const WEIXIN_MEDIA_TYPE = {
   IMAGE: 1,

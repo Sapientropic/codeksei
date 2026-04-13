@@ -1,36 +1,9 @@
 import type { NormalizedIncomingMessage, UnknownRecord } from "../../../core/runtime-types";
-import * as accountStoreModule from "./account-store";
-import * as contextTokenStoreModule from "./context-token-store";
+import { listWeixinAccounts, resolveSelectedAccount } from "./account-store";
+import { loadPersistedContextTokens, persistContextToken } from "./context-token-store";
 import { getUpdatesV2 } from "./api-v2";
-import * as messageUtilsV2Module from "./message-utils-v2";
-import * as syncBufferStoreModule from "./sync-buffer-store";
-
-const { listWeixinAccounts, resolveSelectedAccount } = accountStoreModule as {
-  listWeixinAccounts: (config: WeixinConfig) => WeixinAccount[];
-  resolveSelectedAccount: (config: WeixinConfig) => WeixinAccount;
-};
-const { loadPersistedContextTokens, persistContextToken } = contextTokenStoreModule as {
-  loadPersistedContextTokens: (config: WeixinConfig, accountId: string) => Record<string, string>;
-  persistContextToken: (
-    config: WeixinConfig,
-    accountId: string,
-    userId: string,
-    contextToken: string,
-  ) => Record<string, string>;
-};
-const { createInboundFilter } = messageUtilsV2Module as {
-  createInboundFilter: () => {
-    normalize: (
-      message: unknown,
-      config: WeixinConfig,
-      accountId: string,
-    ) => NormalizedIncomingMessage | null;
-  };
-};
-const { loadSyncBuffer, saveSyncBuffer } = syncBufferStoreModule as {
-  loadSyncBuffer: (config: WeixinConfig, accountId: string) => string;
-  saveSyncBuffer: (config: WeixinConfig, accountId: string, buffer: string) => void;
-};
+import { createInboundFilter } from "./message-utils-v2";
+import { loadSyncBuffer, saveSyncBuffer } from "./sync-buffer-store";
 
 const LONG_POLL_TIMEOUT_MS = 35_000;
 

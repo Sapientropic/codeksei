@@ -27,6 +27,10 @@ style/type 例外的唯一真相源仍是 [`src/release/style-type-exception-inv
 - Weixin 文本发送共语义已拆到 `delivery-text.ts` / `delivery-trace.ts`
 - shared process/store/watchdog owner 已拆到独立 helper 与显式 shared types
 - `RuntimeWatchdogLifecycle` 与 `SessionStore` 的高风险内部规则已拆到 approval/timer 与 lock/binding/approval helpers
+- `src/app/terminal-command-context.ts` 的 `leafArgs` 现在只按传入 argv 推导，程序化调用不再偷看 ambient `process.argv`
+- `SessionStore` 写链已收口到 `SessionStoreWriter` + async/yielding lock，不再用同步阻塞锁卡住 Node event loop
+- `CodekseiApp` 的 runtime event pipeline 与 start/shutdown lifecycle 已拆到独立 owner helper，`app-runtime-factory.ts` 也已拆成 infrastructure/workflow 两层
+- `src/**` 中 `import * as fooModule` + typed destructure 已清零，并由 release guard 持续保护
 - `tests/shared-mode-long-chain.test.ts` 已覆盖 built `dist` 下的 shared/open/status、approval continuity restart、以及 `stream / settled` reply mode smoke
 
 这意味着旧文档里的以下说法都已过期，不应继续当成待办：
@@ -89,6 +93,13 @@ style/type 例外的唯一真相源仍是 [`src/release/style-type-exception-inv
 - Note / Review / Timeline / State：
   - `note-sync`、`durable-note-schema`、review source/document/semantic 边界、timeline state sync、queue store 这一束已经从“兼容中间态”收成可维护的 typed boundary
 
+### 5. 2026-04-13 follow-up 四条主线已关账
+
+- Batch P：terminal command argv contract 修复
+- Batch Q：SessionStore async writer / non-blocking lock 收口
+- Batch R：`CodekseiApp` / factory 第三轮瘦身
+- Batch S：typed module-destructure 清债与防回流 guard
+
 ## 完成定义校验
 
 本轮原计划里的完成定义，当前状态如下：
@@ -101,6 +112,7 @@ style/type 例外的唯一真相源仍是 [`src/release/style-type-exception-inv
 - Weixin / Codex / Note-Review-Timeline 三条 bucket 收口完成：已完成
 - `docs/architecture.md` 与最终结构同步：已完成
 - maintainer 级真实账号 smoke 仍建议额外手跑一次，但仓库内自动化长链路 smoke 已补齐：已完成到当前目标
+- terminal programmatic argv / SessionStore writer-owner / app shell thinning / typed module-destructure guard：已完成
 
 说明：
 
@@ -138,6 +150,7 @@ style/type 例外的唯一真相源仍是 [`src/release/style-type-exception-inv
 - 已存在的 JSON state shape 没有做无迁移翻转
 - 运行时构建产物仍输出 CommonJS，没有切到运行时 ESM
 - `src/core/app.ts` 与 `src/core/app-runtime-factory.ts` 仍承担 composition root / wiring 角色
+- 上述两个入口仍是 composition root，但 runtime event pipeline、lifecycle runner、session write owner 已拆出，不应再把新的 owner 逻辑堆回顶层文件
 - `graphify` 继续只作为 bucket 信号，不作为验收门
 
 ## 后续如果再发现新债，怎么开

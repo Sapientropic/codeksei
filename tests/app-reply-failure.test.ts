@@ -18,10 +18,33 @@ test("reply delivery failure clears local turn state when weixin send stays brok
             calls.push(["findBindingForThreadId", threadId]);
             return { workspaceRoot: "E:/repo/current" };
           },
-          clearPendingApprovalForThread(threadId: string) {
-            calls.push(["clearPendingApprovalForThread", threadId]);
-          },
         };
+      },
+    },
+    sessionWriter: {
+      async clearPendingApprovalForThread(threadId: string) {
+        calls.push(["clearPendingApprovalForThread", threadId]);
+      },
+      async rememberApprovalPrefixForWorkspace() {
+        return [];
+      },
+      async rememberPendingApprovalForThread() {
+        return null;
+      },
+      async rememberWorkspaceBootstrapForThread() {
+        return null;
+      },
+      async setActiveWorkspaceRoot() {
+        return null;
+      },
+      async setCodexParamsForWorkspace() {
+        return null;
+      },
+      async setThreadIdForWorkspace() {
+        return null;
+      },
+      async clearThreadIdForWorkspace() {
+        return null;
       },
     },
     threadStateStore: {
@@ -60,6 +83,36 @@ test("reply delivery failure ignores empty thread ids", async () => {
       getSessionStore() {
         touched = true;
         return {};
+      },
+    },
+    sessionWriter: {
+      async rememberApprovalPrefixForWorkspace() {
+        touched = true;
+        return [];
+      },
+      async rememberPendingApprovalForThread() {
+        touched = true;
+        return null;
+      },
+      async rememberWorkspaceBootstrapForThread() {
+        touched = true;
+        return null;
+      },
+      async setActiveWorkspaceRoot() {
+        touched = true;
+        return null;
+      },
+      async setCodexParamsForWorkspace() {
+        touched = true;
+        return null;
+      },
+      async setThreadIdForWorkspace() {
+        touched = true;
+        return null;
+      },
+      async clearThreadIdForWorkspace() {
+        touched = true;
+        return null;
       },
     },
     threadStateStore: {

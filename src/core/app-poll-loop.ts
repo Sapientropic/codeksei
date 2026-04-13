@@ -1,9 +1,6 @@
-import * as approvalCommandPolicyModule from "./approval-command-policy";
+import { normalizeTrimmedText } from "./approval-command-policy";
 import type { ChannelAccount, ChannelAdapterLike } from "./app-service-contract";
 
-const { normalizeTrimmedText } = approvalCommandPolicyModule as {
-  normalizeTrimmedText: (value: unknown) => string;
-};
 
 interface LongPollSystemMessageDispatcher {
   hasPending(): boolean;

@@ -1,47 +1,15 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { CodekseiApp } from "../core/app";
-import * as brandingModule from "../core/branding";
-import * as envLoaderModule from "../core/env-loader";
-import * as configModule from "../core/config";
-import * as instructionsTemplateModule from "../core/instructions-template";
-import * as timelineIntegrationModule from "../integrations/timeline";
-import * as cliArgsModule from "../core/cli-args";
-import * as jsonStateModule from "../state/json-state";
-import * as pathUtilsModule from "../core/path-utils";
-import * as personReferenceModule from "../core/person-reference";
+import { ensureCodekseiHomeEnv, ensureStateDirectory } from "../core/branding";
+import { loadEnvStack } from "../core/env-loader";
+import { readConfig } from "../core/config";
+import { renderInstructionTemplate } from "../core/instructions-template";
+import { createTimelineIntegration } from "../integrations/timeline";
+import { writeForeignTextDocument } from "../state/json-state";
+import { resolvePackageRoot } from "../core/path-utils";
+import { resolveConfiguredPersonName } from "../core/person-reference";
 
-const {
-  ensureCodekseiHomeEnv,
-  ensureStateDirectory,
-} = brandingModule as {
-  ensureCodekseiHomeEnv: (args: { fallbackRoot: string }) => void;
-  ensureStateDirectory: () => void;
-};
-const { loadEnvStack } = envLoaderModule as {
-  loadEnvStack: () => void;
-};
-const { readConfig } = configModule as {
-  readConfig: () => TerminalRuntimeConfig;
-};
-const { renderInstructionTemplate } = instructionsTemplateModule as {
-  renderInstructionTemplate: (template: string, values: Record<string, unknown>) => string;
-};
-const { createTimelineIntegration } = timelineIntegrationModule as {
-  createTimelineIntegration: (config: TerminalRuntimeConfig) => TerminalTimelineIntegrationLike;
-};
-const { sliceLeafCommandArgs } = cliArgsModule as {
-  sliceLeafCommandArgs: (argv: string[], maxDepth: number) => string[];
-};
-const { writeForeignTextDocument } = jsonStateModule as {
-  writeForeignTextDocument: (filePath: string, text: string, options: { encoding: BufferEncoding }) => void;
-};
-const { resolvePackageRoot } = pathUtilsModule as {
-  resolvePackageRoot: (baseDir: string) => string;
-};
-const { resolveConfiguredPersonName } = personReferenceModule as {
-  resolveConfiguredPersonName: (config: TerminalRuntimeConfig) => string;
-};
 
 export interface TerminalRuntimeConfig extends Record<string, unknown> {
   sessionsFile: string;
@@ -72,7 +40,7 @@ export function createTerminalCommandContext(argv: string[]): TerminalCommandCon
   ensureStateDirectory();
   ensureCodekseiHomeEnv({ fallbackRoot: resolvePackageRoot(__dirname) });
 
-  const leafArgs = sliceLeafCommandArgs(process.argv, 4);
+  const leafArgs = Array.isArray(argv) ? argv.slice(2) : [];
   const baseConfig = readConfig();
   const config: TerminalRuntimeConfig = {
     ...baseConfig,

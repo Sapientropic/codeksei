@@ -1,22 +1,11 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import * as brandingModule from "../core/branding";
+import { ensureStateDirectory, readPrefixedBoolEnv, readPrefixedEnv, resolveStateDir } from "../core/branding";
 import { loadEnvStack } from "../core/env-loader";
 import { resolvePackageRoot } from "../core/path-utils";
 import { DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS } from "./shared-bridge-heartbeat";
 import type { SharedProcessContext } from "./shared-types";
 
-const {
-  ensureStateDirectory,
-  readPrefixedBoolEnv,
-  readPrefixedEnv,
-  resolveStateDir,
-} = brandingModule as {
-  ensureStateDirectory: (args?: { env?: NodeJS.ProcessEnv }) => void;
-  readPrefixedBoolEnv: (env: NodeJS.ProcessEnv, key: string, fallback?: boolean) => boolean;
-  readPrefixedEnv: (env: NodeJS.ProcessEnv, key: string) => string;
-  resolveStateDir: (args?: { env?: NodeJS.ProcessEnv }) => string;
-};
 
 interface ResolveSharedProcessContextArgs {
   cwd?: string;

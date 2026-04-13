@@ -1,13 +1,7 @@
 import * as fs from "node:fs";
-import * as instructionsTemplateModule from "../../../core/instructions-template";
-import * as workspaceBootstrapModule from "../../../workspace/workspace-bootstrap";
+import { renderInstructionTemplate } from "../../../core/instructions-template";
+import { buildWorkspaceContinuityInstructions } from "../../../workspace/workspace-bootstrap";
 
-const { renderInstructionTemplate } = instructionsTemplateModule as {
-  renderInstructionTemplate: (source: string, context: Record<string, unknown>) => string;
-};
-const { buildWorkspaceContinuityInstructions } = workspaceBootstrapModule as {
-  buildWorkspaceContinuityInstructions: (workspaceRoot: string, config: Record<string, unknown>) => string;
-};
 
 interface CodexInstructionConfig extends Record<string, unknown> {
   weixinInstructionsFile?: string;

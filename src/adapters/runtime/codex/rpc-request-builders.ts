@@ -1,8 +1,5 @@
-import * as brandingModule from "../../../core/branding";
+import { readPrefixedEnv } from "../../../core/branding";
 
-const { readPrefixedEnv } = brandingModule as {
-  readPrefixedEnv: (env: NodeJS.ProcessEnv, key: string) => string;
-};
 
 export const DEFAULT_CODEX_COMMAND = "codex";
 
