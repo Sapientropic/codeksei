@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import type { TimelineLocale } from "../../contracts";
 import type { TimelineRuntimeConfig } from "../../../runtime-config";
 import { TimelineStore } from "../../infra/timeline/timeline-store";
 
@@ -8,6 +9,7 @@ interface TimelineDashboardBuildOptions {
   siteDir: string;
   entryFile: string;
   cssFile: string;
+  locale: TimelineLocale;
 }
 
 interface TimelineDashboardBuildInput extends TimelineDashboardBuildOptions {
@@ -33,6 +35,7 @@ function getTimelineDashboardBuildOptions(config: TimelineRuntimeConfig): Timeli
     siteDir: config.timelineSiteDir,
     entryFile: path.join(__dirname, "..", "..", "timeline", "dashboard-app.js"),
     cssFile: path.join(__dirname, "..", "..", "timeline", "css", "dashboard.css"),
+    locale: config.timelineLocale,
   };
 }
 

@@ -163,6 +163,7 @@ CODEKSEI_WEIXIN_REPLY_MODE=stream
 CODEKSEI_WEIXIN_ROUTE_TAG=
 CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION=2.1.1
 CODEKSEI_TIMEZONE=Asia/Shanghai
+CODEKSEI_TIMELINE_LOCALE=zh-CN
 CODEKSEI_DIARY_DIR=/绝对路径/你的 vault/日记
 CODEKSEI_TIMELINE_STATE_DIR=/绝对路径/你的 vault/.codex/timeline
 CODEKSEI_WORKSPACE_BOOTSTRAP_CONFIG=/绝对路径/你的 workspace-bootstrap.json
@@ -186,6 +187,7 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - 微信 persona / continuity instructions 默认来自仓库里的 `templates/weixin-instructions.md`，如需本地覆盖可在状态目录放 `weixin-instructions.local.md`
 - 如果你在共享模式下使用多 workspace，建议启动前就设置好 `CODEKSEI_WORKSPACE_ROOT`
 - `CODEKSEI_TIMEZONE` 可选；若显式设置，它会统一驱动 reminder / diary / review / timeline 的本地时间解释
+- `CODEKSEI_TIMELINE_LOCALE` 可选；当前用于 timeline dashboard 的文案、日期格式和 demo data 语言切换，支持 `zh-CN` 与 `en`
 - 如果不设 `CODEKSEI_TIMEZONE`，Codeksei 会优先沿用 timeline state 里已声明的非 legacy timezone；否则回退到系统时区
 - 旧的 `Asia/Shanghai` legacy timeline state 在需要时会在下一次 timeline 命令时自动迁移到当前统一 timezone
 - `CODEKSEI_TIMELINE_STATE_DIR` 默认指向 Codeksei timeline 数据根；当前主布局会在它下面使用 `timeline/*.json`

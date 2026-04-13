@@ -13,6 +13,7 @@ const EMPTY_DASHBOARD_DATA: TimelineDashboardData = {
     taxonomyUpdatedAt: "",
     factsUpdatedAt: "",
     isDemoData: false,
+    locale: "zh-CN",
     timezone: "Asia/Shanghai",
     availableDates: [],
     latestDate: "",

@@ -1,9 +1,12 @@
 import * as path from "node:path";
 import { readPrefixedEnv, readPrefixedIntEnv, resolveStateDir } from "../core/branding";
 import { resolveTimelineStateFiles } from "../core/timezone";
+import type { TimelineLocale } from "./runtime/contracts";
+import { resolveTimelineLocale } from "./runtime/infra/i18n/timeline-locale";
 
 interface TimelineRuntimeBaseConfig extends Record<string, unknown> {
   stateDir?: unknown;
+  timelineLocale?: unknown;
   timelineStateDir?: unknown;
 }
 
@@ -13,6 +16,7 @@ interface TimelineRuntimeConfig {
   timelineDbFile: string;
   timelineDir: string;
   timelineFactsFile: string;
+  timelineLocale: TimelineLocale;
   timelinePort: number;
   timelineSiteDir: string;
   timelineStateFile: string;
@@ -36,6 +40,7 @@ function resolveTimelineRuntimeConfig(
     timelineDbFile: path.join(timelineFiles.dir, "timeline-db.json"),
     timelineDir: timelineFiles.dir,
     timelineFactsFile: timelineFiles.factsFile,
+    timelineLocale: resolveConfiguredTimelineLocale(baseConfig.timelineLocale),
     timelinePort: resolveTimelinePort(),
     timelineSiteDir: path.join(timelineFiles.dir, "site"),
     timelineStateFile: timelineFiles.stateFile,
@@ -56,6 +61,18 @@ function resolveTimelinePort(): number {
   }
   const legacyPort = Number.parseInt(String(process.env.TIMELINE_FOR_AGENT_PORT || "").trim(), 10);
   return Number.isFinite(legacyPort) && legacyPort > 0 ? legacyPort : 4317;
+}
+
+function resolveConfiguredTimelineLocale(rawValue: unknown): TimelineLocale {
+  return resolveTimelineLocale(
+    normalizeText(rawValue)
+      || readPrefixedEnv(process.env, "TIMELINE_LOCALE")
+      || process.env.TIMELINE_FOR_AGENT_LOCALE
+  );
+}
+
+function normalizeText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 function normalizePath(value: unknown): string {

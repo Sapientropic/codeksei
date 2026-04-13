@@ -31,6 +31,35 @@ test("first-party timeline runtime can build a static site from the published di
   assert.equal(fs.existsSync(path.join(repoRoot, "dist", "src", "timeline", "runtime", "timeline", "css", "dashboard.css")), true);
 });
 
+test("first-party timeline runtime honors CODEKSEI_TIMELINE_LOCALE when building demo dashboard output", () => {
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-timeline-build-en-"));
+  const result = runTimelineCommand(["build"], {
+    CODEKSEI_STATE_DIR: stateDir,
+    CODEKSEI_TIMELINE_LOCALE: "en",
+    CODEKSEI_TIMELINE_STATE_DIR: stateDir,
+  });
+
+  assert.equal(result.status, 0, result.stderr || "expected english timeline build to succeed");
+  const html = fs.readFileSync(path.join(stateDir, "timeline", "site", "index.html"), "utf8");
+  const payload = JSON.parse(fs.readFileSync(path.join(stateDir, "timeline", "site", "dashboard-data.json"), "utf8"));
+  assert.match(html, /<html lang="en">/u);
+  assert.equal(payload.meta.locale, "en");
+  assert.equal(payload.taxonomy.categories[0].label, "Life");
+});
+
+test("first-party timeline runtime still accepts legacy TIMELINE_FOR_AGENT_LOCALE for compatibility", () => {
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-timeline-build-legacy-locale-"));
+  const result = runTimelineCommand(["build"], {
+    CODEKSEI_STATE_DIR: stateDir,
+    CODEKSEI_TIMELINE_STATE_DIR: stateDir,
+    TIMELINE_FOR_AGENT_LOCALE: "en",
+  });
+
+  assert.equal(result.status, 0, result.stderr || "expected legacy-locale timeline build to succeed");
+  const payload = JSON.parse(fs.readFileSync(path.join(stateDir, "timeline", "site", "dashboard-data.json"), "utf8"));
+  assert.equal(payload.meta.locale, "en");
+});
+
 test("first-party timeline runtime covers categories, write, read, proposals, and screenshot help", () => {
   const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-timeline-roundtrip-"));
   const env = {

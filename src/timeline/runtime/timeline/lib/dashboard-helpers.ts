@@ -1,8 +1,14 @@
 import type {
   TimelineDashboardData,
+  TimelineLocale,
   TimelineRangeKey,
   TimelineView,
 } from "../../contracts";
+import {
+  getTimelineText,
+  resolveTimelineIntlLocale,
+  resolveTimelineLocale,
+} from "../../infra/i18n/timeline-locale";
 
 interface TimelineViewItemLike {
   id: string;
@@ -37,7 +43,7 @@ function buildMonthTimeline(data: TimelineDashboardData, monthKey: string): Time
     end: `${anchorDate}T23:59:59.999+08:00`,
     groups: dates.map((date) => ({
       id: date,
-      content: formatMonthGroupLabel(date),
+      content: formatMonthGroupLabel(date, data?.meta?.locale || "zh-CN"),
     })),
     items: dates.flatMap((date) => {
       const dayTimeline = data?.timelines?.day?.[date];
@@ -71,8 +77,8 @@ function anchorItemRangeToReferenceDay(startAt: string, endAt: string, anchorDat
   return { start: anchoredStart, end: anchoredEnd };
 }
 
-function formatMonthGroupLabel(date: string): string {
-  const weekday = new Intl.DateTimeFormat("zh-CN", {
+function formatMonthGroupLabel(date: string, locale: TimelineLocale | string = "zh-CN"): string {
+  const weekday = new Intl.DateTimeFormat(resolveTimelineIntlLocale(locale), {
     timeZone: "Asia/Shanghai",
     weekday: "short",
   }).format(Date.parse(`${date}T00:00:00+08:00`));
@@ -98,16 +104,17 @@ function offsetShanghaiDate(date: string, dayDelta: number): string {
   }).format(timestamp + dayDelta * 24 * 60 * 60 * 1000);
 }
 
-function formatDateTime(value: string): string {
+function formatDateTime(value: string, locale: TimelineLocale | string = "zh-CN"): string {
   if (!value) {
-    return "暂无";
+    return getTimelineText(locale, "dateTimeNA");
   }
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) {
     return value;
   }
-  return new Intl.DateTimeFormat("zh-CN", {
+  return new Intl.DateTimeFormat(resolveTimelineIntlLocale(locale), {
     timeZone: "Asia/Shanghai",
+    year: "numeric",
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
@@ -116,7 +123,11 @@ function formatDateTime(value: string): string {
   }).format(parsed);
 }
 
-function formatRangeSelection(range: TimelineRangeKey, value: string): string {
+function formatRangeSelection(
+  range: TimelineRangeKey,
+  value: string,
+  locale: TimelineLocale | string = "zh-CN",
+): string {
   if (!value) {
     return "";
   }
@@ -124,22 +135,35 @@ function formatRangeSelection(range: TimelineRangeKey, value: string): string {
     return value;
   }
   if (range === "week") {
-    return `周 ${value}`;
+    return resolveTimelineLocale(locale) === "zh-CN"
+      ? `${value} ${getTimelineText(locale, "weekOf")}`
+      : `${getTimelineText(locale, "weekOf")} ${value}`;
   }
-  return `${value} 月`;
+  return value;
 }
 
-function formatMinutes(value: number): string {
+function formatMinutes(value: number, locale: TimelineLocale | string = "zh-CN"): string {
   const minutes = Number(value || 0);
   if (!Number.isFinite(minutes)) {
-    return "0 分钟";
+    return resolveTimelineLocale(locale) === "zh-CN"
+      ? `0${getTimelineText(locale, "minuteUnit")}`
+      : "0 min";
   }
   if (minutes < 60) {
-    return `${minutes} 分钟`;
+    return resolveTimelineLocale(locale) === "zh-CN"
+      ? `${minutes}${getTimelineText(locale, "minuteUnit")}`
+      : `${minutes} ${getTimelineText(locale, "minuteUnit")}`;
   }
   const hours = Math.floor(minutes / 60);
   const remaining = minutes % 60;
-  return remaining ? `${hours} 小时 ${remaining} 分钟` : `${hours} 小时`;
+  if (resolveTimelineLocale(locale) === "zh-CN") {
+    return remaining
+      ? `${hours}${getTimelineText(locale, "hourUnit")}${remaining}${getTimelineText(locale, "minuteUnit")}`
+      : `${hours}${getTimelineText(locale, "hourUnit")}`;
+  }
+  return remaining
+    ? `${hours} ${getTimelineText(locale, "hourUnit")} ${remaining} ${getTimelineText(locale, "minuteUnit")}`
+    : `${hours} ${getTimelineText(locale, "hourUnit")}`;
 }
 
 function formatMinutesTick(value: number): string {

@@ -93,6 +93,7 @@ README、帮助文本和公开示例默认都按 `codeksei` 书写。
 - Windows / macOS / Linux 可跑 timeline CLI
 - 要求 `Node.js >= 22`
 - Chromium / Chrome / Edge 只在 `timeline screenshot` 时需要
+- `CODEKSEI_TIMELINE_LOCALE=zh-CN|en` 可切换 timeline dashboard 文案、日期格式和 demo data 语言
 
 建议：
 

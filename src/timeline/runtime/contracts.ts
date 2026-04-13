@@ -1,6 +1,7 @@
 export type TimelineStatus = "draft" | "final";
 export type TimelineNodeStatus = "official" | "provisional";
 export type TimelineRangeKey = "day" | "week" | "month";
+export type TimelineLocale = "zh-CN" | "en";
 
 export interface TimelineSubcategory {
   id: string;
@@ -246,6 +247,7 @@ export interface TimelineDashboardMeta {
   factsUpdatedAt: string;
   isDemoData: boolean;
   timezone: string;
+  locale: TimelineLocale;
   availableDates: string[];
   latestDate: string;
 }
@@ -269,6 +271,7 @@ export interface TimelineDashboardMetaOverrides {
   taxonomyUpdatedAt?: string;
   factsUpdatedAt?: string;
   isDemoData?: boolean;
+  locale?: TimelineLocale;
 }
 
 export interface TimelineScreenshotOptions {

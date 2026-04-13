@@ -1,6 +1,7 @@
 import type {
   TimelineCategoryDetail,
   TimelineDashboardData,
+  TimelineLocale,
   TimelineDashboardMetaOverrides,
   TimelineDay,
   TimelineEvent,
@@ -14,6 +15,11 @@ import type {
   TimelineViewItem,
   TimelineState,
 } from "../../contracts";
+import {
+  getTimelineText,
+  localizeTimelineTaxonomy,
+  resolveTimelineLocale,
+} from "../i18n/timeline-locale";
 
 type TimelineCategoryLookup = {
   categoryId: string;
@@ -38,6 +44,7 @@ type TimelineRangeAggregateInput = {
   eventNodeMap: Map<string, TimelineEventNode>;
   allDates: string[];
   timelineDates?: string[];
+  locale: TimelineLocale;
 };
 
 const CATEGORY_THEME_COLORS: Record<string, string> = {
@@ -56,25 +63,28 @@ const CATEGORY_THEME_COLORS: Record<string, string> = {
 function buildTimelineViews(
   state: TimelineState,
   metaOverrides: TimelineDashboardMetaOverrides = {},
+  options: { locale?: TimelineLocale | string } = {},
 ): TimelineDashboardData {
+  const locale = resolveTimelineLocale(options.locale || metaOverrides.locale);
   const dates = Object.keys(state.facts || {}).sort();
-  const categoryMap = buildCategoryMap(state.taxonomy);
-  const eventNodeMap = buildEventNodeMap(state.taxonomy);
+  const localizedTaxonomy = localizeTimelineTaxonomy(state.taxonomy, locale);
+  const categoryMap = buildCategoryMap(localizedTaxonomy);
+  const eventNodeMap = buildEventNodeMap(localizedTaxonomy);
   const dayTimelines: Record<string, TimelineView> = {};
   for (const date of dates) {
-    dayTimelines[date] = buildDayTimeline(date, state.facts[date], categoryMap);
+    dayTimelines[date] = buildDayTimeline(date, state.facts[date], categoryMap, locale);
   }
 
-  const weekRanges = buildWeekRanges(dates);
+  const weekRanges = buildWeekRanges(dates, locale);
   const weekTimelines: Record<string, TimelineView> = {};
   for (const weekRange of weekRanges) {
-    weekTimelines[weekRange.key] = buildWeekTimeline(weekRange, state.facts, categoryMap);
+    weekTimelines[weekRange.key] = buildWeekTimeline(weekRange, state.facts, categoryMap, locale);
   }
 
   const rangeData = {
-    day: buildDayRangeData(dates, state, categoryMap, eventNodeMap),
-    week: buildWeekRangeData(weekRanges, state, categoryMap, eventNodeMap),
-    month: buildMonthRangeData(dates, state, categoryMap, eventNodeMap),
+    day: buildDayRangeData(dates, state, categoryMap, eventNodeMap, locale),
+    week: buildWeekRangeData(weekRanges, state, categoryMap, eventNodeMap, locale),
+    month: buildMonthRangeData(dates, state, categoryMap, eventNodeMap, locale),
   };
 
   return {
@@ -85,12 +95,13 @@ function buildTimelineViews(
       factsUpdatedAt: metaOverrides.factsUpdatedAt || "",
       isDemoData: Boolean(metaOverrides.isDemoData),
       timezone: state.timezone || "Asia/Shanghai",
+      locale,
       availableDates: dates,
       latestDate: dates[dates.length - 1] || "",
     },
     taxonomy: {
-      categories: state.taxonomy.categories,
-      eventNodes: state.taxonomy.eventNodes,
+      categories: localizedTaxonomy.categories,
+      eventNodes: localizedTaxonomy.eventNodes,
     },
     timelines: {
       day: dayTimelines,
@@ -104,6 +115,7 @@ function buildDayTimeline(
   date: string,
   day: TimelineDay | null | undefined,
   categoryMap: Map<string, TimelineCategoryLookup>,
+  locale: TimelineLocale,
 ): TimelineView {
   const events = Array.isArray(day?.events) ? day.events : [];
   return {
@@ -121,7 +133,7 @@ function buildDayTimeline(
         title: event.title,
         note: event.note || "",
         color: categoryMap.get(event.subcategoryId)?.color || categoryMap.get(event.categoryId)?.color || "var(--cat-life)",
-        durationText: formatMinutes(durationMinutes(event.startAt, event.endAt)),
+        durationText: formatMinutes(durationMinutes(event.startAt, event.endAt), locale),
         timeText: `${formatShanghaiClockTime(event.startAt)} - ${formatShanghaiClockTime(event.endAt)}`,
       },
       className: `cat-${event.categoryId}`,
@@ -133,10 +145,11 @@ function buildWeekTimeline(
   weekRange: TimelineWeekRange,
   facts: Record<string, TimelineDay>,
   categoryMap: Map<string, TimelineCategoryLookup>,
+  locale: TimelineLocale,
 ): TimelineView {
   const groups = weekRange.dates.map((date) => ({
     id: date,
-    content: formatWeekday(date),
+    content: formatWeekday(date, locale),
   }));
   const items: TimelineViewItem[] = [];
   const anchorDate = "2000-01-01";
@@ -155,7 +168,7 @@ function buildWeekTimeline(
           title: event.title,
           note: event.note || "",
           color: categoryMap.get(event.subcategoryId)?.color || categoryMap.get(event.categoryId)?.color || "var(--cat-life)",
-          durationText: formatMinutes(durationMinutes(event.startAt, event.endAt)),
+          durationText: formatMinutes(durationMinutes(event.startAt, event.endAt), locale),
           timeText: `${formatShanghaiClockTime(event.startAt)} - ${formatShanghaiClockTime(event.endAt)}`,
           dateText: date,
         },
@@ -183,10 +196,11 @@ function buildDayRangeData(
   state: TimelineState,
   categoryMap: Map<string, TimelineCategoryLookup>,
   eventNodeMap: Map<string, TimelineEventNode>,
+  locale: TimelineLocale,
 ): Record<string, TimelineRangeAggregate> {
   const output: Record<string, TimelineRangeAggregate> = {};
   for (const date of dates) {
-    output[date] = buildDayAggregate(date, state.facts[date]?.events || [], categoryMap, eventNodeMap);
+    output[date] = buildDayAggregate(date, state.facts[date]?.events || [], categoryMap, eventNodeMap, locale);
   }
   return output;
 }
@@ -196,6 +210,7 @@ function buildWeekRangeData(
   state: TimelineState,
   categoryMap: Map<string, TimelineCategoryLookup>,
   eventNodeMap: Map<string, TimelineEventNode>,
+  locale: TimelineLocale,
 ): Record<string, TimelineRangeAggregate> {
   const output: Record<string, TimelineRangeAggregate> = {};
   for (const weekRange of weekRanges) {
@@ -211,6 +226,7 @@ function buildWeekRangeData(
       categoryMap,
       eventNodeMap,
       allDates: weekRange.dates,
+      locale,
     });
   }
   return output;
@@ -221,6 +237,7 @@ function buildMonthRangeData(
   state: TimelineState,
   categoryMap: Map<string, TimelineCategoryLookup>,
   eventNodeMap: Map<string, TimelineEventNode>,
+  locale: TimelineLocale,
 ): Record<string, TimelineRangeAggregate> {
   const grouped = new Map<string, string[]>();
   for (const date of dates) {
@@ -244,6 +261,7 @@ function buildMonthRangeData(
       categoryMap,
       eventNodeMap,
       allDates: monthDates,
+      locale,
     });
   }
   return output;
@@ -257,6 +275,7 @@ function buildRangeAggregate({
   categoryMap,
   eventNodeMap: _eventNodeMap,
   allDates,
+  locale,
 }: TimelineRangeAggregateInput): TimelineRangeAggregate {
   const totalMinutes = events.reduce((sum, event) => sum + durationMinutes(event.startAt, event.endAt), 0);
   const categoryBuckets = new Map<string, { categoryId: string; label: string; color: string; minutes: number }>();
@@ -319,6 +338,7 @@ function buildRangeAggregate({
     const relatedEvents = buildEventBlocks(
       events.filter((event) => event.categoryId === category.categoryId),
       allDates.length > 1,
+      categoryMap,
     );
     const trend = allDates.map((date) => {
       let minutes = 0;
@@ -354,6 +374,7 @@ function buildRangeAggregate({
       events: buildEventBlocks(
         events.filter((event) => event.subcategoryId === subcategoryBucket.subcategoryId),
         allDates.length > 1,
+        categoryMap,
       ),
     };
   }
@@ -374,6 +395,7 @@ function buildDayAggregate(
   events: TimelineEvent[],
   categoryMap: Map<string, TimelineCategoryLookup>,
   eventNodeMap: Map<string, TimelineEventNode>,
+  locale: TimelineLocale,
 ): TimelineRangeAggregate {
   const base = buildRangeAggregate({
     key: date,
@@ -383,6 +405,7 @@ function buildDayAggregate(
     categoryMap,
     eventNodeMap,
     allDates: [date],
+    locale,
   });
 
   const categoryDetails: Record<string, TimelineCategoryDetail> = {};
@@ -437,7 +460,7 @@ function buildEventNodeMap(taxonomy: TimelineTaxonomy): Map<string, TimelineEven
   return map;
 }
 
-function buildWeekRanges(dates: string[]): TimelineWeekRange[] {
+function buildWeekRanges(dates: string[], locale: TimelineLocale): TimelineWeekRange[] {
   const grouped = new Map<string, string[]>();
   for (const date of dates) {
     const startDate = getWeekStart(date);
@@ -450,7 +473,9 @@ function buildWeekRanges(dates: string[]): TimelineWeekRange[] {
     .sort((left, right) => left[0].localeCompare(right[0]))
     .map(([startDate, groupedDates]) => ({
       key: startDate,
-      label: `${startDate} 当周`,
+      label: locale === "zh-CN"
+        ? `${startDate} ${getTimelineText(locale, "weekOf")}`
+        : `${getTimelineText(locale, "weekOf")} ${startDate}`,
       start: `${startDate}T00:00:00.000+08:00`,
       end: `${offsetDate(startDate, 7)}T00:00:00.000+08:00`,
       dates: fillWeekDates(startDate, groupedDates),
@@ -500,8 +525,8 @@ function formatShanghaiDate(timestampMs: number): string {
   }).format(timestampMs);
 }
 
-function formatWeekday(date: string): string {
-  return new Intl.DateTimeFormat("zh-CN", {
+function formatWeekday(date: string, locale: TimelineLocale): string {
+  return new Intl.DateTimeFormat(locale === "zh-CN" ? "zh-CN" : "en-US", {
     timeZone: "Asia/Shanghai",
     weekday: "short",
   }).format(Date.parse(`${date}T00:00:00+08:00`));
@@ -529,13 +554,22 @@ function anchorEventToReferenceDay(startAt: string, endAt: string, anchorDate: s
   };
 }
 
-function formatMinutes(minutes: number): string {
+function formatMinutes(minutes: number, locale: TimelineLocale): string {
   if (minutes < 60) {
-    return `${minutes} 分钟`;
+    return locale === "zh-CN"
+      ? `${minutes}${getTimelineText(locale, "minuteUnit")}`
+      : `${minutes} ${getTimelineText(locale, "minuteUnit")}`;
   }
   const hours = Math.floor(minutes / 60);
   const remaining = minutes % 60;
-  return remaining ? `${hours} 小时 ${remaining} 分钟` : `${hours} 小时`;
+  if (locale === "zh-CN") {
+    return remaining
+      ? `${hours}${getTimelineText(locale, "hourUnit")}${remaining}${getTimelineText(locale, "minuteUnit")}`
+      : `${hours}${getTimelineText(locale, "hourUnit")}`;
+  }
+  return remaining
+    ? `${hours} ${getTimelineText(locale, "hourUnit")} ${remaining} ${getTimelineText(locale, "minuteUnit")}`
+    : `${hours} ${getTimelineText(locale, "hourUnit")}`;
 }
 
 function formatCompactDuration(minutes: number): string {
@@ -586,7 +620,11 @@ function buildHourlyDistribution(events: TimelineEvent[]): TimelineTrendPoint[] 
   return buckets;
 }
 
-function buildEventBlocks(events: TimelineEvent[], includeDate: boolean): TimelineEventBlock[] {
+function buildEventBlocks(
+  events: TimelineEvent[],
+  includeDate: boolean,
+  categoryMap: Map<string, TimelineCategoryLookup>,
+): TimelineEventBlock[] {
   return [...events]
     .sort((left, right) => Date.parse(left.startAt) - Date.parse(right.startAt))
     .map((event) => ({
@@ -602,7 +640,7 @@ function buildEventBlocks(events: TimelineEvent[], includeDate: boolean): Timeli
       status: event.eventNodeId ? "official" : "derived",
       categoryId: event.categoryId,
       subcategoryId: event.subcategoryId,
-      subcategoryLabel: event.subcategoryId,
+      subcategoryLabel: categoryMap.get(event.subcategoryId)?.label || event.subcategoryId,
       minutes: durationMinutes(event.startAt, event.endAt),
     }));
 }

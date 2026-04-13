@@ -337,6 +337,7 @@ function buildTimelineLeafHelpDocument(
       body: [
         "  把当前 timeline 数据构建成静态 dashboard 产物，适合写入数据后刷新页面或在发布前先验一次构建链路。",
         "  这条命令本身不要求 Chromium/Chrome/Edge；浏览器可执行文件只在 screenshot 链路里才需要。",
+        "  `CODEKSEI_TIMELINE_LOCALE=en|zh-CN` 可切换 dashboard 文案、日期格式和 demo data 语言。",
         "  运行前提仍是 Node.js >= 22，以及当前 timeline 状态目录可写。",
       ],
       examples: [
@@ -348,6 +349,7 @@ function buildTimelineLeafHelpDocument(
       body: [
         "  启动已经构建好的 timeline 静态页面服务，适合稳定查看，不做源码或数据监听。",
         "  `--port` 可显式指定本地端口；没传时默认沿用当前 timeline runtime 端口。",
+        "  `CODEKSEI_TIMELINE_LOCALE=en|zh-CN` 可切换 dashboard 文案、日期格式和 demo data 语言。",
         "  这条命令不要求 Chromium/Chrome/Edge，可在 Windows / macOS / Linux 上直接起本地 URL 给浏览器打开。",
       ],
       examples: [
@@ -360,6 +362,7 @@ function buildTimelineLeafHelpDocument(
       body: [
         "  启动带自动重建和热刷新能力的 timeline 开发服务，适合调 dashboard、改数据后立刻看效果。",
         "  `--port` 可显式指定本地端口；native watch 命中配额或平台不支持递归 watch 时，会自动退到 polling。",
+        "  `CODEKSEI_TIMELINE_LOCALE=en|zh-CN` 可切换 dashboard 文案、日期格式和 demo data 语言。",
         "  运行前提仍是 Node.js >= 22；浏览器可执行文件只在 screenshot 命令里才需要。",
       ],
       examples: [

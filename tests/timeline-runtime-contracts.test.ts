@@ -94,15 +94,40 @@ test("buildTimelineViews aggregates canonical timeline state into dashboard rang
       },
     },
     proposals: [],
-  });
+  }, { locale: "zh-CN" });
 
   assert.equal(views.meta.latestDate, "2026-04-05");
+  assert.equal(views.meta.locale, "zh-CN");
   assert.equal(views.timelines.day["2026-04-05"].items.length, 1);
   assert.equal(views.ranges.day["2026-04-05"].categories[0].categoryId, "work");
   assert.equal(
     views.ranges.day["2026-04-05"].categoryDetails.work.events[0].label,
     "Deep Work",
   );
+});
+
+test("buildTimelineViews localizes taxonomy and meta when locale is english", () => {
+  const views = buildTimelineViews({
+    version: 1,
+    timezone: "Asia/Shanghai",
+    taxonomy: {
+      categories: [
+        {
+          id: "life",
+          label: "生活",
+          color: "var(--cat-life)",
+          children: [{ id: "life.meal", label: "吃饭" }],
+        },
+      ],
+      eventNodes: [],
+    },
+    facts: {},
+    proposals: [],
+  }, { locale: "en" });
+
+  assert.equal(views.meta.locale, "en");
+  assert.equal(views.taxonomy.categories[0].label, "Life");
+  assert.equal(views.taxonomy.categories[0].children[0].label, "Meals");
 });
 
 test("resolveTimelineScreenshotOptions normalizes selector aliases and range routing", () => {
@@ -114,6 +139,7 @@ test("resolveTimelineScreenshotOptions normalizes selector aliases and range rou
       timelineDbFile: path.join(tempRoot, "timeline-db.json"),
       timelineDir: path.join(tempRoot, "timeline"),
       timelineFactsFile: path.join(tempRoot, "timeline-facts.json"),
+      timelineLocale: "zh-CN",
       timelinePort: 4317,
       timelineSiteDir: path.join(tempRoot, "site"),
       timelineStateFile: path.join(tempRoot, "timeline-state.json"),

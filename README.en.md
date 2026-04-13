@@ -156,6 +156,7 @@ CODEKSEI_WEIXIN_REPLY_MODE=stream
 CODEKSEI_WEIXIN_ROUTE_TAG=
 CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION=2.1.1
 CODEKSEI_TIMEZONE=Asia/Shanghai
+CODEKSEI_TIMELINE_LOCALE=zh-CN
 CODEKSEI_DIARY_DIR=/absolute/path/to/your/vault/diary
 CODEKSEI_TIMELINE_STATE_DIR=/absolute/path/to/your/vault/.codex/timeline
 CODEKSEI_WORKSPACE_BOOTSTRAP_CONFIG=/absolute/path/to/workspace-bootstrap.json
@@ -178,6 +179,7 @@ Notes:
 - WeChat persona / continuity instructions now default to the repo template at `templates/weixin-instructions.md`; use `weixin-instructions.local.md` in the state directory only when you need a local overlay
 - If you use multiple workspaces in shared mode, set `CODEKSEI_WORKSPACE_ROOT` before starting
 - `CODEKSEI_TIMEZONE` is optional; when set, it becomes the single local-time contract for reminder / diary / review / timeline flows
+- `CODEKSEI_TIMELINE_LOCALE` is optional; it currently switches timeline dashboard copy, date formatting, and demo data between `zh-CN` and `en`
 - If `CODEKSEI_TIMEZONE` is unset, Codeksei first reuses any non-legacy timezone already declared by the timeline state; otherwise it falls back to the system timezone
 - Legacy `Asia/Shanghai` timeline state can be auto-migrated to the unified timezone the next time you run a timeline command
 - `CODEKSEI_TIMELINE_STATE_DIR` points at the Codeksei timeline data root; the current primary layout stores runtime files under `timeline/*.json`

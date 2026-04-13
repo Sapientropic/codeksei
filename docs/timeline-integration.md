@@ -18,6 +18,12 @@
 - `timeline screenshot`：需要本机存在可用的 Chromium / Chrome / Edge，或可被 `playwright-core` 发现的浏览器
 - `timeline dev`：优先走 native `fs.watch`；如果命中 watcher 配额，或平台不支持递归 watch，会自动退到 polling，而不是直接失去热更新
 
+## Locale
+
+- `CODEKSEI_TIMELINE_LOCALE=zh-CN|en`
+- 当前只作用于 timeline dashboard：文案、日期格式、HTML `lang` 与 demo data 语言
+- 不会改变 timeline 写入 JSON 的 schema，也不会改动真实用户已经写入的事件内容
+
 ## CLI-First Path
 
 默认顺序：
