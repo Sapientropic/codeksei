@@ -1,9 +1,10 @@
 import type { RuntimeEvent } from "../../../contracts/runtime-events";
 import type { RuntimeTurnSendState, UnknownRecord } from "../../../core/runtime-types";
-import * as workspaceAliasModule from "../../../workspace/workspace-alias";
-import * as eventsModule from "./events";
+import { resolveCodexWorkspaceRoot } from "../../../workspace/workspace-alias";
+import { mapCodexMessageToRuntimeEvent } from "./events";
 import { extractThreadId, type RuntimeMessage } from "./message-utils";
 import { SessionStore } from "./session-store";
+import { SessionStoreWriter } from "./session-store-writer";
 import {
   buildInstructionRefreshText,
   buildOpeningTurnText,
@@ -20,12 +21,6 @@ import {
 } from "./diagnostics";
 import { createRuntimeLifecycle } from "./lifecycle";
 
-const { resolveCodexWorkspaceRoot } = workspaceAliasModule as {
-  resolveCodexWorkspaceRoot: (workspaceRoot: string) => string;
-};
-const { mapCodexMessageToRuntimeEvent } = eventsModule as {
-  mapCodexMessageToRuntimeEvent: (message: UnknownRecord) => RuntimeEvent<UnknownRecord> | null;
-};
 
 interface CodexRuntimeConfig extends Record<string, unknown> {
   sessionsFile: string;
@@ -84,6 +79,7 @@ interface CodexRuntimeAdapter {
   createClient(): RuntimeClientLike;
   onEvent(listener: (event: RuntimeEvent<UnknownRecord>, message: UnknownRecord) => void): () => void;
   getSessionStore(): SessionStore;
+  getSessionWriter(): SessionStoreWriter;
   initialize(): Promise<ReadyState>;
   close(): Promise<void>;
   respondApproval(args: RespondApprovalArgs): Promise<{ requestId: string | number; decision: "accept" | "decline" }>;
@@ -95,7 +91,8 @@ interface CodexRuntimeAdapter {
 
 export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRuntimeAdapter {
   const sessionStore = new SessionStore({ filePath: config.sessionsFile });
-  const runtimeLifecycle = createRuntimeLifecycle({ config, sessionStore });
+  const sessionWriter = new SessionStoreWriter(sessionStore);
+  const runtimeLifecycle = createRuntimeLifecycle({ config, sessionWriter });
 
   return {
     describe: runtimeLifecycle.describe,
@@ -116,6 +113,9 @@ export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRunt
     },
     getSessionStore() {
       return sessionStore;
+    },
+    getSessionWriter() {
+      return sessionWriter;
     },
     async initialize() {
       return runtimeLifecycle.ensureInitialized();
@@ -174,7 +174,7 @@ export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRunt
         });
         const result = await completion;
         if (bindingKey) {
-          sessionStore.rememberWorkspaceBootstrapForThread(bindingKey, workspaceRoot, threadId);
+          await sessionWriter.rememberWorkspaceBootstrapForThread(bindingKey, workspaceRoot, threadId);
         }
         return { threadId, ...result };
       });
@@ -208,11 +208,11 @@ export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRunt
           if (!threadId) {
             throw new Error("thread/start did not return a thread id");
           }
-          sessionStore.setThreadIdForWorkspace(bindingKey, workspaceRoot, threadId, metadata);
+          await sessionWriter.setThreadIdForWorkspace(bindingKey, workspaceRoot, threadId, metadata);
           startedNewThread = true;
         } else {
           await runtimeClient.resumeThread({ threadId }).catch(async () => {
-            sessionStore.clearThreadIdForWorkspace(bindingKey, workspaceRoot);
+            await sessionWriter.clearThreadIdForWorkspace(bindingKey, workspaceRoot);
             const recreated = await startThreadWithWorkspaceDiagnostics({
               runtimeClient,
               cwd: runtimeWorkspaceRoot,
@@ -225,7 +225,7 @@ export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRunt
             if (!threadId) {
               throw new Error("thread/start did not return a thread id");
             }
-            sessionStore.setThreadIdForWorkspace(bindingKey, workspaceRoot, threadId, metadata);
+            await sessionWriter.setThreadIdForWorkspace(bindingKey, workspaceRoot, threadId, metadata);
             startedNewThread = true;
           });
         }

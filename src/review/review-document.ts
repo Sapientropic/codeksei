@@ -5,12 +5,9 @@ import {
   formatDateInTimezone,
   formatDateTimeInTimezone,
 } from "../core/timezone";
-import * as brandingModule from "../core/branding";
+import { PRIMARY_REVIEW_MARKER_PREFIX } from "../core/branding";
 import type { ReviewDraft, ReviewKind, ReviewProfile } from "./review-types";
 
-const { PRIMARY_REVIEW_MARKER_PREFIX } = brandingModule as {
-  PRIMARY_REVIEW_MARKER_PREFIX: string;
-};
 
 const REVIEW_MARKER_PREFIX = PRIMARY_REVIEW_MARKER_PREFIX;
 

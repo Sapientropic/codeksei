@@ -1,11 +1,8 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import * as pathUtilsModule from "./path-utils";
+import { resolveCrossPlatformPath } from "./path-utils";
 
-const { resolveCrossPlatformPath } = pathUtilsModule as {
-  resolveCrossPlatformPath: (value: string) => string;
-};
 
 type EnvMap = Record<string, unknown>;
 

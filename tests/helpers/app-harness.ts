@@ -13,6 +13,7 @@ import type {
   RuntimeTurnLifecycleLike,
   RuntimeWatchdogLifecycleLike,
   SessionStoreLike,
+  SessionStoreWriterLike,
   StreamDeliveryLike,
   SystemMessageDispatcherRef,
   SystemMessageQueueLike,
@@ -143,6 +144,9 @@ function createTestAppHarness({
     getApprovalCommandAllowlistForWorkspace() {
       return [];
     },
+    getAvailableModelCatalog() {
+      return null;
+    },
     getBinding(candidateBindingKey) {
       return this.state?.bindings?.[candidateBindingKey] || null;
     },
@@ -161,10 +165,31 @@ function createTestAppHarness({
     listPendingApprovals() {
       return [];
     },
-    rememberPendingApprovalForThread() {
+  };
+
+  const sessionWriter: SessionStoreWriterLike = {
+    async clearPendingApprovalForThread() {},
+    async rememberApprovalPrefixForWorkspace() {
+      return [];
+    },
+    async rememberPendingApprovalForThread() {
       return null;
     },
-    rememberWorkspaceBootstrapForThread() {},
+    async rememberWorkspaceBootstrapForThread() {
+      return null;
+    },
+    async setActiveWorkspaceRoot() {
+      return null;
+    },
+    async setCodexParamsForWorkspace() {
+      return null;
+    },
+    async setThreadIdForWorkspace() {
+      return null;
+    },
+    async clearThreadIdForWorkspace() {
+      return null;
+    },
   };
 
   const channelAdapter: ChannelAdapterLike = {
@@ -322,6 +347,7 @@ function createTestAppHarness({
       normalizeText,
       resolveReplyTargetForBinding,
       runtimeAdapter,
+      sessionWriter,
       streamDelivery,
       streamSettlementTimeoutMs: 5 * 60_000,
       threadStateStore,
@@ -380,6 +406,7 @@ function createTestAppHarness({
       runtimeAdapter,
       runtimeTurnLifecycle,
       runtimeWatchdogLifecycle,
+      sessionWriter,
       streamDelivery,
       systemMessageDispatcherState,
       systemMessageQueue,

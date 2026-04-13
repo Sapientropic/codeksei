@@ -1,10 +1,6 @@
 import { spawn } from "node:child_process";
 import { WebSocket, type RawData } from "ws";
-import * as codexSpawnModule from "../../../core/codex-spawn";
-
-const { buildSpawnInvocation } = codexSpawnModule as {
-  buildSpawnInvocation: (command: string, args: string[]) => { command: string; args: string[] };
-};
+import { buildSpawnInvocation } from "../../../core/codex-spawn";
 
 const TRANSPORT_STDERR_MAX_CHARS = 4000;
 

@@ -5,6 +5,7 @@ const test: typeof import("node:test") = require("node:test");
 const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 
 const { SessionStore }: typeof import("../src/adapters/runtime/codex/session-store") = require("../src/adapters/runtime/codex/session-store");
+const { SessionStoreWriter }: typeof import("../src/adapters/runtime/codex/session-store-writer") = require("../src/adapters/runtime/codex/session-store-writer");
 const { ThreadStateStore }: typeof import("../src/runtime/thread-state-store") = require("../src/runtime/thread-state-store");
 const { createControlCommandHandlers }: typeof import("../src/core/channel-command-control-handlers") = require("../src/core/channel-command-control-handlers");
 const { RuntimeWatchdogLifecycle }: typeof import("../src/runtime/runtime-watchdog-lifecycle") = require("../src/runtime/runtime-watchdog-lifecycle");
@@ -14,21 +15,22 @@ import type {
   StreamDeliveryLike,
 } from "../src/core/app-service-contract";
 
-function createSessionStoreFixture() {
+async function createSessionStoreFixture() {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-approval-"));
   const filePath = path.join(tempRoot, "sessions.json");
   const sessionStore = new SessionStore({ filePath });
+  const sessionWriter = new SessionStoreWriter(sessionStore);
   const bindingKey = sessionStore.buildBindingKey({
     workspaceId: "workspace-1",
     accountId: "acct-1",
     senderId: "user-1",
   });
-  sessionStore.setThreadIdForWorkspace(bindingKey, "E:/repo/current", "thread-current", {
+  await sessionWriter.setThreadIdForWorkspace(bindingKey, "E:/repo/current", "thread-current", {
     workspaceId: "workspace-1",
     accountId: "acct-1",
     senderId: "user-1",
   });
-  sessionStore.rememberPendingApprovalForThread("thread-current", {
+  await sessionWriter.rememberPendingApprovalForThread("thread-current", {
     requestId: "approval-1",
     reason: "Need shell",
     command: "npm run review:weekly",
@@ -37,11 +39,11 @@ function createSessionStoreFixture() {
     signature: "sig-1",
     promptedAt: "2026-04-12T00:00:00.000Z",
   });
-  return { bindingKey, sessionStore };
+  return { bindingKey, sessionStore, sessionWriter };
 }
 
 test("approval commands still resolve persisted pending approval after a restart", async () => {
-  const { sessionStore } = createSessionStoreFixture();
+  const { sessionStore, sessionWriter } = await createSessionStoreFixture();
   const threadStateStore = new ThreadStateStore();
   const runtimeCalls: Array<{ requestId: string; decision: "accept" | "decline" }> = [];
   const textCalls: Array<{ text: string }> = [];
@@ -62,6 +64,7 @@ test("approval commands still resolve persisted pending approval after a restart
         runtimeCalls.push(payload);
       },
     },
+    sessionWriter,
     threadStateStore,
   });
 
@@ -88,7 +91,7 @@ test("approval commands still resolve persisted pending approval after a restart
 });
 
 test("restoreBoundThreadSubscriptions rehydrates persisted approval into thread runtime state", async () => {
-  const { bindingKey, sessionStore } = createSessionStoreFixture();
+  const { bindingKey, sessionStore, sessionWriter } = await createSessionStoreFixture();
   const threadStateStore = new ThreadStateStore();
   const resumedThreads: string[] = [];
   const streamTargets: Array<{ bindingKey: string; target: unknown }> = [];
@@ -199,6 +202,7 @@ test("restoreBoundThreadSubscriptions rehydrates persisted approval into thread 
       return null;
     },
     runtimeAdapter,
+    sessionWriter,
     streamDelivery,
     streamSettlementTimeoutMs: 1000,
     threadStateStore,

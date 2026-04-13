@@ -1,4 +1,4 @@
-import * as commandSurfaceModule from "../contracts/command-surface";
+import { findCommandAction, listCommandActions } from "../contracts/command-surface";
 
 type TerminalAudience = "public" | "repo";
 
@@ -11,13 +11,6 @@ interface CommandActionLike {
   terminal: string[];
 }
 
-const {
-  findCommandAction,
-  listCommandActions,
-} = commandSurfaceModule as {
-  findCommandAction: (actionId: string) => CommandActionLike | null;
-  listCommandActions: () => CommandActionLike[];
-};
 
 const ACTION_USAGE_ARGS: Readonly<Record<string, string>> = Object.freeze({
   "channel.send_file": "--path /绝对路径",

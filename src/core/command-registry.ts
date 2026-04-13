@@ -1,5 +1,5 @@
-import * as commandSurfaceModule from "../contracts/command-surface";
-import * as commandArgsModule from "../contracts/command-args";
+import { findCommandAction, listCommandActions, listCommandGroups as listCommandGroupsFromSurface } from "../contracts/command-surface";
+import { listCommandArgFlagsForHelp } from "../contracts/command-args";
 import {
   buildTerminalActionExample,
   buildTerminalEntryUsage,
@@ -19,24 +19,6 @@ interface CommandActionLike {
   weixin: string[];
 }
 
-const {
-  findCommandAction,
-  listCommandActions,
-  listCommandGroups: listCommandGroupsFromSurface,
-} = commandSurfaceModule as {
-  findCommandAction: (actionId: string) => CommandActionLike | null;
-  listCommandActions: () => CommandActionLike[];
-  listCommandGroups: () => Array<{ id: string; label: string; actions: CommandActionLike[] }>;
-};
-const { listCommandArgFlagsForHelp } = commandArgsModule as {
-  listCommandArgFlagsForHelp: (schemaKey: string) => Array<{
-    description: string;
-    keys?: string[];
-    name: string;
-    placeholder?: string;
-    required?: boolean;
-  }>;
-};
 
 export function listCommandGroups() {
   return listCommandGroupsFromSurface();

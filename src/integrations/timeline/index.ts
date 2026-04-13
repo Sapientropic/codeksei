@@ -3,11 +3,8 @@ import * as path from "node:path";
 
 import { resolveTimelineStateFiles } from "../../core/timezone";
 import { ensureTimelineStateTimezone } from "./state-sync";
-import * as brandingModule from "../../core/branding";
+import { readPrefixedEnv } from "../../core/branding";
 
-const { readPrefixedEnv } = brandingModule as {
-  readPrefixedEnv(env: NodeJS.ProcessEnv, suffix: string): string;
-};
 
 interface TimelineIntegrationConfig extends Record<string, unknown> {
   timelineStateDir?: string;

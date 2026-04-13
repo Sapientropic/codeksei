@@ -3,6 +3,7 @@ import type {
   ChannelAdapterLike,
   RuntimeAdapterLike,
   SessionStoreLike,
+  SessionStoreWriterLike,
   StreamDeliveryLike,
   ThreadStateStoreLike,
 } from "../core/app-service-contract";
@@ -30,6 +31,7 @@ export interface RuntimeWatchdogApprovalDependencies {
   normalizeText: NormalizeText;
   resolveReplyTargetForBinding: ResolveReplyTargetForBinding;
   runtimeAdapter: RuntimeAdapterLike;
+  sessionWriter: SessionStoreWriterLike;
   streamDelivery: StreamDeliveryLike;
   threadStateStore: ThreadStateStoreLike;
 }
@@ -58,7 +60,7 @@ export async function handleApprovalRequested(
     const promptState = sessionStore.getPendingApprovalForThread(eventThreadId);
     const promptSignature = dependencies.buildApprovalPromptSignature(approval);
     if (promptState?.signature && promptState.signature === promptSignature) {
-      sessionStore.rememberPendingApprovalForThread(eventThreadId, approval, {
+      await dependencies.sessionWriter.rememberPendingApprovalForThread(eventThreadId, approval, {
         signature: promptSignature,
         promptedAt: promptState.promptedAt || new Date().toISOString(),
       });
@@ -67,7 +69,7 @@ export async function handleApprovalRequested(
       );
       return true;
     }
-    sessionStore.rememberPendingApprovalForThread(eventThreadId, approval, {
+    await dependencies.sessionWriter.rememberPendingApprovalForThread(eventThreadId, approval, {
       signature: promptSignature,
     });
     await sendApprovalPrompt(dependencies, {
@@ -76,7 +78,7 @@ export async function handleApprovalRequested(
     });
     return true;
   }
-  clearPendingApproval(sessionStore, eventThreadId);
+  await clearPendingApproval(dependencies.sessionWriter, eventThreadId);
   await dependencies.runtimeAdapter.respondApproval({
     requestId: approval.requestId,
     decision: "accept",
@@ -190,13 +192,13 @@ export async function restoreBoundThreadSubscriptions(
   }
 }
 
-export function clearPendingApproval(sessionStore: SessionStoreLike, threadId: unknown): void {
-  if (typeof sessionStore.clearPendingApprovalForThread === "function") {
-    sessionStore.clearPendingApprovalForThread(threadId);
+export async function clearPendingApproval(sessionWriter: SessionStoreWriterLike, threadId: unknown): Promise<void> {
+  if (typeof sessionWriter.clearPendingApprovalForThread === "function") {
+    await sessionWriter.clearPendingApprovalForThread(threadId);
     return;
   }
-  if (typeof sessionStore.clearApprovalPrompt === "function") {
-    sessionStore.clearApprovalPrompt(threadId);
+  if (typeof sessionWriter.clearApprovalPrompt === "function") {
+    await sessionWriter.clearApprovalPrompt(threadId);
   }
 }
 

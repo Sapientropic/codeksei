@@ -6,10 +6,6 @@ interface ParseCliArgsOptions {
   passthroughKey?: string;
 }
 
-function sliceLeafCommandArgs(argv: readonly string[] = process.argv, startIndex = 4): string[] {
-  return Array.isArray(argv) ? argv.slice(startIndex) : [];
-}
-
 function parseCliArgs<T = ParsedCliOptions>(
   args: readonly string[],
   schema: CommandArgSchema | null,
@@ -120,5 +116,4 @@ function shouldCapturePassthroughValue(token: unknown, next: unknown) {
 
 export {
   parseCliArgs,
-  sliceLeafCommandArgs,
 };

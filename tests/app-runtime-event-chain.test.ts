@@ -55,6 +55,16 @@ test("runtime event chain keeps later events alive after an earlier handler fail
               runtimeEventListener = listener;
             },
           },
+          sessionWriter: {
+            clearPendingApprovalForThread: async () => undefined,
+            rememberApprovalPrefixForWorkspace: async () => [],
+            rememberPendingApprovalForThread: async () => undefined,
+            rememberWorkspaceBootstrapForThread: async () => undefined,
+            setActiveWorkspaceRoot: async () => undefined,
+            setCodexParamsForWorkspace: async () => undefined,
+            setThreadIdForWorkspace: async () => undefined,
+            clearThreadIdForWorkspace: async () => undefined,
+          },
           runtimeTurnLifecycle: {
             handlePreparedMessage: async () => undefined,
             prepareIncomingMessageForRuntime: async () => undefined,
@@ -66,7 +76,7 @@ test("runtime event chain keeps later events alive after an earlier handler fail
           runtimeWatchdogLifecycle: {
             clearRuntimeEventWatchdog: () => undefined,
             clearTurnSettlementWatchdog: () => undefined,
-            confirmPendingWorkspaceBootstrap: () => undefined,
+            confirmPendingWorkspaceBootstrap: async () => undefined,
             handleRuntimeEvent: async (event: Record<string, unknown>) => {
               const eventId = String((event.payload as { id?: unknown })?.id || "");
               handledEvents.push(eventId);

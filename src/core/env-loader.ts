@@ -1,10 +1,7 @@
 import * as fs from "node:fs";
 import * as dotenv from "dotenv";
-import * as brandingModule from "./branding";
+import { listEnvFileCandidates } from "./branding";
 
-const { listEnvFileCandidates } = brandingModule as {
-  listEnvFileCandidates: (args: { cwd?: string; env?: Record<string, unknown> }) => string[];
-};
 
 type EnvMap = Record<string, string | undefined>;
 

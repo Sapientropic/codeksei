@@ -1,7 +1,7 @@
 import { getCommandArgsSchema } from "../contracts/command-args";
 import { parseCliArgs } from "../core/cli-args";
 import { buildTerminalLeafHelp } from "../core/command-registry";
-import * as noteSyncModule from "../notes/note-sync";
+import { resolveNoteSyncTarget, syncNoteFile } from "../notes/note-sync";
 
 interface NoteSyncOptions {
   help: boolean;
@@ -26,20 +26,6 @@ interface NoteSyncResult {
   filePath: string;
 }
 
-const {
-  resolveNoteSyncTarget,
-  syncNoteFile,
-} = noteSyncModule as {
-  resolveNoteSyncTarget: (config: unknown, options: NoteSyncOptions) => NoteSyncTarget;
-  syncNoteFile: (options: {
-    filePath: string;
-    section: string;
-    text: string;
-    style: string;
-    slot: string;
-    maxItems: string;
-  }) => NoteSyncResult;
-};
 
 async function runNoteSyncCommand(config: unknown, args: string[] = []) {
   const options = parseNoteSyncArgs(args);
@@ -53,7 +39,10 @@ async function runNoteSyncCommand(config: unknown, args: string[] = []) {
     throw new Error("note 内容不能为空，传 --text 或通过 stdin 输入");
   }
 
-  const target = resolveNoteSyncTarget(config, options);
+  const target = resolveNoteSyncTarget(
+    config as Parameters<typeof resolveNoteSyncTarget>[0],
+    options,
+  );
   const result = syncNoteFile({
     filePath: target.filePath,
     section: options.section,

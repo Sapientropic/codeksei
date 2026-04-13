@@ -59,9 +59,10 @@ function normalizeWeixinIncomingMessage(
 
   return {
     provider: "weixin",
-    accountId,
-    workspaceId: config.workspaceId,
+    accountId: normalizeText(accountId),
+    workspaceId: normalizeText(config.workspaceId),
     senderId,
+    command: "message",
     chatId: senderId,
     messageId: normalizeText(message.message_id),
     threadKey: normalizeText(message.session_id),

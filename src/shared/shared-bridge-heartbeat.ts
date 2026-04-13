@@ -1,23 +1,9 @@
-import * as jsonStateModule from "../state/json-state";
+import { isPlainObject, readManagedJsonStateFile, writeManagedJsonStateFile } from "../state/json-state";
 import type {
   SharedBridgeHeartbeatClassification,
   SharedBridgeHeartbeatRecord,
 } from "./shared-types";
 
-const {
-  isPlainObject,
-  readManagedJsonStateFile,
-  writeManagedJsonStateFile,
-} = jsonStateModule as {
-  isPlainObject: (value: unknown) => boolean;
-  readManagedJsonStateFile: (args: {
-    filePath: string;
-    fallback: null;
-    label: string;
-    validate: (value: unknown) => true | string;
-  }) => unknown;
-  writeManagedJsonStateFile: (filePath: string, payload: unknown) => void;
-};
 
 const DEFAULT_SHARED_BRIDGE_HEARTBEAT_MAX_AGE_MS = 120_000;
 

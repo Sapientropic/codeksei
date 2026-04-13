@@ -1,3 +1,4 @@
+import type { SessionStoreWriterLike } from "./app-service-contract";
 import {
   normalizeCommandArgument,
   normalizeTrimmedText,
@@ -6,8 +7,6 @@ import {
 interface RuntimeAdapterLike {
   getSessionStore(): {
     findBindingForThreadId(threadId: string): { workspaceRoot?: unknown } | null;
-    clearPendingApprovalForThread?(threadId: string): void;
-    clearApprovalPrompt?(threadId: string): void;
   };
 }
 
@@ -24,6 +23,7 @@ interface DeliveryFailurePayload {
 
 interface DeliveryFailureContext {
   runtimeAdapter: RuntimeAdapterLike;
+  sessionWriter: SessionStoreWriterLike;
   threadStateStore: ThreadStateStoreLike;
   clearRuntimeEventWatchdog(threadId: string): void;
   clearTurnSettlementWatchdog(threadId: string, turnId: string): void;
@@ -37,6 +37,7 @@ async function handleReplyDeliveryFailure({
   sentText = "",
 }: DeliveryFailurePayload, {
   runtimeAdapter,
+  sessionWriter,
   threadStateStore,
   clearRuntimeEventWatchdog,
   clearTurnSettlementWatchdog,
@@ -70,7 +71,7 @@ async function handleReplyDeliveryFailure({
   }
   // Delivery failure is a local terminal state even if Codex later finishes
   // the turn, otherwise the bridge UI keeps showing a ghost "still replying".
-  clearPendingApproval(sessionStore, normalizedThreadId);
+  await clearPendingApproval(sessionWriter, normalizedThreadId);
   threadStateStore.markTurnFailed(normalizedThreadId, normalizedTurnId, deliveryFailureText);
   await stopTypingForThread(normalizedThreadId);
 }
@@ -81,16 +82,16 @@ function isPersistentWeixinSendFailure(error: unknown): boolean {
 }
 
 function clearPendingApproval(
-  sessionStore: ReturnType<RuntimeAdapterLike["getSessionStore"]>,
+  sessionWriter: SessionStoreWriterLike,
   threadId: string,
-): void {
-  if (typeof sessionStore?.clearPendingApprovalForThread === "function") {
-    sessionStore.clearPendingApprovalForThread(threadId);
-    return;
+): Promise<void> {
+  if (typeof sessionWriter?.clearPendingApprovalForThread === "function") {
+    return sessionWriter.clearPendingApprovalForThread(threadId);
   }
-  if (typeof sessionStore?.clearApprovalPrompt === "function") {
-    sessionStore.clearApprovalPrompt(threadId);
+  if (typeof sessionWriter?.clearApprovalPrompt === "function") {
+    return sessionWriter.clearApprovalPrompt(threadId);
   }
+  return Promise.resolve();
 }
 
 export {

@@ -1,6 +1,7 @@
 import type {
   ChannelAdapterLike,
   RuntimeAdapterLike,
+  SessionStoreWriterLike,
   StreamDeliveryLike,
   ThreadStateStoreLike,
 } from "../core/app-service-contract";
@@ -52,6 +53,7 @@ interface RuntimeWatchdogLifecycleDependencies {
   normalizeText: NormalizeText;
   resolveReplyTargetForBinding: ResolveReplyTargetForBinding;
   runtimeAdapter: RuntimeAdapterLike;
+  sessionWriter: SessionStoreWriterLike;
   streamDelivery: StreamDeliveryLike;
   streamSettlementTimeoutMs: number;
   threadStateStore: ThreadStateStoreLike;
@@ -150,11 +152,15 @@ export class RuntimeWatchdogLifecycle {
     );
   }
 
-  confirmPendingWorkspaceBootstrap(event: RuntimeEvent<UnknownRecord>): void {
-    confirmPendingWorkspaceBootstrap(
+  async confirmPendingWorkspaceBootstrap(event: RuntimeEvent<UnknownRecord>): Promise<void> {
+    await confirmPendingWorkspaceBootstrap(
       {
         normalizeText: this.normalizeText,
-        runtimeAdapter: this.approvalDependencies.runtimeAdapter,
+        rememberWorkspaceBootstrapForThread: (
+          bindingKey,
+          workspaceRoot,
+          threadId,
+        ) => this.approvalDependencies.sessionWriter.rememberWorkspaceBootstrapForThread(bindingKey, workspaceRoot, threadId),
       },
       this.pendingWorkspaceBootstrapByThreadId,
       event,
@@ -162,6 +168,7 @@ export class RuntimeWatchdogLifecycle {
   }
 
   async handleRuntimeEvent(event: RuntimeEvent<UnknownRecord>): Promise<void> {
+    await this.confirmPendingWorkspaceBootstrap(event);
     await this.approvalDependencies.streamDelivery.handleRuntimeEvent(event);
     await handleRuntimeWatchdogEvent(this.approvalDependencies, event);
   }

@@ -1,4 +1,4 @@
-import * as brandingModule from "../core/branding";
+import { readPrefixedEnv } from "../core/branding";
 import {
   ensureManagedAppServer,
   ensureManagedBridge,
@@ -6,9 +6,6 @@ import {
   resolveSharedProcessContext,
 } from "./shared-common";
 
-const { readPrefixedEnv } = brandingModule as {
-  readPrefixedEnv: (env: NodeJS.ProcessEnv, key: string) => string;
-};
 
 function parseIntervalMinutes() {
   for (const rawArg of process.argv.slice(2)) {

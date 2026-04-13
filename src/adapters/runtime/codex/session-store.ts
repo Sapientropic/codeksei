@@ -13,7 +13,7 @@ import {
   readManagedJsonStateFile,
   writeManagedJsonStateFile,
 } from "../../../state/json-state";
-import * as modelCatalogModule from "./model-catalog";
+import { normalizeModelCatalog } from "./model-catalog";
 import {
   createEmptySessionBinding,
   getCodexParamsMap,
@@ -33,9 +33,6 @@ import {
 } from "./session-store-approvals";
 import { withSessionStoreLock } from "./session-store-lock";
 
-const { normalizeModelCatalog } = modelCatalogModule as {
-  normalizeModelCatalog: (models: unknown) => NormalizedModelCatalogEntry[];
-};
 
 interface SessionStoreConfig {
   filePath: string;
@@ -100,14 +97,14 @@ export class SessionStore {
     writeManagedJsonStateFile(this.filePath, this.state);
   }
 
-  private withFileLock<T>(work: () => T): T {
+  private async withFileLock<T>(work: () => Promise<T> | T): Promise<T> {
     return withSessionStoreLock(this.lockFilePath, work);
   }
 
-  private mutateState<T>(mutator: (state: SessionState) => T): T {
-    return this.withFileLock(() => {
+  private async mutateState<T>(mutator: (state: SessionState) => T | Promise<T>): Promise<T> {
+    return this.withFileLock(async () => {
       this.state = this.readLatestState();
-      const result = mutator(this.state);
+      const result = await mutator(this.state);
       this.writeCurrentState();
       return result;
     });
@@ -130,7 +127,7 @@ export class SessionStore {
     return typeof activeWorkspaceRoot === "string" ? activeWorkspaceRoot : "";
   }
 
-  updateBinding(bindingKey: unknown, nextBinding: SessionBindingUpdate): SessionBinding | null {
+  async updateBinding(bindingKey: unknown, nextBinding: SessionBindingUpdate): Promise<SessionBinding | null> {
     const normalizedBindingKey = normalizeValue(bindingKey);
     if (!normalizedBindingKey) {
       return null;
@@ -159,12 +156,12 @@ export class SessionStore {
     return typeof threadId === "string" ? threadId : "";
   }
 
-  setThreadIdForWorkspace(
+  async setThreadIdForWorkspace(
     bindingKey: unknown,
     workspaceRoot: unknown,
     threadId: unknown,
     extra: Record<string, unknown> = {},
-  ): SessionBinding | null {
+  ): Promise<SessionBinding | null> {
     const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
     const normalizedThreadId = normalizeValue(threadId);
     if (!normalizedWorkspaceRoot) {
@@ -219,11 +216,11 @@ export class SessionStore {
     };
   }
 
-  setCodexParamsForWorkspace(
+  async setCodexParamsForWorkspace(
     bindingKey: unknown,
     workspaceRoot: unknown,
     { model = "" }: { model?: unknown },
-  ): SessionBinding | null {
+  ): Promise<SessionBinding | null> {
     const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
     if (!normalizedWorkspaceRoot) {
       return this.getBinding(bindingKey);
@@ -253,7 +250,7 @@ export class SessionStore {
     });
   }
 
-  clearThreadIdForWorkspace(bindingKey: unknown, workspaceRoot: unknown): SessionBinding | null {
+  async clearThreadIdForWorkspace(bindingKey: unknown, workspaceRoot: unknown): Promise<SessionBinding | null> {
     const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
     if (!normalizedWorkspaceRoot) {
       return this.getBinding(bindingKey);
@@ -286,7 +283,7 @@ export class SessionStore {
     });
   }
 
-  setActiveWorkspaceRoot(bindingKey: unknown, workspaceRoot: unknown): SessionBinding | null {
+  async setActiveWorkspaceRoot(bindingKey: unknown, workspaceRoot: unknown): Promise<SessionBinding | null> {
     const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
     if (!normalizedWorkspaceRoot) {
       return this.getBinding(bindingKey);
@@ -343,7 +340,11 @@ export class SessionStore {
     return getWorkspaceBootstrapThreadMap(current)[normalizedWorkspaceRoot] === normalizedThreadId;
   }
 
-  rememberWorkspaceBootstrapForThread(bindingKey: unknown, workspaceRoot: unknown, threadId: unknown): SessionBinding | null {
+  async rememberWorkspaceBootstrapForThread(
+    bindingKey: unknown,
+    workspaceRoot: unknown,
+    threadId: unknown,
+  ): Promise<SessionBinding | null> {
     const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
     const normalizedThreadId = normalizeValue(threadId);
     if (!normalizedWorkspaceRoot || !normalizedThreadId) {
@@ -387,7 +388,7 @@ export class SessionStore {
       .filter((entry) => entry.length > 0);
   }
 
-  rememberApprovalPrefixForWorkspace(workspaceRoot: unknown, commandTokens: unknown): string[][] {
+  async rememberApprovalPrefixForWorkspace(workspaceRoot: unknown, commandTokens: unknown): Promise<string[][]> {
     const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
     const normalizedTokens = normalizeCommandTokens(commandTokens);
     if (!normalizedWorkspaceRoot || !normalizedTokens.length) {
@@ -425,14 +426,14 @@ export class SessionStore {
     }));
   }
 
-  rememberPendingApprovalForThread(
+  async rememberPendingApprovalForThread(
     threadId: unknown,
     approval: PendingApprovalUpdate | null | undefined,
     {
       signature = "",
       promptedAt = "",
     }: { signature?: unknown; promptedAt?: unknown } = {},
-  ): PendingApprovalRecord | null {
+  ): Promise<PendingApprovalRecord | null> {
     const normalizedThreadId = normalizeValue(threadId);
     if (!normalizedThreadId) {
       return null;
@@ -463,7 +464,11 @@ export class SessionStore {
     return this.getPendingApprovalForThread(threadId);
   }
 
-  rememberApprovalPrompt(threadId: unknown, requestIdOrApproval: unknown, signature = ""): PendingApprovalRecord | null {
+  async rememberApprovalPrompt(
+    threadId: unknown,
+    requestIdOrApproval: unknown,
+    signature = "",
+  ): Promise<PendingApprovalRecord | null> {
     if (isRecord(requestIdOrApproval)) {
       return this.rememberPendingApprovalForThread(threadId, requestIdOrApproval, { signature });
     }
@@ -477,12 +482,12 @@ export class SessionStore {
     });
   }
 
-  clearPendingApprovalForThread(threadId: unknown): void {
+  async clearPendingApprovalForThread(threadId: unknown): Promise<void> {
     const normalizedThreadId = normalizeValue(threadId);
     if (!normalizedThreadId) {
       return;
     }
-    this.mutateState((state) => {
+    await this.mutateState((state) => {
       if (!state.approvalPromptStateByThreadId?.[normalizedThreadId]) {
         return null;
       }
@@ -495,8 +500,8 @@ export class SessionStore {
     });
   }
 
-  clearApprovalPrompt(threadId: unknown): void {
-    this.clearPendingApprovalForThread(threadId);
+  async clearApprovalPrompt(threadId: unknown): Promise<void> {
+    await this.clearPendingApprovalForThread(threadId);
   }
 
   getAvailableModelCatalog(): AvailableModelCatalogView | null {
@@ -512,7 +517,7 @@ export class SessionStore {
     return { models, updatedAt };
   }
 
-  setAvailableModelCatalog(models: unknown): AvailableModelCatalogView | null {
+  async setAvailableModelCatalog(models: unknown): Promise<AvailableModelCatalogView | null> {
     const normalizedModels = normalizeModelCatalog(models) as NormalizedModelCatalogEntry[];
     if (!normalizedModels.length) {
       return null;

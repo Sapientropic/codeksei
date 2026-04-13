@@ -5,23 +5,8 @@ import {
   resolvePackageRoot,
 } from "./path-utils";
 import { resolveTimezoneConfig } from "./timezone";
-import * as brandingModule from "./branding";
+import { readPrefixedBoolEnv, readPrefixedEnv, readPrefixedIntEnv, readPrefixedListEnv, resolveAppHome, resolveStateDir } from "./branding";
 
-const {
-  readPrefixedBoolEnv,
-  readPrefixedEnv,
-  readPrefixedIntEnv,
-  readPrefixedListEnv,
-  resolveAppHome,
-  resolveStateDir,
-} = brandingModule as {
-  readPrefixedBoolEnv(env: NodeJS.ProcessEnv, suffix: string): boolean;
-  readPrefixedEnv(env: NodeJS.ProcessEnv, suffix: string): string;
-  readPrefixedIntEnv(env: NodeJS.ProcessEnv, suffix: string): number;
-  readPrefixedListEnv(env: NodeJS.ProcessEnv, suffix: string): string[];
-  resolveAppHome(args: { env: NodeJS.ProcessEnv; fallbackRoot?: string }): string;
-  resolveStateDir(args?: { env?: NodeJS.ProcessEnv }): string;
-};
 
 function readConfig() {
   const packageRoot = resolvePackageRoot(__dirname);

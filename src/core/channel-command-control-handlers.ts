@@ -1,5 +1,5 @@
 import { findModelByQuery } from "../adapters/runtime/codex/model-catalog";
-import type { ChannelAdapterLike, RuntimeAdapterLike } from "./app-service-contract";
+import type { ChannelAdapterLike, RuntimeAdapterLike, SessionStoreWriterLike } from "./app-service-contract";
 import type {
   ChannelCommandRuntimeAdapter,
   ChannelCommandSessionStore,
@@ -15,17 +15,18 @@ interface AvailableModelCatalogView {
 }
 
 interface ControlCommandSessionStore extends ChannelCommandSessionStore {
-  clearApprovalPrompt?(threadId: unknown): void;
-  clearPendingApprovalForThread?(threadId: unknown): void;
   getAvailableModelCatalog(): AvailableModelCatalogView | null;
   getCodexParamsForWorkspace(bindingKey: string, workspaceRoot: string): { model?: string };
-  rememberApprovalPrefixForWorkspace(workspaceRoot: string, commandTokens: string[]): unknown;
-  setCodexParamsForWorkspace(bindingKey: string, workspaceRoot: string, params: { model: string }): unknown;
 }
 
 interface ControlCommandRuntimeAdapter extends Pick<RuntimeAdapterLike, "respondApproval">, ChannelCommandRuntimeAdapter {
   getSessionStore(): ControlCommandSessionStore;
 }
+
+type ControlCommandSessionWriter = Pick<
+  SessionStoreWriterLike,
+  "clearApprovalPrompt" | "clearPendingApprovalForThread" | "rememberApprovalPrefixForWorkspace" | "setCodexParamsForWorkspace"
+>;
 
 interface ControlCommandThreadStateStore extends ChannelCommandThreadStateStore {
   resolveApproval(threadId: string, status?: string): unknown;
@@ -48,11 +49,13 @@ function createControlCommandHandlers({
   channelAdapter,
   resolveWorkspaceRoot,
   runtimeAdapter,
+  sessionWriter,
   threadStateStore,
 }: {
   channelAdapter: ControlCommandChannelAdapter;
   resolveWorkspaceRoot(bindingKey: string): string;
   runtimeAdapter: ControlCommandRuntimeAdapter;
+  sessionWriter: ControlCommandSessionWriter;
   threadStateStore: ControlCommandThreadStateStore;
 }): ControlCommandHandlers {
   return {
@@ -86,12 +89,12 @@ function createControlCommandHandlers({
         requestId: approval.requestId,
         decision,
       });
-      clearPendingApproval(sessionStore, threadId);
+      await clearPendingApproval(sessionWriter, threadId);
       console.log(
         `[codeksei] approval response delivered thread=${threadId} requestId=${approval.requestId} decision=${decision}`
       );
       if (command.name === "always" && decision === "accept") {
-        sessionStore.rememberApprovalPrefixForWorkspace(workspaceRoot, approval.commandTokens);
+        await sessionWriter.rememberApprovalPrefixForWorkspace(workspaceRoot, approval.commandTokens);
       }
       threadStateStore.resolveApproval(threadId, "running");
       const text = command.name === "always"
@@ -146,7 +149,7 @@ function createControlCommandHandlers({
         return;
       }
 
-      sessionStore.setCodexParamsForWorkspace(bindingKey, workspaceRoot, {
+      await sessionWriter.setCodexParamsForWorkspace(bindingKey, workspaceRoot, {
         model: matched.model,
       });
       await channelAdapter.sendText({
@@ -174,12 +177,12 @@ export {
   createControlCommandHandlers,
 };
 
-function clearPendingApproval(sessionStore: ControlCommandSessionStore, threadId: string): void {
-  if (typeof sessionStore?.clearPendingApprovalForThread === "function") {
-    sessionStore.clearPendingApprovalForThread(threadId);
+async function clearPendingApproval(sessionWriter: ControlCommandSessionWriter, threadId: string): Promise<void> {
+  if (typeof sessionWriter?.clearPendingApprovalForThread === "function") {
+    await sessionWriter.clearPendingApprovalForThread(threadId);
     return;
   }
-  if (typeof sessionStore?.clearApprovalPrompt === "function") {
-    sessionStore.clearApprovalPrompt(threadId);
+  if (typeof sessionWriter?.clearApprovalPrompt === "function") {
+    await sessionWriter.clearApprovalPrompt(threadId);
   }
 }

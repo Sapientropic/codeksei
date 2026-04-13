@@ -127,7 +127,6 @@ function createControlCommandHarness({
     buildBindingKey() {
       return DEFAULT_BINDING_KEY;
     },
-    clearApprovalPrompt() {},
     getAvailableModelCatalog() {
       return catalog;
     },
@@ -140,11 +139,17 @@ function createControlCommandHarness({
     getThreadIdForWorkspace() {
       return "thread-current";
     },
-    rememberApprovalPrefixForWorkspace(targetWorkspaceRoot: string, commandTokens: string[]) {
+  };
+
+  const sessionWriter = {
+    async clearApprovalPrompt() {},
+    async rememberApprovalPrefixForWorkspace(targetWorkspaceRoot: string, commandTokens: string[]) {
       rememberPrefixCalls.push({ workspaceRoot: targetWorkspaceRoot, commandTokens });
+      return [];
     },
-    setCodexParamsForWorkspace(bindingKey: string, targetWorkspaceRoot: string, params: { model: string }) {
+    async setCodexParamsForWorkspace(bindingKey: string, targetWorkspaceRoot: string, params: { model: string }) {
       setModelCalls.push({ bindingKey, workspaceRoot: targetWorkspaceRoot, params });
+      return undefined;
     },
   };
 
@@ -182,6 +187,7 @@ function createControlCommandHarness({
         return workspaceRoot;
       },
       runtimeAdapter,
+      sessionWriter,
       threadStateStore,
     }),
     rememberPrefixCalls,
@@ -219,9 +225,6 @@ function createWorkspaceCommandHarness({
     buildBindingKey() {
       return DEFAULT_BINDING_KEY;
     },
-    clearThreadIdForWorkspace(key: string, workspaceRoot: string) {
-      clearThreadCalls.push({ key, workspaceRoot });
-    },
     findBindingForThreadId(threadId: string) {
       return knownThreadBindings[threadId] || null;
     },
@@ -240,10 +243,16 @@ function createWorkspaceCommandHarness({
       }
       return "";
     },
-    setActiveWorkspaceRoot(key: string, workspaceRoot: string) {
+  };
+
+  const sessionWriter = {
+    async clearThreadIdForWorkspace(key: string, workspaceRoot: string) {
+      clearThreadCalls.push({ key, workspaceRoot });
+    },
+    async setActiveWorkspaceRoot(key: string, workspaceRoot: string) {
       setWorkspaceCalls.push({ key, workspaceRoot });
     },
-    setThreadIdForWorkspace(key: string, workspaceRoot: string, threadId: string) {
+    async setThreadIdForWorkspace(key: string, workspaceRoot: string, threadId: string) {
       setThreadCalls.push({ key, workspaceRoot, threadId });
     },
   };
@@ -297,6 +306,7 @@ function createWorkspaceCommandHarness({
       scheduleRuntimeEventWatchdog(payload) {
         watchdogCalls.push(payload);
       },
+      sessionWriter,
       streamDelivery,
       threadStateStore,
     }),

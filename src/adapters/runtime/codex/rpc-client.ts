@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import * as brandingModule from "../../../core/branding";
+import { PRIMARY_RPC_CLIENT_INFO } from "../../../core/branding";
 import {
   createRpcEnvelopeRouter,
   type PendingEntry,
@@ -23,9 +23,6 @@ import {
   type TransportMode,
 } from "./rpc-transport";
 
-const { PRIMARY_RPC_CLIENT_INFO } = brandingModule as {
-  PRIMARY_RPC_CLIENT_INFO: Record<string, unknown>;
-};
 
 const CODEX_CLIENT_INFO = PRIMARY_RPC_CLIENT_INFO;
 

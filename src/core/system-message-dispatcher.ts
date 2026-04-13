@@ -1,8 +1,5 @@
-import * as personReferenceModule from "./person-reference";
+import { resolvePromptPersonEn } from "./person-reference";
 
-const { resolvePromptPersonEn } = personReferenceModule as {
-  resolvePromptPersonEn: (config: Record<string, unknown>) => string;
-};
 
 class SystemMessageDispatcher {
   accountId: any;

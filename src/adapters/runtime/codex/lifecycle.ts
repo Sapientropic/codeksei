@@ -1,9 +1,6 @@
-import * as rpcClientModule from "./rpc-client";
+import { CodexRpcClient } from "./rpc-client";
 import type { RuntimeClientLike } from "./diagnostics";
 
-const { CodexRpcClient } = rpcClientModule as {
-  CodexRpcClient: new (options: Record<string, unknown>) => RuntimeClientLike;
-};
 
 interface CodexRuntimeConfig extends Record<string, unknown> {
   stateDir: string;
@@ -13,7 +10,7 @@ interface CodexRuntimeConfig extends Record<string, unknown> {
 }
 
 interface SessionStoreLike {
-  setAvailableModelCatalog(models: unknown): unknown;
+  setAvailableModelCatalog(models: unknown): Promise<unknown>;
 }
 
 interface ReadyState {
@@ -29,10 +26,10 @@ interface RpcModelListResponse extends Record<string, unknown> {
 
 export function createRuntimeLifecycle({
   config,
-  sessionStore,
+  sessionWriter,
 }: {
   config: CodexRuntimeConfig;
-  sessionStore: SessionStoreLike;
+  sessionWriter: SessionStoreLike;
 }) {
   let client: RuntimeClientLike | null = null;
   let readyState: ReadyState | null = null;
@@ -55,7 +52,7 @@ export function createRuntimeLifecycle({
       ? modelResponse.result.data
       : [];
     if (models.length) {
-      sessionStore.setAvailableModelCatalog(models);
+      await sessionWriter.setAvailableModelCatalog(models);
     }
     readyState = {
       endpoint: normalizeText(config.codexEndpoint) || "(spawn)",

@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
-import * as brandingModule from "../core/branding";
-import * as workspaceAliasModule from "../workspace/workspace-alias";
+import { readPrefixedEnv } from "../core/branding";
+import { resolveCodexWorkspaceRoot } from "../workspace/workspace-alias";
 import {
   buildSpawnInvocation,
   ensureSharedAppServer,
@@ -8,12 +8,6 @@ import {
   resolveSharedProcessContext,
 } from "./shared-common";
 
-const { readPrefixedEnv } = brandingModule as {
-  readPrefixedEnv: (env: NodeJS.ProcessEnv, key: string) => string;
-};
-const { resolveCodexWorkspaceRoot } = workspaceAliasModule as {
-  resolveCodexWorkspaceRoot: (workspaceRoot: string) => string;
-};
 
 async function main() {
   const sharedContext = resolveSharedProcessContext();

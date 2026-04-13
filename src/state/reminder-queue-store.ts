@@ -82,11 +82,11 @@ class ReminderQueueStore {
     return due;
   }
 
-  peekNextDueAtMs() {
+  peekNextDueAtMs(): number {
     this.load();
     const first = this.state.reminders[0];
     const dueAtMs = first?.dueAtMs;
-    return Number.isFinite(dueAtMs) ? dueAtMs : 0;
+    return typeof dueAtMs === "number" && Number.isFinite(dueAtMs) ? dueAtMs : 0;
   }
 }
 

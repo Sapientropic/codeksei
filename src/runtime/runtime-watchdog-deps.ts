@@ -1,6 +1,7 @@
 import type {
   ChannelAdapterLike,
   RuntimeAdapterLike,
+  SessionStoreWriterLike,
   StreamDeliveryLike,
   ThreadStateStoreLike,
 } from "../core/app-service-contract";
@@ -33,6 +34,7 @@ export interface RuntimeWatchdogDependencyArgs {
   normalizeText: NormalizeText;
   resolveReplyTargetForBinding: ResolveReplyTargetForBinding;
   runtimeAdapter: RuntimeAdapterLike;
+  sessionWriter: SessionStoreWriterLike;
   streamDelivery: StreamDeliveryLike;
   streamSettlementTimeoutMs: number;
   threadStateStore: ThreadStateStoreLike;
@@ -50,6 +52,7 @@ export function buildRuntimeWatchdogDependencies({
   normalizeText,
   resolveReplyTargetForBinding,
   runtimeAdapter,
+  sessionWriter,
   streamDelivery,
   streamSettlementTimeoutMs,
   threadStateStore,
@@ -69,6 +72,7 @@ export function buildRuntimeWatchdogDependencies({
     normalizeText,
     resolveReplyTargetForBinding,
     runtimeAdapter,
+    sessionWriter,
     streamDelivery,
     threadStateStore,
   };
@@ -82,7 +86,10 @@ export function buildRuntimeWatchdogDependencies({
     streamSettlementTimeoutMs,
     normalizeCommandArgument,
     normalizeText,
-    clearPendingApproval,
+    clearPendingApproval: (threadId) => clearPendingApproval(sessionWriter, threadId),
+    rememberWorkspaceBootstrapForThread: (bindingKey, workspaceRoot, threadId) => (
+      sessionWriter.rememberWorkspaceBootstrapForThread(bindingKey, workspaceRoot, threadId)
+    ),
     stopTypingForThread: (threadId) => stopTypingForThread(approvalDependencies, threadId),
   };
   return {

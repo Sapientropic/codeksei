@@ -1,18 +1,7 @@
 import * as crypto from "node:crypto";
-import * as protocolModule from "./protocol";
-import * as brandingModule from "../../../core/branding";
+import { buildJsonHeaders } from "./protocol";
+import { PRIMARY_CHANNEL_VERSION } from "../../../core/branding";
 
-const { buildJsonHeaders } = protocolModule as {
-  buildJsonHeaders: (args: {
-    body: string;
-    token?: string;
-    routeTag?: string;
-    clientVersion?: string;
-  }) => Record<string, string>;
-};
-const { PRIMARY_CHANNEL_VERSION } = brandingModule as {
-  PRIMARY_CHANNEL_VERSION: string;
-};
 
 const DEFAULT_LONG_POLL_TIMEOUT_MS = 35_000;
 const DEFAULT_API_TIMEOUT_MS = 15_000;

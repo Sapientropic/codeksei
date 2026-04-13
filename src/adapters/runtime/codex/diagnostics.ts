@@ -4,7 +4,7 @@ import {
   type RuntimeEvent,
 } from "../../../contracts/runtime-events";
 import type { UnknownRecord } from "../../../core/runtime-types";
-import * as eventsModule from "./events";
+import { mapCodexMessageToRuntimeEvent } from "./events";
 import { extractThreadIdFromParams } from "./message-utils";
 import {
   collectReplyFragment,
@@ -15,9 +15,6 @@ import {
   shouldIgnoreReplyFragmentTurnCompletion,
 } from "./reply-fragment-collector";
 
-const { mapCodexMessageToRuntimeEvent } = eventsModule as {
-  mapCodexMessageToRuntimeEvent: (message: RpcMessage) => RuntimeEvent<UnknownRecord> | null;
-};
 
 interface RpcMessageParams extends UnknownRecord {
   threadId?: unknown;

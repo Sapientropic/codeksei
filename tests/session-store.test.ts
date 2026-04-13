@@ -4,6 +4,8 @@ const os: typeof import("node:os") = require("node:os");
 const path: typeof import("node:path") = require("node:path");
 const test: typeof import("node:test") = require("node:test");
 const { SessionStore }: typeof import("../src/adapters/runtime/codex/session-store") = require("../src/adapters/runtime/codex/session-store");
+const { SessionStoreWriter }: typeof import("../src/adapters/runtime/codex/session-store-writer") = require("../src/adapters/runtime/codex/session-store-writer");
+const { withSessionStoreLock }: typeof import("../src/adapters/runtime/codex/session-store-lock") = require("../src/adapters/runtime/codex/session-store-lock");
 
 function createTempSessionFile() {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-session-store-"));
@@ -33,21 +35,22 @@ test("SessionStore quarantines schema-invalid nested binding state", () => {
   );
 });
 
-test("SessionStore round-trips pending approvals with deep normalized state", () => {
+test("SessionStore round-trips pending approvals with deep normalized state", async () => {
   const { filePath } = createTempSessionFile();
   const store = new SessionStore({ filePath });
+  const writer = new SessionStoreWriter(store);
   const bindingKey = store.buildBindingKey({
     workspaceId: "workspace-1",
     accountId: "acct-1",
     senderId: "user-1",
   });
 
-  store.setThreadIdForWorkspace(bindingKey, "E:/repo/current", "thread-current", {
+  await writer.setThreadIdForWorkspace(bindingKey, "E:/repo/current", "thread-current", {
     workspaceId: "workspace-1",
     accountId: "acct-1",
     senderId: "user-1",
   });
-  store.rememberPendingApprovalForThread("thread-current", {
+  await writer.rememberPendingApprovalForThread("thread-current", {
     requestId: "approval-1",
     reason: "Need shell",
     command: "npm run review:weekly",
@@ -86,13 +89,17 @@ test("SessionStore round-trips pending approvals with deep normalized state", ()
   });
 });
 
-test("SessionStore keeps both bindings when two instances write the same file in sequence", () => {
+test("SessionStoreWriter keeps both bindings when two instances write the same file concurrently", async () => {
   const { filePath } = createTempSessionFile();
   const storeA = new SessionStore({ filePath });
   const storeB = new SessionStore({ filePath });
+  const writerA = new SessionStoreWriter(storeA);
+  const writerB = new SessionStoreWriter(storeB);
 
-  storeA.setThreadIdForWorkspace("binding-a", "E:/repo/a", "thread-a");
-  storeB.setThreadIdForWorkspace("binding-b", "E:/repo/b", "thread-b");
+  await Promise.all([
+    writerA.setThreadIdForWorkspace("binding-a", "E:/repo/a", "thread-a"),
+    writerB.setThreadIdForWorkspace("binding-b", "E:/repo/b", "thread-b"),
+  ]);
 
   const reloaded = new SessionStore({ filePath });
   assert.deepEqual(
@@ -103,12 +110,13 @@ test("SessionStore keeps both bindings when two instances write the same file in
   assert.equal(reloaded.getThreadIdForWorkspace("binding-b", "E:/repo/b"), "thread-b");
 });
 
-test("SessionStore read APIs refresh persisted state written by another instance", () => {
+test("SessionStore read APIs refresh persisted state written by another instance", async () => {
   const { filePath } = createTempSessionFile();
   const reader = new SessionStore({ filePath });
-  const writer = new SessionStore({ filePath });
+  const writerStore = new SessionStore({ filePath });
+  const writer = new SessionStoreWriter(writerStore);
 
-  writer.setThreadIdForWorkspace("binding-a", "E:/repo/current", "thread-current");
+  await writer.setThreadIdForWorkspace("binding-a", "E:/repo/current", "thread-current");
 
   assert.equal(reader.getThreadIdForWorkspace("binding-a", "E:/repo/current"), "thread-current");
   assert.deepEqual(reader.listWorkspaceRoots("binding-a"), ["E:/repo/current"]);
@@ -116,4 +124,60 @@ test("SessionStore read APIs refresh persisted state written by another instance
     bindingKey: "binding-a",
     workspaceRoot: "E:/repo/current",
   });
+});
+
+test("SessionStoreWriter persists rebinding, workspace bootstrap, model params, and approval clearing", async () => {
+  const { filePath } = createTempSessionFile();
+  const store = new SessionStore({ filePath });
+  const writer = new SessionStoreWriter(store);
+
+  await writer.setThreadIdForWorkspace("binding-a", "E:/repo/current", "thread-current");
+  await writer.rememberWorkspaceBootstrapForThread("binding-a", "E:/repo/current", "thread-current");
+  await writer.setCodexParamsForWorkspace("binding-a", "E:/repo/current", { model: "gpt-5.4" });
+  await writer.rememberPendingApprovalForThread("thread-current", {
+    requestId: "approval-2",
+    reason: "Need shell",
+    command: "npm run review:monthly",
+    commandTokens: ["npm", "run", "review:monthly"],
+  }, {
+    signature: "sig-2",
+    promptedAt: "2026-04-13T00:00:00.000Z",
+  });
+
+  assert.equal(store.hasWorkspaceBootstrapForThread("binding-a", "E:/repo/current", "thread-current"), true);
+  assert.equal(store.getCodexParamsForWorkspace("binding-a", "E:/repo/current").model, "gpt-5.4");
+  assert.equal(store.getPendingApprovalForThread("thread-current")?.requestId, "approval-2");
+
+  await writer.clearPendingApprovalForThread("thread-current");
+  await writer.setThreadIdForWorkspace("binding-a", "E:/repo/current", "thread-rebound");
+
+  const reloaded = new SessionStore({ filePath });
+  const binding = reloaded.getBinding("binding-a");
+  if (!binding) {
+    throw new Error("expected rebound binding");
+  }
+  assert.equal(reloaded.getPendingApprovalForThread("thread-current"), null);
+  assert.equal(reloaded.getThreadIdForWorkspace("binding-a", "E:/repo/current"), "thread-rebound");
+  assert.equal(binding.workspaceBootstrapThreadIdByWorkspaceRoot?.["E:/repo/current"] || "", "");
+});
+
+test("withSessionStoreLock yields while waiting for another writer to release the lock", async () => {
+  const { filePath } = createTempSessionFile();
+  const lockFilePath = `${filePath}.lock`;
+  fs.writeFileSync(lockFilePath, "busy\n", "utf8");
+
+  let timerFired = false;
+  const releaseTimer = setTimeout(() => {
+    timerFired = true;
+    fs.rmSync(lockFilePath, { force: true });
+  }, 30);
+
+  try {
+    const result = await withSessionStoreLock(lockFilePath, async () => "acquired");
+    assert.equal(result, "acquired");
+    assert.equal(timerFired, true);
+  } finally {
+    clearTimeout(releaseTimer);
+    fs.rmSync(lockFilePath, { force: true });
+  }
 });
