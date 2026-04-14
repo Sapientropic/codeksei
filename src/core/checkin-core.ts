@@ -32,7 +32,7 @@ import type { SystemMessageQueueLike } from "./app-service-contract";
 
 const INTERNAL_CHECKIN_TRIGGER_TEMPLATE = "Take a quiet look at whether now is a good moment to reach out to %PERSON%. You may stay silent, send one short WeChat message, update diary/timeline, or take another useful backstage action. If no user-visible message should be sent, output exactly SILENT. If you do send a message, output only the message text.";
 const CHECKIN_MAX_SILENCE_MS = 24 * 60 * 60_000;
-const CHECKIN_ACTIVE_WAKE_TIMEOUT_MS = 30 * 60_000;
+export const CHECKIN_ACTIVE_WAKE_TIMEOUT_MS = 30 * 60_000;
 
 interface CheckinSessionStoreLike {
   buildBindingKey(args: { accountId: string; senderId: string; workspaceId: string }): string;

@@ -127,10 +127,26 @@ const LEAF_HELP = {
     bodyLabel: "说明：",
     body: [
       "  查看 Hermes 命令、repo-local sibling checkout、Weixin 账号、skill 同步状态、skills catalog 和 hosted semantic review 可用性。",
+      "  若能解析当前唯一 target，还会附带当前 target 的托管 checkin wake/recovery one-shot job 摘要。",
       "  这是只读检查，不会修改本机 Hermes 状态。",
     ],
     examples: [
       "  codeksei operator hermes status",
+      "  codeksei operator hermes status --user wxid_xxx --workspace /absolute/workspace",
+    ],
+    includeFlagBlock: true,
+  }),
+  "operator.hermes.sync_checkin": () => ({
+    usage: [buildTerminalActionExample("operator.hermes.sync_checkin", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  按 Codeksei 当前 checkin state 为 Hermes 同步唯一需要存在的 one-shot wake/recovery job。",
+      "  scheduled -> wake；due -> 立即执行的 wake；in_progress -> 30 分钟 recovery fallback。",
+      "  这是宿主 re-arm 入口，不会改写 Codeksei 自己的 nextWakeAt 真相源。",
+    ],
+    examples: [
+      "  codeksei operator hermes sync-checkin --user wxid_xxx --workspace /absolute/workspace",
+      "  codeksei operator hermes sync-checkin --dry-run --user wxid_xxx --workspace /absolute/workspace",
     ],
     includeFlagBlock: true,
   }),
@@ -294,7 +310,7 @@ const LEAF_HELP = {
     bodyLabel: "说明：",
     body: [
       "  只生成一条 host-neutral check-in trigger payload，不写本地 system queue。",
-      "  适合给 Hermes heartbeat / automation 这类宿主消费；它不是本地 bridge-only 入口。",
+      "  适合给 Hermes one-shot wake job 消费；它不是本地 bridge-only 入口。",
       "  默认优先用显式 --user / --workspace；其次才吃唯一稳定默认值与可用 session hints。",
     ],
     examples: [
@@ -323,6 +339,7 @@ const LEAF_HELP = {
       "  记录这轮 proactive check-in 的完成结果，并由 agent 显式写回下一次唤醒时间。",
       "  --trigger / --result 必填；--next-wake-at 与 --sleep-for 二选一。",
       "  agent 给出过长时间会被 clamp 到 24h guardrail；缺失或无效时间会回退 fallback window。",
+      "  Hermes Hosted Mode 下，写回 state 后还会自动把下一条 wake one-shot job 重新 arm 给 Hermes，并清理未来 recovery job。",
     ],
     examples: [
       "  codeksei system checkin-complete --user wxid_xxx --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for 6h",
@@ -420,16 +437,18 @@ const LEAF_HELP = {
 
 function buildHermesOperatorResourceHelpText(): string {
   return renderHelpDocument({
-    usage: ["codeksei operator hermes <install-skill|status|smoke>"],
+    usage: ["codeksei operator hermes <install-skill|sync-checkin|status|smoke>"],
     bodyLabel: "说明：",
     body: [
       "  这是 Hermes Hosted Mode 的 operator resource。",
       "  install-skill：同步仓内 companion skill；支持 --dry-run 预览。",
+      "  sync-checkin：按 Codeksei 当前状态为 Hermes 同步 wake/recovery one-shot job。",
       "  status：只读查看 Hermes hosted 集成状态。",
       "  smoke：只读执行 hosted parity 前置检查。",
     ],
     examples: [
       "  codeksei operator hermes install-skill --dry-run",
+      "  codeksei operator hermes sync-checkin --user wxid_xxx --workspace /absolute/workspace",
       "  codeksei operator hermes status",
       "  codeksei operator hermes smoke",
     ],

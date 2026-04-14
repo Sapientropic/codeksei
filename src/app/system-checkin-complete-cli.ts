@@ -8,12 +8,16 @@ import {
 } from "../core/cli-contract";
 import {
   buildCheckinTargetResolutionErrorMessage,
+  type CheckinResolvedTarget,
   normalizeCheckinCompleteResult,
   resolveCheckinTarget,
   runCheckinComplete,
 } from "../core/checkin-core";
 import { buildTerminalLeafHelp } from "../core/command-registry";
 import type { AppRuntimeConfig } from "../core/app-service-contract";
+import { resolveHostMode } from "../core/host-mode";
+import { createHostedCheckinWakePlan } from "../core/hosted-checkin-cron";
+import { syncCheckinCronViaHermesRepoLocal } from "../core/hermes-repo-local";
 import { formatCheckinRange } from "../state/checkin-config";
 import { normalizeText } from "../core/text-normalization";
 
@@ -32,6 +36,10 @@ type RuntimeConfig = Pick<AppRuntimeConfig, "checkinConfigFile" | "checkinSchedu
   | "accountId"
   | "allowedUserIds"
   | "channelProvider"
+  | "hermesHome"
+  | "hermesPythonCommand"
+  | "hermesRepoLocalShimPath"
+  | "hermesRepoRoot"
   | "runtime"
   | "sessionsFile"
   | "userName"
@@ -96,9 +104,15 @@ export async function runSystemCheckinCompleteCommand(
       target: resolution.value,
       triggerId: options.trigger,
     });
+    const hostMode = resolveHostMode(config);
+    const hostedWakeSync = hostMode.profile === "hosted-hermes-weixin"
+      ? syncHostedWakeAfterCompletion(config, resolution.value, completion.nextWakeAt)
+      : null;
     return {
+      ok: hostedWakeSync?.ok === "partial" ? "partial" : true,
       data: {
         completion: completion.completion,
+        hostedWakeSync: hostedWakeSync?.data || null,
         interval: {
           range: formatCheckinRange(completion.intervalConfig),
           source: completion.intervalConfig.source,
@@ -113,6 +127,7 @@ export async function runSystemCheckinCompleteCommand(
         `scheduleSource: ${completion.completion.scheduleSource}`,
         `nextWakeAt: ${completion.nextWakeAt}`,
         `nextDueAt: ${completion.nextDueAt}`,
+        ...(hostedWakeSync?.text ? [hostedWakeSync.text] : []),
       ].join("\n"),
     };
   } catch (error) {
@@ -126,5 +141,44 @@ export async function runSystemCheckinCompleteCommand(
       },
       "传合法的 --trigger / --result，并且在 --next-wake-at 与 --sleep-for 中二选一。"
     );
+  }
+}
+
+function syncHostedWakeAfterCompletion(
+  config: RuntimeConfig,
+  target: CheckinResolvedTarget,
+  nextWakeAt: string,
+): CommandExecutionResult<Record<string, unknown>> | null {
+  try {
+    const plan = createHostedCheckinWakePlan(config, target, nextWakeAt);
+    const sync = syncCheckinCronViaHermesRepoLocal(config, {
+      due_at_iso: plan.plannedWakeAt,
+      name: plan.name,
+      prompt: plan.prompt,
+      role: plan.role,
+      sender_id: plan.senderId,
+      target_key: plan.targetKey,
+      workspace_root: plan.workspaceRoot,
+    });
+    return {
+      data: {
+        created: sync.created,
+        deliver: sync.deliver,
+        jobId: sync.jobId,
+        name: sync.name,
+        nextRunAt: sync.nextRunAt,
+        removedJobIds: sync.removedJobIds,
+        role: sync.role,
+      },
+      text: `hosted_next_wake: ${sync.nextRunAt} [${sync.role}] job=${sync.jobId}`,
+    };
+  } catch (error) {
+    return {
+      ok: "partial",
+      data: {
+        error: error instanceof Error ? error.message : String(error || "unknown error"),
+      },
+      text: `hosted_next_wake_sync_failed: ${error instanceof Error ? error.message : String(error || "unknown error")}`,
+    };
   }
 }

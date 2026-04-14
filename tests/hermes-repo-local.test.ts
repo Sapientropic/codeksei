@@ -9,6 +9,7 @@ const {
   collectHermesRepoLocalReport,
   resolveHermesRepoRoot,
   sendFileViaHermesRepoLocal,
+  syncCheckinCronViaHermesRepoLocal,
 } = require("../src/core/hermes-repo-local");
 const {
   createFakeHermesRepoLocalFixture,
@@ -170,6 +171,100 @@ test("repo-local bridge falls back to python3 when python is unavailable", () =>
       delete process.env.FAKE_HERMES_REPO_LOCAL_LOG;
     } else {
       process.env.FAKE_HERMES_REPO_LOCAL_LOG = previousLogFile;
+    }
+  }
+});
+
+test("repo-local bridge can sync hosted checkin one-shot jobs", () => {
+  const fixture = createFakeHermesRepoLocalFixture(
+    fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-hermes-repo-local-sync-checkin-"))
+  );
+  const previousSessionKey = process.env.HERMES_SESSION_KEY;
+  process.env.HERMES_SESSION_KEY = fixture.sessionKey;
+
+  try {
+    const result = syncCheckinCronViaHermesRepoLocal({
+      CODEKSEI_HERMES_HOME: fixture.hermesHome,
+      CODEKSEI_HERMES_REPO_LOCAL_SHIM_PATH: fixture.shimPath,
+      CODEKSEI_HERMES_REPO_ROOT: fixture.repoRoot,
+    }, {
+      due_at_iso: "2026-04-14T12:00:00.000Z",
+      name: "ck-checkin-wake-test",
+      prompt: "sync me",
+      role: "wake",
+      sender_id: "wx-user",
+      target_key: "wx-user::/workspace",
+      workspace_root: "/workspace",
+    });
+
+    assert.equal(result.role, "wake");
+    assert.equal(result.jobId.startsWith("cron-"), true);
+    const jobs = JSON.parse(fs.readFileSync(fixture.jobsFile, "utf8"));
+    assert.equal(Array.isArray(jobs.jobs), true);
+    assert.equal(jobs.jobs.length, 1);
+    assert.equal(jobs.jobs[0].codeksei_checkin_role, "wake");
+  } finally {
+    if (previousSessionKey === undefined) {
+      delete process.env.HERMES_SESSION_KEY;
+    } else {
+      process.env.HERMES_SESSION_KEY = previousSessionKey;
+    }
+  }
+});
+
+test("repo-local bridge falls back to cron/session env origin when HERMES_SESSION_KEY is missing", () => {
+  const fixture = createFakeHermesRepoLocalFixture(
+    fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-hermes-repo-local-origin-fallback-"))
+  );
+  const artifactPath = path.join(fixture.repoRoot, "artifact.txt");
+  fs.writeFileSync(artifactPath, "artifact", "utf8");
+  const previousSessionKey = process.env.HERMES_SESSION_KEY;
+  const previousPlatform = process.env.HERMES_SESSION_PLATFORM;
+  const previousChatId = process.env.HERMES_SESSION_CHAT_ID;
+  const previousChatName = process.env.HERMES_SESSION_CHAT_NAME;
+  const previousThreadId = process.env.HERMES_CRON_AUTO_DELIVER_THREAD_ID;
+  delete process.env.HERMES_SESSION_KEY;
+  process.env.HERMES_SESSION_PLATFORM = "weixin";
+  process.env.HERMES_SESSION_CHAT_ID = "wxid_sender";
+  process.env.HERMES_SESSION_CHAT_NAME = "Cron Origin";
+  process.env.HERMES_CRON_AUTO_DELIVER_THREAD_ID = "thread-7";
+
+  try {
+    const result = sendFileViaHermesRepoLocal({
+      CODEKSEI_HERMES_HOME: fixture.hermesHome,
+      CODEKSEI_HERMES_REPO_LOCAL_SHIM_PATH: fixture.shimPath,
+      CODEKSEI_HERMES_REPO_ROOT: fixture.repoRoot,
+    }, {
+      file_path: artifactPath,
+    });
+
+    assert.equal(result.filePath, artifactPath);
+    assert.equal(result.chatId, "wxid_sender");
+  } finally {
+    if (previousSessionKey === undefined) {
+      delete process.env.HERMES_SESSION_KEY;
+    } else {
+      process.env.HERMES_SESSION_KEY = previousSessionKey;
+    }
+    if (previousPlatform === undefined) {
+      delete process.env.HERMES_SESSION_PLATFORM;
+    } else {
+      process.env.HERMES_SESSION_PLATFORM = previousPlatform;
+    }
+    if (previousChatId === undefined) {
+      delete process.env.HERMES_SESSION_CHAT_ID;
+    } else {
+      process.env.HERMES_SESSION_CHAT_ID = previousChatId;
+    }
+    if (previousChatName === undefined) {
+      delete process.env.HERMES_SESSION_CHAT_NAME;
+    } else {
+      process.env.HERMES_SESSION_CHAT_NAME = previousChatName;
+    }
+    if (previousThreadId === undefined) {
+      delete process.env.HERMES_CRON_AUTO_DELIVER_THREAD_ID;
+    } else {
+      process.env.HERMES_CRON_AUTO_DELIVER_THREAD_ID = previousThreadId;
     }
   }
 });

@@ -4,6 +4,7 @@ import {
   runHermesInstallSkillCommand,
   runHermesSmokeCommand,
   runHermesStatusCommand,
+  runHermesSyncCheckinCommand,
 } from "./hermes-operator-cli";
 import { runNoteAutoCommand, runNoteMaybeCommand } from "./note-auto-cli";
 import { runNoteSyncCommand } from "./note-sync-cli";
@@ -103,6 +104,9 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
   },
   "operator.hermes.smoke": async (_manifest, context) => {
     return runHermesSmokeCommand(context.config, context.leafArgs);
+  },
+  "operator.hermes.sync_checkin": async (_manifest, context) => {
+    return runHermesSyncCheckinCommand(context.config, context.leafArgs);
   },
   login: async (_manifest, context) => {
     await context.getApp().login();

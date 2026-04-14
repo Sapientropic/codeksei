@@ -1,7 +1,13 @@
+import * as path from "node:path";
+
 import type { CommandExecutionResult } from "../contracts/cli-contract";
 import { getCommandArgsSchema } from "../contracts/command-args";
+import { SessionStore } from "../adapters/runtime/codex/session-store";
 import { parseCliArgs } from "../core/cli-args";
-import { buildValidationError } from "../core/cli-contract";
+import {
+  buildTargetResolutionRequiredError,
+  buildValidationError,
+} from "../core/cli-contract";
 import { runCliMutation } from "../core/cli-mutation";
 import { buildTerminalLeafHelp } from "../core/command-registry";
 import type { AppRuntimeConfig } from "../core/app-service-contract";
@@ -13,6 +19,20 @@ import {
   type HermesSkillInstallPreview,
   type HermesSkillInstallResult,
 } from "../core/host-mode";
+import {
+  collectHostedCheckinCronSummary,
+  createHostedCheckinCronPlanFromTick,
+  type HostedCheckinCronSummary,
+} from "../core/hosted-checkin-cron";
+import {
+  buildCheckinTargetResolutionErrorMessage,
+  resolveCheckinTarget,
+  runCheckinTick,
+} from "../core/checkin-core";
+import {
+  resolveHermesHomePath,
+  syncCheckinCronViaHermesRepoLocal,
+} from "../core/hermes-repo-local";
 import { normalizeText } from "../core/text-normalization";
 
 interface HermesInstallSkillOptions {
@@ -23,6 +43,20 @@ interface HermesInstallSkillOptions {
 
 interface HermesReadOnlyOptions {
   help: boolean;
+}
+
+interface HermesStatusOptions {
+  help: boolean;
+  user: string;
+  workspace: string;
+}
+
+interface HermesSyncCheckinOptions {
+  dryRun?: boolean;
+  help: boolean;
+  idempotencyKey?: string;
+  user: string;
+  workspace: string;
 }
 
 type HermesInstallSkillMutationData = HermesSkillInstallPreview | HermesSkillInstallResult;
@@ -39,10 +73,48 @@ type HermesInstallSkillSideEffect = {
   target: string;
 };
 
+type HermesSyncCheckinMutationData = {
+  planned: {
+    name: string;
+    nextRunAt: string;
+    role: "recovery" | "wake";
+    targetKey: string;
+  };
+  summary: HostedCheckinCronSummary;
+  sync: {
+    chatId: string;
+    created: boolean;
+    deliver: string;
+    jobId: string;
+    name: string;
+    nextRunAt: string;
+    platform: string;
+    removedJobIds: string[];
+    role: "recovery" | "wake";
+    threadId: string;
+  };
+  target: {
+    senderId: string;
+    senderSource: string;
+    workspaceRoot: string;
+    workspaceSource: string;
+  };
+  tick: {
+    due: boolean;
+    nextWakeAt: string;
+    status: string;
+    triggerId: string;
+  };
+};
+
 type HermesOperatorConfig = Pick<
   AppRuntimeConfig,
+  | "accountId"
+  | "allowedUserIds"
   | "channel"
   | "channelProvider"
+  | "checkinConfigFile"
+  | "checkinScheduleStateFile"
   | "cliIdempotencyLedgerFile"
   | "hermesCommand"
   | "hermesHome"
@@ -51,6 +123,9 @@ type HermesOperatorConfig = Pick<
   | "hermesRepoRoot"
   | "reviewSemanticHost"
   | "runtime"
+  | "sessionsFile"
+  | "userName"
+  | "workspaceId"
   | "workspaceRoot"
 >;
 
@@ -60,11 +135,12 @@ export function buildHermesOperatorValidationError(value: string) {
     {
       subcommands: [
         "install-skill",
+        "sync-checkin",
         "status",
         "smoke",
       ],
     },
-    "可用子命令：install-skill, status, smoke",
+    "可用子命令：install-skill, sync-checkin, status, smoke",
   );
 }
 
@@ -126,7 +202,7 @@ export async function runHermesStatusCommand(
   config: HermesOperatorConfig,
   args: string[] = [],
 ): Promise<CommandExecutionResult> {
-  const options = parseCliArgs<HermesReadOnlyOptions>(args, getCommandArgsSchema("hermesStatus"));
+  const options = parseCliArgs<HermesStatusOptions>(args, getCommandArgsSchema("hermesStatus"));
   if (options.help) {
     return {
       data: null,
@@ -135,8 +211,12 @@ export async function runHermesStatusCommand(
   }
 
   const report = collectHermesHostedStatusReport(config);
+  const managedCheckin = resolveManagedCheckinSummary(config, options);
   return {
-    data: report,
+    data: {
+      ...report,
+      managedCheckin,
+    },
     text: [
       `profile: ${report.hostProfile.profile}`,
       `supported: ${report.hostProfile.supported ? "yes" : "no"}`,
@@ -149,9 +229,16 @@ export async function runHermesStatusCommand(
       `semantic_host: ${report.hermes.semanticReview.activeHost}`,
       `semantic_available: ${report.hermes.semanticReview.available ? "yes" : "no"}`,
       `skills_listed: ${report.skillCatalog.listed ? "yes" : "no"}`,
+      ...(managedCheckin ? [
+        `managed_checkin_target: ${managedCheckin.targetKey}`,
+        `managed_checkin_wake_jobs: ${managedCheckin.wakeJobs.length}`,
+        `managed_checkin_recovery_jobs: ${managedCheckin.recoveryJobs.length}`,
+        `managed_checkin_next_wake: ${managedCheckin.nextPlannedWakeAt || "(none)"}`,
+        `managed_checkin_drifted: ${managedCheckin.drifted ? "yes" : "no"}`,
+      ] : []),
     ].join("\n"),
     next: report.hermes.installedSkill.inSync
-      ? ["codeksei operator hermes smoke"]
+      ? ["codeksei operator hermes sync-checkin", "codeksei operator hermes smoke"]
       : ["codeksei operator hermes install-skill"],
   };
 }
@@ -179,6 +266,166 @@ export async function runHermesSmokeCommand(
     ].join("\n"),
     next: smoke.next,
   };
+}
+
+export async function runHermesSyncCheckinCommand(
+  config: HermesOperatorConfig,
+  args: string[] = [],
+): Promise<CommandExecutionResult> {
+  const options = parseCliArgs<HermesSyncCheckinOptions>(args, getCommandArgsSchema("hermesSyncCheckin"));
+  if (options.help) {
+    return {
+      data: null,
+      text: buildTerminalLeafHelp("operator.hermes.sync_checkin"),
+    };
+  }
+
+  const resolution = resolveCheckinTarget({
+    accountId: normalizeText(config.accountId),
+    config,
+    explicitUser: options.user,
+    explicitWorkspace: options.workspace,
+    sessionStore: config.sessionsFile ? new SessionStore({ filePath: config.sessionsFile }) : null,
+  });
+  if (!resolution.ok || !resolution.value) {
+    throw buildTargetResolutionRequiredError(
+      buildCheckinTargetResolutionErrorMessage(resolution),
+      {
+        senderCandidates: resolution.senderResolution.candidates,
+        senderSource: resolution.senderResolution.source,
+        workspaceCandidates: resolution.workspaceResolution.candidates,
+        workspaceSource: resolution.workspaceResolution.source,
+      },
+      "显式传 --user / --workspace，或先把唯一稳定默认值写进配置。"
+    );
+  }
+  const target = resolution.value;
+
+  const tick = runCheckinTick({
+    config,
+    target,
+  });
+  const plan = createHostedCheckinCronPlanFromTick(config, target, tick);
+  const jobsFile = path.join(resolveHermesHomePath(config), "cron", "jobs.json");
+
+  return runCliMutation<HermesSyncCheckinMutationData>({
+    commandKey: "operator.hermes.sync_checkin",
+    config,
+    configSource: {
+      hermesHome: resolveHermesHomePath(config),
+      jobsFile,
+    },
+    dryRun: Boolean(options.dryRun),
+    dryRunResult: {
+      data: {
+        planned: {
+          name: plan.name,
+          nextRunAt: plan.plannedWakeAt,
+          role: plan.role,
+          targetKey: plan.targetKey,
+        },
+        summary: collectHostedCheckinCronSummary(config, target),
+        sync: {
+          chatId: "",
+          created: false,
+          deliver: "origin",
+          jobId: "",
+          name: plan.name,
+          nextRunAt: plan.plannedWakeAt,
+          platform: "weixin",
+          removedJobIds: [],
+          role: plan.role,
+          threadId: "",
+        },
+        target,
+        tick: {
+          due: tick.due,
+          nextWakeAt: tick.nextWakeAt,
+          status: tick.status,
+          triggerId: normalizeText(tick.payload?.triggerId) || normalizeText(tick.activeWake?.triggerId),
+        },
+      },
+      text: [
+        "hosted checkin sync dry-run",
+        `status: ${tick.status}`,
+        `target: ${plan.targetKey}`,
+        `role: ${plan.role}`,
+        `nextRunAt: ${plan.plannedWakeAt}`,
+        `jobsFile: ${jobsFile}`,
+      ].join("\n"),
+    },
+    execute: async () => {
+      const sync = syncCheckinCronViaHermesRepoLocal(config, {
+        due_at_iso: plan.plannedWakeAt,
+        name: plan.name,
+        prompt: plan.prompt,
+        role: plan.role,
+        sender_id: plan.senderId,
+        target_key: plan.targetKey,
+        workspace_root: plan.workspaceRoot,
+      });
+      const summary = collectHostedCheckinCronSummary(config, target);
+      return {
+        data: {
+          planned: {
+            name: plan.name,
+            nextRunAt: plan.plannedWakeAt,
+            role: plan.role,
+            targetKey: plan.targetKey,
+          },
+          summary,
+          sync: {
+            chatId: sync.chatId,
+            created: sync.created,
+            deliver: sync.deliver,
+            jobId: sync.jobId,
+            name: sync.name,
+            nextRunAt: sync.nextRunAt,
+            platform: sync.platform,
+            removedJobIds: sync.removedJobIds,
+            role: sync.role,
+            threadId: sync.threadId,
+          },
+          target,
+          tick: {
+            due: tick.due,
+            nextWakeAt: tick.nextWakeAt,
+            status: tick.status,
+            triggerId: normalizeText(tick.payload?.triggerId) || normalizeText(tick.activeWake?.triggerId),
+          },
+        },
+        text: [
+          `hosted checkin synced: ${sync.jobId}`,
+          `status: ${tick.status}`,
+          `role: ${plan.role}`,
+          `nextRunAt: ${sync.nextRunAt}`,
+          `removedFutureJobs: ${sync.removedJobIds.length}`,
+        ].join("\n"),
+      };
+    },
+    idempotencyKey: normalizeText(options.idempotencyKey),
+    request: {
+      role: plan.role,
+      senderId: plan.senderId,
+      status: tick.status,
+      targetKey: plan.targetKey,
+      workspaceRoot: plan.workspaceRoot,
+      nextRunAt: plan.plannedWakeAt,
+    },
+    resolvedTargets: {
+      jobsFile,
+      role: plan.role,
+      senderId: plan.senderId,
+      targetKey: plan.targetKey,
+      workspaceRoot: plan.workspaceRoot,
+    },
+    sideEffects: [
+      {
+        kind: "sync_hermes_checkin_cron_job",
+        target: jobsFile,
+      },
+    ],
+  });
 }
 
 function buildHermesInstallSkillSideEffects(preview: HermesSkillInstallPreview): HermesInstallSkillSideEffect[] {
@@ -221,4 +468,37 @@ function renderHermesInstallSkillResult(result: HermesSkillInstallResult): strin
 
 function normalizeLocalPath(value: string): string {
   return normalizeText(value).replace(/\\/g, "/");
+}
+
+function resolveManagedCheckinSummary(
+  config: HermesOperatorConfig,
+  options: Pick<HermesStatusOptions, "user" | "workspace">,
+): HostedCheckinCronSummary | null {
+  const wantsExplicitTarget = Boolean(normalizeText(options.user) || normalizeText(options.workspace));
+  if (!wantsExplicitTarget && !Array.isArray(config.allowedUserIds) && !normalizeText(config.sessionsFile)) {
+    return null;
+  }
+  const resolution = resolveCheckinTarget({
+    accountId: normalizeText(config.accountId),
+    config,
+    explicitUser: options.user,
+    explicitWorkspace: options.workspace,
+    sessionStore: config.sessionsFile ? new SessionStore({ filePath: config.sessionsFile }) : null,
+  });
+  if (!resolution.ok || !resolution.value) {
+    if (wantsExplicitTarget) {
+      throw buildTargetResolutionRequiredError(
+        buildCheckinTargetResolutionErrorMessage(resolution),
+        {
+          senderCandidates: resolution.senderResolution.candidates,
+          senderSource: resolution.senderResolution.source,
+          workspaceCandidates: resolution.workspaceResolution.candidates,
+          workspaceSource: resolution.workspaceResolution.source,
+        },
+        "显式传 --user / --workspace，或先把唯一稳定默认值写进配置。"
+      );
+    }
+    return null;
+  }
+  return collectHostedCheckinCronSummary(config, resolution.value);
 }

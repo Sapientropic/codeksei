@@ -18,6 +18,7 @@ const {
 const {
   runSystemCheckinTriggerCommand,
 }: typeof import("../src/app/system-checkin-trigger-cli") = require("../src/app/system-checkin-trigger-cli");
+const { createFakeHermesRepoLocalFixture } = require("./helpers/fake-hermes-repo-local.ts");
 
 function createCheckinConfigFixture() {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-checkin-trigger-"));
@@ -206,4 +207,76 @@ test("checkin-complete rejects missing or invalid result values", async () => {
     ]),
     (error: unknown) => error instanceof CliError && error.code === "validation_error",
   );
+});
+
+test("hosted checkin-complete re-arms the next wake and clears future recovery jobs", async () => {
+  const fixture = createCheckinConfigFixture();
+  const repoLocal = createFakeHermesRepoLocalFixture(
+    fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-checkin-complete-hosted-"))
+  );
+  const baseConfig: Parameters<typeof runSystemCheckinCompleteCommand>[0] = {
+    channelProvider: "hermes",
+    runtime: "hermes",
+    checkinConfigFile: fixture.checkinConfigFile,
+    checkinScheduleStateFile: fixture.checkinScheduleStateFile,
+    sessionsFile: fixture.sessionsFile,
+    hermesHome: repoLocal.hermesHome,
+    hermesRepoRoot: repoLocal.repoRoot,
+    hermesRepoLocalShimPath: repoLocal.shimPath,
+  };
+  const target = {
+    senderId: "wx-user",
+    senderSource: "explicit_user",
+    workspaceRoot: fixture.workspaceRoot,
+    workspaceSource: "explicit_workspace",
+  };
+  const startMs = Date.now() - 120_000;
+  runCheckinTick({
+    config: baseConfig,
+    nowMs: startMs,
+    target,
+  });
+  const due = runCheckinTick({
+    config: baseConfig,
+    nowMs: startMs + 60_000,
+    target,
+  });
+  runCheckinTick({
+    ack: String(due.payload?.triggerId || ""),
+    config: baseConfig,
+    nowMs: startMs + 61_000,
+    target,
+  });
+  fs.writeFileSync(repoLocal.jobsFile, JSON.stringify({
+    jobs: [{
+      id: "cron-old-recovery",
+      name: "ck-checkin-recovery-test",
+      next_run_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+      enabled: true,
+      state: "scheduled",
+      deliver: "origin",
+      codeksei_checkin_target_key: `wx-user::${fixture.workspaceRoot}`,
+      codeksei_checkin_role: "recovery",
+    }],
+    updated_at: new Date().toISOString(),
+  }, null, 2), "utf8");
+
+  const result = await runSystemCheckinCompleteCommand(baseConfig, [
+    "--user", "wx-user",
+    "--workspace", fixture.workspaceRoot,
+    "--trigger", String(due.payload?.triggerId || ""),
+    "--result", "silent",
+    "--sleep-for", "6h",
+  ]);
+
+  assert.equal(result.ok, true);
+  const data = result.data as {
+    hostedWakeSync: { jobId: string; removedJobIds: string[]; role: string };
+  };
+  assert.equal(data.hostedWakeSync.role, "wake");
+  assert.equal(data.hostedWakeSync.jobId.startsWith("cron-"), true);
+  assert.deepEqual(data.hostedWakeSync.removedJobIds, ["cron-old-recovery"]);
+  const jobsState = JSON.parse(fs.readFileSync(repoLocal.jobsFile, "utf8"));
+  assert.equal(jobsState.jobs.length, 1);
+  assert.equal(jobsState.jobs[0].codeksei_checkin_role, "wake");
 });

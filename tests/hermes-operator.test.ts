@@ -8,11 +8,32 @@ const {
   runHermesInstallSkillCommand,
   runHermesSmokeCommand,
   runHermesStatusCommand,
+  runHermesSyncCheckinCommand,
 } = require("../src/app/hermes-operator-cli");
+const { CheckinScheduleStateStore } = require("../src/state/checkin-schedule-state-store");
+const { CheckinConfigStore } = require("../src/state/checkin-config-store");
 const { createFakeHermesCommand } = require("./helpers/fake-hermes-command.ts");
 const {
   createFakeHermesRepoLocalFixture,
 } = require("./helpers/fake-hermes-repo-local.ts");
+
+function createHostedCheckinFixture(prefix: string) {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  const workspaceRoot = path.join(tempRoot, "workspace");
+  fs.mkdirSync(workspaceRoot, { recursive: true });
+  const checkinConfigFile = path.join(tempRoot, "checkin-config.json");
+  new CheckinConfigStore({ filePath: checkinConfigFile }).setConfig({
+    minIntervalMs: 60_000,
+    maxIntervalMs: 60_000,
+  });
+  return {
+    checkinConfigFile,
+    checkinScheduleStateFile: path.join(tempRoot, "checkin-schedule-state.json"),
+    sessionsFile: path.join(tempRoot, "sessions.json"),
+    tempRoot,
+    workspaceRoot,
+  };
+}
 
 test("operator hermes install-skill installs and syncs the companion skill", async () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-hermes-install-"));
@@ -91,4 +112,120 @@ test("operator hermes smoke returns partial when hosted prerequisites are missin
   assert.equal(result.ok, "partial");
   assert.equal(result.data.ok, false);
   assert.match(result.data.checks.weixinAccounts.reason, /Weixin/u);
+});
+
+test("operator hermes sync-checkin creates a wake job for scheduled hosted checkins", async () => {
+  const fixture = createHostedCheckinFixture("codeksei-hermes-sync-wake-");
+  const repoLocal = createFakeHermesRepoLocalFixture(
+    fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-hermes-sync-wake-repo-local-"))
+  );
+
+  const result = await runHermesSyncCheckinCommand({
+    runtime: "hermes",
+    channelProvider: "hermes",
+    checkinConfigFile: fixture.checkinConfigFile,
+    checkinScheduleStateFile: fixture.checkinScheduleStateFile,
+    sessionsFile: fixture.sessionsFile,
+    workspaceRoot: fixture.workspaceRoot,
+    hermesHome: repoLocal.hermesHome,
+    hermesRepoRoot: repoLocal.repoRoot,
+    hermesRepoLocalShimPath: repoLocal.shimPath,
+  }, [
+    "--user", "wx-user",
+    "--workspace", fixture.workspaceRoot,
+  ]);
+
+  assert.equal(result.data.tick.status, "scheduled");
+  assert.equal(result.data.planned.role, "wake");
+  assert.equal(result.data.summary.wakeJobs.length, 1);
+  assert.equal(result.data.summary.recoveryJobs.length, 0);
+});
+
+test("operator hermes sync-checkin creates an immediate wake job when checkin is already due", async () => {
+  const fixture = createHostedCheckinFixture("codeksei-hermes-sync-due-");
+  const repoLocal = createFakeHermesRepoLocalFixture(
+    fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-hermes-sync-due-repo-local-"))
+  );
+  const baseConfig = {
+    runtime: "hermes",
+    channelProvider: "hermes",
+    checkinConfigFile: fixture.checkinConfigFile,
+    checkinScheduleStateFile: fixture.checkinScheduleStateFile,
+    sessionsFile: fixture.sessionsFile,
+    workspaceRoot: fixture.workspaceRoot,
+    hermesHome: repoLocal.hermesHome,
+    hermesRepoRoot: repoLocal.repoRoot,
+    hermesRepoLocalShimPath: repoLocal.shimPath,
+  };
+  new CheckinScheduleStateStore({ filePath: fixture.checkinScheduleStateFile }).setState({
+    activeWake: null,
+    lastCompletion: null,
+    nextWakeAt: new Date(Date.now() - 60_000).toISOString(),
+    pendingTrigger: null,
+    scheduleSource: "agent",
+    senderId: "wx-user",
+    targetKey: `wx-user::${fixture.workspaceRoot}`,
+    updatedAt: new Date().toISOString(),
+    workspaceRoot: fixture.workspaceRoot,
+  });
+
+  const result = await runHermesSyncCheckinCommand(baseConfig, [
+    "--user", "wx-user",
+    "--workspace", fixture.workspaceRoot,
+  ]);
+
+  assert.equal(result.data.tick.status, "due");
+  assert.equal(result.data.planned.role, "wake");
+  assert.equal(result.data.sync.jobId.startsWith("cron-"), true);
+  assert.equal(result.data.tick.triggerId.length > 0, true);
+});
+
+test("operator hermes sync-checkin creates a recovery job while active wake is in progress", async () => {
+  const fixture = createHostedCheckinFixture("codeksei-hermes-sync-recovery-");
+  const repoLocal = createFakeHermesRepoLocalFixture(
+    fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-hermes-sync-recovery-repo-local-"))
+  );
+  const baseConfig = {
+    runtime: "hermes",
+    channelProvider: "hermes",
+    checkinConfigFile: fixture.checkinConfigFile,
+    checkinScheduleStateFile: fixture.checkinScheduleStateFile,
+    sessionsFile: fixture.sessionsFile,
+    workspaceRoot: fixture.workspaceRoot,
+    hermesHome: repoLocal.hermesHome,
+    hermesRepoRoot: repoLocal.repoRoot,
+    hermesRepoLocalShimPath: repoLocal.shimPath,
+  };
+  const nowIso = new Date().toISOString();
+  new CheckinScheduleStateStore({ filePath: fixture.checkinScheduleStateFile }).setState({
+    activeWake: {
+      createdAt: nowIso,
+      dueAt: nowIso,
+      kind: "checkin",
+      senderId: "wx-user",
+      source: "checkin_trigger",
+      startedAt: nowIso,
+      text: "ping",
+      triggerId: "trigger-1",
+      workspaceRoot: fixture.workspaceRoot,
+    },
+    lastCompletion: null,
+    nextWakeAt: "",
+    pendingTrigger: null,
+    scheduleSource: "agent",
+    senderId: "wx-user",
+    targetKey: `wx-user::${fixture.workspaceRoot}`,
+    updatedAt: nowIso,
+    workspaceRoot: fixture.workspaceRoot,
+  });
+
+  const result = await runHermesSyncCheckinCommand(baseConfig, [
+    "--user", "wx-user",
+    "--workspace", fixture.workspaceRoot,
+  ]);
+
+  assert.equal(result.data.tick.status, "in_progress");
+  assert.equal(result.data.planned.role, "recovery");
+  assert.equal(result.data.summary.wakeJobs.length, 0);
+  assert.equal(result.data.summary.recoveryJobs.length, 1);
 });

@@ -128,11 +128,22 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
   hermesStatus: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,
+      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "可选；显式 sender id，用于补充当前 target 的托管摘要" },
+      { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "可选；显式 workspace 路径，用于补充当前 target 的托管摘要" },
     ],
   }),
   hermesSmoke: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,
+    ],
+  }),
+  hermesSyncCheckin: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      COMMON_DRY_RUN_FLAG,
+      COMMON_IDEMPOTENCY_FLAG,
+      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id；没传时尝试唯一稳定默认值或当前 active session" },
+      { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "显式绝对 workspace 路径；没传时尝试唯一稳定默认值" },
     ],
   }),
   projectRadar: createCommandArgSchema({

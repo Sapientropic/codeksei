@@ -19,9 +19,9 @@
 边界：
 
 - `Bridge Mode` 下，Codeksei 自己托管 bridge / shared 线程
-- `Hermes Hosted Mode` 下，宿主控制命令交给 Hermes；Codeksei 主要暴露 timeline / diary / reminder / review / note / project radar / doctor / schema，并提供 Hermes operator 入口做 skill/status/smoke
+- `Hermes Hosted Mode` 下，宿主控制命令交给 Hermes；Codeksei 主要暴露 timeline / diary / reminder / review / note / project radar / doctor / schema，并提供 Hermes operator 入口做 skill/status/smoke/sync-checkin
 - `channel send-file`、`timeline screenshot --send`、`reminder write` 已接上 Hermes repo-local 路径；`system send` 仍因缺少 backstage-only 宿主原语而保持 blocked
-- `Hermes Hosted Mode` 下，主动 checkin 的调度也交给 Hermes；Codeksei 只提供 `tick -> ack -> complete` 的调度真相与 one-shot trigger generation
+- `Hermes Hosted Mode` 下，Hermes 只执行 one-shot wake/recovery job；Codeksei 继续持有 `tick -> ack -> complete` 的调度真相，并通过 `operator hermes sync-checkin` 把下一次 wake 重新 arm 给 Hermes
 
 ## 命名
 
@@ -55,6 +55,7 @@ operator / bootstrap：
 - `codeksei operator help`
 - `codeksei operator schema`
 - `codeksei operator hermes install-skill`
+- `codeksei operator hermes sync-checkin`
 - `codeksei operator hermes status`
 - `codeksei operator hermes smoke`
 - `codeksei login` `Bridge Mode only`
@@ -83,13 +84,15 @@ operator / bootstrap：
 - `codeksei system checkin-tick --user <senderId> --workspace /absolute/workspace`
 - `codeksei system checkin-tick --user <senderId> --workspace /absolute/workspace --ack <triggerId>`
 - `codeksei system checkin-complete --user <senderId> --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for 6h`
+- `codeksei operator hermes sync-checkin --user <senderId> --workspace /absolute/workspace`
 
 说明：
 
 - `codeksei help` / `codeksei schema` 默认只暴露 public finite command surface
 - `codeksei operator help` / `codeksei operator schema` 才会显示 bootstrap、shared、background、maintainer 入口
-- `codeksei operator hermes --help` / `codeksei operator schema operator hermes` 会列出 Hermes Hosted Mode 的 3 个 leaf action
+- `codeksei operator hermes --help` / `codeksei operator schema operator hermes` 会列出 Hermes Hosted Mode 的 4 个 leaf action
 - `codeksei operator hermes install-skill` 是唯一会改本机 Hermes skill 状态的 leaf action；支持 `--dry-run`
+- `codeksei operator hermes sync-checkin` 会按当前 target 的 checkin state 为 Hermes 创建/更新唯一需要存在的 one-shot wake/recovery job；支持 `--dry-run`
 - 非 TTY 默认返回 JSON envelope；TTY 默认返回 text
 - `stdout` 留给结果数据，`stderr` 留给诊断与 debug 信息
 - 全局参数统一支持：`--format json|text`、`--verbose`、`--workspace-root /absolute/path`
@@ -97,6 +100,7 @@ operator / bootstrap：
 - `codeksei start` / `npm run start:checkin` 更适合 operator 调试，不再视作默认 public discovery 面
 - 如果当前配置是 `Hermes Hosted Mode`，`codeksei start` 与 `shared:start` 会明确提示“改由 Hermes gateway 托管”，不会隐式回退到 Codex app-server
 - `codeksei system checkin-poller` 现在只保留 bridge 宿主包装；host-neutral 真相层是 `checkin-trigger`、`checkin-tick` 与 `checkin-complete`
+- `checkin-complete` 在 Hermes Hosted Mode 下会在写回 state 后自动 re-arm 下一条 wake one-shot job，并清理未来 recovery job
 - `system checkin --range` 现在是 fallback window，不再代表 agent 的真实唤醒节奏
 
 ## 微信命令
