@@ -1,9 +1,15 @@
 import * as os from "node:os";
 import * as path from "node:path";
+import type { AppRuntimeConfig } from "./app-service-contract";
 import {
   resolveCrossPlatformPathFromRoot,
   resolvePackageRoot,
 } from "./path-utils";
+import {
+  resolveHermesHomePath,
+  resolveHermesRepoLocalShimPath,
+  resolveHermesRepoRoot,
+} from "./hermes-repo-local";
 import { resolveTimezoneConfig } from "./timezone";
 import { readPrefixedBoolEnv, readPrefixedEnv, readPrefixedIntEnv, readPrefixedListEnv, resolveAppHome, resolveStateDir } from "./branding";
 
@@ -11,50 +17,69 @@ interface ReadConfigOptions {
   workspaceRoot?: string;
 }
 
-function readConfig(options: ReadConfigOptions = {}) {
+type EnvSource = NodeJS.ProcessEnv & Record<string, string | undefined>;
+
+function readConfig(options: ReadConfigOptions = {}): AppRuntimeConfig {
+  return parseEnvConfig(process.env, options);
+}
+
+function parseEnvConfig(env: EnvSource, options: ReadConfigOptions = {}): AppRuntimeConfig {
   const packageRoot = resolvePackageRoot(__dirname);
-  const stateDir = resolveStateDir({ env: process.env });
+  const stateDir = resolveStateDir({ env });
   const workspaceRoot = options.workspaceRoot
-    || readPrefixedEnv(process.env, "WORKSPACE_ROOT")
+    || readPrefixedEnv(env, "WORKSPACE_ROOT")
     || process.cwd();
-  const timelineStateDir = readPrefixedEnv(process.env, "TIMELINE_STATE_DIR") || stateDir;
+  const timelineStateDir = readPrefixedEnv(env, "TIMELINE_STATE_DIR") || stateDir;
   const timezoneConfig = resolveTimezoneConfig({
-    explicitTimezone: readPrefixedEnv(process.env, "TIMEZONE"),
+    explicitTimezone: readPrefixedEnv(env, "TIMEZONE"),
     timelineStateDir,
   });
   const appHome = resolveAppHome({
-    env: process.env,
+    env,
     fallbackRoot: packageRoot,
   }) || packageRoot;
+  const hermesHome = resolveHermesHomePath({
+    hermesHome: readPrefixedEnv(env, "HERMES_HOME") || env.HERMES_HOME,
+  });
+  const hermesRepoRoot = resolveHermesRepoRoot({
+    hermesRepoRoot: readPrefixedEnv(env, "HERMES_REPO_ROOT"),
+  });
+  const hermesRepoLocalShimPath = resolveHermesRepoLocalShimPath({
+    hermesRepoLocalShimPath: readPrefixedEnv(env, "HERMES_REPO_LOCAL_SHIM_PATH"),
+  });
+  const runtimeAccessMode = normalizeRuntimeAccessMode(
+    readPrefixedEnv(env, "RUNTIME_ACCESS_MODE") || readPrefixedEnv(env, "CODEX_ACCESS_MODE"),
+  );
+  const codexAccessMode = normalizeRuntimeAccessMode(readPrefixedEnv(env, "CODEX_ACCESS_MODE"));
 
   return {
     stateDir,
     codekseiHome: appHome,
-    workspaceId: readPrefixedEnv(process.env, "WORKSPACE_ID") || "default",
+    workspaceId: readPrefixedEnv(env, "WORKSPACE_ID") || "default",
     workspaceRoot,
     timezone: timezoneConfig.timezone,
     timezoneSource: timezoneConfig.source,
     timezoneExplicit: timezoneConfig.explicit,
     timelineStateTimezone: timezoneConfig.timelineStateTimezone,
-    diaryDir: readPrefixedEnv(process.env, "DIARY_DIR") || path.join(stateDir, "diary"),
+    diaryDir: readPrefixedEnv(env, "DIARY_DIR") || path.join(stateDir, "diary"),
     timelineStateDir,
-    userName: readPrefixedEnv(process.env, "USER_NAME") || "",
-    userGender: readPrefixedEnv(process.env, "USER_GENDER") || "female",
-    allowedUserIds: readPrefixedListEnv(process.env, "ALLOWED_USER_IDS"),
-    channel: readPrefixedEnv(process.env, "CHANNEL") || "weixin",
-    runtime: readPrefixedEnv(process.env, "RUNTIME")
-      || (readPrefixedEnv(process.env, "CHANNEL_PROVIDER") === "hermes" ? "hermes" : "codex"),
-    channelProvider: readPrefixedEnv(process.env, "CHANNEL_PROVIDER")
-      || (readPrefixedEnv(process.env, "RUNTIME") === "hermes" ? "hermes" : "codeksei"),
-    accountId: readPrefixedEnv(process.env, "ACCOUNT_ID"),
-    weixinBaseUrl: readPrefixedEnv(process.env, "WEIXIN_BASE_URL") || "https://ilinkai.weixin.qq.com",
-    weixinCdnBaseUrl: readPrefixedEnv(process.env, "WEIXIN_CDN_BASE_URL") || "https://novac2c.cdn.weixin.qq.com/c2c",
-    weixinAdapterVariant: readPrefixedEnv(process.env, "WEIXIN_ADAPTER") || "v2",
-    weixinReplyMode: normalizeWeixinReplyMode(readPrefixedEnv(process.env, "WEIXIN_REPLY_MODE") || "stream"),
-    weixinDeliveryTrace: readPrefixedBoolEnv(process.env, "WEIXIN_DELIVERY_TRACE"),
-    weixinQrBotType: readPrefixedEnv(process.env, "WEIXIN_QR_BOT_TYPE") || "3",
-    weixinRouteTag: readPrefixedEnv(process.env, "WEIXIN_ROUTE_TAG"),
-    weixinProtocolClientVersion: readPrefixedEnv(process.env, "WEIXIN_PROTOCOL_CLIENT_VERSION") || "2.1.1",
+    userName: readPrefixedEnv(env, "USER_NAME") || "",
+    userGender: readPrefixedEnv(env, "USER_GENDER") || "female",
+    allowedUserIds: readPrefixedListEnv(env, "ALLOWED_USER_IDS"),
+    channel: readPrefixedEnv(env, "CHANNEL") || "weixin",
+    runtime: readPrefixedEnv(env, "RUNTIME")
+      || (readPrefixedEnv(env, "CHANNEL_PROVIDER") === "hermes" ? "hermes" : "codex"),
+    channelProvider: readPrefixedEnv(env, "CHANNEL_PROVIDER")
+      || (readPrefixedEnv(env, "RUNTIME") === "hermes" ? "hermes" : "codeksei"),
+    accountId: readPrefixedEnv(env, "ACCOUNT_ID") || "",
+    weixinBaseUrl: readPrefixedEnv(env, "WEIXIN_BASE_URL") || "https://ilinkai.weixin.qq.com",
+    weixinCdnBaseUrl: readPrefixedEnv(env, "WEIXIN_CDN_BASE_URL") || "https://novac2c.cdn.weixin.qq.com/c2c",
+    weixinAdapterVariant: readPrefixedEnv(env, "WEIXIN_ADAPTER") || "v2",
+    weixinReplyMode: normalizeWeixinReplyMode(readPrefixedEnv(env, "WEIXIN_REPLY_MODE") || "stream"),
+    weixinDeliveryTrace: readPrefixedBoolEnv(env, "WEIXIN_DELIVERY_TRACE"),
+    weixinQrBotType: readPrefixedEnv(env, "WEIXIN_QR_BOT_TYPE") || "3",
+    weixinRouteTag: readPrefixedEnv(env, "WEIXIN_ROUTE_TAG") || "",
+    weixinProtocolClientVersion: readPrefixedEnv(env, "WEIXIN_PROTOCOL_CLIENT_VERSION") || "2.1.1",
     accountsDir: path.join(stateDir, "accounts"),
     logDir: path.join(stateDir, "logs"),
     reminderQueueFile: path.join(stateDir, "reminder-queue.json"),
@@ -64,45 +89,45 @@ function readConfig(options: ReadConfigOptions = {}) {
     systemMessageDeadLetterFile: path.join(stateDir, "system-message-dead-letter.json"),
     timelineScreenshotQueueFile: path.join(stateDir, "timeline-screenshot-queue.json"),
     cliIdempotencyLedgerFile: path.join(stateDir, "cli-idempotency-ledger.json"),
-    weixinInstructionsFile: readPrefixedEnv(process.env, "WEIXIN_INSTRUCTIONS_FILE")
+    weixinInstructionsFile: readPrefixedEnv(env, "WEIXIN_INSTRUCTIONS_FILE")
       || path.join(packageRoot, "templates", "weixin-instructions.md"),
-    weixinInstructionsOverlayFile: readPrefixedEnv(process.env, "WEIXIN_INSTRUCTIONS_OVERLAY_FILE")
+    weixinInstructionsOverlayFile: readPrefixedEnv(env, "WEIXIN_INSTRUCTIONS_OVERLAY_FILE")
       || path.join(stateDir, "weixin-instructions.local.md"),
     weixinOperationsFile: path.join(packageRoot, "templates", "weixin-operations.md"),
-    weixinOperationsOverlayFile: readPrefixedEnv(process.env, "WEIXIN_OPERATIONS_OVERLAY_FILE")
+    weixinOperationsOverlayFile: readPrefixedEnv(env, "WEIXIN_OPERATIONS_OVERLAY_FILE")
       || path.join(stateDir, "weixin-operations.local.md"),
     syncBufferDir: path.join(stateDir, "sync-buffers"),
-    runtimeEndpoint: readPrefixedEnv(process.env, "RUNTIME_ENDPOINT")
-      || readPrefixedEnv(process.env, "CODEX_ENDPOINT"),
-    runtimeCommand: readPrefixedEnv(process.env, "RUNTIME_COMMAND")
-      || readPrefixedEnv(process.env, "CODEX_COMMAND"),
-    runtimeAccessMode: readPrefixedEnv(process.env, "RUNTIME_ACCESS_MODE")
-      || readPrefixedEnv(process.env, "CODEX_ACCESS_MODE"),
-    hermesCommand: readPrefixedEnv(process.env, "HERMES_COMMAND")
-      || process.env.HERMES_COMMAND
+    runtimeEndpoint: readPrefixedEnv(env, "RUNTIME_ENDPOINT")
+      || readPrefixedEnv(env, "CODEX_ENDPOINT")
+      || "",
+    runtimeCommand: readPrefixedEnv(env, "RUNTIME_COMMAND")
+      || readPrefixedEnv(env, "CODEX_COMMAND")
+      || "",
+    runtimeAccessMode,
+    codexAccessMode,
+    hermesCommand: readPrefixedEnv(env, "HERMES_COMMAND")
+      || env.HERMES_COMMAND
       || "hermes",
-    hermesHome: readPrefixedEnv(process.env, "HERMES_HOME")
-      || process.env.HERMES_HOME
-      || path.join(os.homedir(), ".hermes"),
-    hermesRepoRoot: readPrefixedEnv(process.env, "HERMES_REPO_ROOT"),
-    hermesRepoLocalShimPath: readPrefixedEnv(process.env, "HERMES_REPO_LOCAL_SHIM_PATH"),
-    hermesPythonCommand: readPrefixedEnv(process.env, "HERMES_PYTHON_COMMAND"),
+    hermesHome,
+    hermesRepoRoot,
+    hermesRepoLocalShimPath,
+    hermesPythonCommand: readPrefixedEnv(env, "HERMES_PYTHON_COMMAND") || "",
     sessionsFile: path.join(stateDir, "sessions.json"),
-    workspaceBootstrapConfigFile: readPrefixedEnv(process.env, "WORKSPACE_BOOTSTRAP_CONFIG")
+    workspaceBootstrapConfigFile: readPrefixedEnv(env, "WORKSPACE_BOOTSTRAP_CONFIG")
       || path.join(stateDir, "workspace-bootstrap.json"),
-    projectRadarConfigFile: readPrefixedEnv(process.env, "PROJECT_RADAR_CONFIG")
+    projectRadarConfigFile: readPrefixedEnv(env, "PROJECT_RADAR_CONFIG")
       || resolveCrossPlatformPathFromRoot(workspaceRoot, ".codex", "code-projects.json"),
-    durableNoteSchemaConfigFile: readPrefixedEnv(process.env, "DURABLE_NOTE_SCHEMA_CONFIG")
+    durableNoteSchemaConfigFile: readPrefixedEnv(env, "DURABLE_NOTE_SCHEMA_CONFIG")
       || resolveCrossPlatformPathFromRoot(workspaceRoot, ".codex", "durable-note-schema.json"),
-    reviewSchemaConfigFile: readPrefixedEnv(process.env, "REVIEW_SCHEMA_CONFIG")
+    reviewSchemaConfigFile: readPrefixedEnv(env, "REVIEW_SCHEMA_CONFIG")
       || resolveCrossPlatformPathFromRoot(workspaceRoot, ".codex", "review-schema.json"),
-    reviewSemanticMode: readPrefixedEnv(process.env, "REVIEW_SEMANTIC_MODE") || "hybrid",
-    reviewSemanticHost: readPrefixedEnv(process.env, "REVIEW_SEMANTIC_HOST") || "auto",
-    reviewSemanticModel: readPrefixedEnv(process.env, "REVIEW_SEMANTIC_MODEL"),
-    reviewSemanticTimeoutMs: readPrefixedIntEnv(process.env, "REVIEW_SEMANTIC_TIMEOUT_MS") || 120000,
+    reviewSemanticMode: readPrefixedEnv(env, "REVIEW_SEMANTIC_MODE") || "hybrid",
+    reviewSemanticHost: readPrefixedEnv(env, "REVIEW_SEMANTIC_HOST") || "auto",
+    reviewSemanticModel: readPrefixedEnv(env, "REVIEW_SEMANTIC_MODEL") || "",
+    reviewSemanticTimeoutMs: readPrefixedIntEnv(env, "REVIEW_SEMANTIC_TIMEOUT_MS") || 120000,
     sharedBridgeHeartbeatFile: path.join(stateDir, "logs", "shared-wechat-heartbeat.json"),
     sharedWatchdogStateFile: path.join(stateDir, "logs", "shared-watchdog-state.json"),
-    startWithCheckin: readPrefixedBoolEnv(process.env, "ENABLE_CHECKIN"),
+    startWithCheckin: readPrefixedBoolEnv(env, "ENABLE_CHECKIN"),
   };
 }
 
@@ -110,4 +135,9 @@ function normalizeWeixinReplyMode(value: unknown): "settled" | "stream" {
   return String(value || "").trim().toLowerCase() === "settled" ? "settled" : "stream";
 }
 
-export { readConfig };
+function normalizeRuntimeAccessMode(value: unknown): string {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "default" ? "current" : normalized;
+}
+
+export { parseEnvConfig, readConfig };

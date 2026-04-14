@@ -20,37 +20,123 @@ import type {
 // Keep the app/runtime/store seam in one place so app.ts, the factory, and the
 // three lifecycle classes do not silently drift into incompatible local *Like
 // copies again.
-export interface AppRuntimeConfig extends Record<string, unknown> {
+export interface AppRuntimeConfig {
   stateDir: string;
+  codekseiHome: string;
   workspaceId: string;
   workspaceRoot: string;
+  timezone: string;
+  timezoneSource: string;
+  timezoneExplicit: boolean;
+  timelineStateTimezone: string;
+  diaryDir: string;
+  timelineStateDir: string;
+  userName: string;
+  userGender: string;
+  allowedUserIds: string[];
+  channel: string;
+  channelProvider: string;
+  runtime: string;
+  accountId: string;
+  weixinBaseUrl: string;
+  weixinCdnBaseUrl: string;
+  weixinAdapterVariant: string;
+  weixinReplyMode: string;
+  weixinDeliveryTrace: boolean;
+  weixinQrBotType: string;
+  weixinRouteTag: string;
+  weixinProtocolClientVersion: string;
+  accountsDir: string;
+  logDir: string;
+  reminderQueueFile: string;
+  checkinConfigFile: string;
+  checkinScheduleStateFile: string;
+  systemMessageQueueFile: string;
+  systemMessageDeadLetterFile: string;
+  timelineScreenshotQueueFile: string;
+  cliIdempotencyLedgerFile: string;
+  weixinInstructionsFile: string;
+  weixinInstructionsOverlayFile: string;
+  weixinOperationsFile: string;
+  weixinOperationsOverlayFile: string;
+  syncBufferDir: string;
+  runtimeEndpoint: string;
+  runtimeCommand: string;
+  runtimeAccessMode: string;
+  codexAccessMode: string;
+  hermesCommand: string;
+  hermesHome: string;
+  hermesRepoRoot: string;
+  hermesRepoLocalShimPath: string;
+  hermesPythonCommand: string;
   sessionsFile: string;
-  allowedUserIds?: unknown;
-  channel?: unknown;
-  channelProvider?: unknown;
-  runtime?: unknown;
-  runtimeCommand?: string;
-  runtimeEndpoint?: string;
-  runtimeAccessMode?: string;
-  hermesCommand?: string;
-  hermesHome?: string;
-  reviewSemanticHost?: string;
-  sharedBridgeHeartbeatFile?: string;
-  startWithCheckin?: boolean;
-  checkinConfigFile?: string;
-  checkinScheduleStateFile?: string;
-  systemMessageDeadLetterFile?: string;
-  systemMessageQueueFile?: string;
-  reminderQueueFile?: string;
-  timelineScreenshotQueueFile?: string;
-  weixinCdnBaseUrl?: string;
-  weixinDeliveryTrace?: boolean;
-  weixinReplyMode?: string;
+  workspaceBootstrapConfigFile: string;
+  projectRadarConfigFile: string;
+  durableNoteSchemaConfigFile: string;
+  reviewSchemaConfigFile: string;
+  reviewSemanticMode: string;
+  reviewSemanticHost: string;
+  reviewSemanticModel: string;
+  reviewSemanticTimeoutMs: number;
+  sharedBridgeHeartbeatFile: string;
+  sharedWatchdogStateFile: string;
+  startWithCheckin: boolean;
 }
 
 export interface ChannelAccount {
   accountId: string;
   baseUrl: string;
+}
+
+export interface ChannelAdapterOperations {
+  pollUpdates: boolean;
+  login: boolean;
+  resolveAccount: boolean;
+  visibleTextDelivery: boolean;
+  visibleTypingDelivery: boolean;
+  visibleFileDelivery: boolean;
+}
+
+export interface ChannelAdapterDescriptor {
+  id: string;
+  kind: "channel";
+  provider: string;
+  operations: ChannelAdapterOperations;
+  variant?: string | undefined;
+  stateDir?: string | undefined;
+  baseUrl?: string | undefined;
+  accountsDir?: string | undefined;
+  syncBufferDir?: string | undefined;
+  protocolClientVersion?: string | undefined;
+  routeTag?: string | undefined;
+  profile?: string | undefined;
+  mode?: string | undefined;
+  supported?: boolean | undefined;
+  channel?: string | undefined;
+  capabilities?: unknown;
+}
+
+export interface RuntimeAdapterOperations {
+  initialize: boolean;
+  interactiveTurn: boolean;
+  refreshThreadInstructions: boolean;
+  respondApproval: boolean;
+  resumeThread: boolean;
+  cancelTurn: boolean;
+}
+
+export interface RuntimeAdapterDescriptor {
+  id: string;
+  kind: "runtime";
+  provider: string;
+  operations: RuntimeAdapterOperations;
+  endpoint?: string | undefined;
+  sessionsFile?: string | undefined;
+  profile?: string | undefined;
+  mode?: string | undefined;
+  supported?: boolean | undefined;
+  channelProvider?: string | undefined;
+  capabilities?: unknown;
 }
 
 export interface RuntimeAdapterState {
@@ -112,7 +198,7 @@ export interface SessionStoreWriterLike {
 }
 
 export interface ChannelAdapterLike {
-  describe(): { id?: string } & Record<string, unknown>;
+  describe(): ChannelAdapterDescriptor;
   getKnownContextTokens(): Record<string, string>;
   getUpdates(args?: {
     syncBuffer?: string;
@@ -146,7 +232,7 @@ export interface ChannelAdapterLike {
 export interface RuntimeAdapterLike {
   cancelTurn(args: { threadId: string; turnId: string }): Promise<unknown>;
   close(): Promise<void>;
-  describe(): { id?: string } & Record<string, unknown>;
+  describe(): RuntimeAdapterDescriptor;
   getSessionStore(): SessionStoreLike;
   initialize(): Promise<RuntimeAdapterState>;
   onEvent(listener: (event: RuntimeEvent<UnknownRecord>) => void): unknown;
@@ -175,6 +261,20 @@ export interface RuntimeAdapterLike {
 export interface TimelineIntegrationLike {
   describe(): { id?: string } & Record<string, unknown>;
   runSubcommand(command: string, args: string[]): Promise<unknown>;
+}
+
+export function supportsChannelOperation(
+  channelAdapter: Pick<ChannelAdapterLike, "describe">,
+  operation: keyof ChannelAdapterOperations,
+): boolean {
+  return Boolean(channelAdapter.describe().operations[operation]);
+}
+
+export function supportsRuntimeOperation(
+  runtimeAdapter: Pick<RuntimeAdapterLike, "describe">,
+  operation: keyof RuntimeAdapterOperations,
+): boolean {
+  return Boolean(runtimeAdapter.describe().operations[operation]);
 }
 
 export interface ThreadStateSnapshot {

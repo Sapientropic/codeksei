@@ -14,6 +14,7 @@
 
 这次不会把 Hermes 的 Python Weixin adapter 硬塞进 Node/TS。Hermes Weixin 仍由 Hermes 官方维护，Codeksei 负责 timeline / diary / reminder / review / note / project radar 这些领域能力，并通过 `operator hermes` 入口管理 skill/status/smoke。
 主动 checkin 也按同一条边界收口：Codeksei 负责 trigger generation、`tick -> ack -> complete` 调度真相与下一次唤醒决策，Bridge / Hermes 只负责各自宿主侧的 heartbeat、派发与超时兜底。
+运行配置入口也已经收口成 `src/core/config.ts` 的 `parseEnvConfig()`：env/CLI override 先规范化成显式字段的 `AppRuntimeConfig`，下游 factory / host policy / CLI 命令不再各自做一轮局部 `typeof config.xxx === "string"` 补丁式收口。
 
 当前质量基线也已经同步到结构层：
 
@@ -40,6 +41,7 @@
 - 驱动 app poll loop
 - 协调 command router 与 app-level wiring
 - 保持 app-level wiring 与 bridge coordination
+- host policy 现在按 sibling owner 拆开：`host-mode-resolution.ts` 只做纯判定，`hosted-hermes-diagnostics.ts` 负责 doctor/status/smoke，`hosted-hermes-skill.ts` 负责 skill preview/install，`review-semantic-host-policy.ts` 负责 semantic host 选择；`host-mode.ts` 退回 barrel
 - 把 runtime event pipeline、lifecycle runner、terminal façade 委托给独立 helper，而不是继续把串行链、启动/关闭细节和 terminal 能力暴露堆在 `app.ts`
 - `CodekseiApp` 现在是 thin façade：状态位 + `readonly services`，再把 admin / target resolution / runtime delegate 分别下沉到 `app-admin-actions.ts`、`app-target-resolution.ts`、`app-runtime-delegates.ts`
 
@@ -84,6 +86,7 @@
 - runtime turn / approval / watchdog / backstage 调度
 - thread state 与 stream delivery owner
 - 把 channel / runtime adapter 之间的会话级协作收口成稳定实现
+- 先看 adapter descriptor / operations，再决定是否调用 visible text / typing / file delivery 与 interactive runtime turn；unsupported host path 不再依赖“先调再在 adapter 里 reject”
 
 不负责：
 
@@ -157,6 +160,7 @@
 - `delivery-trace.ts` 负责 trace context、retry backoff、stable client id 重试
 - `updates.ts` 负责 account / context token / sync buffer / getUpdates
 - `login-*`、`message-utils*`、`protocol.ts`、`account-store.ts`、`context-token-store.ts` 各自承担 owner-local 边界
+- channel adapter 现在通过 `describe().operations` 显式声明 `pollUpdates` / `login` / `resolveAccount` / `visibleTextDelivery` / `visibleTypingDelivery` / `visibleFileDelivery`
 
 实现约束：
 
@@ -191,6 +195,8 @@
 - `session-store.ts` 继续保留 public class surface，但内部 binding/workspace、approval、model catalog 已拆到独立 owner helpers，壳层只保留 refresh / mutate / persist / façade
 - `session-store.ts` 现在只暴露同步读面；持久化写入通过 `session-store-writer.ts` 的 async owner 进入 non-blocking lock
 - `rpc-client.ts` 继续承担 transport owner，但不再顺手吸收 session / shared 恢复规则
+- runtime adapter 现在通过 `describe().operations` 显式声明 `initialize` / `interactiveTurn` / `refreshThreadInstructions` / `respondApproval` / `resumeThread` / `cancelTurn`
+- hosted mode adapter 不再伪装成“支持 bridge-only runtime/send-back 但运行时再拒绝”；bridge-only 能力由 descriptor 与命令合同一起前置挡住
 
 ## 7. Shared Mode
 

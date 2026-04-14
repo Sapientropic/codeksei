@@ -9,6 +9,7 @@ import type {
   StreamDeliveryLike,
   ThreadStateStoreLike,
 } from "../core/app-service-contract";
+import { supportsChannelOperation, supportsRuntimeOperation } from "../core/app-service-contract";
 import { userFacingMessages } from "../core/message-catalog";
 import type {
   PendingApprovalState,
@@ -82,13 +83,15 @@ export async function handleApprovalRequested(
     return true;
   }
   await clearPendingApproval(dependencies.sessionWriter, eventThreadId);
-  await ignoreBestEffortError(dependencies.runtimeAdapter.respondApproval({
-    requestId: approval.requestId,
-    decision: "accept",
-  }), {
-    label: "approval auto-accept",
-    reason: "auto-approved commands should not leave a rejected promise in the approval recovery path",
-  });
+  if (supportsRuntimeOperation(dependencies.runtimeAdapter, "respondApproval")) {
+    await ignoreBestEffortError(dependencies.runtimeAdapter.respondApproval({
+      requestId: approval.requestId,
+      decision: "accept",
+    }), {
+      label: "approval auto-accept",
+      reason: "auto-approved commands should not leave a rejected promise in the approval recovery path",
+    });
+  }
   dependencies.threadStateStore.resolveApproval(eventThreadId, "running");
   return true;
 }
@@ -99,7 +102,7 @@ export async function stopTypingForThread(
 ): Promise<void> {
   const linked = dependencies.runtimeAdapter.getSessionStore().findBindingForThreadId(threadId);
   const target = linked?.bindingKey ? dependencies.resolveReplyTargetForBinding(linked.bindingKey) : null;
-  if (!target) {
+  if (!target || !supportsChannelOperation(dependencies.channelAdapter, "visibleTypingDelivery")) {
     return;
   }
   await ignoreBestEffortError(dependencies.channelAdapter.sendTyping({
@@ -119,7 +122,7 @@ export async function sendFailureToThread(
 ): Promise<void> {
   const linked = dependencies.runtimeAdapter.getSessionStore().findBindingForThreadId(threadId);
   const target = linked?.bindingKey ? dependencies.resolveReplyTargetForBinding(linked.bindingKey) : null;
-  if (!target) {
+  if (!target || !supportsChannelOperation(dependencies.channelAdapter, "visibleTextDelivery")) {
     return;
   }
   await ignoreBestEffortError(dependencies.channelAdapter.sendText({
@@ -149,17 +152,25 @@ export async function sendApprovalPrompt(
     );
     return;
   }
+  if (!supportsChannelOperation(dependencies.channelAdapter, "visibleTextDelivery")) {
+    logWarn(
+      `[codeksei] approval prompt skipped binding=${bindingKey} requestId=${approval?.requestId || ""} reason=text_delivery_unsupported`,
+    );
+    return;
+  }
   logInfo(
     `[codeksei] approval prompt sending binding=${bindingKey} user=${target.userId} requestId=${approval?.requestId || ""}`,
   );
-  await ignoreBestEffortError(dependencies.channelAdapter.sendTyping({
-    userId: target.userId,
-    status: 0,
-    contextToken: target.contextToken,
-  }), {
-    label: "approval prompt typing stop",
-    reason: "approval prompt typing stop is best-effort cleanup before the prompt send",
-  });
+  if (supportsChannelOperation(dependencies.channelAdapter, "visibleTypingDelivery")) {
+    await ignoreBestEffortError(dependencies.channelAdapter.sendTyping({
+      userId: target.userId,
+      status: 0,
+      contextToken: target.contextToken,
+    }), {
+      label: "approval prompt typing stop",
+      reason: "approval prompt typing stop is best-effort cleanup before the prompt send",
+    });
+  }
   await dependencies.channelAdapter.sendText({
     userId: target.userId,
     text: dependencies.buildApprovalPromptText(approval),
@@ -198,10 +209,12 @@ export async function restoreBoundThreadSubscriptions(
         continue;
       }
       seenThreadIds.add(normalizedThreadId);
-      await ignoreBestEffortError(dependencies.runtimeAdapter.resumeThread({ threadId: normalizedThreadId }), {
-        label: "watchdog thread resume",
-        reason: "subscription restore should keep hydrating later bindings even if one resume fails",
-      });
+      if (supportsRuntimeOperation(dependencies.runtimeAdapter, "resumeThread")) {
+        await ignoreBestEffortError(dependencies.runtimeAdapter.resumeThread({ threadId: normalizedThreadId }), {
+          label: "watchdog thread resume",
+          reason: "subscription restore should keep hydrating later bindings even if one resume fails",
+        });
+      }
     }
   }
 

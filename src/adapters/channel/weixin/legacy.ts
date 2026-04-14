@@ -1,5 +1,6 @@
 import * as crypto from "node:crypto";
 import { writeStdoutLine } from "../../../core/terminal-output";
+import type { ChannelAdapterDescriptor } from "../../../core/app-service-contract";
 
 import { getConfig, getUpdates, sendMessage, sendTyping } from "./api";
 import {
@@ -28,13 +29,14 @@ const WEIXIN_SEND_CHUNK_LIMIT = 80;
 const MAX_WEIXIN_CHUNK = 3800;
 const WEIXIN_MAX_DELIVERY_MESSAGES = 10;
 
-interface LegacyWeixinConfig extends Record<string, unknown> {
+interface LegacyWeixinConfig {
   stateDir?: string;
   weixinBaseUrl?: string;
   accountsDir?: string;
   syncBufferDir?: string;
   weixinCdnBaseUrl?: string;
   weixinDeliveryTrace?: boolean;
+  workspaceId?: unknown;
 }
 
 interface LegacyWeixinAccount {
@@ -140,11 +142,20 @@ function createLegacyWeixinChannelAdapter(config: LegacyWeixinConfig) {
         id: "weixin",
         variant: "legacy",
         kind: "channel",
+        provider: "weixin",
+        operations: {
+          pollUpdates: true,
+          login: true,
+          resolveAccount: true,
+          visibleTextDelivery: true,
+          visibleTypingDelivery: true,
+          visibleFileDelivery: true,
+        },
         stateDir: config.stateDir,
         baseUrl: config.weixinBaseUrl,
         accountsDir: config.accountsDir,
         syncBufferDir: config.syncBufferDir,
-      };
+      } satisfies ChannelAdapterDescriptor;
     },
     async login() {
       await runLegacyLoginFlow(config);

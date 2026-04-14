@@ -29,6 +29,7 @@ import {
   collectDiaryEntries,
   collectNightlyEntries,
 } from "./review-sources";
+import type { AppRuntimeConfig } from "../core/app-service-contract";
 import type {
   DiaryReviewEntry,
   NightlyReviewEntry,
@@ -65,7 +66,9 @@ interface ReviewSchemaWorkspaceProfile {
   reviews?: Record<string, Record<string, unknown>>;
 }
 
-function loadReviewSchemaConfig(config: Record<string, unknown> = {}): NormalizedWorkspaceSchemaConfig {
+type ReviewConfig = Partial<AppRuntimeConfig>;
+
+function loadReviewSchemaConfig(config: ReviewConfig = {}): NormalizedWorkspaceSchemaConfig {
   const filePath = normalizeText(config.reviewSchemaConfigFile);
   if (!filePath) {
     return { workspaces: {} };
@@ -81,7 +84,7 @@ function loadReviewSchemaConfig(config: Record<string, unknown> = {}): Normalize
 }
 
 function resolveReviewProfile(
-  config: Record<string, unknown> = {},
+  config: ReviewConfig = {},
   kind: unknown,
   options: { required?: boolean } = {},
 ): ReviewProfile | null {
@@ -122,7 +125,7 @@ function resolveReviewProfile(
   };
 }
 
-async function buildReview(config: Record<string, unknown> = {}, kind: unknown, options: Record<string, unknown> = {}) {
+async function buildReview(config: ReviewConfig = {}, kind: unknown, options: Record<string, unknown> = {}) {
   const profile = resolveReviewProfile(config, kind)!;
   const timezone = config.timezone || LEGACY_TIMELINE_TIMEZONE;
   const window = resolveReviewWindow(profile.kind, {
@@ -162,7 +165,7 @@ async function buildReview(config: Record<string, unknown> = {}, kind: unknown, 
 }
 
 async function writeReview(
-  config: Record<string, unknown> = {},
+  config: ReviewConfig = {},
   kind: unknown,
   options: Record<string, unknown> = {},
 ) {

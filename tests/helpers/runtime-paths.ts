@@ -42,14 +42,14 @@ function remapSourceAbsolutePath(absolutePath: string): string {
     return "";
   }
   const distCandidate = path.join(distRoot, path.relative(repoRoot, absolutePath));
-  const resolvedDistPath = resolveBuiltModulePath(distCandidate);
-  if (resolvedDistPath) {
-    return resolvedDistPath;
+  const resolvedSourcePath = resolveSourceModulePath(absolutePath);
+  if (resolvedSourcePath) {
+    return resolvedSourcePath;
   }
-  // Prefer built output when it exists so verify keeps exercising the shipped
-  // shape, but fall back to source during targeted local tests for newly added
-  // modules that have not been built yet.
-  return resolveSourceModulePath(absolutePath) || distCandidate;
+  // Test runs should follow the current worktree first; build/pack already
+  // cover emitted artifacts separately, and stale dist output is a common
+  // source of false negatives during refactors.
+  return resolveBuiltModulePath(distCandidate) || distCandidate;
 }
 
 function resolveBuiltModulePath(distCandidate: string): string {

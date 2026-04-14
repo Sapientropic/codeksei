@@ -8,6 +8,7 @@ import {
   resolveConfiguredPersonName,
   resolvePromptPersonEn,
 } from "./person-reference";
+import type { AppRuntimeConfig } from "./app-service-contract";
 import type {
   PersistIncomingWeixinAttachmentsResult,
   PersistedIncomingWeixinAttachment,
@@ -64,7 +65,7 @@ export function getSystemMessageFailureRetryDelayMs(attemptCount: unknown): numb
 
 export function buildReminderSystemTrigger(
   reminder: { text?: unknown } | null | undefined,
-  config: Record<string, unknown> = {},
+  config: Pick<AppRuntimeConfig, "userName"> = { userName: "" },
 ): string {
   const reminderText = String(reminder?.text || "").trim();
   const person = resolvePromptPersonEn(config);
@@ -81,7 +82,10 @@ export function buildReminderSystemTrigger(
 export function buildRuntimeInboundText(
   normalized: InboundMessageRef,
   persisted: PersistedAttachmentResult = {},
-  config: Record<string, unknown> = {},
+  config: Pick<AppRuntimeConfig, "timezone" | "userName"> = {
+    timezone: LEGACY_TIMELINE_TIMEZONE,
+    userName: "",
+  },
 ): string {
   const text = String(normalized?.text || "").trim();
   const saved = Array.isArray(persisted?.saved) ? persisted.saved : [];

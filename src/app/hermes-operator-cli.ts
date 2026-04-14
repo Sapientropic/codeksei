@@ -4,6 +4,7 @@ import { parseCliArgs } from "../core/cli-args";
 import { buildValidationError } from "../core/cli-contract";
 import { runCliMutation } from "../core/cli-mutation";
 import { buildTerminalLeafHelp } from "../core/command-registry";
+import type { AppRuntimeConfig } from "../core/app-service-contract";
 import {
   collectHermesHostedStatusReport,
   installHermesCompanionSkill,
@@ -24,6 +25,21 @@ interface HermesReadOnlyOptions {
   help: boolean;
 }
 
+type HermesOperatorConfig = Pick<
+  AppRuntimeConfig,
+  | "channel"
+  | "channelProvider"
+  | "cliIdempotencyLedgerFile"
+  | "hermesCommand"
+  | "hermesHome"
+  | "hermesPythonCommand"
+  | "hermesRepoLocalShimPath"
+  | "hermesRepoRoot"
+  | "reviewSemanticHost"
+  | "runtime"
+  | "workspaceRoot"
+>;
+
 export function buildHermesOperatorValidationError(value: string) {
   return buildValidationError(
     `不支持的 Hermes operator 子命令: ${value}`,
@@ -39,7 +55,7 @@ export function buildHermesOperatorValidationError(value: string) {
 }
 
 export async function runHermesInstallSkillCommand(
-  config: Record<string, unknown>,
+  config: HermesOperatorConfig,
   args: string[] = [],
 ): Promise<CommandExecutionResult> {
   const options = parseCliArgs<HermesInstallSkillOptions>(args, getCommandArgsSchema("hermesInstallSkill"));
@@ -88,7 +104,7 @@ export async function runHermesInstallSkillCommand(
 }
 
 export async function runHermesStatusCommand(
-  config: Record<string, unknown>,
+  config: HermesOperatorConfig,
   args: string[] = [],
 ): Promise<CommandExecutionResult> {
   const options = parseCliArgs<HermesReadOnlyOptions>(args, getCommandArgsSchema("hermesStatus"));
@@ -122,7 +138,7 @@ export async function runHermesStatusCommand(
 }
 
 export async function runHermesSmokeCommand(
-  config: Record<string, unknown>,
+  config: HermesOperatorConfig,
   args: string[] = [],
 ): Promise<CommandExecutionResult> {
   const options = parseCliArgs<HermesReadOnlyOptions>(args, getCommandArgsSchema("hermesSmoke"));

@@ -8,7 +8,8 @@ import { resolvePackageRoot } from "../../core/path-utils";
 import { resolveRuntimeEntrypointAbsolute } from "../../contracts/runtime-entrypoints";
 
 
-interface TimelineIntegrationConfig extends Record<string, unknown> {
+interface TimelineIntegrationConfig {
+  stateDir?: unknown;
   timelineStateDir?: string;
 }
 

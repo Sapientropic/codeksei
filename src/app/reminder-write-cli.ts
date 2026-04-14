@@ -10,6 +10,7 @@ import {
 import { loadPersistedContextTokens } from "../adapters/channel/weixin/context-token-store";
 import { getCommandArgsSchema } from "../contracts/command-args";
 import type { CommandExecutionResult } from "../contracts/cli-contract";
+import type { AppRuntimeConfig } from "../core/app-service-contract";
 import { parseCliArgs } from "../core/cli-args";
 import { buildAuthRequiredError, buildTargetResolutionRequiredError } from "../core/cli-contract";
 import { runCliMutation } from "../core/cli-mutation";
@@ -26,13 +27,22 @@ import { parseCompactDurationMs } from "../core/duration";
 import { ReminderQueueStore } from "../state/reminder-queue-store";
 import { inspectPreferredSenderId } from "../workspace/default-targets";
 
-export interface ReminderWriteConfig extends WeixinAccountConfig {
+export interface ReminderWriteConfig extends WeixinAccountConfig, Pick<
+  AppRuntimeConfig,
+  | "hermesHome"
+  | "hermesPythonCommand"
+  | "hermesRepoLocalShimPath"
+  | "hermesRepoRoot"
+  | "reminderQueueFile"
+  | "sessionsFile"
+> {
   cliIdempotencyLedgerFile?: string;
   allowedUserIds?: unknown;
-  reminderQueueFile: string;
-  sessionsFile: string;
   timezone?: unknown;
   workspaceRoot?: unknown;
+  channel?: unknown;
+  channelProvider?: unknown;
+  runtime?: unknown;
 }
 
 interface ReminderWriteOptions extends Record<string, unknown> {

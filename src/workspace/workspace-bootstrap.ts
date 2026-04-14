@@ -9,7 +9,7 @@ import {
 } from "../contracts/config-files";
 import { loadJsonConfig } from "../core/config-loader";
 
-interface WorkspaceBootstrapOptions extends Record<string, unknown> {
+interface WorkspaceBootstrapOptions {
   workspaceBootstrapConfigFile?: unknown;
 }
 

@@ -112,12 +112,23 @@ interface HermesRepoLocalInvocation {
   session_key?: string;
 }
 
-export function resolveHermesHomePath(config: Record<string, unknown> = {}): string {
+export interface HermesRepoLocalConfigInput {
+  hermesHome?: unknown;
+  hermesRepoRoot?: unknown;
+  hermesRepoLocalShimPath?: unknown;
+  hermesPythonCommand?: unknown;
+  CODEKSEI_HERMES_HOME?: unknown;
+  CODEKSEI_HERMES_REPO_ROOT?: unknown;
+  CODEKSEI_HERMES_REPO_LOCAL_SHIM_PATH?: unknown;
+  CODEKSEI_HERMES_PYTHON_COMMAND?: unknown;
+}
+
+export function resolveHermesHomePath(config: HermesRepoLocalConfigInput = {}): string {
   return normalizeText(config.hermesHome || config.CODEKSEI_HERMES_HOME || process.env.HERMES_HOME)
     || path.join(os.homedir(), ".hermes");
 }
 
-export function resolveHermesRepoRoot(config: Record<string, unknown> = {}): string {
+export function resolveHermesRepoRoot(config: HermesRepoLocalConfigInput = {}): string {
   const explicit = normalizeText(config.hermesRepoRoot || config.CODEKSEI_HERMES_REPO_ROOT);
   if (explicit) {
     return path.resolve(explicit);
@@ -126,7 +137,7 @@ export function resolveHermesRepoRoot(config: Record<string, unknown> = {}): str
   return path.resolve(packageRoot, "..", "hermes-agent");
 }
 
-export function resolveHermesRepoLocalShimPath(config: Record<string, unknown> = {}): string {
+export function resolveHermesRepoLocalShimPath(config: HermesRepoLocalConfigInput = {}): string {
   const explicit = normalizeText(config.hermesRepoLocalShimPath || config.CODEKSEI_HERMES_REPO_LOCAL_SHIM_PATH);
   if (explicit) {
     return path.resolve(explicit);
@@ -135,7 +146,7 @@ export function resolveHermesRepoLocalShimPath(config: Record<string, unknown> =
   return path.join(packageRoot, "tools", "hermes_repo_local", "bridge.py");
 }
 
-export function collectHermesRepoLocalReport(config: Record<string, unknown> = {}): HermesRepoLocalReport {
+export function collectHermesRepoLocalReport(config: HermesRepoLocalConfigInput = {}): HermesRepoLocalReport {
   const repoRoot = resolveHermesRepoRoot(config);
   const shimPath = resolveHermesRepoLocalShimPath(config);
   const sessionsIndexPath = path.join(resolveHermesHomePath(config), "sessions", "sessions.json");
@@ -189,7 +200,7 @@ export function collectHermesRepoLocalReport(config: Record<string, unknown> = {
 }
 
 export function sendFileViaHermesRepoLocal(
-  config: Record<string, unknown>,
+  config: HermesRepoLocalConfigInput,
   payload: HermesRepoLocalSendFilePayload,
 ): HermesRepoLocalSendFileResult {
   const data = invokeHermesRepoLocalBridge<HermesRepoLocalSendFileShimResult>(config, {
@@ -211,7 +222,7 @@ export function sendFileViaHermesRepoLocal(
 }
 
 export function createReminderViaHermesRepoLocal(
-  config: Record<string, unknown>,
+  config: HermesRepoLocalConfigInput,
   payload: HermesRepoLocalReminderPayload,
 ): HermesRepoLocalReminderResult {
   const data = invokeHermesRepoLocalBridge<HermesRepoLocalReminderShimResult>(config, {
@@ -235,7 +246,7 @@ export function createReminderViaHermesRepoLocal(
 }
 
 function invokeHermesRepoLocalBridge<TData>(
-  config: Record<string, unknown>,
+  config: HermesRepoLocalConfigInput,
   request: HermesRepoLocalInvocation,
 ): TData {
   const report = collectHermesRepoLocalReport(config);
@@ -307,7 +318,7 @@ function readHermesRepoCommit(repoRoot: string): string {
   return result.ok ? normalizeText(result.stdout) : "";
 }
 
-function resolvePythonInvocation(config: Record<string, unknown>): {
+function resolvePythonInvocation(config: HermesRepoLocalConfigInput): {
   command: string;
   argsPrefix: string[];
 } {

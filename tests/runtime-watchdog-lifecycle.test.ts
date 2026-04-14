@@ -6,9 +6,58 @@ const { RUNTIME_EVENT_TYPES }: typeof import("../src/contracts/runtime-events") 
 const { RuntimeWatchdogLifecycle }: typeof import("../src/runtime/runtime-watchdog-lifecycle") = require("../src/runtime/runtime-watchdog-lifecycle");
 const { ThreadStateStore }: typeof import("../src/runtime/thread-state-store") = require("../src/runtime/thread-state-store");
 
-function createLifecycleHarness() {
+function buildTestChannelDescriptor(overrides: Partial<{
+  visibleTextDelivery: boolean;
+  visibleTypingDelivery: boolean;
+}> = {}) {
+  return {
+    id: "test-channel",
+    kind: "channel" as const,
+    provider: "test",
+    operations: {
+      pollUpdates: true,
+      login: true,
+      resolveAccount: true,
+      visibleTextDelivery: overrides.visibleTextDelivery ?? true,
+      visibleTypingDelivery: overrides.visibleTypingDelivery ?? true,
+      visibleFileDelivery: true,
+    },
+  };
+}
+
+function buildTestRuntimeDescriptor(overrides: Partial<{
+  resumeThread: boolean;
+}> = {}) {
+  return {
+    id: "test-runtime",
+    kind: "runtime" as const,
+    provider: "test",
+    operations: {
+      initialize: true,
+      interactiveTurn: true,
+      refreshThreadInstructions: true,
+      respondApproval: true,
+      resumeThread: overrides.resumeThread ?? true,
+      cancelTurn: true,
+    },
+  };
+}
+
+function createLifecycleHarness({
+  channelOperations = {},
+  runtimeOperations = {},
+}: {
+  channelOperations?: Partial<{
+    visibleTextDelivery: boolean;
+    visibleTypingDelivery: boolean;
+  }>;
+  runtimeOperations?: Partial<{
+    resumeThread: boolean;
+  }>;
+} = {}) {
   const textCalls: string[] = [];
   const typingStops: number[] = [];
+  const resumedThreads: string[] = [];
   const threadStateStore = new ThreadStateStore();
   const lifecycle = new RuntimeWatchdogLifecycle({
     buildApprovalPromptSignature() {
@@ -18,6 +67,9 @@ function createLifecycleHarness() {
       return "";
     },
     channelAdapter: {
+      describe() {
+        return buildTestChannelDescriptor(channelOperations);
+      },
       async sendText(payload: { text?: unknown }) {
         textCalls.push(String(payload.text || ""));
       },
@@ -39,12 +91,27 @@ function createLifecycleHarness() {
       return null;
     },
     runtimeAdapter: {
+      describe() {
+        return buildTestRuntimeDescriptor(runtimeOperations);
+      },
       getSessionStore() {
         return {
+          listBindings() {
+            return [];
+          },
+          listPendingApprovals() {
+            return [];
+          },
+          findBindingForThreadId() {
+            return null;
+          },
           getThreadIdForWorkspace() {
             return "";
           },
         };
+      },
+      async resumeThread(payload: { threadId: string }) {
+        resumedThreads.push(payload.threadId);
       },
     } as never,
     sessionWriter: {
@@ -64,7 +131,7 @@ function createLifecycleHarness() {
     firstRuntimeEventNoticeTimeoutMs: 5,
   });
 
-  return { lifecycle, textCalls, threadStateStore, typingStops };
+  return { lifecycle, resumedThreads, textCalls, threadStateStore, typingStops };
 }
 
 test("first-event watchdog still fires after an earlier turn left a stale turn id", async () => {
@@ -151,4 +218,39 @@ test("real first-progress events clear the first-event watchdog", () => {
 
     assert.equal(lifecycle.pendingRuntimeEventWatchdogs.size, 0, `${eventType} should clear the watchdog`);
   }
+});
+
+test("first-event watchdog skips visible recovery when the host cannot deliver text or typing", async () => {
+  const { lifecycle, textCalls, typingStops } = createLifecycleHarness({
+    channelOperations: {
+      visibleTextDelivery: false,
+      visibleTypingDelivery: false,
+    },
+  });
+
+  lifecycle.scheduleRuntimeEventWatchdog({
+    bindingKey: "binding-current",
+    workspaceRoot: "E:/repo/current",
+    threadId: "thread-current",
+    normalized: {
+      senderId: "user-1",
+      contextToken: "ctx-1",
+      provider: "weixin",
+    } as never,
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 40));
+
+  assert.deepEqual(textCalls, []);
+  assert.deepEqual(typingStops, []);
+});
+
+test("restoreBoundThreadSubscriptions skips runtime resume when the host descriptor marks it unsupported", async () => {
+  const { lifecycle, resumedThreads } = createLifecycleHarness({
+    runtimeOperations: { resumeThread: false },
+  });
+
+  await lifecycle.restoreBoundThreadSubscriptions();
+
+  assert.deepEqual(resumedThreads, []);
 });

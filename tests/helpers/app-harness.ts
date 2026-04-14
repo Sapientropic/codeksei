@@ -77,6 +77,38 @@ interface TestAppHarness {
   handleReplyDeliveryFailure(payload: DeliveryFailurePayload): Promise<void>;
 }
 
+function buildTestChannelDescriptor(id: string) {
+  return {
+    id,
+    kind: "channel" as const,
+    provider: "test",
+    operations: {
+      pollUpdates: true,
+      login: true,
+      resolveAccount: true,
+      visibleTextDelivery: true,
+      visibleTypingDelivery: true,
+      visibleFileDelivery: true,
+    },
+  };
+}
+
+function buildTestRuntimeDescriptor(id: string) {
+  return {
+    id,
+    kind: "runtime" as const,
+    provider: "test",
+    operations: {
+      initialize: true,
+      interactiveTurn: true,
+      refreshThreadInstructions: true,
+      respondApproval: true,
+      resumeThread: true,
+      cancelTurn: true,
+    },
+  };
+}
+
 function createTestAppHarness({
   runTimelineSubcommandImpl = async () => undefined,
   sendFileImpl = async () => ({ kind: "file" }),
@@ -105,18 +137,66 @@ function createTestAppHarness({
   const typingCalls: Array<{ userId: string; status: number; contextToken?: string }> = [];
 
   const baseConfig: AppRuntimeConfig = {
-    allowedUserIds: ["user-1"],
-    codexAccessMode: "",
-    reminderQueueFile: path.join(tempRoot, "reminder-queue.json"),
-    sessionsFile: path.join(tempRoot, "sessions.json"),
     stateDir: tempRoot,
+    codekseiHome: tempRoot,
+    workspaceId: "workspace-1",
+    workspaceRoot,
+    timezone: "Asia/Shanghai",
+    timezoneSource: "system",
+    timezoneExplicit: false,
+    timelineStateTimezone: "",
+    diaryDir: path.join(tempRoot, "diary"),
+    timelineStateDir: tempRoot,
+    userName: "",
+    userGender: "female",
+    allowedUserIds: ["user-1"],
+    channel: "weixin",
+    channelProvider: "codeksei",
+    runtime: "codex",
+    accountId: "",
+    weixinBaseUrl: "http://127.0.0.1",
+    weixinCdnBaseUrl: "https://cdn.example.com",
+    weixinAdapterVariant: "v2",
+    weixinReplyMode: "stream",
+    weixinDeliveryTrace: false,
+    weixinQrBotType: "3",
+    weixinRouteTag: "",
+    weixinProtocolClientVersion: "2.1.1",
+    accountsDir: path.join(tempRoot, "accounts"),
+    logDir: path.join(tempRoot, "logs"),
+    reminderQueueFile: path.join(tempRoot, "reminder-queue.json"),
+    checkinConfigFile: path.join(tempRoot, "checkin-config.json"),
+    checkinScheduleStateFile: path.join(tempRoot, "checkin-schedule-state.json"),
     systemMessageDeadLetterFile: path.join(tempRoot, "system-message-dead-letter.json"),
     systemMessageQueueFile: path.join(tempRoot, "system-message-queue.json"),
     timelineScreenshotQueueFile: path.join(tempRoot, "timeline-screenshot-queue.json"),
-    weixinDeliveryTrace: false,
-    weixinReplyMode: "stream",
-    workspaceId: "workspace-1",
-    workspaceRoot,
+    cliIdempotencyLedgerFile: path.join(tempRoot, "cli-idempotency-ledger.json"),
+    weixinInstructionsFile: path.join(tempRoot, "weixin-instructions.md"),
+    weixinInstructionsOverlayFile: path.join(tempRoot, "weixin-instructions.local.md"),
+    weixinOperationsFile: path.join(tempRoot, "weixin-operations.md"),
+    weixinOperationsOverlayFile: path.join(tempRoot, "weixin-operations.local.md"),
+    syncBufferDir: path.join(tempRoot, "sync-buffers"),
+    runtimeEndpoint: "",
+    runtimeCommand: "",
+    runtimeAccessMode: "workspace-write",
+    codexAccessMode: "",
+    hermesCommand: "hermes",
+    hermesHome: path.join(tempRoot, ".hermes"),
+    hermesRepoRoot: "",
+    hermesRepoLocalShimPath: "",
+    hermesPythonCommand: "",
+    sessionsFile: path.join(tempRoot, "sessions.json"),
+    workspaceBootstrapConfigFile: path.join(tempRoot, "workspace-bootstrap.json"),
+    projectRadarConfigFile: path.join(workspaceRoot, ".codex", "code-projects.json"),
+    durableNoteSchemaConfigFile: path.join(workspaceRoot, ".codex", "durable-note-schema.json"),
+    reviewSchemaConfigFile: path.join(workspaceRoot, ".codex", "review-schema.json"),
+    reviewSemanticMode: "hybrid",
+    reviewSemanticHost: "auto",
+    reviewSemanticModel: "",
+    reviewSemanticTimeoutMs: 120_000,
+    sharedBridgeHeartbeatFile: path.join(tempRoot, "logs", "shared-wechat-heartbeat.json"),
+    sharedWatchdogStateFile: path.join(tempRoot, "logs", "shared-watchdog-state.json"),
+    startWithCheckin: false,
   };
 
   const bindingKey = "workspace-1:acct-1:user-1";
@@ -195,7 +275,7 @@ function createTestAppHarness({
 
   const channelAdapter: ChannelAdapterLike = {
     describe() {
-      return { id: "test-channel" };
+      return buildTestChannelDescriptor("test-channel");
     },
     getKnownContextTokens() {
       return { "user-1": "ctx-1" };
@@ -235,7 +315,7 @@ function createTestAppHarness({
     async cancelTurn() {},
     async close() {},
     describe() {
-      return { id: "test-runtime" };
+      return buildTestRuntimeDescriptor("test-runtime");
     },
     getSessionStore() {
       return sessionStore;

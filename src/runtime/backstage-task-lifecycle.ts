@@ -9,6 +9,7 @@ import type {
   ThreadStateStoreLike,
   TimelineScreenshotQueueLike,
 } from "../core/app-service-contract";
+import { supportsChannelOperation } from "../core/app-service-contract";
 import { ignoreBestEffortError } from "../core/error-handling";
 import { logError, logWarn } from "../core/logging";
 import { operatorMessages, userFacingMessages } from "../core/message-catalog";
@@ -193,21 +194,25 @@ export class BackstageTaskLifecycle {
         logError(operatorMessages.timelineScreenshotJobFailed(job.id, messageText));
         // The job has already failed locally. Clearing typing state and sending
         // the user-facing failure notice are best-effort cleanup steps only.
-        await ignoreBestEffortError(this.channelAdapter.sendTyping({
-          userId: job.senderId,
-          status: 0,
-        }), {
-          label: "backstage timeline screenshot typing stop",
-          reason: "typing stop is best-effort cleanup after the screenshot job already failed locally",
-        });
-        await ignoreBestEffortError(this.channelAdapter.sendText({
-          userId: job.senderId,
-          text: userFacingMessages.timelineScreenshotFailed(messageText),
-          preserveBlock: true,
-        }), {
-          label: "backstage timeline screenshot failure notice",
-          reason: "failure notice should not mask the original screenshot job failure",
-        });
+        if (supportsChannelOperation(this.channelAdapter, "visibleTypingDelivery")) {
+          await ignoreBestEffortError(this.channelAdapter.sendTyping({
+            userId: job.senderId,
+            status: 0,
+          }), {
+            label: "backstage timeline screenshot typing stop",
+            reason: "typing stop is best-effort cleanup after the screenshot job already failed locally",
+          });
+        }
+        if (supportsChannelOperation(this.channelAdapter, "visibleTextDelivery")) {
+          await ignoreBestEffortError(this.channelAdapter.sendText({
+            userId: job.senderId,
+            text: userFacingMessages.timelineScreenshotFailed(messageText),
+            preserveBlock: true,
+          }), {
+            label: "backstage timeline screenshot failure notice",
+            reason: "failure notice should not mask the original screenshot job failure",
+          });
+        }
       }
     }
   }

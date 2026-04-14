@@ -6,7 +6,7 @@ import { resolvePromptPersonEn } from "./person-reference";
 interface SystemMessageDispatcherConfig {
   workspaceId: string;
   workspaceRoot: string;
-  [key: string]: unknown;
+  userName?: unknown;
 }
 
 interface SystemMessageDeferOptions {

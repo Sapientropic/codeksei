@@ -9,6 +9,7 @@ import { readConfig } from "../core/config";
 import { loadEnvStack } from "../core/env-loader";
 import { assertBridgeMode } from "../core/host-mode";
 import { writeStderrLine, writeStdoutLine } from "../core/terminal-output";
+import type { AppRuntimeConfig } from "../core/app-service-contract";
 import { resolvePreferredSenderId, resolvePreferredWorkspaceRoot } from "../workspace/default-targets";
 import {
   ensureLogDir,
@@ -31,7 +32,7 @@ import type {
 
 const ALERT_COOLDOWN_MS = 10 * 60_000;
 
-function loadWatchdogConfig(): Record<string, unknown> {
+function loadWatchdogConfig(): AppRuntimeConfig {
   loadEnvStack();
   ensureCodekseiHomeEnv({ fallbackRoot: resolvePackageRoot(__dirname) });
   return readConfig();
@@ -143,7 +144,7 @@ function buildAlert({
   actions: string[];
   errorMessage: string;
   after: SharedHealthSnapshot;
-  config: Record<string, unknown>;
+  config: AppRuntimeConfig;
   sharedContext: SharedProcessContext;
 }): SharedWatchdogAlert | null {
   if (result === "recovered") {
@@ -202,11 +203,11 @@ function shouldSendAlert(previousState: SharedWatchdogState | null, signature: u
 }
 
 async function sendVisibleAlert(
-  config: Record<string, unknown>,
+  config: AppRuntimeConfig,
   text: string,
 ): Promise<Omit<SharedWatchdogNotification, "kind" | "sentAt">> {
   try {
-    const runtimeConfig = config as ReturnType<typeof readConfig>;
+    const runtimeConfig = config;
     const account = resolveSelectedAccount(runtimeConfig);
     const sessionStore = new SessionStore({ filePath: runtimeConfig.sessionsFile });
     const senderId = resolvePreferredSenderId({

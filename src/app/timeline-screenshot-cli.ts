@@ -5,6 +5,7 @@ import { resolveSelectedAccount } from "../adapters/channel/weixin/account-store
 import { SessionStore } from "../adapters/runtime/codex/session-store";
 import { getCommandArgsSchema } from "../contracts/command-args";
 import type { CommandExecutionResult } from "../contracts/cli-contract";
+import type { AppRuntimeConfig } from "../core/app-service-contract";
 import { parseCliArgs } from "../core/cli-args";
 import { buildTargetResolutionRequiredError } from "../core/cli-contract";
 import { buildTerminalLeafHelp } from "../core/command-registry";
@@ -30,11 +31,28 @@ interface TimelineScreenshotOptions {
   forwardArgs: string[];
 }
 
-interface RuntimeConfig extends Record<string, unknown> {
-  cliIdempotencyLedgerFile?: string;
-  sessionsFile: string;
-  timelineScreenshotQueueFile: string;
-}
+type RuntimeConfig = Pick<
+  AppRuntimeConfig,
+  | "accountId"
+  | "accountsDir"
+  | "allowedUserIds"
+  | "channel"
+  | "channelProvider"
+  | "cliIdempotencyLedgerFile"
+  | "hermesHome"
+  | "hermesPythonCommand"
+  | "hermesRepoLocalShimPath"
+  | "hermesRepoRoot"
+  | "runtime"
+  | "sessionsFile"
+  | "stateDir"
+  | "timelineStateDir"
+  | "timelineScreenshotQueueFile"
+  | "weixinBaseUrl"
+  | "weixinRouteTag"
+  | "workspaceId"
+  | "workspaceRoot"
+>;
 
 interface SelectedAccount {
   accountId: string;

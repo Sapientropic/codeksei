@@ -4,11 +4,15 @@ import { renderInstructionTemplate } from "../../../core/instructions-template";
 import { buildWorkspaceContinuityInstructions } from "../../../workspace/workspace-bootstrap";
 
 
-interface CodexInstructionConfig extends Record<string, unknown> {
+interface CodexInstructionConfig {
+  codekseiHome?: unknown;
+  userGender?: unknown;
+  userName?: unknown;
   weixinInstructionsFile?: string;
   weixinOperationsFile?: string;
   weixinInstructionsOverlayFile?: string;
   weixinOperationsOverlayFile?: string;
+  workspaceBootstrapConfigFile?: unknown;
 }
 
 export function buildOpeningTurnText(

@@ -105,15 +105,6 @@ function createAppInfrastructure({
   config: AppFactoryConfig;
   handleReplyDeliveryFailure: HandleReplyDeliveryFailure;
 }): AppInfrastructure {
-  const systemMessageQueueFile = typeof config.systemMessageQueueFile === "string" ? config.systemMessageQueueFile : "";
-  const systemMessageDeadLetterFile = typeof config.systemMessageDeadLetterFile === "string"
-    ? config.systemMessageDeadLetterFile
-    : "";
-  const timelineScreenshotQueueFile = typeof config.timelineScreenshotQueueFile === "string"
-    ? config.timelineScreenshotQueueFile
-    : "";
-  const reminderQueueFile = typeof config.reminderQueueFile === "string" ? config.reminderQueueFile : "";
-
   const hostMode = resolveHostMode(config);
   const channelAdapter = hostMode.mode === "bridge"
     ? createWeixinChannelAdapter(config)
@@ -125,15 +116,15 @@ function createAppInfrastructure({
   const timelineIntegration = createTimelineIntegration(config);
   const threadStateStore = new ThreadStateStore();
   const systemMessageQueue = new SystemMessageQueueStore({
-    filePath: systemMessageQueueFile,
-    deadLetterFilePath: systemMessageDeadLetterFile,
+    filePath: config.systemMessageQueueFile,
+    deadLetterFilePath: config.systemMessageDeadLetterFile,
   });
-  const timelineScreenshotQueue = new TimelineScreenshotQueueStore({ filePath: timelineScreenshotQueueFile });
-  const reminderQueue = new ReminderQueueStore({ filePath: reminderQueueFile });
+  const timelineScreenshotQueue = new TimelineScreenshotQueueStore({ filePath: config.timelineScreenshotQueueFile });
+  const reminderQueue = new ReminderQueueStore({ filePath: config.reminderQueueFile });
   const streamDelivery = new StreamDelivery({
     channelAdapter,
     sessionStore: runtimeAdapter.getSessionStore(),
-    weixinReplyMode: typeof config.weixinReplyMode === "string" ? config.weixinReplyMode : "",
+    weixinReplyMode: config.weixinReplyMode,
     deliveryTraceEnabled: Boolean(config.weixinDeliveryTrace),
     onDeliveryFailure: (payload: DeliveryFailurePayload) => handleReplyDeliveryFailure(payload),
   });

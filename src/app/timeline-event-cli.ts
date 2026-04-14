@@ -32,8 +32,11 @@ interface TimelineEventOptions extends Record<string, unknown> {
   tags?: unknown[];
 }
 
-interface TimelineEventConfig extends Record<string, unknown> {
+interface TimelineEventConfig {
   cliIdempotencyLedgerFile?: string;
+  stateDir?: unknown;
+  timelineLocale?: unknown;
+  timelineStateDir?: unknown;
   timezone?: unknown;
 }
 

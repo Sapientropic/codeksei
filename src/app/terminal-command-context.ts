@@ -5,6 +5,7 @@ import { loadEnvStack } from "../core/env-loader";
 import { readConfig } from "../core/config";
 import { createTerminalAppFacade, type TerminalAppFacade } from "../core/app-terminal-facade";
 import { renderInstructionTemplate } from "../core/instructions-template";
+import type { AppRuntimeConfig } from "../core/app-service-contract";
 import { createTimelineIntegration } from "../integrations/timeline";
 import { writeForeignTextDocument } from "../state/json-state";
 import { resolvePackageRoot } from "../core/path-utils";
@@ -12,21 +13,7 @@ import { resolveConfiguredPersonName } from "../core/person-reference";
 import type { GlobalCliOptions } from "../contracts/cli-contract";
 import type { TerminalCommandManifestEntry } from "../contracts/command-surface";
 
-
-export interface TerminalRuntimeConfig extends Record<string, unknown> {
-  cliIdempotencyLedgerFile?: string;
-  sessionsFile: string;
-  stateDir: string;
-  checkinConfigFile?: string;
-  checkinScheduleStateFile?: string;
-  systemMessageQueueFile: string;
-  systemMessageDeadLetterFile: string;
-  timelineScreenshotQueueFile: string;
-  workspaceId: string;
-  workspaceRoot: string;
-  startWithCheckin?: boolean;
-  weixinInstructionsFile?: string;
-}
+export type TerminalRuntimeConfig = AppRuntimeConfig;
 
 export interface TerminalTimelineIntegrationLike {
   runSubcommand(command: string, args: string[]): Promise<unknown>;
@@ -86,9 +73,7 @@ function ensureBootstrapFiles(config: TerminalRuntimeConfig): void {
 }
 
 function ensureInstructionsTemplate(config: TerminalRuntimeConfig): void {
-  const filePath = typeof config.weixinInstructionsFile === "string"
-    ? config.weixinInstructionsFile.trim()
-    : "";
+  const filePath = config.weixinInstructionsFile.trim();
   if (!filePath || fs.existsSync(filePath)) {
     return;
   }

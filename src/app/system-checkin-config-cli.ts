@@ -20,7 +20,7 @@ interface SystemCheckinConfigOptions {
   reset: boolean;
 }
 
-interface RuntimeConfig extends Record<string, unknown> {
+interface RuntimeConfig {
   cliIdempotencyLedgerFile?: string;
   checkinConfigFile?: string;
 }

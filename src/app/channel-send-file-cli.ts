@@ -3,6 +3,7 @@ import type { CommandExecutionResult } from "../contracts/cli-contract";
 import { parseCliArgs } from "../core/cli-args";
 import { buildTerminalLeafHelp } from "../core/command-registry";
 import { runCliMutation } from "../core/cli-mutation";
+import type { AppRuntimeConfig } from "../core/app-service-contract";
 import {
   sendFileViaHermesRepoLocal,
 } from "../core/hermes-repo-local";
@@ -29,9 +30,17 @@ interface ChannelSendFileApp {
   }): Promise<ChannelSendFileResult>;
 }
 
-interface ChannelSendFileConfig extends Record<string, unknown> {
-  cliIdempotencyLedgerFile?: string;
-}
+type ChannelSendFileConfig = Partial<Pick<
+  AppRuntimeConfig,
+  | "channel"
+  | "channelProvider"
+  | "cliIdempotencyLedgerFile"
+  | "hermesHome"
+  | "hermesPythonCommand"
+  | "hermesRepoLocalShimPath"
+  | "hermesRepoRoot"
+  | "runtime"
+>>;
 
 async function runChannelSendFileCommand(
   app: ChannelSendFileApp,

@@ -10,7 +10,7 @@ const DEDUP_TTL_MS = 5 * 60_000;
 
 type LooseRecord = Record<string, unknown>;
 
-interface WeixinIncomingConfig extends Record<string, unknown> {
+interface WeixinIncomingConfig {
   workspaceId?: unknown;
 }
 

@@ -5,6 +5,7 @@ import {
 } from "../contracts/runtime-events";
 import { ignoreBestEffortError } from "../core/error-handling";
 import type { ChannelAdapterLike, RuntimeAdapterLike, StreamDeliveryLike, ThreadStateStoreLike } from "../core/app-service-contract";
+import { supportsChannelOperation } from "../core/app-service-contract";
 import { logError } from "../core/logging";
 import { operatorMessages, userFacingMessages } from "../core/message-catalog";
 import type {
@@ -113,15 +114,17 @@ export function scheduleRuntimeEventWatchdog(
       return;
     }
     watchdog.noticeSent = true;
-    await ignoreBestEffortError(dependencies.channelAdapter.sendText({
-      userId: normalized.senderId,
-      contextToken: normalized.contextToken,
-      preserveBlock: true,
-      text: userFacingMessages.runtimeFirstEventNotice(workspaceRoot, normalizedThreadId),
-    }), {
-      label: "runtime first-event notice",
-      reason: "first-event notice is best-effort; watchdog timing should continue even if chat delivery fails",
-    });
+    if (supportsChannelOperation(dependencies.channelAdapter, "visibleTextDelivery")) {
+      await ignoreBestEffortError(dependencies.channelAdapter.sendText({
+        userId: normalized.senderId,
+        contextToken: normalized.contextToken,
+        preserveBlock: true,
+        text: userFacingMessages.runtimeFirstEventNotice(workspaceRoot, normalizedThreadId),
+      }), {
+        label: "runtime first-event notice",
+        reason: "first-event notice is best-effort; watchdog timing should continue even if chat delivery fails",
+      });
+    }
   }, dependencies.firstRuntimeEventNoticeTimeoutMs);
   const failureTimer = setTimeout(async () => {
     pendingRuntimeEventWatchdogs.delete(normalizedThreadId);
@@ -129,23 +132,27 @@ export function scheduleRuntimeEventWatchdog(
     if (hasObservedInitialRuntimeProgress(currentThreadState)) {
       return;
     }
-    await ignoreBestEffortError(dependencies.channelAdapter.sendTyping({
-      userId: normalized.senderId,
-      status: 0,
-      contextToken: normalized.contextToken,
-    }), {
-      label: "runtime watchdog typing stop",
-      reason: "typing stop is best-effort cleanup before the failure escalation notice",
-    });
-    await ignoreBestEffortError(dependencies.channelAdapter.sendText({
-      userId: normalized.senderId,
-      contextToken: normalized.contextToken,
-      preserveBlock: true,
-      text: userFacingMessages.runtimeFirstEventFailure(workspaceRoot, normalizedThreadId),
-    }), {
-      label: "runtime first-event failure notice",
-      reason: "the escalation notice is best-effort after the watchdog already concluded this turn is stuck",
-    });
+    if (supportsChannelOperation(dependencies.channelAdapter, "visibleTypingDelivery")) {
+      await ignoreBestEffortError(dependencies.channelAdapter.sendTyping({
+        userId: normalized.senderId,
+        status: 0,
+        contextToken: normalized.contextToken,
+      }), {
+        label: "runtime watchdog typing stop",
+        reason: "typing stop is best-effort cleanup before the failure escalation notice",
+      });
+    }
+    if (supportsChannelOperation(dependencies.channelAdapter, "visibleTextDelivery")) {
+      await ignoreBestEffortError(dependencies.channelAdapter.sendText({
+        userId: normalized.senderId,
+        contextToken: normalized.contextToken,
+        preserveBlock: true,
+        text: userFacingMessages.runtimeFirstEventFailure(workspaceRoot, normalizedThreadId),
+      }), {
+        label: "runtime first-event failure notice",
+        reason: "the escalation notice is best-effort after the watchdog already concluded this turn is stuck",
+      });
+    }
   }, dependencies.firstRuntimeEventFailureTimeoutMs);
   pendingRuntimeEventWatchdogs.set(normalizedThreadId, {
     noticeTimer,

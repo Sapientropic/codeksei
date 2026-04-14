@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
-import { PACKAGE_NAME } from "./contracts/app-env";
-import type { CommandExecutionResult, GlobalCliOptions } from "./contracts/cli-contract";
+import type { CommandExecutionResult } from "./contracts/cli-contract";
 import {
   findTerminalCommandManifest,
   findTerminalCommandManifestFromArgv,
@@ -19,11 +18,10 @@ import {
   CliError,
   emitCliError,
   emitCliResult,
-  formatCliErrorMessage,
   parseGlobalCliOptions,
   resolveGlobalCliOptions,
 } from "./core/cli-contract";
-import { logError } from "./core/logging";
+import { installCliRuntimeErrorHooks } from "./core/cli-runtime-hooks";
 import { createTerminalCommandContext } from "./app/terminal-command-context";
 import { runTerminalManifestCommand } from "./app/terminal-command-dispatch";
 import type { TerminalCommandManifestEntry } from "./contracts/command-surface";
@@ -38,8 +36,6 @@ interface ParsedCommandIntent {
   helpFlag: boolean;
 }
 
-let runtimeErrorHooksInstalled = false;
-
 export async function main(): Promise<void> {
   const parsedGlobalOptions = parseGlobalCliOptions(process.argv.slice(2));
   const cli = resolveGlobalCliOptions(parsedGlobalOptions);
@@ -51,7 +47,7 @@ export async function main(): Promise<void> {
     return;
   }
 
-  installRuntimeErrorHooks(cli);
+  installCliRuntimeErrorHooks(cli);
   const context = createTerminalCommandContext(argv, cli, intent.manifest);
   if (intent.manifest) {
     const result = await runTerminalManifestCommand(intent.manifest, context);
@@ -165,32 +161,6 @@ export function resolveTerminalCommandManifest(
     return findTerminalCommandManifest(normalizedCommand, "");
   }
   return null;
-}
-
-function installRuntimeErrorHooks(cli: GlobalCliOptions): void {
-  if (runtimeErrorHooksInstalled) {
-    return;
-  }
-  runtimeErrorHooksInstalled = true;
-
-  process.on("unhandledRejection", (reason: unknown) => {
-    const message = formatCliErrorMessage(reason);
-    logError(`[${PACKAGE_NAME}] unhandled rejection ${message}`);
-    if (cli.verbose || cli.debug) {
-      const detail = reason instanceof Error ? reason.stack || reason.message : String(reason);
-      logError(detail);
-    }
-  });
-
-  process.on("uncaughtException", (error: unknown) => {
-    const message = formatCliErrorMessage(error);
-    logError(`[${PACKAGE_NAME}] uncaught exception ${message}`);
-    if (cli.verbose || cli.debug) {
-      const detail = error instanceof Error ? error.stack || error.message : String(error);
-      logError(detail);
-    }
-    process.exitCode = 1;
-  });
 }
 
 function hasArgFlag(argv: string[], flag: string): boolean {

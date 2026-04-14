@@ -5,6 +5,12 @@ import {
   resolvePromptPersonZh,
 } from "./person-reference";
 
+interface InstructionTemplateConfigInput {
+  codekseiHome?: unknown;
+  userGender?: unknown;
+  userName?: unknown;
+}
+
 function resolveUserPronoun(gender: unknown): string {
   const normalized = normalizeText(gender).toLowerCase();
   if (normalized === "male" || normalized === "man" || normalized === "m" || normalized === "男") {
@@ -16,7 +22,7 @@ function resolveUserPronoun(gender: unknown): string {
   return "她";
 }
 
-function renderInstructionTemplate(template: unknown, config: Record<string, unknown> = {}): string {
+function renderInstructionTemplate(template: unknown, config: InstructionTemplateConfigInput = {}): string {
   const userName = resolveConfiguredPersonName(config);
   const pronoun = resolveUserPronoun(config?.userGender);
   const personZh = resolvePromptPersonZh(config);

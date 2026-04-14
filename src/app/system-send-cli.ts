@@ -24,8 +24,16 @@ interface SystemSendOptions {
   workspace: string;
 }
 
-interface RuntimeConfig extends Record<string, unknown> {
+interface RuntimeConfig {
+  accountId?: string;
+  accountsDir?: string;
+  allowedUserIds?: unknown;
   cliIdempotencyLedgerFile?: string;
+  userName?: unknown;
+  weixinBaseUrl?: string;
+  weixinRouteTag?: string;
+  workspaceId?: unknown;
+  workspaceRoot?: unknown;
   sessionsFile: string;
   systemMessageQueueFile: string;
   systemMessageDeadLetterFile: string;

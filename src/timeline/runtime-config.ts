@@ -5,7 +5,7 @@ import { resolveTimelineStateFiles } from "../core/timezone";
 import type { TimelineLocale } from "./runtime/contracts";
 import { resolveTimelineLocale } from "./runtime/infra/i18n/timeline-locale";
 
-interface TimelineRuntimeBaseConfig extends Record<string, unknown> {
+interface TimelineRuntimeBaseConfig {
   stateDir?: unknown;
   timelineLocale?: unknown;
   timelineStateDir?: unknown;

@@ -255,6 +255,7 @@ function createWorkspaceCommandHarness({
   const config = {
     checkinConfigFile: "",
     workspaceRoot: currentWorkspaceRoot,
+    runtimeAccessMode: "workspace-write",
     codexAccessMode: "workspace-write",
   };
 

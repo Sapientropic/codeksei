@@ -9,14 +9,17 @@ import { loadSyncBuffer, saveSyncBuffer } from "./sync-buffer-store";
 
 const LONG_POLL_TIMEOUT_MS = 35_000;
 
-export interface WeixinConfig extends Record<string, unknown> {
+export interface WeixinConfig {
   stateDir: string;
   accountsDir?: string;
   syncBufferDir?: string;
   weixinBaseUrl?: string;
+  weixinCdnBaseUrl?: string;
+  weixinDeliveryTrace?: boolean;
   weixinRouteTag?: string;
   weixinProtocolClientVersion?: string;
   weixinAdapterVariant?: string;
+  workspaceId?: unknown;
 }
 
 export interface WeixinAccount {

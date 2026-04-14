@@ -17,13 +17,42 @@ interface CreateDeliveryOptions {
   streamIdleFlushMs?: number;
   streamForceFlushChars?: number;
   streamBoundaryFlushChars?: number;
+  channelOperations?: Partial<{
+    visibleTextDelivery: boolean;
+    visibleTypingDelivery: boolean;
+    visibleFileDelivery: boolean;
+  }>;
   sendTextImpl?: ((payload: { text: string; preserveBlock?: boolean }) => Promise<void>) | null;
+  onDeliveryFailure?: ((payload: DeliveryFailurePayload) => Promise<void> | void) | null;
 }
 
 interface DeliveryHarness {
   delivery: StreamDeliveryInstance;
   sent: SentMessage[];
   attach(threadId: string): void;
+}
+
+function buildTestChannelDescriptor(
+  id: string,
+  overrides: Partial<{
+    visibleTextDelivery: boolean;
+    visibleTypingDelivery: boolean;
+    visibleFileDelivery: boolean;
+  }> = {},
+) {
+  return {
+    id,
+    kind: "channel" as const,
+    provider: "test",
+    operations: {
+      pollUpdates: true,
+      login: true,
+      resolveAccount: true,
+      visibleTextDelivery: overrides.visibleTextDelivery ?? true,
+      visibleTypingDelivery: overrides.visibleTypingDelivery ?? true,
+      visibleFileDelivery: overrides.visibleFileDelivery ?? true,
+    },
+  };
 }
 
 function sleep(ms: number): Promise<void> {
@@ -35,12 +64,14 @@ function createDelivery({
   streamIdleFlushMs = 5,
   streamForceFlushChars = 12,
   streamBoundaryFlushChars = 6,
+  channelOperations = {},
   sendTextImpl = null,
+  onDeliveryFailure = null,
 }: CreateDeliveryOptions = {}): DeliveryHarness {
   const sent: SentMessage[] = [];
   const channelAdapter: ChannelAdapterLike = {
     describe() {
-      return { id: "test-channel" };
+      return buildTestChannelDescriptor("test-channel", channelOperations);
     },
     getKnownContextTokens() {
       return {};
@@ -118,6 +149,7 @@ function createDelivery({
     streamBoundaryFlushChars,
     channelAdapter,
     sessionStore,
+    onDeliveryFailure,
   });
 
   function attach(threadId: string): void {
@@ -497,7 +529,7 @@ test("persistent send failure abandons the run and reports delivery degradation"
     streamBoundaryFlushChars: 6,
     channelAdapter: {
       describe() {
-        return { id: "test-channel" };
+        return buildTestChannelDescriptor("test-channel");
       },
       getKnownContextTokens() {
         return {};
@@ -586,4 +618,34 @@ test("persistent send failure abandons the run and reports delivery degradation"
   const firstDegraded = degraded[0];
   assert.ok(firstDegraded);
   assert.equal(firstDegraded.threadId, "thread-fail");
+});
+
+test("unsupported visible text delivery abandons the run before calling sendText", async () => {
+  const degraded: DeliveryFailurePayload[] = [];
+  const sentPayloads: string[] = [];
+  const { delivery, attach } = createDelivery({
+    channelOperations: { visibleTextDelivery: false },
+    sendTextImpl: async (payload) => {
+      sentPayloads.push(payload.text);
+    },
+    onDeliveryFailure(payload) {
+      degraded.push(payload);
+    },
+  });
+  attach("thread-unsupported");
+
+  await startTurn(delivery, "thread-unsupported", "turn-unsupported");
+  await sendDelta(delivery, {
+    threadId: "thread-unsupported",
+    turnId: "turn-unsupported",
+    itemId: "final-1",
+    text: "这条不会真的发出去。",
+    phase: "final",
+  });
+  await sleep(20);
+
+  assert.deepEqual(sentPayloads, []);
+  assert.equal(degraded.length, 1);
+  assert.equal(degraded[0]?.threadId, "thread-unsupported");
+  assert.match(String(degraded[0]?.error || ""), /不支持可见文本回传/u);
 });

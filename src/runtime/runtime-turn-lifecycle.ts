@@ -26,6 +26,7 @@ import type {
   IncomingWeixinAttachment,
   PersistIncomingWeixinAttachmentsResult,
 } from "../contracts/weixin-media";
+import { supportsChannelOperation as canUseChannelOperation, supportsRuntimeOperation as canUseRuntimeOperation } from "../core/app-service-contract";
 
 type PersistedAttachmentResult = PersistIncomingWeixinAttachmentsResult;
 
@@ -134,6 +135,9 @@ export class RuntimeTurnLifecycle {
   }
 
   async sendTimelineScreenshot({ senderId = "", args = [], outputFile = "" }: TimelineScreenshotRequest = {}) {
+    if (!canUseChannelOperation(this.channelAdapter, "visibleFileDelivery")) {
+      throw new Error("当前宿主不支持可见文件回传。");
+    }
     const targetUserId = this.normalizeText(senderId) || this.resolveDefaultTerminalUser();
     if (!targetUserId) {
       throw new Error("无法确定时间轴截图要发送给哪个微信用户，先配置 CODEKSEI_ALLOWED_USER_IDS");
@@ -167,6 +171,9 @@ export class RuntimeTurnLifecycle {
   }
 
   async sendLocalFileToCurrentChat({ senderId = "", filePath = "" }: SendLocalFileRequest = {}) {
+    if (!canUseChannelOperation(this.channelAdapter, "visibleFileDelivery")) {
+      throw new Error("当前宿主不支持可见文件回传。");
+    }
     const targetUserId = this.normalizeText(senderId) || this.resolveDefaultTerminalUser();
     if (!targetUserId) {
       throw new Error("无法确定文件要发送给哪个微信用户，先配置 CODEKSEI_ALLOWED_USER_IDS");
@@ -233,7 +240,7 @@ export class RuntimeTurnLifecycle {
       return sendResult;
     }
 
-    if (reportFailureToUser) {
+    if (reportFailureToUser && canUseChannelOperation(this.channelAdapter, "visibleTextDelivery")) {
       const messageText = this.normalizeText(sendResult.reason) || "unknown error";
       await ignoreBestEffortError(this.channelAdapter.sendText({
         userId: normalized.senderId,
@@ -281,29 +288,33 @@ export class RuntimeTurnLifecycle {
     });
 
     if (!persisted.saved.length && persisted.failed.length && !String(normalized.text || "").trim()) {
-      await ignoreBestEffortError(this.channelAdapter.sendText({
-        userId: normalized.senderId,
-        text: userFacingMessages.attachmentReceiveFailed(persisted.failed.map((item) => item.reason)),
-        contextToken: normalized.contextToken,
-        preserveBlock: true,
-      }), {
-        label: "attachment failure notice",
-        reason: "attachment persistence failure should still return null even if the courtesy notice cannot be delivered",
-      });
+      if (canUseChannelOperation(this.channelAdapter, "visibleTextDelivery")) {
+        await ignoreBestEffortError(this.channelAdapter.sendText({
+          userId: normalized.senderId,
+          text: userFacingMessages.attachmentReceiveFailed(persisted.failed.map((item) => item.reason)),
+          contextToken: normalized.contextToken,
+          preserveBlock: true,
+        }), {
+          label: "attachment failure notice",
+          reason: "attachment persistence failure should still return null even if the courtesy notice cannot be delivered",
+        });
+      }
       return null;
     }
 
     const runtimeInboundText = this.buildRuntimeInboundText(normalized, persisted, this.config);
     if (!runtimeInboundText) {
-      await ignoreBestEffortError(this.channelAdapter.sendText({
-        userId: normalized.senderId,
-        text: userFacingMessages.attachmentReceiveFailed(persisted.failed.map((item) => item.reason)),
-        contextToken: normalized.contextToken,
-        preserveBlock: true,
-      }), {
-        label: "attachment-only failure notice",
-        reason: "the user-facing attachment failure notice is best-effort after the runtime payload collapsed to empty",
-      });
+      if (canUseChannelOperation(this.channelAdapter, "visibleTextDelivery")) {
+        await ignoreBestEffortError(this.channelAdapter.sendText({
+          userId: normalized.senderId,
+          text: userFacingMessages.attachmentReceiveFailed(persisted.failed.map((item) => item.reason)),
+          contextToken: normalized.contextToken,
+          preserveBlock: true,
+        }), {
+          label: "attachment-only failure notice",
+          reason: "the user-facing attachment failure notice is best-effort after the runtime payload collapsed to empty",
+        });
+      }
       return null;
     }
 
@@ -330,15 +341,18 @@ export class RuntimeTurnLifecycle {
     if (!normalizedUserId) {
       return runner();
     }
+    const canSendTyping = canUseChannelOperation(this.channelAdapter, "visibleTypingDelivery");
 
-    await ignoreBestEffortError(this.channelAdapter.sendTyping({
-      userId: normalizedUserId,
-      status: 1,
-      contextToken,
-    }), {
-      label: "typing start",
-      reason: "typing start should not block the actual runtime work",
-    });
+    if (canSendTyping) {
+      await ignoreBestEffortError(this.channelAdapter.sendTyping({
+        userId: normalizedUserId,
+        status: 1,
+        contextToken,
+      }), {
+        label: "typing start",
+        reason: "typing start should not block the actual runtime work",
+      });
+    }
 
     let succeeded = false;
     try {
@@ -346,7 +360,7 @@ export class RuntimeTurnLifecycle {
       succeeded = true;
       return result;
     } finally {
-      if (clearOnSuccess || !succeeded) {
+      if (canSendTyping && (clearOnSuccess || !succeeded)) {
         await ignoreBestEffortError(this.channelAdapter.sendTyping({
           userId: normalizedUserId,
           status: 0,
@@ -370,6 +384,12 @@ export class RuntimeTurnLifecycle {
     normalized: NormalizedIncomingMessage;
     prepared: PreparedRuntimeMessage;
   }): Promise<RuntimeTurnSendResult> {
+    if (!canUseRuntimeOperation(this.runtimeAdapter, "interactiveTurn")) {
+      return {
+        status: "retryable_error",
+        reason: "当前宿主不支持 interactive runtime turn。",
+      };
+    }
     try {
       const turn = await this.withUserTyping({
         userId: normalized.senderId,

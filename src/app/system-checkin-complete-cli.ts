@@ -13,6 +13,7 @@ import {
   runCheckinComplete,
 } from "../core/checkin-core";
 import { buildTerminalLeafHelp } from "../core/command-registry";
+import type { AppRuntimeConfig } from "../core/app-service-contract";
 import { formatCheckinRange } from "../state/checkin-config";
 import { normalizeText } from "../core/text-normalization";
 
@@ -26,12 +27,17 @@ interface SystemCheckinCompleteOptions {
   workspace: string;
 }
 
-interface RuntimeConfig extends Record<string, unknown> {
-  accountId?: unknown;
-  checkinConfigFile?: string;
-  checkinScheduleStateFile?: string;
-  sessionsFile?: string;
-}
+type RuntimeConfig = Pick<AppRuntimeConfig, "checkinConfigFile" | "checkinScheduleStateFile"> & Partial<Pick<
+  AppRuntimeConfig,
+  | "accountId"
+  | "allowedUserIds"
+  | "channelProvider"
+  | "runtime"
+  | "sessionsFile"
+  | "userName"
+  | "workspaceId"
+  | "workspaceRoot"
+>>;
 
 export async function runSystemCheckinCompleteCommand(
   config: RuntimeConfig,

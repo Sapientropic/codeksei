@@ -1,18 +1,22 @@
 import { normalizeText } from "./text-normalization";
 
+interface PersonReferenceConfigInput {
+  userName?: unknown;
+}
+
 function normalizePersonName(value: unknown): string {
   return normalizeText(value);
 }
 
-function resolveConfiguredPersonName(config: Record<string, unknown> = {}): string {
+function resolveConfiguredPersonName(config: PersonReferenceConfigInput = {}): string {
   return normalizePersonName(config?.userName);
 }
 
-function resolvePromptPersonZh(config: Record<string, unknown> = {}): string {
+function resolvePromptPersonZh(config: PersonReferenceConfigInput = {}): string {
   return resolveConfiguredPersonName(config) || "眼前这个人";
 }
 
-function resolvePromptPersonEn(config: Record<string, unknown> = {}): string {
+function resolvePromptPersonEn(config: PersonReferenceConfigInput = {}): string {
   return resolveConfiguredPersonName(config) || "the person you're with";
 }
 

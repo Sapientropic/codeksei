@@ -17,7 +17,7 @@ import {
   normalizeSection,
 } from "./shared";
 
-interface DiaryWriteConfig extends Record<string, unknown> {
+interface DiaryWriteConfig {
   cliIdempotencyLedgerFile?: string;
   diaryDir?: string;
   timezone?: unknown;

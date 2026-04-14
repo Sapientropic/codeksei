@@ -8,7 +8,7 @@ import {
   writeManagedJsonStateFile,
 } from "../../../state/json-state";
 
-interface WeixinAccountConfig extends Record<string, unknown> {
+interface WeixinAccountConfig {
   accountsDir?: string;
   weixinBaseUrl?: string;
   weixinRouteTag?: string;
@@ -157,11 +157,11 @@ function resolveSelectedAccount(config: WeixinAccountConfig): WeixinAccountRecor
 }
 
 function resolveAccountsDir(config: WeixinAccountConfig): string {
-  return typeof config.accountsDir === "string" ? config.accountsDir : "";
+  return config.accountsDir || "";
 }
 
 function resolveWeixinBaseUrl(config: WeixinAccountConfig): string {
-  return typeof config.weixinBaseUrl === "string" ? config.weixinBaseUrl : "";
+  return config.weixinBaseUrl || "";
 }
 
 function validateWeixinAccountRecord(value: unknown): true | string {

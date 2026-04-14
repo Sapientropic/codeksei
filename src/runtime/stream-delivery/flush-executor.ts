@@ -1,5 +1,6 @@
 import * as crypto from "crypto";
 import type { ChannelAdapterLike } from "../../core/app-service-contract";
+import { supportsChannelOperation } from "../../core/app-service-contract";
 import { logError, logInfo, logWarn } from "../../core/logging";
 import type { DeliveryFailurePayload, ReplyTarget } from "../../core/runtime-types";
 import { computeVisibleDeliveryDelta } from "./delta-merge";
@@ -131,6 +132,12 @@ export async function executeStreamFlush(
   const streamingPreserveBlock = Boolean(streamPrepared?.preserveBlock);
   const replyTarget = state.replyTarget;
   if (!replyTarget) {
+    return;
+  }
+  if (!supportsChannelOperation(context.channelAdapter, "visibleTextDelivery")) {
+    const error = new Error("当前宿主不支持可见文本回传。");
+    logWarn(`[codeksei] skip stream delivery thread=${state.threadId} reason=text_delivery_unsupported`);
+    handleStreamDeliveryFailure(context, state, error);
     return;
   }
   const tracePayload = buildDeliveryTracePayload(state, {

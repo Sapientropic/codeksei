@@ -43,9 +43,23 @@ interface CheckinSessionStoreLike {
   };
 }
 
+type CheckinTargetConfig = Partial<Pick<AppRuntimeConfig, "allowedUserIds" | "userName" | "workspaceId" | "workspaceRoot">>;
+type CheckinTickConfig = Pick<AppRuntimeConfig, "checkinConfigFile" | "checkinScheduleStateFile"> & Partial<Pick<AppRuntimeConfig, "userName">>;
+type BridgeCheckinPollerConfig = Pick<
+  AppRuntimeConfig,
+  | "allowedUserIds"
+  | "checkinConfigFile"
+  | "checkinScheduleStateFile"
+  | "systemMessageDeadLetterFile"
+  | "systemMessageQueueFile"
+  | "userName"
+  | "workspaceId"
+  | "workspaceRoot"
+> & Partial<Pick<AppRuntimeConfig, "userName">>;
+
 interface CheckinTargetResolutionArgs {
   accountId?: string;
-  config: Record<string, unknown>;
+  config: CheckinTargetConfig;
   explicitUser?: string;
   explicitWorkspace?: string;
   sessionStore?: CheckinSessionStoreLike | null;
@@ -53,13 +67,13 @@ interface CheckinTargetResolutionArgs {
 
 interface CheckinTickArgs {
   ack?: string;
-  config: Record<string, unknown> & Pick<AppRuntimeConfig, "checkinConfigFile" | "checkinScheduleStateFile">;
+  config: CheckinTickConfig;
   nowMs?: number;
   target: CheckinResolvedTarget;
 }
 
 interface CheckinCompleteArgs {
-  config: Record<string, unknown> & Pick<AppRuntimeConfig, "checkinConfigFile" | "checkinScheduleStateFile">;
+  config: CheckinTickConfig;
   nextWakeAt?: string;
   nowMs?: number;
   result: CheckinCompletionResult;
@@ -70,7 +84,7 @@ interface CheckinCompleteArgs {
 
 interface BridgeCheckinPollerIterationArgs {
   accountId: string;
-  config: Record<string, unknown> & Pick<AppRuntimeConfig, "checkinConfigFile" | "checkinScheduleStateFile" | "systemMessageDeadLetterFile" | "systemMessageQueueFile">;
+  config: BridgeCheckinPollerConfig;
   nowMs?: number;
   queueStore: Pick<SystemMessageQueueLike, "enqueue" | "hasPendingForAccount">;
   sessionStore: CheckinSessionStoreLike;
@@ -140,7 +154,7 @@ export function buildCheckinTargetResolutionErrorMessage(resolution: CheckinTarg
 }
 
 export function buildCheckinTriggerPayload(
-  config: Record<string, unknown>,
+  config: Partial<Pick<AppRuntimeConfig, "userName">>,
   target: CheckinResolvedTarget,
   {
     nowMs = Date.now(),
@@ -453,7 +467,7 @@ function inspectCheckinWorkspaceRoot({
   sessionStore,
 }: {
   accountId: string;
-  config: Record<string, unknown>;
+  config: CheckinTargetConfig;
   explicitWorkspace: string;
   senderId: string;
   sessionStore: CheckinSessionStoreLike | null;
@@ -638,7 +652,7 @@ function setPendingTrigger({
   stateStore,
   target,
 }: {
-  config: Record<string, unknown>;
+  config: Partial<Pick<AppRuntimeConfig, "userName">>;
   currentState: CheckinScheduleState;
   dueAt: string;
   nowMs: number;

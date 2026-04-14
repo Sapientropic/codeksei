@@ -1,4 +1,5 @@
 import type {
+  AppRuntimeConfig,
   ChannelAdapterLike,
   RuntimeAdapterLike,
   SessionStoreLike,
@@ -75,11 +76,22 @@ const EMPTY_SESSION_WRITER: SessionStoreWriterLike = {
   },
 };
 
+type HostedModeConfig = Pick<
+  AppRuntimeConfig,
+  | "channel"
+  | "channelProvider"
+  | "hermesCommand"
+  | "hermesHome"
+  | "reviewSemanticHost"
+  | "runtime"
+  | "workspaceRoot"
+>;
+
 function createModeError(resolved: HostModeResolution, commandLabel: string): Error {
   return new Error(formatBridgeOnlyCommandMessage(resolved, commandLabel));
 }
 
-export function createHostedChannelAdapter(config: Record<string, unknown>): ChannelAdapterLike {
+export function createHostedChannelAdapter(config: HostedModeConfig): ChannelAdapterLike {
   const resolved = resolveHostMode(config);
   return {
     describe() {
@@ -87,6 +99,14 @@ export function createHostedChannelAdapter(config: Record<string, unknown>): Cha
         id: "hermes-weixin",
         kind: "channel",
         provider: "hermes",
+        operations: {
+          pollUpdates: false,
+          login: false,
+          resolveAccount: false,
+          visibleTextDelivery: false,
+          visibleTypingDelivery: false,
+          visibleFileDelivery: false,
+        },
         profile: resolved.profile,
         mode: resolved.mode,
         supported: resolved.supported,
@@ -132,7 +152,7 @@ export interface HostedRuntimeAdapter extends RuntimeAdapterLike {
   getSessionWriter(): SessionStoreWriterLike;
 }
 
-export function createHostedRuntimeAdapter(config: Record<string, unknown>): HostedRuntimeAdapter {
+export function createHostedRuntimeAdapter(config: HostedModeConfig): HostedRuntimeAdapter {
   const resolved = resolveHostMode(config);
   return {
     describe() {
@@ -140,6 +160,14 @@ export function createHostedRuntimeAdapter(config: Record<string, unknown>): Hos
         id: resolved.runtime === "hermes" ? "hermes" : "unsupported-runtime",
         kind: "runtime",
         provider: resolved.runtime,
+        operations: {
+          initialize: false,
+          interactiveTurn: false,
+          refreshThreadInstructions: false,
+          respondApproval: false,
+          resumeThread: false,
+          cancelTurn: false,
+        },
         profile: resolved.profile,
         mode: resolved.mode,
         supported: resolved.supported,

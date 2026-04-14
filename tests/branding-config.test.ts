@@ -5,7 +5,7 @@ const test: typeof import("node:test") = require("node:test");
 const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 
 const branding = require("../src/core/branding");
-const { readConfig } = require("../src/core/config");
+const { parseEnvConfig, readConfig } = require("../src/core/config");
 
 function withPatchedEnv<T>(patch: Record<string, string>, fn: () => T): T {
   const original = { ...process.env };
@@ -179,4 +179,52 @@ test("resolveStateDir defaults to the codeksei state directory", () => {
   } finally {
     os.homedir = originalHomedir;
   }
+});
+
+test("parseEnvConfig keeps the default bridge host shape explicit", () => {
+  const config = parseEnvConfig({
+    CODEKSEI_STATE_DIR: "E:/state",
+  });
+
+  assert.equal(config.channel, "weixin");
+  assert.equal(config.runtime, "codex");
+  assert.equal(config.channelProvider, "codeksei");
+  assert.equal(config.reminderQueueFile.replace(/\\/g, "/"), "E:/state/reminder-queue.json");
+  assert.equal(config.systemMessageQueueFile.replace(/\\/g, "/"), "E:/state/system-message-queue.json");
+  assert.equal(config.timelineScreenshotQueueFile.replace(/\\/g, "/"), "E:/state/timeline-screenshot-queue.json");
+});
+
+test("parseEnvConfig derives hosted Hermes defaults and normalizes reply/access modes", () => {
+  const config = parseEnvConfig({
+    CODEKSEI_STATE_DIR: "E:/state",
+    CODEKSEI_RUNTIME: "hermes",
+    CODEKSEI_WEIXIN_REPLY_MODE: "SETTLED",
+    CODEKSEI_RUNTIME_ACCESS_MODE: "default",
+  });
+
+  assert.equal(config.runtime, "hermes");
+  assert.equal(config.channelProvider, "hermes");
+  assert.equal(config.weixinReplyMode, "settled");
+  assert.equal(config.runtimeAccessMode, "current");
+  assert.match(config.hermesRepoRoot.replace(/\\/g, "/"), /\/hermes-agent$/u);
+  assert.match(config.hermesRepoLocalShimPath.replace(/\\/g, "/"), /\/tools\/hermes_repo_local\/bridge\.py$/u);
+});
+
+test("parseEnvConfig lets workspaceRoot override env and keeps workspace-scoped config files aligned", () => {
+  const config = parseEnvConfig({
+    CODEKSEI_STATE_DIR: "E:/state",
+    CODEKSEI_WORKSPACE_ROOT: "E:/workspace/from-env",
+  }, {
+    workspaceRoot: "E:/workspace/from-cli",
+  });
+
+  assert.equal(config.workspaceRoot, "E:/workspace/from-cli");
+  assert.equal(
+    config.projectRadarConfigFile.replace(/\\/g, "/"),
+    "E:/workspace/from-cli/.codex/code-projects.json",
+  );
+  assert.equal(
+    config.reviewSchemaConfigFile.replace(/\\/g, "/"),
+    "E:/workspace/from-cli/.codex/review-schema.json",
+  );
 });

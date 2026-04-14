@@ -1,5 +1,6 @@
 import type { RuntimeEvent } from "../../../contracts/runtime-events";
 import type { RuntimeTurnSendState, UnknownRecord } from "../../../core/runtime-types";
+import type { AppRuntimeConfig, RuntimeAdapterDescriptor } from "../../../core/app-service-contract";
 import { resolveCodexWorkspaceRoot } from "../../../workspace/workspace-alias";
 import { mapCodexMessageToRuntimeEvent } from "./events";
 import { extractThreadId, type RuntimeMessage } from "./message-utils";
@@ -23,16 +24,17 @@ import {
 import { createRuntimeLifecycle } from "./lifecycle";
 
 
-interface CodexRuntimeConfig extends Record<string, unknown> {
-  sessionsFile: string;
-  stateDir: string;
-  runtimeEndpoint?: string;
-  runtimeCommand?: string;
-  weixinInstructionsFile?: string;
-  weixinOperationsFile?: string;
-  weixinInstructionsOverlayFile?: string;
-  weixinOperationsOverlayFile?: string;
-}
+type CodexRuntimeConfig = Pick<
+  AppRuntimeConfig,
+  | "sessionsFile"
+  | "stateDir"
+  | "runtimeEndpoint"
+  | "runtimeCommand"
+  | "weixinInstructionsFile"
+  | "weixinOperationsFile"
+  | "weixinInstructionsOverlayFile"
+  | "weixinOperationsOverlayFile"
+>;
 
 interface RespondApprovalArgs {
   requestId: string | number;
@@ -73,12 +75,7 @@ interface ReadyState {
 }
 
 interface CodexRuntimeAdapter {
-  describe(): {
-    id: "codex";
-    kind: "runtime";
-    endpoint: string;
-    sessionsFile: string;
-  };
+  describe(): RuntimeAdapterDescriptor;
   createClient(): RuntimeClientLike;
   onEvent(listener: (event: RuntimeEvent<UnknownRecord>, message: UnknownRecord) => void): () => void;
   getSessionStore(): SessionStore;

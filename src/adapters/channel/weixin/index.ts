@@ -2,6 +2,7 @@ import { createLegacyWeixinChannelAdapter } from "./legacy";
 import { runV2LoginFlow } from "./login-v2";
 import { sendWeixinMediaFile } from "./media-send";
 import { createWeixinDeliveryFacade, packChunksForWeixinDelivery, sendV2TextChunk } from "./delivery";
+import type { ChannelAdapterDescriptor } from "../../../core/app-service-contract";
 import type { SendWeixinMediaFileArgs, SendWeixinMediaFileResult } from "./media-types";
 import { createWeixinUpdateState, type GetUpdatesResponse, type WeixinAccount, type WeixinConfig } from "./updates";
 
@@ -32,7 +33,7 @@ interface GetUpdatesArgs {
 }
 
 interface WeixinChannelAdapter {
-  describe(): Record<string, unknown>;
+  describe(): ChannelAdapterDescriptor;
   login(): Promise<void>;
   printAccounts(): void;
   resolveAccount(): WeixinAccount;
@@ -66,6 +67,15 @@ export function createWeixinChannelAdapter(config: WeixinConfig): WeixinChannelA
         id: "weixin",
         variant: "v2",
         kind: "channel",
+        provider: "weixin",
+        operations: {
+          pollUpdates: true,
+          login: true,
+          resolveAccount: true,
+          visibleTextDelivery: true,
+          visibleTypingDelivery: true,
+          visibleFileDelivery: true,
+        },
         stateDir: config.stateDir,
         baseUrl: config.weixinBaseUrl,
         accountsDir: config.accountsDir,

@@ -2,8 +2,12 @@ import { normalizeText } from "../core/text-normalization";
 import { loadPersistedContextTokens } from "../adapters/channel/weixin/context-token-store";
 import type { SessionBinding } from "../contracts/session-state";
 
-interface ConfigLike extends Record<string, unknown> {
+interface ConfigLike {
+  accountId?: string;
+  accountsDir?: string;
   allowedUserIds?: unknown;
+  weixinBaseUrl?: string;
+  weixinRouteTag?: string;
   workspaceId?: unknown;
   workspaceRoot?: unknown;
 }

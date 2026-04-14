@@ -29,7 +29,7 @@ const SEND_MESSAGE_CHUNK_INTERVAL_MS = 350;
 const WEIXIN_SEND_CHUNK_LIMIT = 80;
 const WEIXIN_MAX_DELIVERY_MESSAGES = 10;
 
-interface DeliveryConfig extends Record<string, unknown> {
+interface DeliveryConfig {
   weixinDeliveryTrace?: boolean;
   weixinProtocolClientVersion?: string;
 }

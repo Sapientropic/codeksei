@@ -9,6 +9,7 @@ import {
   resolveCheckinTarget,
 } from "../core/checkin-core";
 import { buildTerminalLeafHelp } from "../core/command-registry";
+import type { AppRuntimeConfig } from "../core/app-service-contract";
 import { normalizeText } from "../core/text-normalization";
 
 interface SystemCheckinTriggerOptions {
@@ -17,10 +18,19 @@ interface SystemCheckinTriggerOptions {
   workspace: string;
 }
 
-interface RuntimeConfig extends Record<string, unknown> {
-  accountId?: unknown;
-  sessionsFile?: string;
-}
+type RuntimeConfig = Partial<Pick<
+  AppRuntimeConfig,
+  | "accountId"
+  | "allowedUserIds"
+  | "channelProvider"
+  | "checkinConfigFile"
+  | "checkinScheduleStateFile"
+  | "runtime"
+  | "sessionsFile"
+  | "userName"
+  | "workspaceId"
+  | "workspaceRoot"
+>>;
 
 export async function runSystemCheckinTriggerCommand(
   config: RuntimeConfig,

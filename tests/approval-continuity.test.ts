@@ -16,6 +16,38 @@ import type {
   StreamDeliveryLike,
 } from "../src/core/app-service-contract";
 
+function buildTestChannelDescriptor(id: string) {
+  return {
+    id,
+    kind: "channel" as const,
+    provider: "test",
+    operations: {
+      pollUpdates: true,
+      login: true,
+      resolveAccount: true,
+      visibleTextDelivery: true,
+      visibleTypingDelivery: true,
+      visibleFileDelivery: true,
+    },
+  };
+}
+
+function buildTestRuntimeDescriptor(id: string) {
+  return {
+    id,
+    kind: "runtime" as const,
+    provider: "test",
+    operations: {
+      initialize: true,
+      interactiveTurn: true,
+      refreshThreadInstructions: true,
+      respondApproval: true,
+      resumeThread: true,
+      cancelTurn: true,
+    },
+  };
+}
+
 async function createSessionStoreFixture() {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-approval-"));
   const filePath = path.join(tempRoot, "sessions.json");
@@ -101,7 +133,7 @@ test("restoreBoundThreadSubscriptions rehydrates persisted approval into thread 
   const streamTargets: Array<{ bindingKey: string; target: unknown }> = [];
   const channelAdapter: ChannelAdapterLike = {
     describe() {
-      return { id: "test-weixin" };
+      return buildTestChannelDescriptor("test-weixin");
     },
     getKnownContextTokens() {
       return {};
@@ -138,7 +170,7 @@ test("restoreBoundThreadSubscriptions rehydrates persisted approval into thread 
     },
     async close() {},
     describe() {
-      return { id: "test-runtime" };
+      return buildTestRuntimeDescriptor("test-runtime");
     },
     getSessionStore() {
       return sessionStore;

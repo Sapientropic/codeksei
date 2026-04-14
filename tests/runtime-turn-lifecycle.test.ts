@@ -4,6 +4,44 @@ const assert: typeof import("node:assert/strict") = require("node:assert/strict"
 const { normalizeText } = require("../src/core/text-normalization");
 const { RuntimeTurnLifecycle } = require("../src/runtime/runtime-turn-lifecycle");
 
+function buildTestChannelDescriptor(overrides: Partial<{
+  visibleTextDelivery: boolean;
+  visibleTypingDelivery: boolean;
+  visibleFileDelivery: boolean;
+}> = {}) {
+  return {
+    id: "test-channel",
+    kind: "channel" as const,
+    provider: "test",
+    operations: {
+      pollUpdates: true,
+      login: true,
+      resolveAccount: true,
+      visibleTextDelivery: overrides.visibleTextDelivery ?? true,
+      visibleTypingDelivery: overrides.visibleTypingDelivery ?? true,
+      visibleFileDelivery: overrides.visibleFileDelivery ?? true,
+    },
+  };
+}
+
+function buildTestRuntimeDescriptor(overrides: Partial<{
+  interactiveTurn: boolean;
+}> = {}) {
+  return {
+    id: "test-runtime",
+    kind: "runtime" as const,
+    provider: "test",
+    operations: {
+      initialize: true,
+      interactiveTurn: overrides.interactiveTurn ?? true,
+      refreshThreadInstructions: true,
+      respondApproval: true,
+      resumeThread: true,
+      cancelTurn: true,
+    },
+  };
+}
+
 function buildIncomingMessage(overrides: Record<string, unknown> = {}) {
   return {
     provider: "weixin",
@@ -27,12 +65,23 @@ function createLifecycle({
   sendTextTurnImpl = async () => ({ threadId: "thread-1", workspaceBootstrapPending: false }),
   persistIncomingWeixinAttachmentsImpl = async () => ({ saved: [], failed: [] }),
   buildRuntimeInboundTextImpl = (normalized: { text?: string }) => String(normalized.text || "").trim(),
+  channelOperations = {},
+  runtimeOperations = {},
 }: {
   codexParams?: { model?: string; effort?: string };
   sendTextTurnImpl?: (payload: Record<string, unknown>) => Promise<{ threadId: string; workspaceBootstrapPending: boolean }>;
   persistIncomingWeixinAttachmentsImpl?: (args: Record<string, unknown>) => Promise<{ saved: unknown[]; failed: Array<{ reason: string }> }>;
   buildRuntimeInboundTextImpl?: (normalized: Record<string, unknown>, persisted: Record<string, unknown>) => string;
+  channelOperations?: Partial<{
+    visibleTextDelivery: boolean;
+    visibleTypingDelivery: boolean;
+    visibleFileDelivery: boolean;
+  }>;
+  runtimeOperations?: Partial<{
+    interactiveTurn: boolean;
+  }>;
 } = {}) {
+  const sendFileCalls: Array<{ filePath: string }> = [];
   const sendTextCalls: Array<{ text: string }> = [];
   const sendTypingCalls: Array<{ status: number }> = [];
   const sendTextTurnCalls: Record<string, unknown>[] = [];
@@ -40,6 +89,9 @@ function createLifecycle({
   const watchdogCalls: Record<string, unknown>[] = [];
 
   const runtimeAdapter = {
+    describe() {
+      return buildTestRuntimeDescriptor(runtimeOperations);
+    },
     getSessionStore() {
       return {
         buildBindingKey({ workspaceId, accountId, senderId }: { workspaceId: string; accountId: string; senderId: string }) {
@@ -58,10 +110,15 @@ function createLifecycle({
 
   const lifecycle = new RuntimeTurnLifecycle({
     channelAdapter: {
+      describe() {
+        return buildTestChannelDescriptor(channelOperations);
+      },
       getKnownContextTokens() {
         return { "user-1": "ctx-1" };
       },
-      async sendFile() {},
+      async sendFile(payload: { filePath: string }) {
+        sendFileCalls.push(payload);
+      },
       async sendText(payload: { text: string }) {
         sendTextCalls.push(payload);
       },
@@ -111,6 +168,7 @@ function createLifecycle({
 
   return {
     bootstrapCalls,
+    fileCalls: sendFileCalls,
     lifecycle,
     sendTextCalls,
     sendTextTurnCalls,
@@ -269,4 +327,75 @@ test("withUserTyping clears the typing indicator after failures", async () => {
   );
 
   assert.deepEqual(harness.sendTypingCalls.map((entry) => entry.status), [1, 0]);
+});
+
+test("sendPreparedMessageToRuntime fails fast before touching the runtime when interactive turn is unsupported", async () => {
+  const harness = createLifecycle({
+    runtimeOperations: { interactiveTurn: false },
+  });
+
+  const result = await harness.lifecycle.sendPreparedMessageToRuntime({
+    bindingKey: "workspace-1:acct-1:user-1",
+    workspaceRoot: "E:/repo/current",
+    normalized: buildIncomingMessage(),
+    prepared: {
+      ...buildIncomingMessage(),
+      originalText: "hello",
+      text: "prepared message",
+      attachments: [],
+      attachmentFailures: [],
+      workspaceRoot: "E:/repo/current",
+    },
+  });
+
+  assert.deepEqual(result, {
+    status: "retryable_error",
+    reason: "当前宿主不支持 interactive runtime turn。",
+  });
+  assert.deepEqual(harness.sendTextTurnCalls, []);
+  assert.deepEqual(harness.sendTypingCalls, []);
+});
+
+test("prepareIncomingMessageForRuntime skips courtesy notices when visible text delivery is unsupported", async () => {
+  const harness = createLifecycle({
+    channelOperations: { visibleTextDelivery: false },
+    persistIncomingWeixinAttachmentsImpl: async () => ({
+      saved: [],
+      failed: [{ reason: "download failed" }],
+    }),
+    buildRuntimeInboundTextImpl: () => "",
+  });
+
+  const prepared = await harness.lifecycle.prepareIncomingMessageForRuntime(buildIncomingMessage({
+    text: "",
+    attachments: [{ kind: "file", fileName: "payload.txt" }],
+  }), "E:/repo/current");
+
+  assert.equal(prepared, null);
+  assert.deepEqual(harness.sendTextCalls, []);
+});
+
+test("withUserTyping skips typing mutations when the host cannot surface typing status", async () => {
+  const harness = createLifecycle({
+    channelOperations: { visibleTypingDelivery: false },
+  });
+
+  await harness.lifecycle.withUserTyping({ userId: "user-1", contextToken: "ctx-1" }, async () => "ok");
+
+  assert.deepEqual(harness.sendTypingCalls, []);
+});
+
+test("sendLocalFileToCurrentChat fails before adapter delivery when visible file delivery is unsupported", async () => {
+  const harness = createLifecycle({
+    channelOperations: { visibleFileDelivery: false },
+  });
+
+  await assert.rejects(
+    () => harness.lifecycle.sendLocalFileToCurrentChat({
+      senderId: "user-1",
+      filePath: "E:/repo/current/report.txt",
+    }),
+    /不支持可见文件回传/u,
+  );
+  assert.deepEqual(harness.fileCalls, []);
 });

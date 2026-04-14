@@ -3,6 +3,7 @@ import type { CommandExecutionResult } from "../contracts/cli-contract";
 import { parseCliArgs } from "../core/cli-args";
 import { runCliMutation } from "../core/cli-mutation";
 import { buildTerminalLeafHelp } from "../core/command-registry";
+import type { AppRuntimeConfig } from "../core/app-service-contract";
 import { buildReview, writeReview } from "../review/review";
 
 type ReviewKind = "nightly" | "weekly" | "monthly";
@@ -19,7 +20,9 @@ interface ReviewOptions extends Record<string, unknown> {
   model: string;
 }
 
-async function runReviewCommand(config: Record<string, unknown>, kind: ReviewKind, args: string[] = []) {
+type ReviewConfig = Partial<AppRuntimeConfig>;
+
+async function runReviewCommand(config: ReviewConfig, kind: ReviewKind, args: string[] = []) {
   const options = parseReviewArgs(args, kind);
   if (options.help) {
     return {

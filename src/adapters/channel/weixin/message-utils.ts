@@ -8,7 +8,7 @@ const BOT_MESSAGE_TYPE = 2;
 
 type LooseRecord = Record<string, unknown>;
 
-interface WeixinIncomingConfig extends Record<string, unknown> {
+interface WeixinIncomingConfig {
   workspaceId?: unknown;
 }
 

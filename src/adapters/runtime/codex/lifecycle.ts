@@ -1,14 +1,12 @@
 import { normalizeText } from "../../../core/text-normalization";
 import { CodexRpcClient } from "./rpc-client";
+import type { AppRuntimeConfig, RuntimeAdapterDescriptor } from "../../../core/app-service-contract";
 import type { RuntimeClientLike } from "./diagnostics";
 
-
-interface CodexRuntimeConfig extends Record<string, unknown> {
-  stateDir: string;
-  runtimeEndpoint?: string;
-  runtimeCommand?: string;
-  sessionsFile: string;
-}
+type CodexRuntimeConfig = Pick<
+  AppRuntimeConfig,
+  "stateDir" | "runtimeEndpoint" | "runtimeCommand" | "sessionsFile"
+>;
 
 interface SessionStoreLike {
   setAvailableModelCatalog(models: unknown): Promise<unknown>;
@@ -106,9 +104,18 @@ export function createRuntimeLifecycle({
     return {
       id: "codex" as const,
       kind: "runtime" as const,
+      provider: "codex",
+      operations: {
+        initialize: true,
+        interactiveTurn: true,
+        refreshThreadInstructions: true,
+        respondApproval: true,
+        resumeThread: true,
+        cancelTurn: true,
+      },
       endpoint: normalizeText(config.runtimeEndpoint) || "(spawn)",
       sessionsFile: config.sessionsFile,
-    };
+    } satisfies RuntimeAdapterDescriptor;
   }
 
   return {

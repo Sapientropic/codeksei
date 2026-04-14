@@ -105,7 +105,7 @@ function validateContextTokenMap(value: unknown): true | string {
 }
 
 function resolveAccountsDir(config: WeixinAccountConfig): string {
-  return typeof config.accountsDir === "string" ? config.accountsDir : "";
+  return config.accountsDir || "";
 }
 
 export {
