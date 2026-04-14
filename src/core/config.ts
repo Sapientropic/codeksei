@@ -1,4 +1,3 @@
-import * as os from "node:os";
 import * as path from "node:path";
 import type { AppRuntimeConfig } from "./app-service-contract";
 import {
@@ -10,6 +9,14 @@ import {
   resolveHermesRepoLocalShimPath,
   resolveHermesRepoRoot,
 } from "./hermes-repo-local";
+import {
+  normalizeCodekseiChannel,
+  normalizeCodekseiChannelProvider,
+  normalizeCodekseiRuntimeAccessMode,
+  normalizeCodekseiRuntimeProvider,
+  normalizeReviewSemanticHost,
+  normalizeWeixinReplyMode,
+} from "./config-value-types";
 import { resolveTimezoneConfig } from "./timezone";
 import { readPrefixedBoolEnv, readPrefixedEnv, readPrefixedIntEnv, readPrefixedListEnv, resolveAppHome, resolveStateDir } from "./branding";
 
@@ -47,10 +54,17 @@ function parseEnvConfig(env: EnvSource, options: ReadConfigOptions = {}): AppRun
   const hermesRepoLocalShimPath = resolveHermesRepoLocalShimPath({
     hermesRepoLocalShimPath: readPrefixedEnv(env, "HERMES_REPO_LOCAL_SHIM_PATH"),
   });
-  const runtimeAccessMode = normalizeRuntimeAccessMode(
+  const runtimeAccessMode = normalizeCodekseiRuntimeAccessMode(
     readPrefixedEnv(env, "RUNTIME_ACCESS_MODE") || readPrefixedEnv(env, "CODEX_ACCESS_MODE"),
   );
-  const codexAccessMode = normalizeRuntimeAccessMode(readPrefixedEnv(env, "CODEX_ACCESS_MODE"));
+  const codexAccessMode = normalizeCodekseiRuntimeAccessMode(readPrefixedEnv(env, "CODEX_ACCESS_MODE"));
+  const runtime = normalizeCodekseiRuntimeProvider(
+    readPrefixedEnv(env, "RUNTIME") || (readPrefixedEnv(env, "CHANNEL_PROVIDER") === "hermes" ? "hermes" : "codex"),
+  ) || "codex";
+  const channelProvider = normalizeCodekseiChannelProvider(
+    readPrefixedEnv(env, "CHANNEL_PROVIDER") || (runtime === "hermes" ? "hermes" : "codeksei"),
+  ) || (runtime === "hermes" ? "hermes" : "codeksei");
+  const channel = normalizeCodekseiChannel(readPrefixedEnv(env, "CHANNEL")) || "weixin";
 
   return {
     stateDir,
@@ -66,11 +80,9 @@ function parseEnvConfig(env: EnvSource, options: ReadConfigOptions = {}): AppRun
     userName: readPrefixedEnv(env, "USER_NAME") || "",
     userGender: readPrefixedEnv(env, "USER_GENDER") || "female",
     allowedUserIds: readPrefixedListEnv(env, "ALLOWED_USER_IDS"),
-    channel: readPrefixedEnv(env, "CHANNEL") || "weixin",
-    runtime: readPrefixedEnv(env, "RUNTIME")
-      || (readPrefixedEnv(env, "CHANNEL_PROVIDER") === "hermes" ? "hermes" : "codex"),
-    channelProvider: readPrefixedEnv(env, "CHANNEL_PROVIDER")
-      || (readPrefixedEnv(env, "RUNTIME") === "hermes" ? "hermes" : "codeksei"),
+    channel,
+    runtime,
+    channelProvider,
     accountId: readPrefixedEnv(env, "ACCOUNT_ID") || "",
     weixinBaseUrl: readPrefixedEnv(env, "WEIXIN_BASE_URL") || "https://ilinkai.weixin.qq.com",
     weixinCdnBaseUrl: readPrefixedEnv(env, "WEIXIN_CDN_BASE_URL") || "https://novac2c.cdn.weixin.qq.com/c2c",
@@ -122,22 +134,13 @@ function parseEnvConfig(env: EnvSource, options: ReadConfigOptions = {}): AppRun
     reviewSchemaConfigFile: readPrefixedEnv(env, "REVIEW_SCHEMA_CONFIG")
       || resolveCrossPlatformPathFromRoot(workspaceRoot, ".codex", "review-schema.json"),
     reviewSemanticMode: readPrefixedEnv(env, "REVIEW_SEMANTIC_MODE") || "hybrid",
-    reviewSemanticHost: readPrefixedEnv(env, "REVIEW_SEMANTIC_HOST") || "auto",
+    reviewSemanticHost: normalizeReviewSemanticHost(readPrefixedEnv(env, "REVIEW_SEMANTIC_HOST")),
     reviewSemanticModel: readPrefixedEnv(env, "REVIEW_SEMANTIC_MODEL") || "",
     reviewSemanticTimeoutMs: readPrefixedIntEnv(env, "REVIEW_SEMANTIC_TIMEOUT_MS") || 120000,
     sharedBridgeHeartbeatFile: path.join(stateDir, "logs", "shared-wechat-heartbeat.json"),
     sharedWatchdogStateFile: path.join(stateDir, "logs", "shared-watchdog-state.json"),
     startWithCheckin: readPrefixedBoolEnv(env, "ENABLE_CHECKIN"),
   };
-}
-
-function normalizeWeixinReplyMode(value: unknown): "settled" | "stream" {
-  return String(value || "").trim().toLowerCase() === "settled" ? "settled" : "stream";
-}
-
-function normalizeRuntimeAccessMode(value: unknown): string {
-  const normalized = String(value || "").trim().toLowerCase();
-  return normalized === "default" ? "current" : normalized;
 }
 
 export { parseEnvConfig, readConfig };

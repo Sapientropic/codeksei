@@ -8,6 +8,7 @@ import type {
 import { formatBridgeOnlyCommandMessage, resolveHostMode, type HostModeResolution } from "./host-mode";
 import type { RuntimeEvent } from "../contracts/runtime-events";
 import type { PendingApprovalState, ThreadBindingRef, UnknownRecord } from "./runtime-types";
+import { getHostProfileMatrixEntry } from "./host-profile-matrix";
 
 const EMPTY_SESSION_STORE: SessionStoreLike = {
   state: { bindings: {} },
@@ -93,20 +94,14 @@ function createModeError(resolved: HostModeResolution, commandLabel: string): Er
 
 export function createHostedChannelAdapter(config: HostedModeConfig): ChannelAdapterLike {
   const resolved = resolveHostMode(config);
+  const matrixEntry = getHostProfileMatrixEntry(resolved.profile);
   return {
     describe() {
       return {
         id: "hermes-weixin",
         kind: "channel",
         provider: "hermes",
-        operations: {
-          pollUpdates: false,
-          login: false,
-          resolveAccount: false,
-          visibleTextDelivery: false,
-          visibleTypingDelivery: false,
-          visibleFileDelivery: false,
-        },
+        operations: { ...matrixEntry.channelOperations },
         profile: resolved.profile,
         mode: resolved.mode,
         supported: resolved.supported,
@@ -154,20 +149,14 @@ export interface HostedRuntimeAdapter extends RuntimeAdapterLike {
 
 export function createHostedRuntimeAdapter(config: HostedModeConfig): HostedRuntimeAdapter {
   const resolved = resolveHostMode(config);
+  const matrixEntry = getHostProfileMatrixEntry(resolved.profile);
   return {
     describe() {
       return {
         id: resolved.runtime === "hermes" ? "hermes" : "unsupported-runtime",
         kind: "runtime",
         provider: resolved.runtime,
-        operations: {
-          initialize: false,
-          interactiveTurn: false,
-          refreshThreadInstructions: false,
-          respondApproval: false,
-          resumeThread: false,
-          cancelTurn: false,
-        },
+        operations: { ...matrixEntry.runtimeOperations },
         profile: resolved.profile,
         mode: resolved.mode,
         supported: resolved.supported,

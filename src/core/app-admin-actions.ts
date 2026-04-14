@@ -3,7 +3,12 @@ import { listCommandActions } from "../contracts/command-surface";
 import { formatCheckinRange, resolveCheckinConfig } from "../state/checkin-config";
 import { normalizeTrimmedText } from "./approval-command-policy";
 import { formatErrorMessage } from "./app-poll-loop";
-import { collectHermesHostedDoctorReport, resolveHostMode } from "./host-mode";
+import {
+  collectHermesHostedDoctorReport,
+  isSupportedHostProfileId,
+  resolveHostMode,
+  type HostProfileId,
+} from "./host-mode";
 import type {
   AppRuntimeConfig,
   ChannelAdapterLike,
@@ -82,7 +87,7 @@ export function collectDoctorReport({
   };
 }
 
-function buildHostCommandMatrix(currentProfile: string): Record<string, unknown> {
+function buildHostCommandMatrix(currentProfile: HostProfileId): Record<string, unknown> {
   const actions = listCommandActions()
     .filter((action) => action.terminal.length)
     .map((action) => ({
@@ -90,7 +95,7 @@ function buildHostCommandMatrix(currentProfile: string): Record<string, unknown>
       hostDependencies: [...action.hostDependencies],
       hostProfileIds: [...action.hostProfileIds],
       hostSupportTier: action.hostSupportTier,
-      supportedNow: action.hostProfileIds.includes(currentProfile as "bridge-codex-weixin" | "hosted-hermes-weixin"),
+      supportedNow: isSupportedHostProfileId(currentProfile) && action.hostProfileIds.includes(currentProfile),
     }));
   return {
     currentProfile,

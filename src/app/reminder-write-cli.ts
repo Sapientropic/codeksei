@@ -56,6 +56,39 @@ interface ReminderWriteOptions extends Record<string, unknown> {
   useStdin?: boolean;
 }
 
+interface HostedReminderWriteDryRunData {
+  deliveryMode: "hermes_repo_local_origin";
+  dueAtIso: string;
+  dueAtMs: number;
+  senderId: string;
+  text: string;
+  workspaceRoot: string;
+}
+
+interface HostedReminderWriteResultData {
+  chatId: string;
+  dueAtMs: number;
+  jobId: string;
+  name: string;
+  nextRunAt: string;
+  platform: string;
+  text: string;
+  threadId: string;
+}
+
+interface BridgeReminderWriteDryRunData {
+  dueAtMs: number;
+  senderId: string;
+  text: string;
+}
+
+interface BridgeReminderWriteResultData {
+  dueAtMs: number;
+  id: string;
+  senderId: string;
+  text: string;
+}
+
 async function runReminderWriteCommand(
   config: ReminderWriteConfig,
   args: readonly string[] = [],
@@ -84,7 +117,9 @@ async function runReminderWriteCommand(
     const dueAtIso = new Date(dueAtMs).toISOString();
     const workspaceRoot = normalizeText(config.workspaceRoot) || process.cwd();
     const jobsFile = path.join(resolveHermesHomePath(config), "cron", "jobs.json");
-    return runCliMutation<Record<string, unknown>>({
+    return runCliMutation<
+      HostedReminderWriteDryRunData | HostedReminderWriteResultData
+    >({
       commandKey: "reminder.write",
       config,
       configSource: {
@@ -183,7 +218,9 @@ async function runReminderWriteCommand(
     );
   }
 
-  return runCliMutation<Record<string, unknown>>({
+  return runCliMutation<
+    BridgeReminderWriteDryRunData | BridgeReminderWriteResultData
+  >({
     commandKey: "reminder.write",
     config,
     configSource: {

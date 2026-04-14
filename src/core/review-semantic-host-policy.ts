@@ -1,7 +1,9 @@
-import { normalizeText } from "../contracts/text-normalization";
+import {
+  normalizeReviewSemanticHost,
+  type ReviewSemanticHost,
+} from "./config-value-types";
 import { resolveHostMode, type HostModeConfigInput } from "./host-mode-resolution";
-
-export type ReviewSemanticHost = "auto" | "codex" | "hermes" | "deterministic";
+export type { ReviewSemanticHost } from "./config-value-types";
 
 export interface ReviewSemanticHostConfigInput extends HostModeConfigInput {
   reviewSemanticHost?: unknown;
@@ -38,10 +40,4 @@ export function buildSemanticReviewUnavailableReason(
     : "当前需要 Hermes semantic host，但找不到可执行的 Hermes 命令。";
 }
 
-export function normalizeReviewSemanticHost(value: unknown): ReviewSemanticHost {
-  const normalized = normalizeText(value).toLowerCase();
-  if (normalized === "codex" || normalized === "hermes" || normalized === "deterministic") {
-    return normalized;
-  }
-  return "auto";
-}
+export { normalizeReviewSemanticHost };

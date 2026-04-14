@@ -27,7 +27,7 @@ import type { TerminalCommandContext } from "./terminal-command-context";
 import { buildCommandSchema } from "../core/command-schema";
 import { buildOperatorHelpText, buildTerminalHelpText } from "../core/command-registry";
 import { buildUnsupportedHostCapabilityError } from "../core/cli-contract";
-import { resolveHostMode } from "../core/host-mode";
+import { formatHostSupportTierHint, resolveHostMode } from "../core/host-mode";
 import { runTimelineBuildCommand } from "../timeline/runtime/app/timeline-build-cli";
 import { runTimelineCategoriesCommand } from "../timeline/runtime/app/timeline-categories-cli";
 import { runTimelineDevCommand } from "../timeline/runtime/app/timeline-dev-cli";
@@ -37,15 +37,8 @@ import { runTimelineServeCommand } from "../timeline/runtime/app/timeline-serve-
 import { runTimelineWriteCommand } from "../timeline/runtime/app/timeline-write-cli";
 import { resolveTimelineRuntimeConfig } from "../timeline/runtime-config";
 
-type ChannelSendFileApp = Parameters<typeof runChannelSendFileCommand>[0];
-type NoteSyncConfig = Parameters<typeof runNoteSyncCommand>[0];
-type NoteAutoConfig = Parameters<typeof runNoteAutoCommand>[0];
-type ProjectRadarConfig = Parameters<typeof runProjectRadarCommand>[0];
 type ReviewKind = Parameters<typeof runReviewCommand>[1];
-type ReminderWriteConfig = Parameters<typeof runReminderWriteCommand>[0];
-type DiaryWriteConfig = Parameters<typeof runDiaryWriteCommand>[0];
-type SystemSendConfig = Parameters<typeof runSystemSendCommand>[0];
-type TimelineEventConfig = Parameters<typeof runTimelineEventCommand>[0];
+type ChannelSendFileApp = Parameters<typeof runChannelSendFileCommand>[0];
 
 
 export type TerminalCommandHandler = (
@@ -131,16 +124,16 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
     return runChannelSendFileCommand(context.getApp() as ChannelSendFileApp, context.leafArgs, context.config);
   },
   "note.sync": async (_manifest, context) => {
-    return runNoteSyncCommand(context.config as NoteSyncConfig, context.leafArgs);
+    return runNoteSyncCommand(context.config, context.leafArgs);
   },
   "note.auto": async (_manifest, context) => {
-    return runNoteAutoCommand(context.config as NoteAutoConfig, context.leafArgs);
+    return runNoteAutoCommand(context.config, context.leafArgs);
   },
   "note.maybe": async (_manifest, context) => {
-    return runNoteMaybeCommand(context.config as NoteAutoConfig, context.leafArgs);
+    return runNoteMaybeCommand(context.config, context.leafArgs);
   },
   "project.radar": async (_manifest, context) => {
-    return runProjectRadarCommand(context.config as ProjectRadarConfig, context.leafArgs);
+    return runProjectRadarCommand(context.config, context.leafArgs);
   },
   "review.command": async (manifest, context) => {
     if (!manifest.kind) {
@@ -149,13 +142,13 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
     return runReviewCommand(context.config, manifest.kind as ReviewKind, context.leafArgs);
   },
   "reminder.write": async (_manifest, context) => {
-    return runReminderWriteCommand(context.config as unknown as ReminderWriteConfig, context.leafArgs);
+    return runReminderWriteCommand(context.config, context.leafArgs);
   },
   "diary.write": async (_manifest, context) => {
-    return runDiaryWriteCommand(context.config as DiaryWriteConfig, context.leafArgs);
+    return runDiaryWriteCommand(context.config, context.leafArgs);
   },
   "system.send": async (_manifest, context) => {
-    return runSystemSendCommand(context.config as SystemSendConfig, context.leafArgs);
+    return runSystemSendCommand(context.config, context.leafArgs);
   },
   "system.checkin-config": async (_manifest, context) => {
     return runSystemCheckinConfigCommand(context.config, context.leafArgs);
@@ -173,10 +166,7 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
     await runSystemCheckinPoller(context.config);
   },
   "timeline.event": async (_manifest, context) => {
-    return runTimelineEventCommand(
-      context.config as TimelineEventConfig,
-      context.leafArgs,
-    );
+    return runTimelineEventCommand(context.config, context.leafArgs);
   },
   "timeline.screenshot": async (_manifest, context) => {
     return runTimelineScreenshotCommand(context.config, context.leafArgs);
@@ -267,7 +257,7 @@ function assertTerminalCommandSupportedForCurrentHost(
       hostSupportTier: manifest.hostSupportTier,
       supportedHostProfiles: [...manifest.hostProfileIds],
     },
-    buildUnsupportedHostCapabilityHint(manifest.hostSupportTier),
+    formatHostSupportTierHint(manifest.hostSupportTier),
   );
 }
 
@@ -288,14 +278,4 @@ function buildUnsupportedHostCapabilityMessage(
     `supportedProfiles: ${manifest.hostProfileIds.join(", ") || "(none)"}`,
     `hostDependencies: ${dependencyText}`,
   ].join("\n");
-}
-
-function buildUnsupportedHostCapabilityHint(tier: TerminalCommandManifestEntry["hostSupportTier"]): string {
-  if (tier === "bridge_only") {
-    return "这条命令是 Bridge Mode 专用入口；切回 bridge-codex-weixin，或改走 Hermes gateway 的宿主控制路径。";
-  }
-  if (tier === "bridge_state_dependent") {
-    return "这条命令当前还缺少 Hermes Hosted Mode 的 source-backed 宿主原语；不会自动降级成可见消息，先改走 bridge-codex-weixin 或 Hermes 原生 backstage 路径。";
-  }
-  return "切换到兼容的 host profile，或改用对应宿主的官方入口。";
 }

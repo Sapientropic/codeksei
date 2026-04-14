@@ -25,6 +25,20 @@ interface HermesReadOnlyOptions {
   help: boolean;
 }
 
+type HermesInstallSkillMutationData = HermesSkillInstallPreview | HermesSkillInstallResult;
+type HermesInstallSkillRequest = {
+  installedPath: string;
+  repoSkillHash: string;
+};
+type HermesInstallSkillResolvedTarget = {
+  backupPath: string;
+  installedPath: string;
+};
+type HermesInstallSkillSideEffect = {
+  kind: "backup_existing_skill" | "write_skill_file";
+  target: string;
+};
+
 type HermesOperatorConfig = Pick<
   AppRuntimeConfig,
   | "channel"
@@ -71,19 +85,24 @@ export async function runHermesInstallSkillCommand(
     throw new Error(`repo Hermes skill asset not found: ${preview.repoSkillAsset.path}`);
   }
 
-  return runCliMutation<Record<string, unknown>>({
+  return runCliMutation<
+    HermesInstallSkillMutationData,
+    HermesInstallSkillRequest,
+    HermesInstallSkillResolvedTarget,
+    HermesInstallSkillSideEffect
+  >({
     commandKey: "operator.hermes.install_skill",
-    config: config as { cliIdempotencyLedgerFile?: string },
+    config,
     dryRun: Boolean(options.dryRun),
     dryRunResult: {
-      data: preview as unknown as Record<string, unknown>,
+      data: preview,
       text: renderHermesInstallSkillPreview(preview),
       next: ["codeksei operator hermes install-skill"],
     },
-    execute: async (): Promise<CommandExecutionResult<Record<string, unknown>>> => {
+    execute: async (): Promise<CommandExecutionResult<HermesInstallSkillMutationData>> => {
       const result = installHermesCompanionSkill(config);
       return {
-        data: result as unknown as Record<string, unknown>,
+        data: result,
         text: renderHermesInstallSkillResult(result),
         next: result.installedSkill.inSync
           ? ["codeksei operator hermes status", "codeksei operator hermes smoke"]
@@ -162,8 +181,8 @@ export async function runHermesSmokeCommand(
   };
 }
 
-function buildHermesInstallSkillSideEffects(preview: HermesSkillInstallPreview): Array<Record<string, string>> {
-  const effects = [
+function buildHermesInstallSkillSideEffects(preview: HermesSkillInstallPreview): HermesInstallSkillSideEffect[] {
+  const effects: HermesInstallSkillSideEffect[] = [
     {
       kind: "write_skill_file",
       target: normalizeLocalPath(preview.installedPath),

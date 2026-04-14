@@ -1,18 +1,16 @@
 import { normalizeText } from "../contracts/text-normalization";
-
-export type CodekseiRuntimeProvider = "codex" | "hermes" | "openclaw-reserved";
-export type CodekseiChannelProvider = "codeksei" | "hermes";
-export type CodekseiExecutionMode = "bridge" | "hosted" | "unsupported";
-export type HostProfileId = "bridge-codex-weixin" | "hosted-hermes-weixin" | "unsupported";
-
-export interface HostCapabilities {
-  ownsBridgeLifecycle: boolean;
-  ownsSharedThreadControl: boolean;
-  ownsWeixinLogin: boolean;
-  supportsHostedSkillInstall: boolean;
-  supportsLiveHostedSmoke: boolean;
-  supportsSemanticReviewHybrid: boolean;
-}
+import {
+  normalizeCodekseiChannelProvider,
+  normalizeCodekseiRuntimeProvider,
+  type CodekseiChannelProvider,
+  type CodekseiExecutionMode,
+  type CodekseiRuntimeProvider,
+} from "./config-value-types";
+import {
+  getHostProfileMatrixEntry,
+  type HostCapabilities,
+  type HostProfileId,
+} from "./host-profile-matrix";
 
 export interface HostModeResolution {
   profile: HostProfileId;
@@ -35,8 +33,8 @@ export interface HostModeConfigInput {
 }
 
 export function resolveHostMode(config: HostModeConfigInput = {}): HostModeResolution {
-  const explicitRuntime = normalizeRuntimeProvider(config.runtime || config.CODEKSEI_RUNTIME);
-  const explicitChannelProvider = normalizeChannelProvider(
+  const explicitRuntime = normalizeCodekseiRuntimeProvider(config.runtime || config.CODEKSEI_RUNTIME);
+  const explicitChannelProvider = normalizeCodekseiChannelProvider(
     config.channelProvider || config.CODEKSEI_CHANNEL_PROVIDER,
   );
   const channel = normalizeChannel(config.channel || config.CODEKSEI_CHANNEL);
@@ -53,29 +51,11 @@ export function resolveHostMode(config: HostModeConfigInput = {}): HostModeResol
   }
 
   if (runtime === "codex" && channelProvider === "codeksei") {
-    return {
-      profile: "bridge-codex-weixin",
-      runtime,
-      channelProvider,
-      channel,
-      mode: "bridge",
-      supported: true,
-      reason: "",
-      capabilities: buildHostCapabilities("bridge-codex-weixin"),
-    };
+    return createSupportedProfile("bridge-codex-weixin", runtime, channelProvider, channel);
   }
 
   if (runtime === "hermes" && channelProvider === "hermes") {
-    return {
-      profile: "hosted-hermes-weixin",
-      runtime,
-      channelProvider,
-      channel,
-      mode: "hosted",
-      supported: true,
-      reason: "",
-      capabilities: buildHostCapabilities("hosted-hermes-weixin"),
-    };
+    return createSupportedProfile("hosted-hermes-weixin", runtime, channelProvider, channel);
   }
 
   if (runtime === "hermes" && channelProvider === "codeksei") {
@@ -126,7 +106,8 @@ export function formatBridgeOnlyCommandMessage(
   commandLabel: string,
 ): string {
   const label = normalizeText(commandLabel) || "该命令";
-  if (resolved.mode === "hosted") {
+  const matrixEntry = getHostProfileMatrixEntry(resolved.profile);
+  if (matrixEntry.bridgeOnlyMessageKind === "hosted_bridge_replaced") {
     return [
       `${label} 在 Hermes Hosted Mode 下不会启动 Codeksei 自己的 runtime/Weixin bridge。`,
       "请改用 Hermes gateway，并使用 Codeksei 的 Hermes operator / skill 入口。",
@@ -158,64 +139,43 @@ function createUnsupportedProfile({
     runtime,
     channelProvider,
     channel,
-    mode: "unsupported",
-    supported: false,
+    mode: getHostProfileMatrixEntry("unsupported").mode,
+    supported: getHostProfileMatrixEntry("unsupported").supported,
     reason,
-    capabilities: buildHostCapabilities("unsupported"),
+    capabilities: getHostProfileMatrixEntry("unsupported").capabilities,
   };
 }
 
-function buildHostCapabilities(profile: HostProfileId): HostCapabilities {
-  if (profile === "bridge-codex-weixin") {
-    return {
-      ownsBridgeLifecycle: true,
-      ownsSharedThreadControl: true,
-      ownsWeixinLogin: true,
-      supportsHostedSkillInstall: false,
-      supportsLiveHostedSmoke: false,
-      supportsSemanticReviewHybrid: true,
-    };
-  }
-  if (profile === "hosted-hermes-weixin") {
-    return {
-      ownsBridgeLifecycle: false,
-      ownsSharedThreadControl: false,
-      ownsWeixinLogin: false,
-      supportsHostedSkillInstall: true,
-      supportsLiveHostedSmoke: true,
-      supportsSemanticReviewHybrid: true,
-    };
-  }
+function createSupportedProfile(
+  profile: Exclude<HostProfileId, "unsupported">,
+  runtime: CodekseiRuntimeProvider,
+  channelProvider: CodekseiChannelProvider,
+  channel: string,
+): HostModeResolution {
+  const matrixEntry = getHostProfileMatrixEntry(profile);
   return {
-    ownsBridgeLifecycle: false,
-    ownsSharedThreadControl: false,
-    ownsWeixinLogin: false,
-    supportsHostedSkillInstall: false,
-    supportsLiveHostedSmoke: false,
-    supportsSemanticReviewHybrid: false,
+    profile,
+    runtime,
+    channelProvider,
+    channel,
+    mode: matrixEntry.mode,
+    supported: matrixEntry.supported,
+    reason: "",
+    capabilities: matrixEntry.capabilities,
   };
-}
-
-function normalizeRuntimeProvider(value: unknown): CodekseiRuntimeProvider | "" {
-  const normalized = normalizeText(value).toLowerCase();
-  if (normalized === "hermes") {
-    return "hermes";
-  }
-  if (normalized === "openclaw-reserved") {
-    return "openclaw-reserved";
-  }
-  return normalized === "codex" ? "codex" : "";
-}
-
-function normalizeChannelProvider(value: unknown): CodekseiChannelProvider | "" {
-  const normalized = normalizeText(value).toLowerCase();
-  if (normalized === "hermes") {
-    return "hermes";
-  }
-  return normalized === "codeksei" ? "codeksei" : "";
 }
 
 function normalizeChannel(value: unknown): string {
   const normalized = normalizeText(value).toLowerCase();
   return normalized || "weixin";
 }
+
+export type {
+  CodekseiChannelProvider,
+  CodekseiExecutionMode,
+  CodekseiRuntimeProvider,
+} from "./config-value-types";
+export type {
+  HostCapabilities,
+  HostProfileId,
+} from "./host-profile-matrix";

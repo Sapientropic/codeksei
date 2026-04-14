@@ -35,6 +35,12 @@ jobs:
       - name: Run verification suite
         run: npm run verify
 
+      - name: Run strict lib checks
+        run: npm run typecheck:strict-libs
+
+      - name: Run installed-package smoke
+        run: npm run smoke:package
+
       - name: Resolve package metadata
         id: package_meta
         shell: bash

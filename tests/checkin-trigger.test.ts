@@ -39,14 +39,15 @@ function createCheckinConfigFixture() {
 
 test("checkin-trigger works in hosted mode with explicit target and no bridge session", async () => {
   const fixture = createCheckinConfigFixture();
-
-  const result = await runSystemCheckinTriggerCommand({
+  const hostedConfig: Parameters<typeof runSystemCheckinTriggerCommand>[0] = {
     channelProvider: "hermes",
     checkinConfigFile: fixture.checkinConfigFile,
     checkinScheduleStateFile: fixture.checkinScheduleStateFile,
     runtime: "hermes",
     sessionsFile: fixture.sessionsFile,
-  }, [
+  };
+
+  const result = await runSystemCheckinTriggerCommand(hostedConfig, [
     "--user", "wx-user",
     "--workspace", fixture.workspaceRoot,
   ]);
@@ -104,14 +105,15 @@ test("checkin-trigger returns target_resolution_required when sender defaults ar
 
 test("checkin-tick also works in hosted mode without local bridge state", async () => {
   const fixture = createCheckinConfigFixture();
-
-  const result = await runSystemCheckinTickCommand({
+  const hostedConfig: Parameters<typeof runSystemCheckinTickCommand>[0] = {
     channelProvider: "hermes",
     checkinConfigFile: fixture.checkinConfigFile,
     checkinScheduleStateFile: fixture.checkinScheduleStateFile,
     runtime: "hermes",
     sessionsFile: fixture.sessionsFile,
-  }, [
+  };
+
+  const result = await runSystemCheckinTickCommand(hostedConfig, [
     "--user", "wx-user",
     "--workspace", fixture.workspaceRoot,
   ]);
@@ -130,7 +132,7 @@ test("checkin-tick also works in hosted mode without local bridge state", async 
 
 test("checkin-complete writes the next wake after tick ack", async () => {
   const fixture = createCheckinConfigFixture();
-  const baseConfig = {
+  const baseConfig: Parameters<typeof runSystemCheckinCompleteCommand>[0] = {
     channelProvider: "hermes",
     checkinConfigFile: fixture.checkinConfigFile,
     checkinScheduleStateFile: fixture.checkinScheduleStateFile,

@@ -13,19 +13,19 @@ export interface CommandErrorShape {
   context?: Record<string, unknown> | undefined;
 }
 
-export interface CommandEnvelope<T = unknown> {
+export interface CommandEnvelope<T = unknown, TMeta extends Record<string, unknown> = Record<string, unknown>> {
   ok: CliOkStatus | false;
   data?: T | undefined;
   error?: CommandErrorShape | undefined;
-  meta?: Record<string, unknown> | undefined;
+  meta?: TMeta | undefined;
   next?: string[] | undefined;
 }
 
-export interface CommandExecutionResult<T = unknown> {
+export interface CommandExecutionResult<T = unknown, TMeta extends Record<string, unknown> = Record<string, unknown>> {
   ok?: CliOkStatus | undefined;
   data?: T | undefined;
   text?: string | undefined;
-  meta?: Record<string, unknown> | undefined;
+  meta?: TMeta | undefined;
   next?: string[] | undefined;
 }
 

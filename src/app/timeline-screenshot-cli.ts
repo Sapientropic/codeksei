@@ -63,6 +63,37 @@ interface TimelineScreenshotCommandDeps {
   sendFileViaHermesRepoLocal?: typeof sendFileViaHermesRepoLocal;
 }
 
+interface HostedTimelineScreenshotDryRunData {
+  deliveryMode: "hermes_repo_local_origin";
+  forwardArgs: string[];
+  outputFile: string;
+  senderId: string;
+}
+
+interface HostedTimelineScreenshotResultData {
+  chatId: string;
+  outputFile: string;
+  platform: string;
+  selector: string;
+  sessionId: string;
+  sessionKey: string;
+  threadId: string;
+  url: string;
+}
+
+interface BridgeTimelineScreenshotDryRunData {
+  forwardArgs: string[];
+  outputFile: string;
+  senderId: string;
+}
+
+interface BridgeTimelineScreenshotResultData {
+  args: string[];
+  id: string;
+  outputFile: string;
+  senderId: string;
+}
+
 async function runTimelineScreenshotCommand(
   config: RuntimeConfig,
   args: string[] = [],
@@ -86,7 +117,9 @@ async function runTimelineScreenshotCommand(
         text: buildTerminalLeafHelp("timeline.screenshot"),
       } satisfies CommandExecutionResult;
     }
-    return runCliMutation<Record<string, unknown>>({
+    return runCliMutation<
+      HostedTimelineScreenshotDryRunData | HostedTimelineScreenshotResultData
+    >({
       commandKey: "timeline.screenshot",
       config,
       configSource: {
@@ -175,7 +208,9 @@ async function runTimelineScreenshotCommand(
   }
   const senderId = senderResolution.value;
 
-  return runCliMutation<Record<string, unknown>>({
+  return runCliMutation<
+    BridgeTimelineScreenshotDryRunData | BridgeTimelineScreenshotResultData
+  >({
     commandKey: "timeline.screenshot",
     config,
     configSource: {

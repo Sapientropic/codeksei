@@ -89,9 +89,14 @@
     "typecheck:web": "tsc -p ./tsconfig.web.json --noEmit --pretty false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "typecheck:tests:ts": "tsc -p ./tsconfig.tests.json --noEmit --pretty false",
-    "typecheck:strict": "npm run typecheck",
+    "typecheck:strict-libs:node": "tsc -p ./tsconfig.strict-libs.node.json --noEmit --pretty false",
+    "typecheck:strict-libs:web": "tsc -p ./tsconfig.strict-libs.web.json --noEmit --pretty false",
+    "typecheck:strict-libs:tests": "tsc -p ./tsconfig.strict-libs.tests.json --noEmit --pretty false",
+    "typecheck:strict-libs": "npm run typecheck:strict-libs:node && npm run typecheck:strict-libs:web && npm run typecheck:strict-libs:tests",
+    "typecheck:strict": "npm run typecheck:strict-libs",
     "check": "npm run lint && npm run typecheck && npm run typecheck:tests:ts",
     "pack:dry-run": "npm pack --dry-run --ignore-scripts",
+    "smoke:package": "tsx ./src/release/smoke-package.ts",
     "verify": "npm run check && npm run build && node --experimental-strip-types --require ./tests/helpers/build-path-resolver.ts --test tests/*.test.ts && npm run pack:dry-run"
   },
   "dependencies": {
