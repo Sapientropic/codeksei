@@ -138,9 +138,11 @@ test("resolveStateDir still resolves relative explicit paths from cwd", () => {
       CODEKSEI_STATE_DIR: ".codeksei-state",
     }, () => readConfig());
 
+    const actual = config.stateDir.replace(/\\/g, "/");
+    const expected = path.join(tempRoot, ".codeksei-state").replace(/\\/g, "/");
     assert.equal(
-      config.stateDir.replace(/\\/g, "/"),
-      `${tempRoot.replace(/\\/g, "/")}/.codeksei-state`
+      actual === expected || actual === `/private${expected}`,
+      true,
     );
   } finally {
     process.chdir(originalCwd);

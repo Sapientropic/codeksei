@@ -25,7 +25,7 @@ interface ApprovalRequestLike {
 function buildApprovalPromptText(approval: ApprovalRequestLike): string {
   const reasonText = normalizeTrimmedText(approval.reason);
   const commandText = normalizeTrimmedText(approval.command);
-  const sections = ["Codex 请求授权"];
+  const sections = ["Runtime 请求授权"];
 
   if (reasonText && reasonText !== commandText) {
     sections.push(`操作说明：\n${reasonText}`);

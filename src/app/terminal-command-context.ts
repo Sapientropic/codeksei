@@ -49,7 +49,7 @@ export function createTerminalCommandContext(
   ensureStateDirectory();
   ensureCodekseiHomeEnv({ fallbackRoot: resolvePackageRoot(__dirname) });
 
-  const consumedArgCount = manifest?.subcommand ? 2 : 1;
+  const consumedArgCount = manifest?.tokenCount || 1;
   const leafArgs = Array.isArray(argv) ? argv.slice(consumedArgCount) : [];
   const baseConfig = readConfig({ workspaceRoot: cli.workspaceRoot });
   const config: TerminalRuntimeConfig = {

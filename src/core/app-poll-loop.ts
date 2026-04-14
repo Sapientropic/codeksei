@@ -110,7 +110,7 @@ export async function runAppPollLoop({
         status: "running",
         accountId: account.accountId,
         workspaceRoot: runtimeState.workspaceRoot,
-        codexEndpoint: runtimeState.endpoint,
+        runtimeEndpoint: runtimeState.endpoint,
         lastPollStartedAt: new Date().toISOString(),
       });
       await flushDueReminders(account);
@@ -127,7 +127,7 @@ export async function runAppPollLoop({
         status: "running",
         accountId: account.accountId,
         workspaceRoot: runtimeState.workspaceRoot,
-        codexEndpoint: runtimeState.endpoint,
+        runtimeEndpoint: runtimeState.endpoint,
         lastPollSucceededAt: new Date().toISOString(),
         consecutiveFailures: 0,
         lastError: "",
@@ -158,7 +158,7 @@ export async function runAppPollLoop({
         status: "degraded",
         accountId: account.accountId,
         workspaceRoot: runtimeState.workspaceRoot,
-        codexEndpoint: runtimeState.endpoint,
+        runtimeEndpoint: runtimeState.endpoint,
         lastPollFailedAt: new Date().toISOString(),
         consecutiveFailures,
         lastError: errorMessage,

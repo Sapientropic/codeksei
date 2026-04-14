@@ -42,7 +42,10 @@ function readConfig(options: ReadConfigOptions = {}) {
     userGender: readPrefixedEnv(process.env, "USER_GENDER") || "female",
     allowedUserIds: readPrefixedListEnv(process.env, "ALLOWED_USER_IDS"),
     channel: readPrefixedEnv(process.env, "CHANNEL") || "weixin",
-    runtime: readPrefixedEnv(process.env, "RUNTIME") || "codex",
+    runtime: readPrefixedEnv(process.env, "RUNTIME")
+      || (readPrefixedEnv(process.env, "CHANNEL_PROVIDER") === "hermes" ? "hermes" : "codex"),
+    channelProvider: readPrefixedEnv(process.env, "CHANNEL_PROVIDER")
+      || (readPrefixedEnv(process.env, "RUNTIME") === "hermes" ? "hermes" : "codeksei"),
     accountId: readPrefixedEnv(process.env, "ACCOUNT_ID"),
     weixinBaseUrl: readPrefixedEnv(process.env, "WEIXIN_BASE_URL") || "https://ilinkai.weixin.qq.com",
     weixinCdnBaseUrl: readPrefixedEnv(process.env, "WEIXIN_CDN_BASE_URL") || "https://novac2c.cdn.weixin.qq.com/c2c",
@@ -68,9 +71,14 @@ function readConfig(options: ReadConfigOptions = {}) {
     weixinOperationsOverlayFile: readPrefixedEnv(process.env, "WEIXIN_OPERATIONS_OVERLAY_FILE")
       || path.join(stateDir, "weixin-operations.local.md"),
     syncBufferDir: path.join(stateDir, "sync-buffers"),
-    codexEndpoint: readPrefixedEnv(process.env, "CODEX_ENDPOINT"),
-    codexCommand: readPrefixedEnv(process.env, "CODEX_COMMAND"),
-    codexAccessMode: readPrefixedEnv(process.env, "CODEX_ACCESS_MODE"),
+    runtimeEndpoint: readPrefixedEnv(process.env, "RUNTIME_ENDPOINT")
+      || readPrefixedEnv(process.env, "CODEX_ENDPOINT"),
+    runtimeCommand: readPrefixedEnv(process.env, "RUNTIME_COMMAND")
+      || readPrefixedEnv(process.env, "CODEX_COMMAND"),
+    runtimeAccessMode: readPrefixedEnv(process.env, "RUNTIME_ACCESS_MODE")
+      || readPrefixedEnv(process.env, "CODEX_ACCESS_MODE"),
+    hermesCommand: readPrefixedEnv(process.env, "HERMES_COMMAND") || "hermes",
+    hermesHome: readPrefixedEnv(process.env, "HERMES_HOME") || path.join(os.homedir(), ".hermes"),
     sessionsFile: path.join(stateDir, "sessions.json"),
     workspaceBootstrapConfigFile: readPrefixedEnv(process.env, "WORKSPACE_BOOTSTRAP_CONFIG")
       || path.join(stateDir, "workspace-bootstrap.json"),
@@ -81,6 +89,7 @@ function readConfig(options: ReadConfigOptions = {}) {
     reviewSchemaConfigFile: readPrefixedEnv(process.env, "REVIEW_SCHEMA_CONFIG")
       || resolveCrossPlatformPathFromRoot(workspaceRoot, ".codex", "review-schema.json"),
     reviewSemanticMode: readPrefixedEnv(process.env, "REVIEW_SEMANTIC_MODE") || "hybrid",
+    reviewSemanticHost: readPrefixedEnv(process.env, "REVIEW_SEMANTIC_HOST") || "auto",
     reviewSemanticModel: readPrefixedEnv(process.env, "REVIEW_SEMANTIC_MODEL"),
     reviewSemanticTimeoutMs: readPrefixedIntEnv(process.env, "REVIEW_SEMANTIC_TIMEOUT_MS") || 120000,
     sharedBridgeHeartbeatFile: path.join(stateDir, "logs", "shared-wechat-heartbeat.json"),

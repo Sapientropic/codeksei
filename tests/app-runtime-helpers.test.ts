@@ -2,7 +2,7 @@ const test: typeof import("node:test") = require("node:test");
 const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 
 const {
-  buildCodexInboundText,
+  buildRuntimeInboundText,
   hasRpcId,
   resolveTimelineScreenshotOutput,
 } = require("../src/core/app-runtime-helpers");
@@ -16,7 +16,7 @@ test("app runtime helpers extract the explicit timeline screenshot output path",
 });
 
 test("app runtime helpers keep attachment guidance and local time in inbound text", () => {
-  const text = buildCodexInboundText({
+  const text = buildRuntimeInboundText({
     text: "请先看图。",
     receivedAt: "2026-04-12T09:30:00+08:00",
   }, {

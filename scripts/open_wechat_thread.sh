@@ -2,12 +2,32 @@
 set -euo pipefail
 
 PORT="${CODEKSEI_SHARED_PORT:-8765}"
-REMOTE_URL="${CODEKSEI_CODEX_ENDPOINT:-ws://127.0.0.1:${PORT}}"
+REMOTE_URL="${CODEKSEI_RUNTIME_ENDPOINT:-${CODEKSEI_CODEX_ENDPOINT:-ws://127.0.0.1:${PORT}}}"
 STATE_DIR="${CODEKSEI_STATE_DIR:-$HOME/.codeksei}"
 SESSION_FILE="${CODEKSEI_SESSIONS_FILE:-${STATE_DIR}/sessions.json}"
 WORKSPACE_ROOT="${CODEKSEI_WORKSPACE_ROOT:-$PWD}"
 ACCOUNT_DIR="${STATE_DIR}/accounts"
 ACCOUNT_ID="${CODEKSEI_ACCOUNT_ID:-}"
+RUNTIME="${CODEKSEI_RUNTIME:-codex}"
+CHANNEL_PROVIDER="${CODEKSEI_CHANNEL_PROVIDER:-}"
+
+if [[ -z "${CHANNEL_PROVIDER}" ]]; then
+  if [[ "${RUNTIME}" == "hermes" ]]; then
+    CHANNEL_PROVIDER="hermes"
+  else
+    CHANNEL_PROVIDER="codeksei"
+  fi
+fi
+
+if [[ "${RUNTIME}" == "hermes" && "${CHANNEL_PROVIDER}" == "hermes" ]]; then
+  echo "Hermes Hosted Mode 下共享线程由 Hermes 宿主管理；不要再执行 open_wechat_thread.sh。" >&2
+  exit 1
+fi
+
+if [[ "${RUNTIME}" == "hermes" || "${CHANNEL_PROVIDER}" == "hermes" ]]; then
+  echo "当前 host 组合不受支持：runtime=${RUNTIME} channelProvider=${CHANNEL_PROVIDER} channel=weixin" >&2
+  exit 1
+fi
 
 if [[ ! -f "${SESSION_FILE}" ]]; then
   echo "session file not found: ${SESSION_FILE}" >&2

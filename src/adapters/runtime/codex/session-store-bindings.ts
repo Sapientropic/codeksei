@@ -3,7 +3,7 @@ import {
   type SessionBinding,
 } from "../../../contracts/session-state";
 
-export interface CodexWorkspaceParams {
+export interface RuntimeWorkspaceParams {
   model: string;
   effort: string;
 }
@@ -33,10 +33,14 @@ export function getThreadMap(binding: SessionBinding | null | undefined): Record
     : {};
 }
 
-export function getCodexParamsMap(binding: SessionBinding | null | undefined): Record<string, CodexWorkspaceParams> {
-  return binding?.codexParamsByWorkspaceRoot && typeof binding.codexParamsByWorkspaceRoot === "object"
-    ? binding.codexParamsByWorkspaceRoot
+export function getRuntimeParamsMap(binding: SessionBinding | null | undefined): Record<string, RuntimeWorkspaceParams> {
+  return binding?.runtimeParamsByWorkspaceRoot && typeof binding.runtimeParamsByWorkspaceRoot === "object"
+    ? binding.runtimeParamsByWorkspaceRoot
     : {};
+}
+
+export function getCodexParamsMap(binding: SessionBinding | null | undefined): Record<string, RuntimeWorkspaceParams> {
+  return getRuntimeParamsMap(binding);
 }
 
 export function getWorkspaceBootstrapThreadMap(binding: SessionBinding | null | undefined): Record<string, string> {

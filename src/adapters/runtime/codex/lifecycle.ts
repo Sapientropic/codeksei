@@ -5,8 +5,8 @@ import type { RuntimeClientLike } from "./diagnostics";
 
 interface CodexRuntimeConfig extends Record<string, unknown> {
   stateDir: string;
-  codexEndpoint?: string;
-  codexCommand?: string;
+  runtimeEndpoint?: string;
+  runtimeCommand?: string;
   sessionsFile: string;
 }
 
@@ -38,8 +38,8 @@ export function createRuntimeLifecycle({
   function ensureClient(): RuntimeClientLike {
     if (!client) {
       client = new CodexRpcClient({
-        endpoint: normalizeText(config.codexEndpoint),
-        codexCommand: normalizeText(config.codexCommand),
+        endpoint: normalizeText(config.runtimeEndpoint),
+        codexCommand: normalizeText(config.runtimeCommand),
         env: process.env,
         extraWritableRoots: [config.stateDir],
       }) as RuntimeClientLike;
@@ -56,7 +56,7 @@ export function createRuntimeLifecycle({
       await sessionWriter.setAvailableModelCatalog(models);
     }
     readyState = {
-      endpoint: normalizeText(config.codexEndpoint) || "(spawn)",
+      endpoint: normalizeText(config.runtimeEndpoint) || "(spawn)",
       models,
     };
     return readyState;
@@ -106,7 +106,7 @@ export function createRuntimeLifecycle({
     return {
       id: "codex" as const,
       kind: "runtime" as const,
-      endpoint: normalizeText(config.codexEndpoint) || "(spawn)",
+      endpoint: normalizeText(config.runtimeEndpoint) || "(spawn)",
       sessionsFile: config.sessionsFile,
     };
   }
@@ -128,4 +128,3 @@ function isReconnectableRuntimeError(error: unknown): boolean {
     || message.includes("Codex process stdin is not writable")
     || message.includes("Codex RPC client closed");
 }
-

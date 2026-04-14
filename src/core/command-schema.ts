@@ -3,44 +3,43 @@ import {
   findTerminalCommandManifest,
   listCommandActions,
   listTerminalCommandManifest,
+  listTerminalCommandManifestByPrefix,
   type CommandAction,
   type TerminalCommandManifestEntry,
 } from "../contracts/command-surface";
 import { buildTerminalLeafHelpText, hasTerminalTopicHelp } from "../contracts/command-help-contract";
 import { listCommandArgFlagsForHelp } from "../contracts/command-args";
-import { buildTerminalActionExample, buildTerminalEntryUsage } from "./terminal-command-usage";
+import { buildTerminalActionExample } from "./terminal-command-usage";
 import { listGlobalCliFlags } from "./cli-contract";
 import { normalizeText } from "./text-normalization";
 
 interface BuildCommandSchemaArgs {
   audience: CliAudience;
-  command: string;
-  subcommand: string;
+  command?: string;
+  subcommand?: string;
+  target?: string[];
 }
 
 function buildCommandSchema(args: BuildCommandSchemaArgs): Record<string, unknown> {
-  const normalizedCommand = normalizeText(args.command).toLowerCase();
-  const normalizedSubcommand = normalizeText(args.subcommand).toLowerCase();
-  if (!normalizedCommand) {
+  const targetTokens = normalizeTargetTokens(args);
+  if (!targetTokens.length) {
     return buildCommandCollectionSchema(args.audience);
   }
 
   const commandSchema = buildSpecificCommandSchema({
     audience: args.audience,
-    command: normalizedCommand,
-    subcommand: normalizedSubcommand,
+    targetTokens,
   });
   if (commandSchema) {
     return commandSchema;
   }
 
-  if (!normalizedSubcommand && hasTerminalTopicHelp(normalizedCommand)) {
-    return buildTopicSchema(args.audience, normalizedCommand);
+  const singleTopic = targetTokens.length === 1 ? targetTokens[0] || "" : "";
+  if (singleTopic && hasTerminalTopicHelp(singleTopic)) {
+    return buildTopicSchema(args.audience, singleTopic);
   }
 
-  throw new Error(
-    `${args.audience} schema target not found: ${[normalizedCommand, normalizedSubcommand].filter(Boolean).join(" ")}`
-  );
+  throw new Error(`${args.audience} schema target not found: ${targetTokens.join(" ")}`);
 }
 
 function buildCommandCollectionSchema(audience: CliAudience): Record<string, unknown> {
@@ -70,17 +69,41 @@ function buildTopicSchema(audience: CliAudience, topic: string): Record<string, 
   };
 }
 
+function buildPrefixSchema(
+  audience: CliAudience,
+  prefixTokens: string[],
+  manifests: TerminalCommandManifestEntry[],
+): Record<string, unknown> {
+  return {
+    type: "command_topic",
+    audience,
+    topic: prefixTokens.join(" "),
+    commands: manifests.map((entry) => buildActionSchema(findActionForManifest(entry))),
+    globalFlags: listGlobalCliFlags(),
+  };
+}
+
 function buildSpecificCommandSchema({
   audience,
-  command,
-  subcommand,
-}: BuildCommandSchemaArgs): Record<string, unknown> | null {
+  targetTokens,
+}: {
+  audience: CliAudience;
+  targetTokens: string[];
+}): Record<string, unknown> | null {
+  const [command = "", ...rest] = targetTokens;
+  const subcommand = rest.join(" ");
   const directManifest = findTerminalCommandManifest(command, subcommand);
   if (directManifest && directManifest.audience === audience) {
     return buildActionSchema(findActionForManifest(directManifest));
   }
 
-  const action = listCommandActions().find((entry) => matchesSchemaLookup(entry, audience, command, subcommand));
+  const prefixMatches = listTerminalCommandManifestByPrefix(targetTokens)
+    .filter((entry) => entry.audience === audience);
+  if (prefixMatches.length) {
+    return buildPrefixSchema(audience, targetTokens, prefixMatches);
+  }
+
+  const action = listCommandActions().find((entry) => matchesSchemaLookup(entry, audience, targetTokens));
   return action ? buildActionSchema(action) : null;
 }
 
@@ -109,6 +132,8 @@ function buildActionSchema(action: CommandAction): Record<string, unknown> {
     key: [action.command, action.subcommand].filter(Boolean).join(" "),
     mutability: action.mutability,
     safetyTier: action.safetyTier,
+    sideEffects: action.sideEffects.map((effect) => ({ ...effect })),
+    supportsDryRun: flags.some((flag) => flag.name === "dryRun"),
     scriptName: action.scriptName || "",
     summary: action.summary,
     terminal: [...action.terminal],
@@ -145,12 +170,13 @@ function findActionForManifest(entry: TerminalCommandManifestEntry): CommandActi
 function matchesSchemaLookup(
   action: CommandAction,
   audience: CliAudience,
-  command: string,
-  subcommand: string,
+  targetTokens: string[],
 ): boolean {
   if (action.audience !== audience || action.entrypointType === "weixin") {
     return false;
   }
+  const [command = "", ...rest] = targetTokens;
+  const subcommand = rest.join(" ");
   const actionKey = [action.command, action.subcommand].filter(Boolean).join(" ");
   const lookupKey = [command, subcommand].filter(Boolean).join(" ");
   if (actionKey && actionKey === lookupKey) {
@@ -160,6 +186,15 @@ function matchesSchemaLookup(
     return true;
   }
   return !subcommand && action.terminal.some((entry) => normalizeText(entry).toLowerCase() === command);
+}
+
+function normalizeTargetTokens(args: BuildCommandSchemaArgs): string[] {
+  const explicitTarget = Array.isArray(args.target)
+    ? args.target
+    : [args.command || "", args.subcommand || ""];
+  return explicitTarget
+    .flatMap((value) => normalizeText(value).toLowerCase().split(/\s+/u))
+    .filter(Boolean);
 }
 
 export { buildCommandSchema };

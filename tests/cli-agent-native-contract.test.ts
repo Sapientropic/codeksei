@@ -39,6 +39,9 @@ test("schema splits public and operator surfaces", () => {
   const operatorActions = asCommandList(asRecord(operatorPayload.data).commands).map((entry) => entry.action);
   assert.ok(operatorActions.includes("app.start"));
   assert.ok(operatorActions.includes("app.shared_start"));
+  assert.ok(operatorActions.includes("operator.hermes.install_skill"));
+  assert.ok(operatorActions.includes("operator.hermes.status"));
+  assert.ok(operatorActions.includes("operator.hermes.smoke"));
 });
 
 test("operator discovery aliases return operator surface instead of internal errors", () => {
@@ -51,6 +54,11 @@ test("operator discovery aliases return operator surface instead of internal err
   assert.equal(operatorHelp.status, 0, operatorHelp.stderr || "expected help operator to succeed");
   const operatorHelpPayload = parseEnvelope(operatorHelp.stdout);
   assert.equal(asRecord(operatorHelpPayload.data).audience, "operator");
+
+  const hermesResource = runCli(["operator", "hermes"]);
+  assert.equal(hermesResource.status, 0, hermesResource.stderr || "expected operator hermes to succeed");
+  const hermesResourcePayload = parseEnvelope(hermesResource.stdout);
+  assert.equal(asRecord(hermesResourcePayload.data).topic, "operator hermes");
 });
 
 test("channel send-file schema exposes warned mutation flags", () => {
@@ -63,6 +71,66 @@ test("channel send-file schema exposes warned mutation flags", () => {
   assert.ok(argNames.includes("dryRun"));
   assert.ok(argNames.includes("idempotencyKey"));
   assert.match(String(asRecord(payload.data).helpText || ""), /--dry-run/u);
+});
+
+test("operator hermes install-skill schema exposes dry-run and side effects", () => {
+  const result = runCli(["operator", "schema", "operator", "hermes", "install-skill"]);
+  assert.equal(result.status, 0, result.stderr || "expected operator hermes install-skill schema to succeed");
+
+  const payload = parseEnvelope(result.stdout);
+  const data = asRecord(payload.data);
+  const args = asCommandArgs(asRecord(data.args).command);
+  const argNames = args.map((entry) => entry.name);
+  assert.equal(data.action, "operator.hermes.install_skill");
+  assert.equal(data.mutability, "write");
+  assert.equal(data.supportsDryRun, true);
+  assert.ok(argNames.includes("dryRun"));
+  assert.ok(argNames.includes("idempotencyKey"));
+  assert.equal(Array.isArray(data.sideEffects), true);
+});
+
+test("operator hermes prefix schema lists leaf actions progressively", () => {
+  const result = runCli(["operator", "schema", "operator", "hermes"]);
+  assert.equal(result.status, 0, result.stderr || "expected operator hermes schema topic to succeed");
+
+  const payload = parseEnvelope(result.stdout);
+  const data = asRecord(payload.data);
+  const actions = asCommandList(data.commands).map((entry) => entry.action).sort();
+  assert.equal(data.type, "command_topic");
+  assert.deepEqual(actions, [
+    "operator.hermes.install_skill",
+    "operator.hermes.smoke",
+    "operator.hermes.status",
+  ]);
+});
+
+test("operator hermes install-skill dry-run previews without writing files", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-cli-hermes-dry-run-"));
+  const hermesHome = path.join(tempRoot, ".hermes");
+  const result = runCli([
+    "operator",
+    "hermes",
+    "install-skill",
+    "--dry-run",
+  ], {
+    CODEKSEI_HERMES_HOME: hermesHome,
+    CODEKSEI_RUNTIME: "hermes",
+    CODEKSEI_CHANNEL_PROVIDER: "hermes",
+  });
+
+  assert.equal(result.status, 0, result.stderr || "expected operator hermes install-skill dry-run to succeed");
+  const payload = parseEnvelope(result.stdout);
+  const meta = asRecord(payload.meta);
+  assert.equal(meta.dryRun, true);
+  assert.equal(fs.existsSync(path.join(hermesHome, "skills", "codeksei-companion", "SKILL.md")), false);
+});
+
+test("operator hermes invalid leaf returns validation_error instead of unknown_command", () => {
+  const result = runCli(["operator", "hermes", "bogus"]);
+  assert.equal(result.status, 3);
+  const payload = parseEnvelope(result.stdout);
+  assert.equal(payload.ok, false);
+  assert.equal(payload.error.code, "validation_error");
 });
 
 test("unknown command returns fixed unknown_command routing", () => {

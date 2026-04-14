@@ -78,7 +78,7 @@ export function buildReminderSystemTrigger(
   ].join("\n");
 }
 
-export function buildCodexInboundText(
+export function buildRuntimeInboundText(
   normalized: InboundMessageRef,
   persisted: PersistedAttachmentResult = {},
   config: Record<string, unknown> = {},

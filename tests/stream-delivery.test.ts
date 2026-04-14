@@ -95,7 +95,7 @@ function createDelivery({
     getBinding() {
       return null;
     },
-    getCodexParamsForWorkspace() {
+    getRuntimeParamsForWorkspace() {
       return { model: "" };
     },
     getPendingApprovalForThread() {
@@ -545,7 +545,7 @@ test("persistent send failure abandons the run and reports delivery degradation"
       getBinding() {
         return null;
       },
-      getCodexParamsForWorkspace() {
+      getRuntimeParamsForWorkspace() {
         return { model: "" };
       },
       getPendingApprovalForThread() {

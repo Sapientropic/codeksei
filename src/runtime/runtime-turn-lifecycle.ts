@@ -56,7 +56,7 @@ type ScheduleRuntimeEventWatchdog = (payload: {
   normalized: PreparedRuntimeMessage;
   threadId?: string;
 }) => void;
-type BuildCodexInboundText = (
+type BuildRuntimeInboundText = (
   normalized: NormalizedIncomingMessage,
   persisted: PersistedAttachmentResult,
   config: RuntimeTurnConfig,
@@ -79,11 +79,11 @@ interface RuntimeTurnLifecycleDependencies {
   scheduleRuntimeEventWatchdog: ScheduleRuntimeEventWatchdog;
   streamDelivery: StreamDeliveryLike;
   timelineIntegration: TimelineIntegrationLike;
-  buildCodexInboundText: BuildCodexInboundText;
+  buildRuntimeInboundText: BuildRuntimeInboundText;
 }
 
 export class RuntimeTurnLifecycle {
-  readonly buildCodexInboundText: BuildCodexInboundText;
+  readonly buildRuntimeInboundText: BuildRuntimeInboundText;
   readonly channelAdapter: ChannelAdapterLike;
   readonly config: RuntimeTurnConfig;
   readonly formatErrorMessage: FormatErrorMessage;
@@ -114,7 +114,7 @@ export class RuntimeTurnLifecycle {
     scheduleRuntimeEventWatchdog,
     streamDelivery,
     timelineIntegration,
-    buildCodexInboundText,
+    buildRuntimeInboundText,
   }: RuntimeTurnLifecycleDependencies) {
     this.channelAdapter = channelAdapter;
     this.config = config;
@@ -130,7 +130,7 @@ export class RuntimeTurnLifecycle {
     this.scheduleRuntimeEventWatchdog = scheduleRuntimeEventWatchdog;
     this.streamDelivery = streamDelivery;
     this.timelineIntegration = timelineIntegration;
-    this.buildCodexInboundText = buildCodexInboundText;
+    this.buildRuntimeInboundText = buildRuntimeInboundText;
   }
 
   async sendTimelineScreenshot({ senderId = "", args = [], outputFile = "" }: TimelineScreenshotRequest = {}) {
@@ -273,7 +273,7 @@ export class RuntimeTurnLifecycle {
       return {
         ...normalized,
         originalText: normalized.text,
-        text: this.buildCodexInboundText(normalized, { saved: [], failed: [] }, this.config),
+        text: this.buildRuntimeInboundText(normalized, { saved: [], failed: [] }, this.config),
         attachments: [],
         attachmentFailures: [],
         workspaceRoot,
@@ -302,8 +302,8 @@ export class RuntimeTurnLifecycle {
       return null;
     }
 
-    const codexInboundText = this.buildCodexInboundText(normalized, persisted, this.config);
-    if (!codexInboundText) {
+    const runtimeInboundText = this.buildRuntimeInboundText(normalized, persisted, this.config);
+    if (!runtimeInboundText) {
       await ignoreBestEffortError(this.channelAdapter.sendText({
         userId: normalized.senderId,
         text: userFacingMessages.attachmentReceiveFailed(persisted.failed.map((item) => item.reason)),
@@ -319,7 +319,7 @@ export class RuntimeTurnLifecycle {
     return {
       ...normalized,
       originalText: normalized.text,
-      text: codexInboundText,
+      text: runtimeInboundText,
       attachments: persisted.saved,
       attachmentFailures: persisted.failed,
       workspaceRoot,
@@ -406,15 +406,15 @@ export class RuntimeTurnLifecycle {
             senderId: prepared.senderId,
           },
         };
-        const codexParams = this.runtimeAdapter.getSessionStore().getCodexParamsForWorkspace(bindingKey, workspaceRoot);
-        const model = codexParams.model;
+        const runtimeParams = this.runtimeAdapter.getSessionStore().getRuntimeParamsForWorkspace(bindingKey, workspaceRoot);
+        const model = runtimeParams.model;
         if (model) {
           sendArgs.model = model;
         }
-        if (codexParams.effort) {
-          sendArgs.effort = codexParams.effort;
+        if (runtimeParams.effort) {
+          sendArgs.effort = runtimeParams.effort;
         }
-        const accessMode = this.normalizeText(this.config.codexAccessMode);
+        const accessMode = this.normalizeText(this.config.runtimeAccessMode);
         if (accessMode) {
           sendArgs.accessMode = accessMode;
         }

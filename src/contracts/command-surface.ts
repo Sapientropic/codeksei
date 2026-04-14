@@ -16,6 +16,7 @@ import {
   type CommandRunnerId,
   type CommandSafetyTier,
   type CommandScriptName,
+  type CommandSideEffectDefinition,
   type CommandStatus,
   type CommandTimelineSubcommand,
   resolveCommandAudienceDefinition,
@@ -39,6 +40,7 @@ export type {
   CommandRunnerId,
   CommandSafetyTier,
   CommandScriptName,
+  CommandSideEffectDefinition,
   CommandStatus,
   CommandTimelineSubcommand,
   PlannedTerminalTopic,
@@ -79,6 +81,7 @@ export interface CommandAction {
   kind: CommandKind | "";
   mutability: CommandMutability;
   safetyTier: CommandSafetyTier;
+  sideEffects: ReadonlyArray<CommandSideEffectDefinition>;
   timelineSubcommand: CommandTimelineSubcommand | "";
   help: Readonly<CommandHelp>;
   approval: Readonly<CommandApproval>;
@@ -96,9 +99,12 @@ export interface TerminalCommandManifestEntry {
   helpTopic: CommandHelpTopic | "";
   kind: CommandKind | "";
   mutability: CommandMutability;
+  pathTokens?: string[] | undefined;
   safetyTier: CommandSafetyTier;
+  sideEffects?: ReadonlyArray<CommandSideEffectDefinition> | undefined;
   timelineSubcommand: CommandTimelineSubcommand | "";
   scriptName: CommandScriptName | "";
+  tokenCount?: number | undefined;
   approval: CommandApproval;
   entrypointType: CommandEntrypointType;
 }
@@ -138,9 +144,12 @@ const TERMINAL_COMMAND_MANIFEST = Object.freeze<readonly TerminalCommandManifest
       helpTopic: entry.help.topic,
       kind: entry.kind,
       mutability: entry.mutability,
+      pathTokens: splitTerminalCommandTokens(entry.command, entry.subcommand),
       safetyTier: entry.safetyTier,
+      sideEffects: entry.sideEffects.map((effect) => ({ ...effect })),
       timelineSubcommand: entry.timelineSubcommand,
       scriptName: entry.scriptName,
+      tokenCount: splitTerminalCommandTokens(entry.command, entry.subcommand).length,
       approval: { ...entry.approval },
       entrypointType: entry.entrypointType,
     }))
@@ -152,6 +161,11 @@ const TERMINAL_COMMAND_MANIFEST_BY_SCRIPT_NAME = new Map(
   TERMINAL_COMMAND_MANIFEST
     .filter((entry) => entry.scriptName)
     .map((entry): [string, TerminalCommandManifestEntry] => [normalizeCommandLookupKey(entry.scriptName), entry])
+);
+const TERMINAL_COMMAND_MANIFEST_BY_TOKEN_COUNT = Object.freeze(
+  TERMINAL_COMMAND_MANIFEST
+    .slice()
+    .sort((left, right) => (right.tokenCount || 0) - (left.tokenCount || 0))
 );
 
 function defineAction(entry: CommandActionDefinition): CommandAction {
@@ -175,6 +189,7 @@ function defineAction(entry: CommandActionDefinition): CommandAction {
     kind: String(entry.kind || "").trim() as CommandKind | "",
     mutability: resolveCommandMutabilityDefinition(actionId),
     safetyTier: resolveCommandSafetyTierDefinition(actionId),
+    sideEffects: Object.freeze((entry.sideEffects || []).map((effect) => ({ ...effect }))),
     timelineSubcommand: String(entry.timelineSubcommand || "").trim() as CommandTimelineSubcommand | "",
     help: Object.freeze({
       topic: normalizeCommandLookupKey(entry.help?.topic) as CommandHelpTopic | "",
@@ -215,6 +230,8 @@ function listCommandGroups(): CommandGroup[] {
 function listTerminalCommandManifest(): TerminalCommandManifestEntry[] {
   return TERMINAL_COMMAND_MANIFEST.map((entry) => ({
     ...entry,
+    pathTokens: [...(entry.pathTokens || [])],
+    sideEffects: (entry.sideEffects || []).map((effect) => ({ ...effect })),
     approval: { ...entry.approval },
   }));
 }
@@ -222,12 +239,71 @@ function listTerminalCommandManifest(): TerminalCommandManifestEntry[] {
 function findTerminalCommandManifest(command: unknown, subcommand: string = ""): TerminalCommandManifestEntry | null {
   const key = [normalizeCommandLookupKey(command), normalizeCommandLookupKey(subcommand)].filter(Boolean).join(" ");
   const entry = TERMINAL_COMMAND_MANIFEST_BY_KEY.get(key);
-  return entry ? { ...entry, approval: { ...entry.approval } } : null;
+  return entry
+    ? {
+      ...entry,
+      pathTokens: [...(entry.pathTokens || [])],
+      sideEffects: (entry.sideEffects || []).map((effect) => ({ ...effect })),
+      approval: { ...entry.approval },
+    }
+    : null;
 }
 
 function findTerminalManifestByScriptName(scriptName: unknown): TerminalCommandManifestEntry | null {
   const entry = TERMINAL_COMMAND_MANIFEST_BY_SCRIPT_NAME.get(normalizeCommandLookupKey(scriptName));
-  return entry ? { ...entry, approval: { ...entry.approval } } : null;
+  return entry
+    ? {
+      ...entry,
+      pathTokens: [...(entry.pathTokens || [])],
+      sideEffects: (entry.sideEffects || []).map((effect) => ({ ...effect })),
+      approval: { ...entry.approval },
+    }
+    : null;
+}
+
+function findTerminalCommandManifestFromArgv(argv: readonly unknown[]): TerminalCommandManifestEntry | null {
+  const normalizedTokens = Array.isArray(argv)
+    ? argv
+      .map((value) => normalizeCommandLookupKey(value))
+      .filter(Boolean)
+    : [];
+
+  for (const entry of TERMINAL_COMMAND_MANIFEST_BY_TOKEN_COUNT) {
+    if ((entry.tokenCount || 0) > normalizedTokens.length) {
+      continue;
+    }
+    const pathTokens = entry.pathTokens || [];
+    if (pathTokens.every((token, index) => normalizedTokens[index] === token)) {
+      return {
+        ...entry,
+        pathTokens: [...pathTokens],
+        sideEffects: (entry.sideEffects || []).map((effect) => ({ ...effect })),
+        approval: { ...entry.approval },
+      };
+    }
+  }
+  return null;
+}
+
+function listTerminalCommandManifestByPrefix(prefixTokens: readonly unknown[]): TerminalCommandManifestEntry[] {
+  const normalizedPrefix = Array.isArray(prefixTokens)
+    ? prefixTokens
+      .map((value) => normalizeCommandLookupKey(value))
+      .filter(Boolean)
+    : [];
+  if (!normalizedPrefix.length) {
+    return [];
+  }
+
+  return TERMINAL_COMMAND_MANIFEST
+    .filter((entry) => (entry.tokenCount || 0) > normalizedPrefix.length)
+    .filter((entry) => normalizedPrefix.every((token, index) => (entry.pathTokens || [])[index] === token))
+    .map((entry) => ({
+      ...entry,
+      pathTokens: [...(entry.pathTokens || [])],
+      sideEffects: (entry.sideEffects || []).map((effect) => ({ ...effect })),
+      approval: { ...entry.approval },
+    }));
 }
 
 function cloneAction(entry: CommandAction): CommandAction {
@@ -235,9 +311,16 @@ function cloneAction(entry: CommandAction): CommandAction {
     ...entry,
     terminal: [...entry.terminal],
     weixin: [...entry.weixin],
+    sideEffects: entry.sideEffects.map((effect) => ({ ...effect })),
     help: { ...entry.help },
     approval: { ...entry.approval },
   };
+}
+
+function splitTerminalCommandTokens(command: string, subcommand: string): string[] {
+  return [command, subcommand]
+    .filter(Boolean)
+    .flatMap((part) => normalizeCommandLookupKey(part).split(/\s+/u).filter(Boolean));
 }
 
 function normalizeCommandLookupKey(value: unknown): string {
@@ -249,8 +332,10 @@ function normalizeCommandLookupKey(value: unknown): string {
 export {
   findCommandAction,
   findTerminalCommandManifest,
+  findTerminalCommandManifestFromArgv,
   findTerminalManifestByScriptName,
   listCommandActions,
   listCommandGroups,
   listTerminalCommandManifest,
+  listTerminalCommandManifestByPrefix,
 };

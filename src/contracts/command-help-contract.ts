@@ -95,7 +95,7 @@ const TOPIC_HELP = {
     ],
     bodyLabel: "补充：",
     body: [
-      "  默认走 hybrid：脚本保骨架，Codex 负责结构化语义提炼；失败时自动回退 deterministic",
+      "  默认走 hybrid：脚本保骨架，runtime 语义生成器负责结构化提炼；失败时自动回退 deterministic",
       "  nightly 负责睡前收口；周/月复盘在有 nightly 时会优先吸收它",
       "  传 --deterministic 可强制只走脚本；传 --model <id> 可覆盖语义提炼使用的模型",
       "  周复盘默认按周一到周日；月复盘默认按自然月",
@@ -107,11 +107,50 @@ const TOPIC_HELP = {
 // help are marked topic_only in command-surface-definitions instead of silently
 // reusing a generic leaf renderer.
 const LEAF_HELP = {
+  "operator.hermes.install_skill": () => ({
+    usage: [buildTerminalActionExample("operator.hermes.install_skill", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  把仓内 codeksei-companion skill 同步到当前 Hermes home 的 ~/.hermes/skills/ 目录。",
+      "  支持 --dry-run 预览目标路径、是否覆盖、是否会生成备份，而不实际写文件。",
+      "  当已安装 skill 内容与仓内 asset 不一致时，会先写一份带时间戳的 backup 再覆盖。",
+    ],
+    examples: [
+      "  codeksei operator hermes install-skill --dry-run",
+      "  codeksei operator hermes install-skill",
+    ],
+    includeFlagBlock: true,
+  }),
+  "operator.hermes.status": () => ({
+    usage: [buildTerminalEntryUsage("operator.hermes.status", "public")],
+    bodyLabel: "说明：",
+    body: [
+      "  查看 Hermes 命令、Weixin 账号、skill 同步状态、skills catalog 和 hosted semantic review 可用性。",
+      "  这是只读检查，不会修改本机 Hermes 状态。",
+    ],
+    examples: [
+      "  codeksei operator hermes status",
+    ],
+    includeFlagBlock: true,
+  }),
+  "operator.hermes.smoke": () => ({
+    usage: [buildTerminalEntryUsage("operator.hermes.smoke", "public")],
+    bodyLabel: "说明：",
+    body: [
+      "  做 hosted 前置检查与 skill parity 检查，不伪造 live Weixin 成功。",
+      "  这是 assisted smoke：只验证本地准备度与宿主边界，不接管 Hermes gateway 的真实消息流。",
+    ],
+    examples: [
+      "  codeksei operator hermes smoke",
+    ],
+    includeFlagBlock: true,
+  }),
   "app.doctor": () => ({
     usage: [buildTerminalActionExample("app.doctor", { audience: "public", includeArgs: true })],
     bodyLabel: "说明：",
     body: [
-      "  输出当前 public CLI 相关的运行时快照，包括状态目录、channel/runtime 描述、timeline 描述与 thread state 摘要。",
+      "  输出当前 public CLI 相关的运行时快照，包括 host mode、runtime/channel provider、timeline 描述与 thread state 摘要。",
+      "  Hermes hosted mode 下会额外检查 hermes 命令、仓内 skill 资产是否已同步、本机 Hermes Weixin 配置痕迹，以及 hosted semantic review 可用性。",
       "  非 TTY 下默认走 JSON envelope；TTY 下默认走文本。",
     ],
   }),
@@ -331,6 +370,24 @@ const LEAF_HELP = {
   }),
 } satisfies Record<CommandLeafHelpKey, CommandHelpBuilder>;
 
+function buildHermesOperatorResourceHelpText(): string {
+  return renderHelpDocument({
+    usage: ["codeksei operator hermes <install-skill|status|smoke>"],
+    bodyLabel: "说明：",
+    body: [
+      "  这是 Hermes Hosted Mode 的 operator resource。",
+      "  install-skill：同步仓内 companion skill；支持 --dry-run 预览。",
+      "  status：只读查看 Hermes hosted 集成状态。",
+      "  smoke：只读执行 hosted parity 前置检查。",
+    ],
+    examples: [
+      "  codeksei operator hermes install-skill --dry-run",
+      "  codeksei operator hermes status",
+      "  codeksei operator hermes smoke",
+    ],
+  }, "");
+}
+
 function buildTerminalTopicHelpText(topic: unknown, context: CommandHelpContext = {}): string {
   const normalizedTopic = normalizeTopic(topic);
   if (!normalizedTopic) {
@@ -376,7 +433,7 @@ function buildReviewLeafHelpDocument(actionId: "review.nightly" | "review.weekly
       description: [
         "  从当前 diary 真相源生成一份 Codeksei 睡前收口。",
         `  默认按 ${resolvedTimezone} 的当前日期推断今天，并给周/月复盘提供更轻的日级原料。`,
-        "  默认走 hybrid：脚本保骨架，Codex 负责结构化语义提炼；失败时自动回退。",
+        "  默认走 hybrid：脚本保骨架，runtime 语义生成器负责结构化提炼；失败时自动回退。",
       ],
       examples: [
         "  codeksei review nightly",
@@ -388,7 +445,7 @@ function buildReviewLeafHelpDocument(actionId: "review.nightly" | "review.weekly
       description: [
         "  从当前 diary 真相源生成一份 Codeksei 生活助理周复盘。",
         `  默认按 ${resolvedTimezone} 的当前日期推断本周（周一到周日）。`,
-        "  默认走 hybrid：脚本保骨架，Codex 负责结构化语义提炼；失败时自动回退。",
+        "  默认走 hybrid：脚本保骨架，runtime 语义生成器负责结构化提炼；失败时自动回退。",
       ],
       examples: [
         "  codeksei review weekly",
@@ -401,7 +458,7 @@ function buildReviewLeafHelpDocument(actionId: "review.nightly" | "review.weekly
       description: [
         "  从当前 diary 真相源生成一份 Codeksei 生活助理月复盘。",
         `  默认按 ${resolvedTimezone} 的当前日期推断本月。`,
-        "  默认走 hybrid：脚本保骨架，Codex 负责结构化语义提炼；失败时自动回退。",
+        "  默认走 hybrid：脚本保骨架，runtime 语义生成器负责结构化提炼；失败时自动回退。",
       ],
       examples: [
         "  codeksei review monthly",
@@ -556,10 +613,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export {
+  buildHermesOperatorResourceHelpText,
   buildTerminalLeafHelpText,
   buildTerminalTopicHelpText,
   hasTerminalTopicHelp,
   listTerminalHelpTopics,
   listTerminalLeafHelpKeys,
 };
-

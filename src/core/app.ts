@@ -37,6 +37,7 @@ import {
   resolveAppWorkspaceRoot,
   resolveReplyTargetForBinding,
 } from "./app-target-resolution";
+import { assertBridgeMode } from "./host-mode";
 import { logError } from "./logging";
 
 type AppConfig = AppRuntimeConfig;
@@ -181,14 +182,17 @@ export class CodekseiApp {
   }
 
   async login(): Promise<void> {
+    assertBridgeMode(this.config, "codeksei login");
     await loginChannel(this.channelAdapter);
   }
 
   printAccounts(): void {
+    assertBridgeMode(this.config, "codeksei accounts");
     printChannelAccounts(this.channelAdapter);
   }
 
   async start(): Promise<void> {
+    assertBridgeMode(this.config, "codeksei start");
     await runCodekseiAppLifecycle({
       config: this.config,
       channelAdapter: this.channelAdapter,
@@ -229,6 +233,7 @@ export class CodekseiApp {
     args = [],
     outputFile = "",
   }: TimelineScreenshotRequest = {}): Promise<unknown> {
+    assertBridgeMode(this.config, "Codeksei bridge timeline screenshot");
     return sendRuntimeTimelineScreenshot({
       payload: { senderId, args, outputFile },
       runtimeTurnLifecycle: this.runtimeTurnLifecycle,
@@ -239,6 +244,7 @@ export class CodekseiApp {
     senderId = "",
     filePath = "",
   }: SendLocalFileRequest = {}): Promise<unknown> {
+    assertBridgeMode(this.config, "Codeksei bridge local file send");
     return sendRuntimeLocalFile({
       payload: { senderId, filePath },
       runtimeTurnLifecycle: this.runtimeTurnLifecycle,

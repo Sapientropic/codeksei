@@ -26,7 +26,21 @@
 
 - **它是什么**：以 WeChat 为入口、把日常记录、提醒、复盘和项目连续性接在一起的本地优先 companion
 - **它适合谁**：容易时间感松开、项目线程常被打断、想让人替自己照看线头的人
-- **你可以先这样试**：`npm install -g codeksei` 先体验基础 CLI；想体验完整形态，再跑共享模式
+- **你可以先这样试**：`npm install -g codeksei` 先体验基础 CLI；想体验完整形态，可选 `Bridge Mode` 或 `Hermes Hosted Mode`
+
+## Host Modes
+
+Codeksei 现在把自己定义成 **companion/domain layer**，不再默认等于某一个固定 agent 宿主。
+
+- `Bridge Mode`
+  现有默认路径：`Codeksei Weixin bridge + Codex runtime`
+- `Hermes Hosted Mode`
+  Hermes 负责 agent loop 和官方 Weixin；Codeksei 通过 CLI / skill surface 暴露 timeline、diary、reminder、review、note、project radar 等能力
+
+选择建议：
+
+- 如果你想直接复用这个仓库现有的共享线程链路，用 `Bridge Mode`
+- 如果你已经在 Hermes 生态里，并且想直接吃 Hermes 官方维护的 Weixin，用 `Hermes Hosted Mode`
 
 <a id="try-codeksei"></a>
 
@@ -41,7 +55,11 @@ codeksei schema
 codeksei review weekly --help
 ```
 
-如果你想直接体验它更完整的样子，让 WeChat 和终端接到同一条共享线程：
+如果你想直接体验它更完整的样子，有两条官方路径：
+
+### Bridge Mode
+
+让 Codeksei 自己托管 WeChat bridge 和共享线程：
 
 ```bash
 git clone https://github.com/Sapientropic/codeksei.git
@@ -51,9 +69,25 @@ npm run login
 npm run shared:start
 ```
 
+### Hermes Hosted Mode
+
+让 Hermes 托管 agent + Weixin，Codeksei 只作为 companion workflow surface：
+
+```bash
+git clone https://github.com/Sapientropic/codeksei.git
+cd codeksei
+npm install
+codeksei doctor
+codeksei operator hermes install-skill
+codeksei operator hermes status
+codeksei operator hermes smoke
+# 然后再由 Hermes gateway / Weixin 使用
+```
+
 - `先试基础 CLI`：看命令面、确认本机环境、感受产品边界
 - `需要 bootstrap / operator 命令时`：再用 `codeksei operator help` 或仓库里的 `npm run ...`
 - `再进共享模式`：体验它真正的连续性、主动分忧、提醒和项目接续
+- `若你已经用 Hermes`：优先直接接 Hermes Hosted Mode，不必再让 Codeksei 重复托管微信桥
 - `试完给反馈`：欢迎到 [GitHub Issues](https://github.com/Sapientropic/codeksei/issues) 告诉我们哪里最有用、哪里最别扭、哪里应该更主动或更克制
 
 <a id="day-with-codeksei"></a>
@@ -80,8 +114,10 @@ npm run shared:start
 - `Reminders`：提醒写入与调度，给生活节奏和待办推进一个外部支点
 - `Review`：nightly / weekly / monthly，把日常记录压成更稳定的节奏校准与复盘材料
 - `Project support`：workspace bootstrap、project radar、按 workspace 恢复共享线程。项目切走再回来时，不用先把整条线在脑子里重建一遍
-- `WeChat bridge`：扫码登录、长轮询收发、文件发送、共享线程接管
-- `Codex runtime`：共享 `app-server`、thread/session 绑定、审批流、stop/resume
+- `WeChat bridge`
+  Bridge Mode 下由 Codeksei 托管；Hermes Hosted Mode 下推荐直接用 Hermes 官方 Weixin
+- `Runtime host`
+  Bridge Mode 当前默认是 Codex；Hermes Hosted Mode 由 Hermes 自己托管 agent/runtime/审批/模型切换
 - `Durable note`：`note:auto`、`note:maybe`、`note:sync`
 
 ## 这些人会喜欢它
@@ -164,6 +200,8 @@ codeksei review weekly --help
 最小可用配置：
 
 ```dotenv
+CODEKSEI_RUNTIME=codex
+CODEKSEI_CHANNEL_PROVIDER=codeksei
 CODEKSEI_USER_NAME=你的名字
 CODEKSEI_USER_GENDER=female
 CODEKSEI_ALLOWED_USER_IDS=桥实际观测到的 sender id
@@ -175,6 +213,10 @@ CODEKSEI_WORKSPACE_ROOT=/绝对路径/你的项目目录
 
 ```dotenv
 CODEKSEI_ACCOUNT_ID=
+CODEKSEI_RUNTIME_ENDPOINT=ws://127.0.0.1:8765
+CODEKSEI_RUNTIME_COMMAND=codex
+CODEKSEI_HERMES_COMMAND=hermes
+CODEKSEI_REVIEW_SEMANTIC_HOST=auto
 CODEKSEI_CODEX_ENDPOINT=ws://127.0.0.1:8765
 CODEKSEI_WEIXIN_ADAPTER=v2
 CODEKSEI_WEIXIN_REPLY_MODE=stream
@@ -200,6 +242,9 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - `CODEKSEI_WEIXIN_REPLY_MODE=stream` 现在表示“半实时增量流”：会按小窗口持续发送用户可见增量，保留段落结构，可读性优先于减少气泡数量
 - `CODEKSEI_WEIXIN_REPLY_MODE=stream` 现在更接近 hybrid stream：优先在自然句边界或已完成块发送，避免把半句 final 提前裂成多个微信气泡
 - `CODEKSEI_WEIXIN_REPLY_MODE=settled` 仍表示“等整轮收口后再发”：只发送最新的可见最终回复
+- `CODEKSEI_RUNTIME` / `CODEKSEI_CHANNEL_PROVIDER` 决定当前是 `Bridge Mode` 还是 `Hermes Hosted Mode`
+- `CODEKSEI_RUNTIME_ENDPOINT` / `CODEKSEI_RUNTIME_COMMAND` 是新的 host-neutral runtime 入口；旧的 `CODEKSEI_CODEX_*` 变量仍保留兼容
+- `CODEKSEI_REVIEW_SEMANTIC_HOST=auto|codex|hermes|deterministic` 可显式指定 review hybrid 语义宿主；默认 `auto`
 - `CODEKSEI_USER_NAME` 决定对话里怎么称呼你，不参与消息路由
 - `CODEKSEI_ALLOWED_USER_IDS` 必须填写微信桥实际观测到的 sender id；最简单的做法是先跑 `codeksei accounts`，如果你当前就在仓库工作树里，也可以直接用 `npm run accounts`
 - 微信 persona / continuity instructions 默认来自仓库里的 `templates/weixin-instructions.md`，如需本地覆盖可在状态目录放 `weixin-instructions.local.md`
@@ -211,13 +256,31 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - `CODEKSEI_TIMELINE_STATE_DIR` 默认指向 Codeksei timeline 数据根；当前主布局会在它下面使用 `timeline/*.json`
 - `.env` 只应放在你的本地工作目录或状态目录里，不要提交进仓库
 
-### 3. 扫码登录
+### 3. 选择运行模式
+
+#### Bridge Mode
+
+Codeksei 自己负责 Weixin bridge 和共享线程。
+
+#### Hermes Hosted Mode
+
+不要执行 `codeksei start` 或 `npm run shared:*`。
+
+- 由 Hermes 负责 gateway / agent loop / Weixin
+- 由 Codeksei CLI + 官方受管的 Hermes skill 提供 companion workflows
+- 可先用 `codeksei operator hermes --help` 或 `codeksei operator schema operator hermes` 看 3 个 leaf action
+- 推荐先执行：
+  `codeksei operator hermes install-skill`
+  `codeksei operator hermes status`
+  `codeksei operator hermes smoke`
+
+### 4. Bridge Mode 扫码登录
 
 ```bash
 npm run login
 ```
 
-### 4. 拉起共享模式
+### 5. Bridge Mode 拉起共享模式
 
 共享模式更适合日常使用：微信和终端会接到同一条共享线程。
 
@@ -237,7 +300,9 @@ npm run shared:open
 npm run shared:status
 ```
 
-### 5. Windows 后台常驻
+如果当前配置是 Hermes Hosted Mode，这几条 shared 命令会明确提示“改用 Hermes gateway”，不会偷偷回退到 Codex app-server。
+
+### 6. Windows 后台常驻
 
 如果你希望登录后自动拉起，并在解锁或恢复睡眠后快速自愈：
 

@@ -8,6 +8,26 @@ STATE_DIR="${CODEKSEI_STATE_DIR:-$HOME/.codeksei}"
 LOG_DIR="${STATE_DIR}/logs"
 PID_FILE="${LOG_DIR}/shared-wechat.pid"
 READYZ_URL="http://127.0.0.1:${PORT}/readyz"
+RUNTIME="${CODEKSEI_RUNTIME:-codex}"
+CHANNEL_PROVIDER="${CODEKSEI_CHANNEL_PROVIDER:-}"
+
+if [[ -z "${CHANNEL_PROVIDER}" ]]; then
+  if [[ "${RUNTIME}" == "hermes" ]]; then
+    CHANNEL_PROVIDER="hermes"
+  else
+    CHANNEL_PROVIDER="codeksei"
+  fi
+fi
+
+if [[ "${RUNTIME}" == "hermes" && "${CHANNEL_PROVIDER}" == "hermes" ]]; then
+  echo "Hermes Hosted Mode 下共享线程由 Hermes 宿主管理；不要再执行 open_shared_wechat_thread.sh。" >&2
+  exit 1
+fi
+
+if [[ "${RUNTIME}" == "hermes" || "${CHANNEL_PROVIDER}" == "hermes" ]]; then
+  echo "当前 host 组合不受支持：runtime=${RUNTIME} channelProvider=${CHANNEL_PROVIDER} channel=weixin" >&2
+  exit 1
+fi
 
 mkdir -p "${LOG_DIR}"
 
@@ -71,5 +91,6 @@ echo "${EXISTING_PID}" > "${PID_FILE}"
 
 echo "shared codeksei running pid=${EXISTING_PID} endpoint=${REMOTE_URL}"
 
+export CODEKSEI_RUNTIME_ENDPOINT="${REMOTE_URL}"
 export CODEKSEI_CODEX_ENDPOINT="${REMOTE_URL}"
 exec "${ROOT_DIR}/scripts/open_wechat_thread.sh" "$@"

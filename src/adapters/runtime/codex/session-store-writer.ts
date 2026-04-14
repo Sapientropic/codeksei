@@ -50,12 +50,20 @@ export class SessionStoreWriter implements SessionStoreWriterLike {
     return this.store.setAvailableModelCatalog(models);
   }
 
+  async setRuntimeParamsForWorkspace(
+    bindingKey: string,
+    workspaceRoot: string,
+    params: { model?: string; effort?: string },
+  ): Promise<unknown> {
+    return this.store.setRuntimeParamsForWorkspace(bindingKey, workspaceRoot, params);
+  }
+
   async setCodexParamsForWorkspace(
     bindingKey: string,
     workspaceRoot: string,
     params: { model?: string; effort?: string },
   ): Promise<unknown> {
-    return this.store.setCodexParamsForWorkspace(bindingKey, workspaceRoot, params);
+    return this.setRuntimeParamsForWorkspace(bindingKey, workspaceRoot, params);
   }
 
   async setThreadIdForWorkspace(

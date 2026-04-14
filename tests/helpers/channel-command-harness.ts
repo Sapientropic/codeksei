@@ -159,7 +159,7 @@ function createControlCommandHarness({
     getAvailableModelCatalog() {
       return catalog;
     },
-    getCodexParamsForWorkspace() {
+    getRuntimeParamsForWorkspace() {
       return { model: currentModel, effort: currentEffort };
     },
     getPendingApprovalForThread() {
@@ -176,7 +176,7 @@ function createControlCommandHarness({
       rememberPrefixCalls.push({ workspaceRoot: targetWorkspaceRoot, commandTokens });
       return [];
     },
-    async setCodexParamsForWorkspace(
+    async setRuntimeParamsForWorkspace(
       bindingKey: string,
       targetWorkspaceRoot: string,
       params: { effort?: string; model?: string },
@@ -268,7 +268,7 @@ function createWorkspaceCommandHarness({
     getActiveWorkspaceRoot() {
       return currentWorkspaceRoot;
     },
-    getCodexParamsForWorkspace() {
+    getRuntimeParamsForWorkspace() {
       return { model: currentModel, effort: "medium" };
     },
     getPendingApprovalForThread() {

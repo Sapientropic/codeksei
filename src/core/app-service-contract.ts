@@ -1,6 +1,5 @@
 import type { RuntimeEvent } from "../contracts/runtime-events";
 import type { ReminderQueueEntry, SystemMessage } from "../contracts/queue-items";
-import type { CodexAppServerCapabilityProbe } from "../contracts/codex-capability";
 import type { AvailableModelCatalogView } from "../contracts/model-catalog";
 import type {
   DeliveryFailurePayload,
@@ -27,8 +26,15 @@ export interface AppRuntimeConfig extends Record<string, unknown> {
   workspaceRoot: string;
   sessionsFile: string;
   allowedUserIds?: unknown;
-  codexCommand?: string;
-  codexAccessMode?: string;
+  channel?: unknown;
+  channelProvider?: unknown;
+  runtime?: unknown;
+  runtimeCommand?: string;
+  runtimeEndpoint?: string;
+  runtimeAccessMode?: string;
+  hermesCommand?: string;
+  hermesHome?: string;
+  reviewSemanticHost?: string;
   sharedBridgeHeartbeatFile?: string;
   startWithCheckin?: boolean;
   checkinConfigFile?: string;
@@ -55,7 +61,7 @@ export interface SessionBindingSnapshot extends Record<string, unknown> {
   accountId?: string;
   activeWorkspaceRoot?: string;
   bindingKey?: string;
-  codexParamsByWorkspaceRoot?: Record<string, unknown>;
+  runtimeParamsByWorkspaceRoot?: Record<string, unknown>;
   senderId?: string;
   threadIdByWorkspaceRoot?: Record<string, string>;
   workspaceId?: string;
@@ -71,7 +77,7 @@ export interface SessionStoreLike {
   getApprovalCommandAllowlistForWorkspace(workspaceRoot: string): string[][];
   getAvailableModelCatalog(): AvailableModelCatalogView | null;
   getBinding(bindingKey: string): { senderId?: string } | null;
-  getCodexParamsForWorkspace(bindingKey: string, workspaceRoot?: string): { model?: string; effort?: string };
+  getRuntimeParamsForWorkspace(bindingKey: string, workspaceRoot?: string): { model?: string; effort?: string };
   getPendingApprovalForThread(threadId: string): PendingApprovalState | null;
   getThreadIdForWorkspace(bindingKey: string, workspaceRoot: string): string;
   listBindings(): SessionBindingSnapshot[];
@@ -90,7 +96,7 @@ export interface SessionStoreWriterLike {
   rememberWorkspaceBootstrapForThread(bindingKey: string, workspaceRoot: string, threadId: string): Promise<unknown>;
   setActiveWorkspaceRoot(bindingKey: string, workspaceRoot: string): Promise<unknown>;
   setAvailableModelCatalog?(models: unknown): Promise<unknown>;
-  setCodexParamsForWorkspace(
+  setRuntimeParamsForWorkspace(
     bindingKey: string,
     workspaceRoot: string,
     params: { model?: string; effort?: string },
@@ -143,7 +149,7 @@ export interface RuntimeAdapterLike {
   getSessionStore(): SessionStoreLike;
   initialize(): Promise<RuntimeAdapterState>;
   onEvent(listener: (event: RuntimeEvent<UnknownRecord>) => void): unknown;
-  probeAppServerCapabilities?(command: string): CodexAppServerCapabilityProbe;
+  probeRuntimeCapabilities?(command: string): unknown;
   refreshThreadInstructions(args: {
     bindingKey: string;
     threadId: string;

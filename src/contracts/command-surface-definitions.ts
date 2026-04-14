@@ -10,6 +10,12 @@ export interface CommandHelpDefinition {
   detail: "leaf" | "topic_only";
 }
 
+export interface CommandSideEffectDefinition {
+  kind: string;
+  target: string;
+  when?: string;
+}
+
 export interface CommandApprovalDefinition {
   autoApprove?: boolean;
 }
@@ -31,6 +37,7 @@ export interface CommandActionDefinition {
   timelineSubcommand?: string;
   help?: CommandHelpDefinition;
   approval?: CommandApprovalDefinition;
+  sideEffects?: readonly CommandSideEffectDefinition[];
 }
 
 export type CommandAudienceDefinition = "operator" | "public";
@@ -91,9 +98,63 @@ export const COMMAND_ACTION_DEFINITIONS = [
     help: { topic: "", leafKey: "operator.schema", detail: "topic_only" },
   },
   {
+    action: "operator.hermes.install_skill",
+    groupId: "lifecycle",
+    summary: "同步仓内 Codeksei companion skill 到当前 Hermes home",
+    terminal: ["operator hermes install-skill"],
+    weixin: [],
+    status: "active",
+    entrypointType: "cli",
+    command: "operator",
+    subcommand: "hermes install-skill",
+    runner: "operator.hermes.install_skill",
+    argsSchemaKey: "hermesInstallSkill",
+    help: { topic: "", leafKey: "operator.hermes.install_skill", detail: "leaf" },
+    sideEffects: [
+      {
+        kind: "write_skill_file",
+        target: "~/.hermes/skills/codeksei-companion/SKILL.md",
+        when: "当目标不存在或内容与仓内 skill asset 不一致时",
+      },
+      {
+        kind: "backup_existing_skill",
+        target: "~/.hermes/skills/codeksei-companion/SKILL.md.backup-<timestamp>",
+        when: "当已安装 skill 存在且将被覆盖时",
+      },
+    ],
+  },
+  {
+    action: "operator.hermes.status",
+    groupId: "lifecycle",
+    summary: "查看 Hermes hosted 集成状态、skill 同步与 semantic review 可用性",
+    terminal: ["operator hermes status"],
+    weixin: [],
+    status: "active",
+    entrypointType: "cli",
+    command: "operator",
+    subcommand: "hermes status",
+    runner: "operator.hermes.status",
+    argsSchemaKey: "hermesStatus",
+    help: { topic: "", leafKey: "operator.hermes.status", detail: "leaf" },
+  },
+  {
+    action: "operator.hermes.smoke",
+    groupId: "lifecycle",
+    summary: "执行 Hermes hosted 前置检查与 skill parity smoke",
+    terminal: ["operator hermes smoke"],
+    weixin: [],
+    status: "active",
+    entrypointType: "cli",
+    command: "operator",
+    subcommand: "hermes smoke",
+    runner: "operator.hermes.smoke",
+    argsSchemaKey: "hermesSmoke",
+    help: { topic: "", leafKey: "operator.hermes.smoke", detail: "leaf" },
+  },
+  {
     action: "app.login",
     groupId: "lifecycle",
-    summary: "发起微信扫码登录并保存账号",
+    summary: "发起 Codeksei 自带微信桥的扫码登录并保存账号（bridge-only）",
     terminal: ["login"],
     weixin: [],
     status: "active",
@@ -105,7 +166,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
   {
     action: "app.accounts",
     groupId: "lifecycle",
-    summary: "查看本地已保存账号",
+    summary: "查看 Codeksei 自带微信桥的本地已保存账号（bridge-only）",
     terminal: ["accounts"],
     weixin: [],
     status: "active",
@@ -117,7 +178,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
   {
     action: "app.start",
     groupId: "lifecycle",
-    summary: "启动当前 channel/runtime 主循环",
+    summary: "启动当前 Codeksei bridge 主循环（bridge-only）",
     terminal: ["start"],
     weixin: [],
     status: "active",
@@ -129,7 +190,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
   {
     action: "app.shared_start",
     groupId: "lifecycle",
-    summary: "启动共享 app-server 与共享微信桥接",
+    summary: "启动共享 app-server 与共享微信桥接（bridge-only）",
     terminal: ["shared:start"],
     weixin: [],
     status: "active",
@@ -139,7 +200,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
   {
     action: "app.shared_open",
     groupId: "lifecycle",
-    summary: "接入当前微信绑定的共享线程",
+    summary: "接入当前微信绑定的共享线程（bridge-only）",
     terminal: ["shared:open"],
     weixin: [],
     status: "active",
@@ -149,7 +210,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
   {
     action: "app.shared_status",
     groupId: "lifecycle",
-    summary: "查看共享 app-server 与共享桥接状态",
+    summary: "查看共享桥接状态；Hermes hosted mode 下仅显示宿主管理提示",
     terminal: ["shared:status"],
     weixin: [],
     status: "active",
@@ -159,7 +220,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
   {
     action: "app.shared_watchdog",
     groupId: "lifecycle",
-    summary: "主动巡检并自恢复共享链路",
+    summary: "主动巡检并自恢复共享链路（bridge-only）",
     terminal: ["shared:watchdog"],
     weixin: [],
     status: "active",
@@ -757,6 +818,9 @@ export const COMMAND_AUDIENCE_OVERRIDES: Readonly<Partial<Record<CommandActionId
   "app.start": "operator",
   "background.install": "operator",
   "background.uninstall": "operator",
+  "operator.hermes.install_skill": "operator",
+  "operator.hermes.smoke": "operator",
+  "operator.hermes.status": "operator",
   "operator.help": "operator",
   "operator.schema": "operator",
   "system.checkin_poller": "operator",
@@ -780,6 +844,9 @@ export const COMMAND_SAFETY_OVERRIDES: Readonly<Partial<Record<CommandActionId, 
   "note.auto": "warned",
   "note.maybe": "open",
   "note.sync": "warned",
+  "operator.hermes.install_skill": "operator",
+  "operator.hermes.smoke": "operator",
+  "operator.hermes.status": "operator",
   "operator.help": "operator",
   "operator.schema": "operator",
   "project.radar": "open",
@@ -819,6 +886,9 @@ export const COMMAND_MUTABILITY_OVERRIDES: Readonly<Partial<Record<CommandAction
   "note.auto": "write",
   "note.maybe": "read",
   "note.sync": "write",
+  "operator.hermes.install_skill": "write",
+  "operator.hermes.smoke": "read",
+  "operator.hermes.status": "read",
   "operator.help": "read",
   "operator.schema": "read",
   "project.radar": "read",

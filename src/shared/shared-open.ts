@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { readPrefixedEnv } from "../contracts/app-env";
 import { formatErrorMessage } from "../core/error-handling";
+import { assertBridgeMode } from "../core/host-mode";
 import { writeStderrLine } from "../core/terminal-output";
 import { resolveCodexWorkspaceRoot } from "../workspace/workspace-alias";
 import {
@@ -15,6 +16,7 @@ type ChildSignal = NodeJS.Signals | null;
 
 
 async function main() {
+  assertBridgeMode(process.env, "npm run shared:open");
   const sharedContext = resolveSharedProcessContext();
   const workspaceRoot = readPrefixedEnv(process.env, "WORKSPACE_ROOT") || process.cwd();
   await ensureSharedAppServer();

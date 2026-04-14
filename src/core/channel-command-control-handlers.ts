@@ -25,7 +25,7 @@ import type { NormalizedIncomingMessage, PendingApprovalState } from "./runtime-
 
 interface ControlCommandSessionStore extends ChannelCommandSessionStore {
   getAvailableModelCatalog(): AvailableModelCatalogView | null;
-  getCodexParamsForWorkspace(bindingKey: string, workspaceRoot: string): { model?: string; effort?: string };
+  getRuntimeParamsForWorkspace(bindingKey: string, workspaceRoot: string): { model?: string; effort?: string };
 }
 
 interface ControlCommandRuntimeAdapter extends Pick<RuntimeAdapterLike, "respondApproval">, ChannelCommandRuntimeAdapter {
@@ -34,7 +34,7 @@ interface ControlCommandRuntimeAdapter extends Pick<RuntimeAdapterLike, "respond
 
 type ControlCommandSessionWriter = Pick<
   SessionStoreWriterLike,
-  "clearApprovalPrompt" | "clearPendingApprovalForThread" | "rememberApprovalPrefixForWorkspace" | "setCodexParamsForWorkspace"
+  "clearApprovalPrompt" | "clearPendingApprovalForThread" | "rememberApprovalPrefixForWorkspace" | "setRuntimeParamsForWorkspace"
 >;
 
 interface ControlCommandThreadStateStore extends ChannelCommandThreadStateStore {
@@ -134,7 +134,7 @@ function createControlCommandHandlers({
       const [modelQuery = "", effortQuery = "", ...rest] = splitCommandArgs(command.args);
       const query = normalizeCommandArgument(modelQuery);
       const catalog = sessionStore.getAvailableModelCatalog();
-      const currentParams = sessionStore.getCodexParamsForWorkspace(bindingKey, workspaceRoot);
+      const currentParams = sessionStore.getRuntimeParamsForWorkspace(bindingKey, workspaceRoot);
       const currentModel = normalizeCommandArgument(currentParams.model);
       const currentEffort = normalizeCommandArgument(currentParams.effort);
 
@@ -166,7 +166,7 @@ function createControlCommandHandlers({
         return;
       }
 
-      await sessionWriter.setCodexParamsForWorkspace(bindingKey, workspaceRoot, {
+      await sessionWriter.setRuntimeParamsForWorkspace(bindingKey, workspaceRoot, {
         model: matched.model,
         effort: nextEffort,
       });
@@ -192,7 +192,7 @@ function createControlCommandHandlers({
       });
       const [effortQuery = "", ...rest] = splitCommandArgs(command.args);
       const catalog = sessionStore.getAvailableModelCatalog();
-      const currentParams = sessionStore.getCodexParamsForWorkspace(bindingKey, workspaceRoot);
+      const currentParams = sessionStore.getRuntimeParamsForWorkspace(bindingKey, workspaceRoot);
       const currentModel = normalizeCommandArgument(currentParams.model);
       const currentEffort = normalizeCommandArgument(currentParams.effort);
       const effectiveModel = resolveEffectiveModelForEffort(catalog?.models || [], currentModel);
@@ -219,7 +219,7 @@ function createControlCommandHandlers({
         return;
       }
 
-      await sessionWriter.setCodexParamsForWorkspace(bindingKey, workspaceRoot, {
+      await sessionWriter.setRuntimeParamsForWorkspace(bindingKey, workspaceRoot, {
         model: effectiveModel.model,
         effort: matchedEffort,
       });

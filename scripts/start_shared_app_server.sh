@@ -7,6 +7,26 @@ STATE_DIR="${CODEKSEI_STATE_DIR:-$HOME/.codeksei}"
 LOG_DIR="${STATE_DIR}/logs"
 PID_FILE="${LOG_DIR}/shared-app-server.pid"
 LOG_FILE="${LOG_DIR}/shared-app-server.log"
+RUNTIME="${CODEKSEI_RUNTIME:-codex}"
+CHANNEL_PROVIDER="${CODEKSEI_CHANNEL_PROVIDER:-}"
+
+if [[ -z "${CHANNEL_PROVIDER}" ]]; then
+  if [[ "${RUNTIME}" == "hermes" ]]; then
+    CHANNEL_PROVIDER="hermes"
+  else
+    CHANNEL_PROVIDER="codeksei"
+  fi
+fi
+
+if [[ "${RUNTIME}" == "hermes" && "${CHANNEL_PROVIDER}" == "hermes" ]]; then
+  echo "Hermes Hosted Mode 下不要启动 Codeksei 自己的 shared app-server；请改用 Hermes gateway。" >&2
+  exit 1
+fi
+
+if [[ "${RUNTIME}" == "hermes" || "${CHANNEL_PROVIDER}" == "hermes" ]]; then
+  echo "当前 host 组合不受支持：runtime=${RUNTIME} channelProvider=${CHANNEL_PROVIDER} channel=weixin" >&2
+  exit 1
+fi
 
 function lookup_listen_pid() {
   lsof -nP -iTCP:"${PORT}" -sTCP:LISTEN 2>/dev/null \

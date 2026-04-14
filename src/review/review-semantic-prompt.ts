@@ -29,12 +29,14 @@ export interface SemanticReviewInput extends JsonObject {
 }
 
 export interface SemanticReviewConfig extends JsonObject {
+  hermesCommand?: unknown;
   reviewSemanticMode?: unknown;
+  reviewSemanticHost?: unknown;
   reviewSemanticTimeoutMs?: unknown;
   reviewSemanticModel?: unknown;
   reviewSemanticGenerator?: ((input: SemanticGeneratorInput) => Promise<unknown>) | unknown;
-  codexEndpoint?: unknown;
-  codexCommand?: unknown;
+  runtimeEndpoint?: unknown;
+  runtimeCommand?: unknown;
   stateDir?: unknown;
   workspaceRoot?: unknown;
 }

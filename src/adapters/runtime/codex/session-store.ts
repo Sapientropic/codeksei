@@ -17,18 +17,18 @@ import {
   findBindingForThreadIdInState,
   getActiveWorkspaceRootFromState,
   getBindingFromState,
-  getCodexParamsForWorkspaceFromState,
+  getRuntimeParamsForWorkspaceFromState,
   getThreadIdForWorkspaceFromState,
   hasWorkspaceBootstrapForThreadInState,
   listBindingsFromState,
   listWorkspaceRootsFromState,
   rememberWorkspaceBootstrapForThreadInState,
   setActiveWorkspaceRootInState,
-  setCodexParamsForWorkspaceInState,
+  setRuntimeParamsForWorkspaceInState,
   setThreadIdForWorkspaceInState,
   updateBindingInState,
   type BindingRef,
-  type CodexWorkspaceParams,
+  type RuntimeWorkspaceParams,
   type SessionBindingUpdate,
 } from "./session-store-binding-state";
 import {
@@ -140,19 +140,31 @@ export class SessionStore {
     return this.mutateState((state) => setThreadIdForWorkspaceInState(state, bindingKey, workspaceRoot, threadId, extra));
   }
 
-  getCodexParamsForWorkspace(bindingKey: unknown, workspaceRoot: unknown): CodexWorkspaceParams {
-    return getCodexParamsForWorkspaceFromState(this.refresh(), bindingKey, workspaceRoot);
+  getRuntimeParamsForWorkspace(bindingKey: unknown, workspaceRoot: unknown): RuntimeWorkspaceParams {
+    return getRuntimeParamsForWorkspaceFromState(this.refresh(), bindingKey, workspaceRoot);
+  }
+
+  async setRuntimeParamsForWorkspace(
+    bindingKey: unknown,
+    workspaceRoot: unknown,
+    { model = "", effort = "" }: { model?: unknown; effort?: unknown },
+  ): Promise<SessionBinding | null> {
+    return this.mutateState((state) => setRuntimeParamsForWorkspaceInState(state, bindingKey, workspaceRoot, {
+      model,
+      effort,
+    }));
+  }
+
+  getCodexParamsForWorkspace(bindingKey: unknown, workspaceRoot: unknown): RuntimeWorkspaceParams {
+    return this.getRuntimeParamsForWorkspace(bindingKey, workspaceRoot);
   }
 
   async setCodexParamsForWorkspace(
     bindingKey: unknown,
     workspaceRoot: unknown,
-    { model = "", effort = "" }: { model?: unknown; effort?: unknown },
+    params: { model?: unknown; effort?: unknown },
   ): Promise<SessionBinding | null> {
-    return this.mutateState((state) => setCodexParamsForWorkspaceInState(state, bindingKey, workspaceRoot, {
-      model,
-      effort,
-    }));
+    return this.setRuntimeParamsForWorkspace(bindingKey, workspaceRoot, params);
   }
 
   async clearThreadIdForWorkspace(bindingKey: unknown, workspaceRoot: unknown): Promise<SessionBinding | null> {

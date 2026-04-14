@@ -2,8 +2,12 @@
 
 import { PACKAGE_NAME } from "./contracts/app-env";
 import type { CommandExecutionResult, GlobalCliOptions } from "./contracts/cli-contract";
-import { findTerminalCommandManifest } from "./contracts/command-surface";
 import {
+  findTerminalCommandManifest,
+  findTerminalCommandManifestFromArgv,
+} from "./contracts/command-surface";
+import {
+  buildHermesOperatorHelpText,
   buildOperatorHelpText,
   buildTerminalHelpText,
   buildTerminalLeafHelp,
@@ -23,6 +27,7 @@ import { logError } from "./core/logging";
 import { createTerminalCommandContext } from "./app/terminal-command-context";
 import { runTerminalManifestCommand } from "./app/terminal-command-dispatch";
 import type { TerminalCommandManifestEntry } from "./contracts/command-surface";
+import { buildHermesOperatorValidationError } from "./app/hermes-operator-cli";
 
 
 interface ParsedCommandIntent {
@@ -71,21 +76,41 @@ function parseCommandIntent(argv: string[]): ParsedCommandIntent {
     argv,
     command,
     subcommand,
-    manifest: resolveTerminalCommandManifest(command, subcommand),
+    manifest: resolveTerminalCommandManifest(argv),
     helpFlag: hasArgFlag(argv, "--help") || hasArgFlag(argv, "-h"),
   };
 }
 
-function runReadonlyHelpPath({ command, subcommand, manifest, helpFlag }: ParsedCommandIntent): CommandExecutionResult | null {
-  if (command === "operator" && (!subcommand || subcommand === "help" || helpFlag)) {
+function runReadonlyHelpPath({ argv, command, subcommand, manifest, helpFlag }: ParsedCommandIntent): CommandExecutionResult | null {
+  if (
+    command === "operator"
+    && (!subcommand || subcommand === "help" || (helpFlag && !manifest))
+  ) {
     return {
       data: buildCommandSchema({ audience: "operator", command: "", subcommand: "" }),
       text: buildOperatorHelpText(),
     };
   }
 
+  if (command === "operator" && subcommand === "hermes" && !manifest) {
+    const requestedLeaf = normalizeArgToken(argv[2]);
+    if (requestedLeaf && !requestedLeaf.startsWith("-")) {
+      throw buildHermesOperatorValidationError(argv[2] || "");
+    }
+    return {
+      data: buildCommandSchema({ audience: "operator", target: ["operator", "hermes"] }),
+      text: buildHermesOperatorHelpText(),
+    };
+  }
+
   if (command === "help" || command === "--help" || command === "-h") {
     if (subcommand === "operator") {
+      if (normalizeArgToken(argv[2]) === "hermes") {
+        return {
+          data: buildCommandSchema({ audience: "operator", target: ["operator", "hermes"] }),
+          text: buildHermesOperatorHelpText(),
+        };
+      }
       return {
         data: buildCommandSchema({ audience: "operator", command: "", subcommand: "" }),
         text: buildOperatorHelpText(),
@@ -104,8 +129,7 @@ function runReadonlyHelpPath({ command, subcommand, manifest, helpFlag }: Parsed
     return {
       data: buildCommandSchema({
         audience: manifest.audience,
-        command: manifest.command,
-        subcommand: manifest.subcommand,
+        target: manifest.pathTokens || [manifest.command, manifest.subcommand].filter(Boolean),
       }),
       text: leafHelp || topicHelp || (manifest.audience === "operator" ? buildTerminalHelpText({ audience: "operator" }) : buildTerminalHelpText()),
     };
@@ -122,15 +146,18 @@ function runReadonlyHelpPath({ command, subcommand, manifest, helpFlag }: Parsed
 }
 
 export function resolveTerminalCommandManifest(
-  command: unknown,
-  subcommand: unknown,
+  argvOrCommand: readonly unknown[] | unknown,
+  subcommand: unknown = "",
 ): TerminalCommandManifestEntry | null {
-  const normalizedCommand = String(command || "").trim();
-  const normalizedSubcommand = String(subcommand || "").trim();
-  const exact = findTerminalCommandManifest(normalizedCommand, normalizedSubcommand);
+  const argv = Array.isArray(argvOrCommand)
+    ? [...argvOrCommand]
+    : [argvOrCommand, subcommand];
+  const exact = findTerminalCommandManifestFromArgv(argv);
   if (exact) {
     return exact;
   }
+  const normalizedCommand = normalizeArgToken(argv[0]);
+  const normalizedSubcommand = normalizeArgToken(argv[1]);
   if (normalizedCommand === "schema") {
     return findTerminalCommandManifest(normalizedCommand, "");
   }
@@ -168,6 +195,10 @@ function installRuntimeErrorHooks(cli: GlobalCliOptions): void {
 
 function hasArgFlag(argv: string[], flag: string): boolean {
   return Array.isArray(argv) && argv.some((item) => String(item || "").trim() === flag);
+}
+
+function normalizeArgToken(value: unknown): string {
+  return String(value || "").trim().toLowerCase();
 }
 
 if (require.main === module) {

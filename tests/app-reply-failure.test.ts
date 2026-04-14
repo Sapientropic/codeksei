@@ -37,7 +37,7 @@ test("reply delivery failure clears local turn state when weixin send stays brok
       async setActiveWorkspaceRoot() {
         return null;
       },
-      async setCodexParamsForWorkspace() {
+      async setRuntimeParamsForWorkspace() {
         return null;
       },
       async setThreadIdForWorkspace() {
@@ -102,7 +102,7 @@ test("reply delivery failure ignores empty thread ids", async () => {
         touched = true;
         return null;
       },
-      async setCodexParamsForWorkspace() {
+      async setRuntimeParamsForWorkspace() {
         touched = true;
         return null;
       },

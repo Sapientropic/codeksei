@@ -26,12 +26,12 @@ function createLifecycle({
   codexParams = { model: "", effort: "" },
   sendTextTurnImpl = async () => ({ threadId: "thread-1", workspaceBootstrapPending: false }),
   persistIncomingWeixinAttachmentsImpl = async () => ({ saved: [], failed: [] }),
-  buildCodexInboundTextImpl = (normalized: { text?: string }) => String(normalized.text || "").trim(),
+  buildRuntimeInboundTextImpl = (normalized: { text?: string }) => String(normalized.text || "").trim(),
 }: {
   codexParams?: { model?: string; effort?: string };
   sendTextTurnImpl?: (payload: Record<string, unknown>) => Promise<{ threadId: string; workspaceBootstrapPending: boolean }>;
   persistIncomingWeixinAttachmentsImpl?: (args: Record<string, unknown>) => Promise<{ saved: unknown[]; failed: Array<{ reason: string }> }>;
-  buildCodexInboundTextImpl?: (normalized: Record<string, unknown>, persisted: Record<string, unknown>) => string;
+  buildRuntimeInboundTextImpl?: (normalized: Record<string, unknown>, persisted: Record<string, unknown>) => string;
 } = {}) {
   const sendTextCalls: Array<{ text: string }> = [];
   const sendTypingCalls: Array<{ status: number }> = [];
@@ -45,7 +45,7 @@ function createLifecycle({
         buildBindingKey({ workspaceId, accountId, senderId }: { workspaceId: string; accountId: string; senderId: string }) {
           return `${workspaceId}:${accountId}:${senderId}`;
         },
-        getCodexParamsForWorkspace() {
+        getRuntimeParamsForWorkspace() {
           return codexParams;
         },
       };
@@ -74,7 +74,7 @@ function createLifecycle({
       workspaceId: "workspace-1",
       workspaceRoot: "E:/repo/current",
       sessionsFile: "E:/state/sessions.json",
-      codexAccessMode: "workspace-write",
+      runtimeAccessMode: "workspace-write",
       weixinCdnBaseUrl: "https://cdn.example.com",
     },
     formatErrorMessage(error: unknown) {
@@ -106,7 +106,7 @@ function createLifecycle({
     timelineIntegration: {
       async runSubcommand() {},
     },
-    buildCodexInboundText: buildCodexInboundTextImpl,
+    buildRuntimeInboundText: buildRuntimeInboundTextImpl,
   });
 
   return {
@@ -125,7 +125,7 @@ test("prepareIncomingMessageForRuntime notifies the user when attachment-only in
       saved: [],
       failed: [{ reason: "download failed" }],
     }),
-    buildCodexInboundTextImpl: () => "",
+    buildRuntimeInboundTextImpl: () => "",
   });
 
   const prepared = await harness.lifecycle.prepareIncomingMessageForRuntime(buildIncomingMessage({

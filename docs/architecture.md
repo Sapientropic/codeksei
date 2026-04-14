@@ -3,6 +3,17 @@
 `Codeksei` 的产品重心仍然是一个会陪人生活、主动记录、帮助节奏校准与项目落地的本地优先生活助理。
 实现层现在按“入口适配 -> runtime 协调 -> 状态持久化 -> 上层工作流”收口，而不是继续把这些职责混在 `src/core` 一个桶里。
 
+## Host-Neutral Core
+
+这一版开始把 `Codeksei` 明确收口成 companion/domain layer，而不是默认绑死某一个固定 agent 宿主。
+
+- `Bridge Mode`
+  `Codeksei Weixin bridge + Codex runtime`
+- `Hermes Hosted Mode`
+  Hermes 托管 agent + 官方 Weixin；Codeksei 通过 CLI / operator / skill surface 暴露领域能力
+
+这次不会把 Hermes 的 Python Weixin adapter 硬塞进 Node/TS。Hermes Weixin 仍由 Hermes 官方维护，Codeksei 负责 timeline / diary / reminder / review / note / project radar 这些领域能力，并通过 `operator hermes` 入口管理 skill/status/smoke。
+
 当前质量基线也已经同步到结构层：
 
 - `npm run check` / `npm run verify` 默认全绿
@@ -128,7 +139,7 @@
 
 `src/adapters/channel/*`
 
-当前主要是 WeChat bridge。
+当前主要是 `Bridge Mode` 下的 WeChat bridge。
 
 负责：
 
@@ -160,13 +171,15 @@
 
 `src/adapters/runtime/*`
 
-当前主运行时是 Codex。
+当前仓内已实现的 bridge runtime 仍然是 Codex，但 core seam 已经按 host-neutral 方向收口。
 
 负责：
 
 - 把消息送入具体 runtime
 - 管理 thread / session / approval / stop / resume
 - 对共享 `app-server` 与本地 client attach 做边界适配
+
+`Hermes Hosted Mode` 当前不在仓内重复实现一份 Hermes runtime adapter；它的主路径是 Hermes 自己做宿主，Codeksei 通过 CLI / operator / skill asset 暴露能力。
 
 当前收口方式：
 
@@ -182,7 +195,7 @@
 
 公开入口脚本在 `scripts/*.sh` / `scripts/*.ps1`，shared lifecycle 逻辑收口在 `src/shared/*`。
 
-这是当前默认运行方式。
+这是当前 `Bridge Mode` 的默认运行方式。
 
 负责：
 
@@ -190,6 +203,8 @@
 - 共享 WeChat bridge
 - watchdog / supervisor / status / open
 - shared heartbeat ownership
+
+在 `Hermes Hosted Mode` 下，`shared:start` / `shared:open` / `shared:watchdog` 不会再偷偷起 Codeksei 自己的 bridge，而是明确提示“由 Hermes 宿主管理”。
 
 `src/shared/shared-bridge-heartbeat.ts` 现在是 heartbeat ingress 与 owner，不再挂在 `src/core`。
 
@@ -226,6 +241,8 @@
 - `src/review/review-draft.ts`、`src/review/review-semantic.ts`、`src/core/timezone.ts` 现在是 façade 入口，window / heuristics / render、prompt / runtime / normalize、state / config / formatting 已各自 owner 化
 - `src/app/*` 继续只做公开入口，不重新吸回领域实现
 - `src/core` / `src/runtime` 不再依赖 style/type allowlist 才能维持这些边界
+- Hermes 集成当前优先走 skill / CLI / operator contract，而不是把 Hermes gateway 逻辑重新 vendoring 进来
+- review hybrid 现在由宿主策略层选择 semantic host：Bridge Mode 默认走 Codex，Hermes Hosted Mode 默认走 Hermes，文件路由与落盘逻辑仍保留在 Codeksei 自己手里
 
 架构保护规则默认守住：
 

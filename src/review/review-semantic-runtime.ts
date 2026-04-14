@@ -38,8 +38,8 @@ export async function runCodexSemanticReview(
   const model = normalizeText(input?.options?.model || config.reviewSemanticModel);
   const workspaceRoot = resolveCodexWorkspaceRoot(input?.profile?.workspaceRoot || config.workspaceRoot || process.cwd());
   const client = new CodexRpcClient({
-    endpoint: normalizeText(config.codexEndpoint),
-    codexCommand: normalizeText(config.codexCommand),
+    endpoint: normalizeText(config.runtimeEndpoint),
+    codexCommand: normalizeText(config.runtimeCommand),
     env: process.env,
     extraWritableRoots: normalizeText(config.stateDir) ? [normalizeText(config.stateDir)] : [],
   });
