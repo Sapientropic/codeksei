@@ -30,7 +30,7 @@ test("repo-local report recognizes a sibling hermes-agent checkout when present"
   assert.equal(report.sessionContextMode, "contextvars");
 });
 
-test("repo-local bridge loads Hermes home .env for hosted sends", () => {
+test("repo-local bridge loads Hermes home .env for hosted sends without overriding bridge wiring", () => {
   const pythonCommand = resolveTestPythonCommand();
   if (!pythonCommand) {
     return;
@@ -41,7 +41,16 @@ test("repo-local bridge loads Hermes home .env for hosted sends", () => {
   );
   const artifactPath = path.join(fixture.repoRoot, "artifact.txt");
   fs.writeFileSync(artifactPath, "artifact", "utf8");
-  fs.writeFileSync(path.join(fixture.hermesHome, ".env"), "WEIXIN_TOKEN=loaded-from-hermes-home\n", "utf8");
+  fs.writeFileSync(
+    path.join(fixture.hermesHome, ".env"),
+    [
+      "WEIXIN_TOKEN=loaded-from-hermes-home",
+      "PYTHONPATH=from-hermes-home-pythonpath",
+      "HERMES_HOME=from-hermes-home",
+      "",
+    ].join("\n"),
+    "utf8"
+  );
   fs.writeFileSync(fixture.shimPath, [
     "import json",
     "import os",
@@ -51,7 +60,11 @@ test("repo-local bridge loads Hermes home .env for hosted sends", () => {
     "log_file = os.environ.get('FAKE_HERMES_REPO_LOCAL_LOG', '')",
     "if log_file:",
     "    with open(log_file, 'a', encoding='utf-8') as handle:",
-    "        handle.write(json.dumps({'env_token': os.environ.get('WEIXIN_TOKEN', '')}, ensure_ascii=False) + '\\n')",
+    "        handle.write(json.dumps({",
+    "            'env_token': os.environ.get('WEIXIN_TOKEN', ''),",
+    "            'pythonpath': os.environ.get('PYTHONPATH', ''),",
+    "            'hermes_home': os.environ.get('HERMES_HOME', ''),",
+    "        }, ensure_ascii=False) + '\\n')",
     "payload = {",
     "    'file_path': request.get('payload', {}).get('file_path', ''),",
     "    'session_key': request.get('session_key', ''),",
@@ -83,6 +96,9 @@ test("repo-local bridge loads Hermes home .env for hosted sends", () => {
     const log = readFakeHermesRepoLocalLog(fixture.logFile);
     assert.equal(log.length, 1);
     assert.equal(log[0].env_token, "loaded-from-hermes-home");
+    assert.equal(log[0].hermes_home, fixture.hermesHome);
+    assert.equal(String(log[0].pythonpath || "").split(path.delimiter)[0], fixture.repoRoot);
+    assert.match(String(log[0].pythonpath || ""), /from-hermes-home-pythonpath/u);
   } finally {
     if (previousSessionKey === undefined) {
       delete process.env.HERMES_SESSION_KEY;

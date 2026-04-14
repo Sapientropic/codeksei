@@ -352,11 +352,8 @@ function buildHermesRepoLocalEnv({
   hermesHome: string;
   repoRoot: string;
 }): NodeJS.ProcessEnv {
-  const existingPythonPath = normalizeText(process.env.PYTHONPATH);
   const env: NodeJS.ProcessEnv = {
     ...process.env,
-    HERMES_HOME: hermesHome,
-    PYTHONPATH: existingPythonPath ? `${repoRoot}${path.delimiter}${existingPythonPath}` : repoRoot,
   };
   const hermesEnvPath = path.join(hermesHome, ".env");
   if (fs.existsSync(hermesEnvPath)) {
@@ -368,6 +365,12 @@ function buildHermesRepoLocalEnv({
       override: true,
     });
   }
+  const existingPythonPath = normalizeText(env.PYTHONPATH);
+  // Repo-local invocations must keep their explicit repo/home wiring even when
+  // Hermes home .env overrides stale shell exports for secrets and platform
+  // credentials. Do not let .env replace these two bridge-critical values.
+  env.HERMES_HOME = hermesHome;
+  env.PYTHONPATH = existingPythonPath ? `${repoRoot}${path.delimiter}${existingPythonPath}` : repoRoot;
   return env;
 }
 
