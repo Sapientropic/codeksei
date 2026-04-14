@@ -69,6 +69,13 @@ test("bind canonicalizes the workspace path before persisting it", async () => {
   const mixedInput = workspaceRoot
     .replace(":", "：")
     .replace(/\\/g, "＼");
+  // On Windows runners, fs.realpathSync() may surface a DOS 8.3 segment while
+  // fs.promises.realpath() returns the long path. The bind handler uses the
+  // async API, so the test should pin that canonicalization contract instead
+  // of a runner-specific string representation.
+  const expectedCanonicalWorkspaceRoot = normalizeWorkspacePath(
+    await fs.promises.realpath(workspaceRoot).catch(() => workspaceRoot)
+  ) || workspaceRoot;
 
   await harness.handlers.bind(buildNormalizedCommandMessage("/bind"), {
     name: "bind",
@@ -80,7 +87,7 @@ test("bind canonicalizes the workspace path before persisting it", async () => {
   assert.ok(firstWorkspaceCall);
   assert.equal(
     firstWorkspaceCall.workspaceRoot,
-    normalizeWorkspacePath(fs.realpathSync(workspaceRoot))
+    expectedCanonicalWorkspaceRoot
   );
   const bindTextCall = harness.textCalls[0];
   assert.ok(bindTextCall);
