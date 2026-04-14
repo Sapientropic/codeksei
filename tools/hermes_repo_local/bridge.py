@@ -16,8 +16,9 @@ import hashlib
 import json
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 def _emit(payload: Dict[str, Any], exit_code: int = 0) -> int:
@@ -69,8 +70,6 @@ def _resolve_hermes_home(request: Dict[str, Any]) -> Path:
 
 
 def _load_session_entry(hermes_home: Path, session_key: str) -> Dict[str, Any]:
-    if not session_key:
-        raise RuntimeError("missing HERMES_SESSION_KEY; repo-local bridge needs an active Hermes session")
     sessions_index = hermes_home / "sessions" / "sessions.json"
     if not sessions_index.exists():
         raise RuntimeError(f"Hermes sessions index not found: {sessions_index}")
@@ -96,6 +95,50 @@ def _normalize_origin(origin: Dict[str, Any]) -> Dict[str, str]:
         "chat_name": str(origin.get("chat_name") or "").strip(),
         "chat_type": str(origin.get("chat_type") or "").strip(),
     }
+
+
+def _origin_from_env() -> Dict[str, str]:
+    thread_id = (
+        os.environ.get("HERMES_SESSION_THREAD_ID", "")
+        or os.environ.get("HERMES_CRON_AUTO_DELIVER_THREAD_ID", "")
+    )
+    return {
+        "platform": str(os.environ.get("HERMES_SESSION_PLATFORM", "")).strip(),
+        "chat_id": str(os.environ.get("HERMES_SESSION_CHAT_ID", "")).strip(),
+        "thread_id": str(thread_id or "").strip(),
+        "user_id": str(os.environ.get("HERMES_SESSION_USER_ID", "")).strip(),
+        "user_name": str(os.environ.get("HERMES_SESSION_USER_NAME", "")).strip(),
+        "chat_name": str(os.environ.get("HERMES_SESSION_CHAT_NAME", "")).strip(),
+        "chat_type": "dm",
+    }
+
+
+def _resolve_origin_context(hermes_home: Path, session_key: str) -> Dict[str, Any]:
+    # Repo-local cron/reminder writes only need origin at create/update time.
+    # Once the job is stored, Hermes runtime delivery resolves `deliver="origin"`
+    # from the persisted job.origin payload instead of reloading live session state.
+    if session_key:
+        try:
+            entry = _load_session_entry(hermes_home, session_key)
+            return {
+                "origin": _normalize_origin(entry.get("origin") or {}),
+                "session_id": str(entry.get("session_id") or "").strip(),
+                "session_key": str(entry.get("session_key") or session_key or "").strip(),
+            }
+        except Exception:
+            pass
+
+    origin = _origin_from_env()
+    if origin.get("platform") and origin.get("chat_id"):
+        return {
+            "origin": origin,
+            "session_id": "",
+            "session_key": session_key,
+        }
+
+    raise RuntimeError(
+        "missing Hermes origin context; need HERMES_SESSION_KEY + sessions.json or cron/session env routing metadata"
+    )
 
 
 def _resolve_weixin_platform_config() -> Any:
@@ -149,7 +192,7 @@ async def _send_file_async(origin: Dict[str, str], file_path: str) -> Dict[str, 
     return result if isinstance(result, dict) else {"success": True}
 
 
-def _handle_send_file(request: Dict[str, Any], session_entry: Dict[str, Any]) -> Dict[str, Any]:
+def _handle_send_file(request: Dict[str, Any], origin_context: Dict[str, Any]) -> Dict[str, Any]:
     payload = request.get("payload") or {}
     if not isinstance(payload, dict):
         raise RuntimeError("send_file payload must be an object")
@@ -160,14 +203,14 @@ def _handle_send_file(request: Dict[str, Any], session_entry: Dict[str, Any]) ->
     if not Path(resolved_path).is_file():
         raise RuntimeError(f"file not found: {resolved_path}")
 
-    origin = _normalize_origin(session_entry.get("origin") or {})
+    origin = origin_context["origin"]
     send_result = asyncio.run(_send_file_async(origin, resolved_path))
     mirrored = _mirror_media_delivery(origin, resolved_path)
     return {
         "file_path": resolved_path,
         "send_result": send_result,
-        "session_key": str(session_entry.get("session_key") or request.get("session_key") or ""),
-        "session_id": str(session_entry.get("session_id") or ""),
+        "session_key": str(origin_context.get("session_key") or request.get("session_key") or ""),
+        "session_id": str(origin_context.get("session_id") or ""),
         "origin": origin,
         "mirrored": mirrored,
     }
@@ -198,7 +241,7 @@ def _build_reminder_prompt(text: str) -> str:
     )
 
 
-def _handle_create_reminder(request: Dict[str, Any], session_entry: Dict[str, Any]) -> Dict[str, Any]:
+def _handle_create_reminder(request: Dict[str, Any], origin_context: Dict[str, Any]) -> Dict[str, Any]:
     from cron.jobs import create_job
 
     payload = request.get("payload") or {}
@@ -214,7 +257,7 @@ def _handle_create_reminder(request: Dict[str, Any], session_entry: Dict[str, An
     if not reminder_text:
         raise RuntimeError("create_reminder payload is missing text")
 
-    origin = _normalize_origin(session_entry.get("origin") or {})
+    origin = origin_context["origin"]
     if not origin["platform"] or not origin["chat_id"]:
         raise RuntimeError("current Hermes session is missing origin platform/chat_id")
 
@@ -236,8 +279,184 @@ def _handle_create_reminder(request: Dict[str, Any], session_entry: Dict[str, An
         "name": str(job.get("name") or ""),
         "deliver": str(job.get("deliver") or ""),
         "next_run_at": str(job.get("next_run_at") or ""),
-        "session_key": str(session_entry.get("session_key") or request.get("session_key") or ""),
-        "session_id": str(session_entry.get("session_id") or ""),
+        "session_key": str(origin_context.get("session_key") or request.get("session_key") or ""),
+        "session_id": str(origin_context.get("session_id") or ""),
+        "origin": origin,
+    }
+
+
+def _normalize_iso_timestamp(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).isoformat()
+    except ValueError:
+        return ""
+
+
+def _parse_iso_datetime(value: Any) -> Optional[datetime]:
+    text = _normalize_iso_timestamp(value)
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text)
+    except ValueError:
+        return None
+
+
+def _is_future_job(job: Dict[str, Any], now: datetime) -> bool:
+    next_run = _parse_iso_datetime(job.get("next_run_at"))
+    return bool(next_run and next_run > now)
+
+
+def _normalize_checkin_role(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    return text if text in {"wake", "recovery"} else ""
+
+
+def _build_checkin_job_updates(
+    *,
+    due_at_iso: str,
+    name: str,
+    origin: Dict[str, str],
+    prompt: str,
+    role: str,
+    sender_id: str,
+    target_key: str,
+    workspace_root: str,
+) -> Dict[str, Any]:
+    from cron.jobs import parse_schedule
+
+    schedule = parse_schedule(due_at_iso)
+    # Keep origin/deliver on every update so bare cron runs can still deliver
+    # to the original Weixin chat without needing a session lookup at send time.
+    return {
+        "codeksei_checkin_role": role,
+        "codeksei_checkin_target_key": target_key,
+        "codeksei_sender_id": sender_id,
+        "codeksei_workspace_root": workspace_root,
+        "deliver": "origin",
+        "enabled": True,
+        "name": name,
+        "origin": {
+            "platform": origin["platform"],
+            "chat_id": origin["chat_id"],
+            "chat_name": origin.get("chat_name") or None,
+            "thread_id": origin.get("thread_id") or None,
+        },
+        "paused_at": None,
+        "paused_reason": None,
+        "prompt": prompt,
+        "schedule": schedule,
+        "schedule_display": schedule.get("display", due_at_iso),
+        "skill": "codeksei-companion",
+        "skills": ["codeksei-companion"],
+        "state": "scheduled",
+    }
+
+
+def _handle_sync_checkin_cron(request: Dict[str, Any], origin_context: Dict[str, Any]) -> Dict[str, Any]:
+    from cron.jobs import create_job, list_jobs, remove_job, update_job
+
+    payload = request.get("payload") or {}
+    if not isinstance(payload, dict):
+        raise RuntimeError("sync_checkin_cron payload must be an object")
+
+    due_at_iso = _normalize_iso_timestamp(payload.get("due_at_iso"))
+    prompt = str(payload.get("prompt") or "").strip()
+    role = _normalize_checkin_role(payload.get("role"))
+    target_key = str(payload.get("target_key") or "").strip()
+    workspace_root = str(payload.get("workspace_root") or "").strip()
+    sender_id = str(payload.get("sender_id") or "").strip()
+    name = str(payload.get("name") or "").strip()
+
+    if not due_at_iso:
+        raise RuntimeError("sync_checkin_cron payload is missing due_at_iso")
+    if not prompt:
+        raise RuntimeError("sync_checkin_cron payload is missing prompt")
+    if not role:
+        raise RuntimeError("sync_checkin_cron payload role must be wake or recovery")
+    if not target_key:
+        raise RuntimeError("sync_checkin_cron payload is missing target_key")
+    if not workspace_root:
+        raise RuntimeError("sync_checkin_cron payload is missing workspace_root")
+    if not sender_id:
+        raise RuntimeError("sync_checkin_cron payload is missing sender_id")
+    if not name:
+        raise RuntimeError("sync_checkin_cron payload is missing name")
+
+    origin = origin_context["origin"]
+    if not origin["platform"] or not origin["chat_id"]:
+        raise RuntimeError("current Hermes session is missing origin platform/chat_id")
+
+    now = datetime.now().astimezone()
+    managed_jobs = []
+    for job in list_jobs(include_disabled=True):
+        if not isinstance(job, dict):
+            continue
+        if str(job.get("codeksei_checkin_target_key") or "").strip() != target_key:
+            continue
+        if not _is_future_job(job, now):
+            continue
+        managed_jobs.append(job)
+
+    desired_job = None
+    stale_job_ids = []
+    for job in managed_jobs:
+        job_role = _normalize_checkin_role(job.get("codeksei_checkin_role"))
+        if job_role == role and desired_job is None:
+            desired_job = job
+            continue
+        stale_job_ids.append(str(job.get("id") or "").strip())
+
+    for job_id in stale_job_ids:
+        if job_id:
+            remove_job(job_id)
+
+    updates = _build_checkin_job_updates(
+        due_at_iso=due_at_iso,
+        name=name,
+        origin=origin,
+        prompt=prompt,
+        role=role,
+        sender_id=sender_id,
+        target_key=target_key,
+        workspace_root=workspace_root,
+    )
+    created = False
+    if desired_job:
+        job = update_job(str(desired_job.get("id") or "").strip(), updates)
+    else:
+        created = True
+        created_job = create_job(
+            prompt=prompt,
+            schedule=due_at_iso,
+            name=name,
+            repeat=1,
+            deliver="origin",
+            origin={
+                "platform": origin["platform"],
+                "chat_id": origin["chat_id"],
+                "chat_name": origin.get("chat_name") or None,
+                "thread_id": origin.get("thread_id") or None,
+            },
+            skills=["codeksei-companion"],
+        )
+        job = update_job(str(created_job.get("id") or "").strip(), updates)
+
+    if not job:
+        raise RuntimeError("failed to create or update Hermes hosted checkin cron job")
+
+    return {
+        "created": created,
+        "deliver": str(job.get("deliver") or ""),
+        "job_id": str(job.get("id") or ""),
+        "name": str(job.get("name") or ""),
+        "next_run_at": str(job.get("next_run_at") or ""),
+        "removed_job_ids": stale_job_ids,
+        "session_key": str(origin_context.get("session_key") or request.get("session_key") or ""),
+        "session_id": str(origin_context.get("session_id") or ""),
         "origin": origin,
     }
 
@@ -248,14 +467,15 @@ def main() -> int:
         _ensure_repo_imports(str(request.get("repo_root") or ""))
         hermes_home = _resolve_hermes_home(request)
         session_key = _resolve_session_key(request)
-        session_entry = _load_session_entry(hermes_home, session_key)
-        session_entry.setdefault("session_key", session_key)
+        origin_context = _resolve_origin_context(hermes_home, session_key)
 
         action = str(request.get("action") or "").strip()
         if action == "send_file":
-            return _emit({"ok": True, "data": _handle_send_file(request, session_entry)})
+            return _emit({"ok": True, "data": _handle_send_file(request, origin_context)})
         if action == "create_reminder":
-            return _emit({"ok": True, "data": _handle_create_reminder(request, session_entry)})
+            return _emit({"ok": True, "data": _handle_create_reminder(request, origin_context)})
+        if action == "sync_checkin_cron":
+            return _emit({"ok": True, "data": _handle_sync_checkin_cron(request, origin_context)})
         return _error(f"unsupported bridge action: {action}", code="validation_error", exit_code=2)
     except Exception as exc:  # pragma: no cover - exercised via Node contract tests
         return _error(str(exc))

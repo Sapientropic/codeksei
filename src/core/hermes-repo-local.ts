@@ -58,6 +58,21 @@ export interface HermesRepoLocalReminderResult {
   threadId: string;
 }
 
+export interface HermesRepoLocalSyncCheckinCronResult {
+  chatId: string;
+  created: boolean;
+  deliver: string;
+  jobId: string;
+  name: string;
+  nextRunAt: string;
+  platform: string;
+  removedJobIds: string[];
+  role: "recovery" | "wake";
+  sessionId: string;
+  sessionKey: string;
+  threadId: string;
+}
+
 interface HermesRepoLocalEnvelope<TData> {
   ok: boolean;
   data?: TData;
@@ -77,6 +92,16 @@ interface HermesRepoLocalReminderPayload {
   text: string;
   workspace_root: string;
   sender_id?: string;
+}
+
+interface HermesRepoLocalSyncCheckinCronPayload {
+  due_at_iso: string;
+  name: string;
+  prompt: string;
+  role: "recovery" | "wake";
+  sender_id: string;
+  target_key: string;
+  workspace_root: string;
 }
 
 interface HermesRepoLocalSendFileShimResult {
@@ -105,10 +130,26 @@ interface HermesRepoLocalReminderShimResult {
   };
 }
 
+interface HermesRepoLocalSyncCheckinCronShimResult {
+  created?: unknown;
+  deliver?: string;
+  job_id?: string;
+  name?: string;
+  next_run_at?: string;
+  removed_job_ids?: unknown;
+  session_id?: string;
+  session_key?: string;
+  origin?: {
+    platform?: string;
+    chat_id?: string;
+    thread_id?: string;
+  };
+}
+
 interface HermesRepoLocalInvocation {
-  action: "create_reminder" | "send_file";
+  action: "create_reminder" | "send_file" | "sync_checkin_cron";
   hermes_home: string;
-  payload: HermesRepoLocalReminderPayload | HermesRepoLocalSendFilePayload;
+  payload: HermesRepoLocalReminderPayload | HermesRepoLocalSendFilePayload | HermesRepoLocalSyncCheckinCronPayload;
   repo_root: string;
   session_key?: string;
 }
@@ -246,6 +287,33 @@ export function createReminderViaHermesRepoLocal(
   };
 }
 
+export function syncCheckinCronViaHermesRepoLocal(
+  config: HermesRepoLocalConfigInput,
+  payload: HermesRepoLocalSyncCheckinCronPayload,
+): HermesRepoLocalSyncCheckinCronResult {
+  const data = invokeHermesRepoLocalBridge<HermesRepoLocalSyncCheckinCronShimResult>(config, {
+    action: "sync_checkin_cron",
+    hermes_home: resolveHermesHomePath(config),
+    payload,
+    repo_root: resolveHermesRepoRoot(config),
+    session_key: normalizeText(process.env.HERMES_SESSION_KEY),
+  });
+  return {
+    chatId: normalizeText(data.origin?.chat_id),
+    created: Boolean(data.created),
+    deliver: normalizeText(data.deliver) || "origin",
+    jobId: normalizeText(data.job_id),
+    name: normalizeText(data.name) || normalizeText(payload.name),
+    nextRunAt: normalizeText(data.next_run_at) || normalizeText(payload.due_at_iso),
+    platform: normalizeText(data.origin?.platform) || "weixin",
+    removedJobIds: normalizeStringList(data.removed_job_ids),
+    role: payload.role,
+    sessionId: normalizeText(data.session_id),
+    sessionKey: normalizeText(data.session_key),
+    threadId: normalizeText(data.origin?.thread_id),
+  };
+}
+
 function invokeHermesRepoLocalBridge<TData>(
   config: HermesRepoLocalConfigInput,
   request: HermesRepoLocalInvocation,
@@ -378,4 +446,13 @@ function normalizeBridgeOutput(value: unknown): string {
   return String(value || "")
     .replace(/\r\n/g, "\n")
     .trim();
+}
+
+function normalizeStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((entry) => normalizeText(entry))
+    .filter(Boolean);
 }
