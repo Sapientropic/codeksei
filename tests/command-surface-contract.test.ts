@@ -15,9 +15,11 @@ const {
   listTerminalCommandManifest,
 } = require("../src/contracts/command-surface");
 const {
+  COMMAND_ACTION_DEFINITION_SLICES,
   COMMAND_ACTION_DEFINITIONS,
   COMMAND_AUDIENCE_OVERRIDES,
   COMMAND_AUTH_OVERRIDES,
+  COMMAND_HOST_DEPENDENCY_OVERRIDES,
   COMMAND_HOST_PROFILE_OVERRIDES,
   COMMAND_HOST_SUPPORT_TIER_OVERRIDES,
   COMMAND_MUTABILITY_OVERRIDES,
@@ -64,6 +66,19 @@ test("command surface groups still expose terminal and weixin help entries", () 
   assert.ok(helpAction);
   assert.deepEqual(helpAction.terminal, ["help"]);
   assert.deepEqual(helpAction.weixin, ["/help"]);
+});
+
+test("command action slices compose into one canonical action table without group drift", () => {
+  const sliceEntries = Object.entries(COMMAND_ACTION_DEFINITION_SLICES) as Array<[string, Array<{ action: string; groupId: string }>]>;
+  const flattened = sliceEntries.flatMap(([, entries]) => entries.map((entry) => entry.action));
+
+  assert.deepEqual(flattened, COMMAND_ACTION_DEFINITIONS.map((entry: { action: string }) => entry.action));
+  assert.equal(new Set(flattened).size, flattened.length);
+
+  for (const [sliceKey, entries] of sliceEntries) {
+    assert.ok(entries.length > 0, `${sliceKey} slice should stay non-empty`);
+    assert.ok(entries.every((entry) => entry.groupId === sliceKey), `${sliceKey} slice should only contain ${sliceKey} actions`);
+  }
 });
 
 test("active terminal actions all point at real package scripts", () => {
@@ -211,6 +226,25 @@ test("every command action resolves through either an explicit classification ov
     const resolvedSafety = resolveCommandSafetyTierDefinition(action.action);
     if (!safetyOverrideIds.has(action.action)) {
       assert.equal(resolvedSafety, "open", `${action.action} should use the default safety tier when not overridden`);
+    }
+  }
+});
+
+test("classification override tables do not reference missing command ids", () => {
+  const actionIds = new Set(COMMAND_ACTION_DEFINITIONS.map((action: { action: string }) => action.action));
+  const overrideTables = [
+    COMMAND_AUDIENCE_OVERRIDES,
+    COMMAND_AUTH_OVERRIDES,
+    COMMAND_HOST_DEPENDENCY_OVERRIDES,
+    COMMAND_HOST_PROFILE_OVERRIDES,
+    COMMAND_HOST_SUPPORT_TIER_OVERRIDES,
+    COMMAND_MUTABILITY_OVERRIDES,
+    COMMAND_SAFETY_OVERRIDES,
+  ];
+
+  for (const table of overrideTables) {
+    for (const actionId of Object.keys(table)) {
+      assert.ok(actionIds.has(actionId), `${actionId} should point at a real command action`);
     }
   }
 });

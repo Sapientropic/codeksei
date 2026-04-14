@@ -1,0 +1,42 @@
+import type { CommandActionDefinition } from "./command-surface-definition-types";
+
+export const INTROSPECTION_COMMAND_ACTION_DEFINITIONS = [
+  {
+    action: "app.schema",
+    groupId: "introspection",
+    summary: "查看当前 public CLI contract schema",
+    terminal: ["schema"],
+    weixin: [],
+    status: "active",
+    entrypointType: "cli",
+    command: "schema",
+    runner: "schema",
+    help: { topic: "", leafKey: "app.schema", detail: "topic_only" },
+  },
+  {
+    action: "operator.help",
+    groupId: "introspection",
+    summary: "查看 operator / bootstrap command surface",
+    terminal: ["operator help"],
+    weixin: [],
+    status: "active",
+    entrypointType: "cli",
+    command: "operator",
+    subcommand: "help",
+    runner: "operator.help",
+    help: { topic: "", leafKey: "operator.help", detail: "topic_only" },
+  },
+  {
+    action: "operator.schema",
+    groupId: "introspection",
+    summary: "查看 operator / bootstrap command schema",
+    terminal: ["operator schema"],
+    weixin: [],
+    status: "active",
+    entrypointType: "cli",
+    command: "operator",
+    subcommand: "schema",
+    runner: "operator.schema",
+    help: { topic: "", leafKey: "operator.schema", detail: "topic_only" },
+  },
+] as const satisfies readonly CommandActionDefinition[];

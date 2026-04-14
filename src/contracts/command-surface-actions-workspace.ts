@@ -1,0 +1,58 @@
+import type { CommandActionDefinition } from "./command-surface-definition-types";
+
+export const WORKSPACE_COMMAND_ACTION_DEFINITIONS = [
+  {
+    action: "workspace.bind",
+    groupId: "workspace",
+    summary: "绑定当前聊天使用的项目目录",
+    terminal: [],
+    weixin: ["/bind"],
+    status: "active",
+    entrypointType: "weixin",
+  },
+  {
+    action: "workspace.status",
+    groupId: "workspace",
+    summary: "查看当前项目、线程、模型与上下文使用情况",
+    terminal: [],
+    weixin: ["/status"],
+    status: "active",
+    entrypointType: "weixin",
+  },
+  {
+    action: "thread.new",
+    groupId: "workspace",
+    summary: "切到新线程草稿，并在下一条消息前重建当前 workspace 上下文",
+    terminal: [],
+    weixin: ["/new"],
+    status: "active",
+    entrypointType: "weixin",
+  },
+  {
+    action: "thread.reread",
+    groupId: "workspace",
+    summary: "让当前线程重新读取最新 instructions 和当前 workspace 稳定入口",
+    terminal: [],
+    weixin: ["/reread"],
+    status: "active",
+    entrypointType: "weixin",
+  },
+  {
+    action: "thread.switch",
+    groupId: "workspace",
+    summary: "切换到指定线程，并在下一条消息前按当前 workspace 检查是否要补读稳定入口",
+    terminal: [],
+    weixin: ["/switch <threadId>"],
+    status: "active",
+    entrypointType: "weixin",
+  },
+  {
+    action: "thread.stop",
+    groupId: "workspace",
+    summary: "停止当前线程中的运行",
+    terminal: [],
+    weixin: ["/stop"],
+    status: "active",
+    entrypointType: "weixin",
+  },
+] as const satisfies readonly CommandActionDefinition[];

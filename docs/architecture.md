@@ -21,7 +21,7 @@
 - `npm run check` / `npm run verify` 默认全绿
 - TS 源码侧的 CommonJS 过渡 allowlist 已清零
 - `@ts-nocheck` allowlist 已清零
-- repo-tracked authored source 里的 `.js/.jsx/.mjs` 已清零；timeline first-party runtime 也回到同一条 TS build 主链
+- repo-tracked authored source 里的 `.js/.jsx/.mjs` 已清零；timeline first-party runtime 现在通过 `tsconfig.node.json` + `tsconfig.web.json` 继续走同一条 TS build 主链，而不是把 DOM lib 默认挂给整仓 Node 代码
 - 构建产物仍输出 CommonJS，但源码内部已经不再靠 `require / module.exports / export {}` 过渡态维持结构
 - timeline build 现在只复制非代码资产（如 CSS / examples），不再把 source runtime 整树原样复制进 `dist`
 - 跨模块共享的基础 helper 现在统一收口到 `src/contracts/text-normalization.ts`、`src/core/error-handling.ts`、`src/core/message-catalog.ts`
@@ -244,7 +244,7 @@
 当前这层的结构特征是：
 
 - note / review / timeline / state 已经形成各自可读的 typed boundary
-- `src/contracts/command-surface.ts` 只保留命令 façade；action definitions 与 rich help contract 已拆成 sibling truth layer
+- `src/contracts/command-surface.ts` 只保留命令 façade；`command-surface-definitions.ts` 已退回 thin composer，action definitions 与 classification tables 分别拆到 sibling truth layer
 - `src/review/review-draft.ts`、`src/review/review-semantic.ts`、`src/core/timezone.ts` 现在是 façade 入口，window / heuristics / render、prompt / runtime / normalize、state / config / formatting 已各自 owner 化
 - `src/app/*` 继续只做公开入口，不重新吸回领域实现
 - `src/core` / `src/runtime` 不再依赖 style/type allowlist 才能维持这些边界

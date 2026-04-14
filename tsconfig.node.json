@@ -1,11 +1,10 @@
 {
-  "extends": "./tsconfig.node.json",
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "noEmit": true
+    "lib": ["ES2023"]
   },
   "include": [
-    "src/**/*",
-    "tests/**/*.ts"
+    "src/**/*"
   ],
   "exclude": [
     "dist",
