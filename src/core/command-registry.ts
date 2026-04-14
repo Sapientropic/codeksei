@@ -1,4 +1,5 @@
 import {
+  buildHermesOperatorResourceHelpText,
   buildTerminalLeafHelpText,
   buildTerminalTopicHelpText,
   hasTerminalTopicHelp,
@@ -80,6 +81,10 @@ export function buildTerminalTopicHelp(topic: unknown, context: Record<string, u
 
 export function buildTerminalLeafHelp(actionId: unknown, context: Record<string, unknown> = {}) {
   return buildTerminalLeafHelpText(actionId, context);
+}
+
+export function buildHermesOperatorHelpText() {
+  return buildHermesOperatorResourceHelpText();
 }
 
 export function isPlannedTerminalTopic(topic: unknown) {

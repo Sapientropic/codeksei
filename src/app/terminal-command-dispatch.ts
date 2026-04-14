@@ -1,6 +1,10 @@
 import { runChannelSendFileCommand } from "./channel-send-file-cli";
 import { runDiaryWriteCommand } from "./diary-write-cli";
-import { runHermesOperatorCommand } from "./hermes-operator-cli";
+import {
+  runHermesInstallSkillCommand,
+  runHermesSmokeCommand,
+  runHermesStatusCommand,
+} from "./hermes-operator-cli";
 import { runNoteAutoCommand, runNoteMaybeCommand } from "./note-auto-cli";
 import { runNoteSyncCommand } from "./note-sync-cli";
 import { runProjectRadarCommand } from "./project-radar-cli";
@@ -69,8 +73,7 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
   schema: async (_manifest, context) => {
     const data = buildCommandSchema({
       audience: "public",
-      command: context.leafArgs[0] || "",
-      subcommand: context.leafArgs[1] || "",
+      target: context.leafArgs,
     });
     return {
       data,
@@ -86,16 +89,21 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
   "operator.schema": async (_manifest, context) => {
     const data = buildCommandSchema({
       audience: "operator",
-      command: context.leafArgs[0] || "",
-      subcommand: context.leafArgs[1] || "",
+      target: context.leafArgs,
     });
     return {
       data,
       text: asPrettyJsonText(data),
     };
   },
-  "operator.hermes": async (_manifest, context) => {
-    return runHermesOperatorCommand(context.config, context.leafArgs);
+  "operator.hermes.install_skill": async (_manifest, context) => {
+    return runHermesInstallSkillCommand(context.config, context.leafArgs);
+  },
+  "operator.hermes.status": async (_manifest, context) => {
+    return runHermesStatusCommand(context.config, context.leafArgs);
+  },
+  "operator.hermes.smoke": async (_manifest, context) => {
+    return runHermesSmokeCommand(context.config, context.leafArgs);
   },
   login: async (_manifest, context) => {
     await context.getApp().login();

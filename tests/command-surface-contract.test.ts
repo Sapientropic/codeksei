@@ -10,6 +10,7 @@ const {
   findTerminalManifestByScriptName,
   listCommandActions,
   findTerminalCommandManifest,
+  findTerminalCommandManifestFromArgv,
   listCommandGroups,
   listTerminalCommandManifest,
 } = require("../src/contracts/command-surface");
@@ -43,6 +44,8 @@ test("command surface can resolve routed terminal commands from a single manifes
   assert.equal(findTerminalCommandManifest("note", "auto")?.action, "note.auto");
   assert.equal(findTerminalCommandManifest("timeline", "screenshot")?.runner, "timeline.screenshot");
   assert.equal(findTerminalCommandManifest("review", "weekly")?.argsSchemaKey, "review");
+  assert.equal(findTerminalCommandManifest("operator", "hermes install-skill")?.action, "operator.hermes.install_skill");
+  assert.equal(findTerminalCommandManifestFromArgv(["operator", "hermes", "status"])?.action, "operator.hermes.status");
   assert.equal(findTerminalManifestByScriptName("note:auto")?.action, "note.auto");
   assert.equal(findTerminalCommandManifest(" NOTE ", " AUTO ")?.action, "note.auto");
   assert.equal(findTerminalManifestByScriptName(" Note:Auto ")?.action, "note.auto");

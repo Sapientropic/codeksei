@@ -10,6 +10,12 @@ export interface CommandHelpDefinition {
   detail: "leaf" | "topic_only";
 }
 
+export interface CommandSideEffectDefinition {
+  kind: string;
+  target: string;
+  when?: string;
+}
+
 export interface CommandApprovalDefinition {
   autoApprove?: boolean;
 }
@@ -31,6 +37,7 @@ export interface CommandActionDefinition {
   timelineSubcommand?: string;
   help?: CommandHelpDefinition;
   approval?: CommandApprovalDefinition;
+  sideEffects?: readonly CommandSideEffectDefinition[];
 }
 
 export type CommandAudienceDefinition = "operator" | "public";
@@ -91,17 +98,58 @@ export const COMMAND_ACTION_DEFINITIONS = [
     help: { topic: "", leafKey: "operator.schema", detail: "topic_only" },
   },
   {
-    action: "operator.hermes",
+    action: "operator.hermes.install_skill",
     groupId: "lifecycle",
-    summary: "Hermes hosted integration：install-skill / status / smoke",
-    terminal: ["operator hermes"],
+    summary: "同步仓内 Codeksei companion skill 到当前 Hermes home",
+    terminal: ["operator hermes install-skill"],
     weixin: [],
     status: "active",
     entrypointType: "cli",
     command: "operator",
-    subcommand: "hermes",
-    runner: "operator.hermes",
-    help: { topic: "", leafKey: "operator.hermes", detail: "leaf" },
+    subcommand: "hermes install-skill",
+    runner: "operator.hermes.install_skill",
+    argsSchemaKey: "hermesInstallSkill",
+    help: { topic: "", leafKey: "operator.hermes.install_skill", detail: "leaf" },
+    sideEffects: [
+      {
+        kind: "write_skill_file",
+        target: "~/.hermes/skills/codeksei-companion/SKILL.md",
+        when: "当目标不存在或内容与仓内 skill asset 不一致时",
+      },
+      {
+        kind: "backup_existing_skill",
+        target: "~/.hermes/skills/codeksei-companion/SKILL.md.backup-<timestamp>",
+        when: "当已安装 skill 存在且将被覆盖时",
+      },
+    ],
+  },
+  {
+    action: "operator.hermes.status",
+    groupId: "lifecycle",
+    summary: "查看 Hermes hosted 集成状态、skill 同步与 semantic review 可用性",
+    terminal: ["operator hermes status"],
+    weixin: [],
+    status: "active",
+    entrypointType: "cli",
+    command: "operator",
+    subcommand: "hermes status",
+    runner: "operator.hermes.status",
+    argsSchemaKey: "hermesStatus",
+    help: { topic: "", leafKey: "operator.hermes.status", detail: "leaf" },
+  },
+  {
+    action: "operator.hermes.smoke",
+    groupId: "lifecycle",
+    summary: "执行 Hermes hosted 前置检查与 skill parity smoke",
+    terminal: ["operator hermes smoke"],
+    weixin: [],
+    status: "active",
+    entrypointType: "cli",
+    command: "operator",
+    subcommand: "hermes smoke",
+    runner: "operator.hermes.smoke",
+    argsSchemaKey: "hermesSmoke",
+    help: { topic: "", leafKey: "operator.hermes.smoke", detail: "leaf" },
   },
   {
     action: "app.login",
@@ -770,7 +818,9 @@ export const COMMAND_AUDIENCE_OVERRIDES: Readonly<Partial<Record<CommandActionId
   "app.start": "operator",
   "background.install": "operator",
   "background.uninstall": "operator",
-  "operator.hermes": "operator",
+  "operator.hermes.install_skill": "operator",
+  "operator.hermes.smoke": "operator",
+  "operator.hermes.status": "operator",
   "operator.help": "operator",
   "operator.schema": "operator",
   "system.checkin_poller": "operator",
@@ -794,7 +844,9 @@ export const COMMAND_SAFETY_OVERRIDES: Readonly<Partial<Record<CommandActionId, 
   "note.auto": "warned",
   "note.maybe": "open",
   "note.sync": "warned",
-  "operator.hermes": "operator",
+  "operator.hermes.install_skill": "operator",
+  "operator.hermes.smoke": "operator",
+  "operator.hermes.status": "operator",
   "operator.help": "operator",
   "operator.schema": "operator",
   "project.radar": "open",
@@ -834,7 +886,9 @@ export const COMMAND_MUTABILITY_OVERRIDES: Readonly<Partial<Record<CommandAction
   "note.auto": "write",
   "note.maybe": "read",
   "note.sync": "write",
-  "operator.hermes": "bootstrap",
+  "operator.hermes.install_skill": "write",
+  "operator.hermes.smoke": "read",
+  "operator.hermes.status": "read",
   "operator.help": "read",
   "operator.schema": "read",
   "project.radar": "read",

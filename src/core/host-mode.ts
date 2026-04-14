@@ -76,6 +76,19 @@ export interface HermesSkillInstallResult {
   };
 }
 
+export interface HermesSkillInstallPreview {
+  installedPath: string;
+  backupPath: string;
+  repoSkillAsset: SkillAssetState;
+  installedSkill: SkillAssetState & {
+    inSync: boolean;
+  };
+  willBackup: boolean;
+  willCreate: boolean;
+  willOverwrite: boolean;
+  willWrite: boolean;
+}
+
 export interface HermesSkillCatalogProbe {
   command: string;
   available: boolean;
@@ -298,6 +311,36 @@ export function collectHermesHostedStatusReport(
 export function installHermesCompanionSkill(
   config: Record<string, unknown> = {},
 ): HermesSkillInstallResult {
+  const preview = previewHermesCompanionSkillInstall(config);
+  if (!preview.repoSkillAsset.exists) {
+    throw new Error(`repo Hermes skill asset not found: ${preview.repoSkillAsset.path}`);
+  }
+
+  fs.mkdirSync(path.dirname(preview.installedPath), { recursive: true });
+  if (preview.willBackup) {
+    fs.copyFileSync(preview.installedPath, preview.backupPath);
+  }
+  if (preview.willWrite) {
+    fs.writeFileSync(preview.installedPath, fs.readFileSync(preview.repoSkillAsset.path, "utf8"), "utf8");
+  }
+
+  const installedAfter = readSkillAssetState(preview.installedPath);
+  return {
+    installedPath: preview.installedPath,
+    created: preview.willCreate && installedAfter.exists,
+    overwritten: preview.willOverwrite,
+    backupPath: preview.willBackup ? preview.backupPath : "",
+    repoSkillAsset: preview.repoSkillAsset,
+    installedSkill: {
+      ...installedAfter,
+      inSync: preview.repoSkillAsset.hash !== "" && preview.repoSkillAsset.hash === installedAfter.hash,
+    },
+  };
+}
+
+export function previewHermesCompanionSkillInstall(
+  config: Record<string, unknown> = {},
+): HermesSkillInstallPreview {
   const hermesHome = resolveHermesHome(config);
   const repoSkillAsset = readSkillAssetState(resolveRepoHermesSkillAssetPath());
   const installedPath = resolveInstalledHermesSkillPath(hermesHome);
@@ -305,30 +348,20 @@ export function installHermesCompanionSkill(
   const backupPath = shouldBackupInstalledSkill(repoSkillAsset, installedBefore)
     ? `${installedPath}.backup-${buildTimestampTag()}`
     : "";
+  const willWrite = Boolean(repoSkillAsset.exists && (!installedBefore.exists || installedBefore.hash !== repoSkillAsset.hash));
 
-  if (!repoSkillAsset.exists) {
-    throw new Error(`repo Hermes skill asset not found: ${repoSkillAsset.path}`);
-  }
-
-  fs.mkdirSync(path.dirname(installedPath), { recursive: true });
-  if (backupPath) {
-    fs.copyFileSync(installedPath, backupPath);
-  }
-  if (!installedBefore.exists || installedBefore.hash !== repoSkillAsset.hash) {
-    fs.writeFileSync(installedPath, fs.readFileSync(repoSkillAsset.path, "utf8"), "utf8");
-  }
-
-  const installedAfter = readSkillAssetState(installedPath);
   return {
     installedPath,
-    created: !installedBefore.exists && installedAfter.exists,
-    overwritten: Boolean(installedBefore.exists && installedBefore.hash !== repoSkillAsset.hash),
     backupPath,
     repoSkillAsset,
     installedSkill: {
-      ...installedAfter,
-      inSync: repoSkillAsset.hash !== "" && repoSkillAsset.hash === installedAfter.hash,
+      ...installedBefore,
+      inSync: repoSkillAsset.exists && installedBefore.exists && repoSkillAsset.hash === installedBefore.hash,
     },
+    willBackup: Boolean(backupPath),
+    willCreate: !installedBefore.exists && willWrite,
+    willOverwrite: Boolean(installedBefore.exists && willWrite && installedBefore.hash !== repoSkillAsset.hash),
+    willWrite,
   };
 }
 

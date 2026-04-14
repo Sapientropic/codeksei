@@ -107,20 +107,43 @@ const TOPIC_HELP = {
 // help are marked topic_only in command-surface-definitions instead of silently
 // reusing a generic leaf renderer.
 const LEAF_HELP = {
-  "operator.hermes": () => ({
-    usage: [buildTerminalActionExample("operator.hermes", { audience: "public", includeArgs: true })],
+  "operator.hermes.install_skill": () => ({
+    usage: [buildTerminalActionExample("operator.hermes.install_skill", { audience: "public", includeArgs: true })],
     bodyLabel: "说明：",
     body: [
-      "  这是 Hermes Hosted Mode 的 operator 入口。",
-      "  install-skill：把仓内 codeksei-companion skill 同步到 ~/.hermes/skills/",
-      "  status：查看 Hermes 命令、Weixin 账号、skill 同步状态与 hosted semantic review 可用性。",
-      "  smoke：做 hosted 前置检查与 skill parity 检查，不伪造 live Weixin 成功。",
+      "  把仓内 codeksei-companion skill 同步到当前 Hermes home 的 ~/.hermes/skills/ 目录。",
+      "  支持 --dry-run 预览目标路径、是否覆盖、是否会生成备份，而不实际写文件。",
+      "  当已安装 skill 内容与仓内 asset 不一致时，会先写一份带时间戳的 backup 再覆盖。",
     ],
     examples: [
+      "  codeksei operator hermes install-skill --dry-run",
       "  codeksei operator hermes install-skill",
+    ],
+    includeFlagBlock: true,
+  }),
+  "operator.hermes.status": () => ({
+    usage: [buildTerminalEntryUsage("operator.hermes.status", "public")],
+    bodyLabel: "说明：",
+    body: [
+      "  查看 Hermes 命令、Weixin 账号、skill 同步状态、skills catalog 和 hosted semantic review 可用性。",
+      "  这是只读检查，不会修改本机 Hermes 状态。",
+    ],
+    examples: [
       "  codeksei operator hermes status",
+    ],
+    includeFlagBlock: true,
+  }),
+  "operator.hermes.smoke": () => ({
+    usage: [buildTerminalEntryUsage("operator.hermes.smoke", "public")],
+    bodyLabel: "说明：",
+    body: [
+      "  做 hosted 前置检查与 skill parity 检查，不伪造 live Weixin 成功。",
+      "  这是 assisted smoke：只验证本地准备度与宿主边界，不接管 Hermes gateway 的真实消息流。",
+    ],
+    examples: [
       "  codeksei operator hermes smoke",
     ],
+    includeFlagBlock: true,
   }),
   "app.doctor": () => ({
     usage: [buildTerminalActionExample("app.doctor", { audience: "public", includeArgs: true })],
@@ -347,6 +370,24 @@ const LEAF_HELP = {
   }),
 } satisfies Record<CommandLeafHelpKey, CommandHelpBuilder>;
 
+function buildHermesOperatorResourceHelpText(): string {
+  return renderHelpDocument({
+    usage: ["codeksei operator hermes <install-skill|status|smoke>"],
+    bodyLabel: "说明：",
+    body: [
+      "  这是 Hermes Hosted Mode 的 operator resource。",
+      "  install-skill：同步仓内 companion skill；支持 --dry-run 预览。",
+      "  status：只读查看 Hermes hosted 集成状态。",
+      "  smoke：只读执行 hosted parity 前置检查。",
+    ],
+    examples: [
+      "  codeksei operator hermes install-skill --dry-run",
+      "  codeksei operator hermes status",
+      "  codeksei operator hermes smoke",
+    ],
+  }, "");
+}
+
 function buildTerminalTopicHelpText(topic: unknown, context: CommandHelpContext = {}): string {
   const normalizedTopic = normalizeTopic(topic);
   if (!normalizedTopic) {
@@ -572,6 +613,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export {
+  buildHermesOperatorResourceHelpText,
   buildTerminalLeafHelpText,
   buildTerminalTopicHelpText,
   hasTerminalTopicHelp,

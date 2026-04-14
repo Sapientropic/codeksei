@@ -79,7 +79,8 @@ operator / bootstrap：
 
 - `codeksei help` / `codeksei schema` 默认只暴露 public finite command surface
 - `codeksei operator help` / `codeksei operator schema` 才会显示 bootstrap、shared、background、maintainer 入口
-- `codeksei operator hermes <install-skill|status|smoke>` 是 Hermes Hosted Mode 的 operator surface
+- `codeksei operator hermes --help` / `codeksei operator schema operator hermes` 会列出 Hermes Hosted Mode 的 3 个 leaf action
+- `codeksei operator hermes install-skill` 是唯一会改本机 Hermes skill 状态的 leaf action；支持 `--dry-run`
 - 非 TTY 默认返回 JSON envelope；TTY 默认返回 text
 - `stdout` 留给结果数据，`stderr` 留给诊断与 debug 信息
 - 全局参数统一支持：`--format json|text`、`--verbose`、`--workspace-root /absolute/path`

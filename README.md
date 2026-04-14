@@ -268,6 +268,7 @@ Codeksei 自己负责 Weixin bridge 和共享线程。
 
 - 由 Hermes 负责 gateway / agent loop / Weixin
 - 由 Codeksei CLI + 官方受管的 Hermes skill 提供 companion workflows
+- 可先用 `codeksei operator hermes --help` 或 `codeksei operator schema operator hermes` 看 3 个 leaf action
 - 推荐先执行：
   `codeksei operator hermes install-skill`
   `codeksei operator hermes status`

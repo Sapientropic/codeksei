@@ -199,10 +199,13 @@ test("createTerminalCommandContext derives leafArgs and checkin from the provide
         key: "review weekly",
         kind: "weekly",
         mutability: "write",
+        pathTokens: ["review", "weekly"],
         runner: "review.command",
         safetyTier: "warned",
         scriptName: "review:weekly",
+        sideEffects: [],
         subcommand: "weekly",
+        tokenCount: 2,
         timelineSubcommand: "",
       },
     );

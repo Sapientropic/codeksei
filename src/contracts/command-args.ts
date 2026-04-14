@@ -118,6 +118,23 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "useStdin", keys: ["--stdin"], type: "boolean", defaultValue: false, description: "从标准输入读取正文" },
     ],
   }),
+  hermesInstallSkill: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      COMMON_DRY_RUN_FLAG,
+      COMMON_IDEMPOTENCY_FLAG,
+    ],
+  }),
+  hermesStatus: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+    ],
+  }),
+  hermesSmoke: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+    ],
+  }),
   projectRadar: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,
