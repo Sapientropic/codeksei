@@ -55,6 +55,7 @@ export interface NormalizedProjectRadarEntry extends PlainObject {
   slug: string;
   title: string;
   repoRoot: string;
+  githubRepo: string;
   notePath: string;
   overviewFiles: string[];
   aliases: string[];
@@ -137,6 +138,7 @@ export function normalizeProjectRadarConfig(value: unknown): NormalizedProjectRa
           slug: normalizeText(entry.slug),
           title: normalizeText(entry.title),
           repoRoot: normalizeText(entry.repoRoot),
+          githubRepo: normalizeGithubRepo(entry.githubRepo),
           notePath: normalizeText(entry.notePath),
           overviewFiles: Array.isArray(entry.overviewFiles)
             ? entry.overviewFiles.map((item: unknown) => normalizeText(item)).filter(Boolean)
@@ -262,6 +264,14 @@ function expectPlainObject(value: unknown, label: string): PlainObject {
 function normalizePositiveInteger(value: unknown): number {
   const numeric = Number.parseInt(String(value ?? ""), 10);
   return Number.isInteger(numeric) && numeric > 0 ? numeric : 0;
+}
+
+function normalizeGithubRepo(value: unknown): string {
+  const normalized = normalizeText(value)
+    .replace(/\\/g, "/")
+    .replace(/^\/+|\/+$/g, "")
+    .toLowerCase();
+  return /^[^/\s]+\/[^/\s]+$/u.test(normalized) ? normalized : "";
 }
 
 function isPlainObject(value: unknown): value is PlainObject {

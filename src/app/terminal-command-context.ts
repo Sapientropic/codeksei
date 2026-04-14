@@ -18,6 +18,7 @@ export interface TerminalRuntimeConfig extends Record<string, unknown> {
   sessionsFile: string;
   stateDir: string;
   checkinConfigFile?: string;
+  checkinScheduleStateFile?: string;
   systemMessageQueueFile: string;
   systemMessageDeadLetterFile: string;
   timelineScreenshotQueueFile: string;

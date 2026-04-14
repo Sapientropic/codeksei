@@ -13,6 +13,7 @@
   Hermes 托管 agent + 官方 Weixin；Codeksei 通过 CLI / operator / skill surface 暴露领域能力
 
 这次不会把 Hermes 的 Python Weixin adapter 硬塞进 Node/TS。Hermes Weixin 仍由 Hermes 官方维护，Codeksei 负责 timeline / diary / reminder / review / note / project radar 这些领域能力，并通过 `operator hermes` 入口管理 skill/status/smoke。
+主动 checkin 也按同一条边界收口：Codeksei 负责 trigger generation 和 tick 调度真相，Bridge / Hermes 只负责各自宿主侧的派发与 ack。
 
 当前质量基线也已经同步到结构层：
 
@@ -243,6 +244,8 @@
 - `src/core` / `src/runtime` 不再依赖 style/type allowlist 才能维持这些边界
 - Hermes 集成当前优先走 skill / CLI / operator contract，而不是把 Hermes gateway 逻辑重新 vendoring 进来
 - review hybrid 现在由宿主策略层选择 semantic host：Bridge Mode 默认走 Codex，Hermes Hosted Mode 默认走 Hermes，文件路由与落盘逻辑仍保留在 Codeksei 自己手里
+- checkin 现在按 host-neutral core 收口：`system checkin-trigger` / `system checkin-tick` 提供生成与调度，`system checkin-poller` 退回 bridge-only wrapper
+- project radar 现在保持“本地 git 真相优先”，只有 git unavailable 时才补 GitHub activity fallback
 
 架构保护规则默认守住：
 

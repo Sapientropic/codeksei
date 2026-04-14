@@ -48,7 +48,7 @@ const TOPIC_HELP = {
   }),
   system: () => ({
     usage: [
-      `${buildExample("system.send", true)} / ${buildTerminalActionExample("system.checkin_config", { audience: "public", includeArgs: true })} / ${buildTerminalEntryUsage("system.checkin_poller", "public")}`,
+      `${buildExample("system.send", true)} / ${buildTerminalActionExample("system.checkin_config", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("system.checkin_trigger", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("system.checkin_tick", { audience: "public", includeArgs: true })} / ${buildTerminalEntryUsage("system.checkin_poller", "public")}`,
     ],
   }),
   timeline: () => ({
@@ -70,6 +70,7 @@ const TOPIC_HELP = {
     body: [
       "  默认从当前 workspace 的 .codex/code-projects.json 读取已跟踪代码项目",
       "  先用 --list 看 slug；讨论具体项目时再用 --project <slug> --json",
+      "  本地 git 仍是第一真相；只有 git unavailable 时才回退到 GitHub activity continuity signal",
     ],
   }),
   note: () => ({
@@ -219,6 +220,8 @@ const LEAF_HELP = {
       body: [
         "  默认从当前 workspace 的 .codex/code-projects.json 读取已跟踪代码项目。",
         `  当前配置文件: ${String(config.projectRadarConfigFile || "(auto)")}`,
+        "  本地 git 正常时仍以 branch / dirty / recent commits 为主；GitHub activity 只在 git unavailable 时作为 fallback。",
+        "  GitHub fallback 不伪装成本地 working tree 真相。",
       ],
       examples: [
         "  codeksei project radar --list",
@@ -280,6 +283,33 @@ const LEAF_HELP = {
       "  codeksei system checkin --show",
       "  codeksei system checkin --range 3-60",
       "  codeksei system checkin --reset",
+    ],
+    includeFlagBlock: true,
+  }),
+  "system.checkin_trigger": () => ({
+    usage: [buildTerminalActionExample("system.checkin_trigger", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  只生成一条 host-neutral check-in trigger payload，不写本地 system queue。",
+      "  适合给 Hermes heartbeat / automation 这类宿主消费；它不是本地 bridge-only 入口。",
+      "  默认优先用显式 --user / --workspace；其次才吃唯一稳定默认值与可用 session hints。",
+    ],
+    examples: [
+      "  codeksei system checkin-trigger --user wxid_xxx --workspace /absolute/workspace",
+    ],
+    includeFlagBlock: true,
+  }),
+  "system.checkin_tick": () => ({
+    usage: [buildTerminalActionExample("system.checkin_tick", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  轮询 host-neutral check-in 调度状态；到点时返回稳定 trigger id 与 payload。",
+      "  pending trigger 未 ack 前，重复 poll 会返回同一个 trigger。",
+      "  传 --ack <triggerId> 只确认当前 pending trigger，并推进下一次随机调度。",
+    ],
+    examples: [
+      "  codeksei system checkin-tick --user wxid_xxx --workspace /absolute/workspace",
+      "  codeksei system checkin-tick --user wxid_xxx --workspace /absolute/workspace --ack <triggerId>",
     ],
     includeFlagBlock: true,
   }),

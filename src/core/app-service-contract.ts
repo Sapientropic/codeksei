@@ -38,6 +38,7 @@ export interface AppRuntimeConfig extends Record<string, unknown> {
   sharedBridgeHeartbeatFile?: string;
   startWithCheckin?: boolean;
   checkinConfigFile?: string;
+  checkinScheduleStateFile?: string;
   systemMessageDeadLetterFile?: string;
   systemMessageQueueFile?: string;
   reminderQueueFile?: string;

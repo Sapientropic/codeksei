@@ -2,9 +2,9 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { spawnSync } from "node:child_process";
 import { resolvePackageRoot } from "../contracts/path-utils";
 import { normalizeText } from "../contracts/text-normalization";
+import { captureSubprocess, resolveCommandOnPath } from "./subprocess-capture";
 
 export type CodekseiRuntimeProvider = "codex" | "hermes" | "openclaw-reserved";
 export type CodekseiChannelProvider = "codeksei" | "hermes";
@@ -455,7 +455,7 @@ export function collectHermesSkillCatalogProbe({
     };
   }
 
-  const result = captureCommand(command, ["skills", "list"], {
+  const result = captureSubprocess(command, ["skills", "list"], {
     cwd,
     timeoutMs: 30_000,
   });
@@ -633,65 +633,6 @@ function normalizeReviewSemanticHost(value: unknown): ReviewSemanticHost {
     return normalized;
   }
   return "auto";
-}
-
-function resolveCommandOnPath(command: string): string {
-  const normalized = normalizeText(command);
-  if (!normalized) {
-    return "";
-  }
-  if ((path.isAbsolute(normalized) || normalized.includes(path.sep)) && fs.existsSync(normalized)) {
-    return normalized;
-  }
-
-  const locator = process.platform === "win32" ? "where" : "which";
-  const result = spawnSync(locator, [normalized], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "ignore"],
-    windowsHide: true,
-  });
-  if (result.status !== 0) {
-    return "";
-  }
-  const firstLine = String(result.stdout || "")
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .find(Boolean);
-  return firstLine || "";
-}
-
-function captureCommand(
-  command: string,
-  args: string[],
-  {
-    cwd,
-    timeoutMs,
-  }: {
-    cwd: string;
-    timeoutMs: number;
-  },
-): {
-  status: number | null;
-  stdout: string;
-  stderr: string;
-  error: string;
-} {
-  const resolvedCommand = resolveCommandOnPath(command) || command;
-  const useShell = process.platform === "win32" && /\.(cmd|bat)$/iu.test(resolvedCommand);
-  const result = spawnSync(resolvedCommand, args, {
-    cwd,
-    encoding: "utf8",
-    shell: useShell,
-    stdio: ["ignore", "pipe", "pipe"],
-    timeout: timeoutMs,
-    windowsHide: true,
-  });
-  return {
-    status: typeof result.status === "number" ? result.status : null,
-    stdout: String(result.stdout || ""),
-    stderr: String(result.stderr || ""),
-    error: result.error instanceof Error ? result.error.message : "",
-  };
 }
 
 function countHermesWeixinAccounts(accountsDir: string): number {

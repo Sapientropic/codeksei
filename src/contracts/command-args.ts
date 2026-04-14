@@ -190,6 +190,21 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "reset", keys: ["--reset"], type: "boolean", defaultValue: false, description: "清除持久化配置并回退到 env/default" },
     ],
   }),
+  systemCheckinTick: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id" },
+      { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "显式绝对 workspace 路径" },
+      { name: "ack", keys: ["--ack"], type: "string", defaultValue: "", description: "确认当前 pending trigger id 并推进下一次调度" },
+    ],
+  }),
+  systemCheckinTrigger: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id" },
+      { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "显式绝对 workspace 路径" },
+    ],
+  }),
   timelineEvent: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,

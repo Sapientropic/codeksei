@@ -15,6 +15,7 @@ const timelineIntegrationDoc = fs.readFileSync(path.join(__dirname, "..", "docs"
 test("README public quickstart prefers codeksei CLI while shared mode keeps repo scripts", () => {
   assert.ok(readme.includes(buildTerminalEntryUsage("app.help", "public")));
   assert.ok(readme.includes("codeksei review weekly --help"));
+  assert.ok(readme.includes("codeksei system checkin-trigger"));
   assert.ok(readme.includes(buildTerminalEntryUsage("app.shared_start", "repo")));
   assert.ok(readme.includes("./docs/timeline-integration.md"));
   assert.ok(readme.includes("CODEKSEI_TIMELINE_LOCALE"));
@@ -23,6 +24,8 @@ test("README public quickstart prefers codeksei CLI while shared mode keeps repo
 test("docs/commands keeps public CLI examples aligned with the terminal usage source", () => {
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("app.login", "public")));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("timeline.event", "public")));
+  assert.ok(commandsDoc.includes(buildTerminalEntryUsage("system.checkin_trigger", "public")));
+  assert.ok(commandsDoc.includes(buildTerminalEntryUsage("system.checkin_tick", "public")));
   assert.ok(commandsDoc.includes(buildTerminalActionExample("review.weekly", { audience: "public", includeArgs: false })));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("app.shared_status", "repo")));
   assert.ok(commandsDoc.includes("./timeline-integration.md"));

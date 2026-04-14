@@ -20,6 +20,7 @@
 
 - `Bridge Mode` 下，Codeksei 自己托管 bridge / shared 线程
 - `Hermes Hosted Mode` 下，宿主控制命令交给 Hermes；Codeksei 主要暴露 timeline / diary / reminder / review / note / project radar / doctor / schema，并提供 Hermes operator 入口做 skill/status/smoke
+- `Hermes Hosted Mode` 下，主动 checkin 的调度也交给 Hermes；Codeksei 只提供 trigger / tick generation
 
 ## 命名
 
@@ -58,6 +59,8 @@ operator / bootstrap：
 - `codeksei login` `Bridge Mode only`
 - `codeksei accounts` `Bridge Mode only`
 - `codeksei start` `Bridge Mode only`
+- `codeksei system checkin-trigger`
+- `codeksei system checkin-tick`
 - `codeksei system checkin-poller`
 
 仓库脚本 / shared 模式：
@@ -74,6 +77,9 @@ operator / bootstrap：
 - `codeksei system checkin --show`
 - `codeksei system checkin --range 3-60`
 - `codeksei system checkin --reset`
+- `codeksei system checkin-trigger --user <senderId> --workspace /absolute/workspace`
+- `codeksei system checkin-tick --user <senderId> --workspace /absolute/workspace`
+- `codeksei system checkin-tick --user <senderId> --workspace /absolute/workspace --ack <triggerId>`
 
 说明：
 
@@ -87,6 +93,7 @@ operator / bootstrap：
 - 日常使用默认走共享模式，让微信入口和终端执行落在同一条线上
 - `codeksei start` / `npm run start:checkin` 更适合 operator 调试，不再视作默认 public discovery 面
 - 如果当前配置是 `Hermes Hosted Mode`，`codeksei start` 与 `shared:start` 会明确提示“改由 Hermes gateway 托管”，不会隐式回退到 Codex app-server
+- `codeksei system checkin-poller` 现在只保留 bridge 宿主包装；host-neutral 真相层是 `checkin-trigger` 与 `checkin-tick`
 
 ## 微信命令
 
@@ -232,7 +239,8 @@ Project radar 用于回答“项目现在在哪、应该从哪里重新进去”
 
 - 找回 tracked repo 的根目录、workspace note、稳定入口文件
 - 看当前 branch、working tree、最近 commits
-- 把 git 动作视作“最近发生了什么”的弱信号，方便判断下一步从哪里接上
+- 本地 repo 不在、不是 git repo、或只剩工作目录时，回退到 GitHub activity 来回答“最近这条项目线在哪活跃”
+- GitHub fallback 只是 continuity signal，不伪装成本地工作树真相
 
 ## Maintainer Smoke
 

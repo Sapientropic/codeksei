@@ -84,6 +84,9 @@ function renderProjectListText(radarConfig: ProjectRadarConfig, trackedProjects:
     lines.push(`- ${project.slug} | ${project.title}`);
     lines.push(`  repo: ${project.repoRoot}`);
     lines.push(`  note: ${project.notePath}`);
+    if (project.githubRepo) {
+      lines.push(`  github: ${project.githubRepo}`);
+    }
   }
   return lines.join("\n");
 }
@@ -100,6 +103,9 @@ function renderProjectRadarsText(result: ProjectRadarResult): string {
     lines.push(`## ${project.slug} | ${project.title}`);
     lines.push(`repo: ${project.repoRoot}`);
     lines.push(`note: ${project.notePath || "(none)"}`);
+    if (project.githubRepo) {
+      lines.push(`githubRepo: ${project.githubRepo}`);
+    }
     if (project.timelineLabel) {
       lines.push(`timeline: ${project.timelineLabel}`);
     }
@@ -115,7 +121,8 @@ function renderProjectRadarsText(result: ProjectRadarResult): string {
     }
 
     if (!project.git.ok) {
-      lines.push(`git: ${project.git.message}`);
+      lines.push(`git: unavailable (${project.git.reason || "unknown"}) ${project.git.message}`);
+      appendGithubActivityText(lines, project.githubActivity);
       continue;
     }
 
@@ -141,6 +148,33 @@ function renderProjectRadarsText(result: ProjectRadarResult): string {
   }
 
   return lines.join("\n");
+}
+
+function appendGithubActivityText(lines: string[], githubActivity: {
+  diagnostics?: { candidates?: string[]; message?: string };
+  latestEvent?: { createdAt?: string; description?: string; repo?: string; type?: string; url?: string } | null;
+  matchedBy?: string;
+  matchedRepo?: string;
+  source?: string;
+  status?: string;
+}): void {
+  lines.push(`githubActivity: ${String(githubActivity.status || "unknown")} [${String(githubActivity.source || "github_activity")}]`);
+  if (githubActivity.matchedRepo) {
+    lines.push(`matchedRepo: ${githubActivity.matchedRepo}${githubActivity.matchedBy ? ` via ${githubActivity.matchedBy}` : ""}`);
+  }
+  if (githubActivity.latestEvent) {
+    lines.push("latestGithubEvent:");
+    lines.push(`- ${githubActivity.latestEvent.type || "(unknown)"} ${githubActivity.latestEvent.createdAt || ""} ${githubActivity.latestEvent.description || ""}`.trim());
+    if (githubActivity.latestEvent.url) {
+      lines.push(`- ${githubActivity.latestEvent.url}`);
+    }
+  }
+  if (githubActivity.diagnostics?.message) {
+    lines.push(`githubDiagnostic: ${githubActivity.diagnostics.message}`);
+  }
+  if (Array.isArray(githubActivity.diagnostics?.candidates) && githubActivity.diagnostics?.candidates.length) {
+    lines.push(`githubCandidates: ${githubActivity.diagnostics.candidates.join(", ")}`);
+  }
 }
 
 export { runProjectRadarCommand };

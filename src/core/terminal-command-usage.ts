@@ -29,6 +29,8 @@ const ACTION_USAGE_ARGS: Readonly<Partial<Record<CommandActionId, string>>> = Ob
   "review.nightly": "[--date YYYY-MM-DD] [--stdout] [--deterministic] [--model <id>]",
   "review.weekly": "[--week YYYY-Www] [--date YYYY-MM-DD] [--stdout] [--deterministic] [--model <id>]",
   "system.checkin_config": "[--show] [--range 3-60] [--reset]",
+  "system.checkin_tick": "[--user <wechat_user_id>] [--workspace /绝对路径] [--ack <triggerId>]",
+  "system.checkin_trigger": "[--user <wechat_user_id>] [--workspace /绝对路径]",
   "system.send": "--text \"<message>\" [--user <wechat_user_id>] [--workspace /绝对路径]",
   "timeline.event": "--date YYYY-MM-DD --start HH:mm --end HH:mm --title \"标题\" (--event-node <id> | --subcategory <id>) [其他参数]",
   "timeline.write": "--date YYYY-MM-DD [--mode merge|replace] [--json '{\"events\":[...]}'] [--stdin]",

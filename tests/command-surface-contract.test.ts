@@ -100,6 +100,8 @@ test("package scripts keep runtime entrypoints aligned with the published-runtim
     "reminder:write": buildNodeRuntimeInvocation("cli", ["reminder", "write"]),
     "diary:write": buildNodeRuntimeInvocation("cli", ["diary", "write"]),
     "system:send": buildNodeRuntimeInvocation("cli", ["system", "send"]),
+    "system:checkin-trigger": buildNodeRuntimeInvocation("cli", ["system", "checkin-trigger"]),
+    "system:checkin-tick": buildNodeRuntimeInvocation("cli", ["system", "checkin-tick"]),
     "system:checkin": buildNodeRuntimeInvocation("cli", ["system", "checkin-poller"]),
     "timeline:event": buildNodeRuntimeInvocation("cli", ["timeline", "event"]),
     "timeline:write": buildNodeRuntimeInvocation("cli", ["timeline", "write"]),

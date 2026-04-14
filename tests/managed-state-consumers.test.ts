@@ -7,7 +7,9 @@ const assert: typeof import("node:assert/strict") = require("node:assert/strict"
 const { SessionStore }: typeof import("../src/adapters/runtime/codex/session-store") = require("../src/adapters/runtime/codex/session-store");
 const { loadWeixinAccount, saveWeixinAccount }: typeof import("../src/adapters/channel/weixin/account-store") = require("../src/adapters/channel/weixin/account-store");
 const { checkinConfigSchema }: typeof import("../src/contracts/checkin-config") = require("../src/contracts/checkin-config");
+const { checkinScheduleStateSchema }: typeof import("../src/contracts/checkin-schedule-state") = require("../src/contracts/checkin-schedule-state");
 const { CheckinConfigStore }: typeof import("../src/state/checkin-config-store") = require("../src/state/checkin-config-store");
+const { CheckinScheduleStateStore }: typeof import("../src/state/checkin-schedule-state-store") = require("../src/state/checkin-schedule-state-store");
 const {
   loadPersistedContextTokens,
   persistContextToken,
@@ -47,6 +49,11 @@ test("managed state ownership matrix stays single-owner and executable", () => {
       file: "checkin-config.json",
       schemaExports: [checkinConfigSchema],
       storeExports: [CheckinConfigStore],
+    },
+    {
+      file: "checkin-schedule-state.json",
+      schemaExports: [checkinScheduleStateSchema],
+      storeExports: [CheckinScheduleStateStore],
     },
     {
       file: "system-message-queue.json",

@@ -59,6 +59,7 @@ function readConfig(options: ReadConfigOptions = {}) {
     logDir: path.join(stateDir, "logs"),
     reminderQueueFile: path.join(stateDir, "reminder-queue.json"),
     checkinConfigFile: path.join(stateDir, "checkin-config.json"),
+    checkinScheduleStateFile: path.join(stateDir, "checkin-schedule-state.json"),
     systemMessageQueueFile: path.join(stateDir, "system-message-queue.json"),
     systemMessageDeadLetterFile: path.join(stateDir, "system-message-dead-letter.json"),
     timelineScreenshotQueueFile: path.join(stateDir, "timeline-screenshot-queue.json"),

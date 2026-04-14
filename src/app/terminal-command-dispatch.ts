@@ -11,6 +11,8 @@ import { runProjectRadarCommand } from "./project-radar-cli";
 import { runReminderWriteCommand } from "./reminder-write-cli";
 import { runReviewCommand } from "./review-cli";
 import { runSystemCheckinConfigCommand } from "./system-checkin-config-cli";
+import { runSystemCheckinTickCommand } from "./system-checkin-tick-cli";
+import { runSystemCheckinTriggerCommand } from "./system-checkin-trigger-cli";
 import { runSystemCheckinPoller } from "./system-checkin-poller";
 import { runSystemSendCommand } from "./system-send-cli";
 import { runTimelineEventCommand } from "./timeline-event-cli";
@@ -153,6 +155,12 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
   },
   "system.checkin-config": async (_manifest, context) => {
     return runSystemCheckinConfigCommand(context.config, context.leafArgs);
+  },
+  "system.checkin-tick": async (_manifest, context) => {
+    return runSystemCheckinTickCommand(context.config, context.leafArgs);
+  },
+  "system.checkin-trigger": async (_manifest, context) => {
+    return runSystemCheckinTriggerCommand(context.config, context.leafArgs);
   },
   "system.checkin-poller": async (_manifest, context) => {
     await runSystemCheckinPoller(context.config);

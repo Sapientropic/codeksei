@@ -47,6 +47,8 @@ codeksei review nightly
 codeksei review weekly
 codeksei review monthly
 codeksei project radar --project <slug> --json
+codeksei system checkin-trigger --user <wechatUserId> --workspace /absolute/workspace
+codeksei system checkin-tick --user <wechatUserId> --workspace /absolute/workspace
 ```
 
 ## Procedure
@@ -59,8 +61,24 @@ codeksei project radar --project <slug> --json
    - `note` for durable memory
    - `review` for structured reflection
    - `project radar` for repo continuity
+   - `system checkin-trigger` / `system checkin-tick` for hosted proactive checkin
 3. When the command returns JSON, use the returned facts directly instead of paraphrasing from memory.
 4. If a command fails because local state or dependencies are missing, explain the missing prerequisite exactly and stop instead of guessing.
+
+## Hosted Proactive Checkin
+
+When Hermes wants Codeksei to decide whether a proactive checkin is due:
+
+```bash
+codeksei --workspace-root /absolute/repo system checkin-tick --user <wechatUserId> --workspace /absolute/repo
+codeksei --workspace-root /absolute/repo system checkin-tick --user <wechatUserId> --workspace /absolute/repo --ack <triggerId>
+```
+
+If Hermes only wants a one-shot payload without schedule state:
+
+```bash
+codeksei --workspace-root /absolute/repo system checkin-trigger --user <wechatUserId> --workspace /absolute/repo
+```
 
 ## Verification
 
