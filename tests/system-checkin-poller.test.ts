@@ -9,7 +9,7 @@ const { CheckinConfigStore }: typeof import("../src/state/checkin-config-store")
 const {
   processBridgeCheckinPollerIteration,
   runCheckinComplete,
-} = require("../src/core/checkin-core");
+} = require("../src/checkin");
 
 function createPollerFixture() {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-checkin-poller-"));

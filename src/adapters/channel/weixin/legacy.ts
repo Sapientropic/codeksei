@@ -1,6 +1,7 @@
 import * as crypto from "node:crypto";
 import { writeStdoutLine } from "../../../core/terminal-output";
 import type { ChannelAdapterDescriptor } from "../../../core/app-service-contract";
+import type { NormalizedIncomingMessage } from "../../../core/runtime-types";
 
 import { getConfig, getUpdates, sendMessage, sendTyping } from "./api";
 import {
@@ -213,7 +214,7 @@ function createLegacyWeixinChannelAdapter(config: LegacyWeixinConfig) {
       }
       return response;
     },
-    normalizeIncomingMessage(message: unknown) {
+    normalizeIncomingMessage(message: unknown): NormalizedIncomingMessage | null {
       const account = ensureAccount();
       return normalizeWeixinIncomingMessage(message, config, account.accountId);
     },

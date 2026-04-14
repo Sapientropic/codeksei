@@ -28,7 +28,7 @@ import {
   buildCheckinTargetResolutionErrorMessage,
   resolveCheckinTarget,
   runCheckinTick,
-} from "../core/checkin-core";
+} from "../checkin";
 import {
   resolveHermesHomePath,
   syncCheckinCronViaHermesRepoLocal,

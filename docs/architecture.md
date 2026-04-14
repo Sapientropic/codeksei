@@ -44,6 +44,7 @@
 - host policy 现在按 sibling owner 拆开：`host-mode-resolution.ts` 只做纯判定，`hosted-hermes-diagnostics.ts` 负责 doctor/status/smoke，`hosted-hermes-skill.ts` 负责 skill preview/install，`review-semantic-host-policy.ts` 负责 semantic host 选择；`host-mode.ts` 退回 barrel
 - 把 runtime event pipeline、lifecycle runner、terminal façade 委托给独立 helper，而不是继续把串行链、启动/关闭细节和 terminal 能力暴露堆在 `app.ts`
 - `CodekseiApp` 现在是 thin façade：状态位 + `readonly services`，再把 admin / target resolution / runtime delegate 分别下沉到 `app-admin-actions.ts`、`app-target-resolution.ts`、`app-runtime-delegates.ts`
+- `src/core/config.ts`、`src/core/timezone.ts` 这类 cross-cutting façade 继续留在 core，但它们的 owner 是共享 contract / env ingress，而不是“顺手塞在壳层里的业务实现”
 
 不负责：
 
@@ -51,6 +52,8 @@
 - managed state 文件读写细节
 - workspace continuity 工具
 - shared heartbeat owner
+- proactive checkin 的调度真相
+- project radar 的 workspace/repo truth
 - review / notes 的实现逻辑
 
 一句话理解：`src/core` 负责“把系统接起来”，不再负责“把状态怎么存、workspace 怎么找、复用说明怎么拼”。
@@ -127,12 +130,14 @@
 - `workspace-alias.ts`
 - `workspace-bootstrap.ts`
 - `default-targets.ts`
+- `project-radar.ts`
 
 负责：
 
 - Windows alias path 与 runtime cwd 兼容
 - workspace bootstrap 读入顺序
 - 默认 sender / workspace root 推断
+- project radar 的 workspace `.codex` 配置、repo/git/GitHub fallback 与 read-first 组合
 
 不负责：
 
@@ -159,6 +164,7 @@
 - `delivery-text.ts` 负责文本归一化、chunk、packing、stream 边界
 - `delivery-trace.ts` 负责 trace context、retry backoff、stable client id 重试
 - `updates.ts` 负责 account / context token / sync buffer / getUpdates
+- `route-matrix.ts` 是当前唯一的 dual-stack 真相源：默认 adapter 下 `login/getUpdates/sendText/sendTyping -> v2`，`sendFile -> legacy`
 - `login-*`、`message-utils*`、`protocol.ts`、`account-store.ts`、`context-token-store.ts` 各自承担 owner-local 边界
 - channel adapter 现在通过 `describe().operations` 显式声明 `pollUpdates` / `login` / `resolveAccount` / `visibleTextDelivery` / `visibleTypingDelivery` / `visibleFileDelivery`
 
@@ -166,6 +172,7 @@
 
 - 源码内部统一走标准 `import / export`
 - media 兼容路径与 v2 text delivery 的分工继续显式保留，避免“顺手统一”把文件发送重新路由回错误栈
+- dual-stack 的维护入口统一看 [`docs/maintainer/weixin-dual-stack.md`](./maintainer/weixin-dual-stack.md)，不要只靠内联注释记忆
 
 不负责：
 
@@ -230,13 +237,14 @@
 
 ## 8. Integrations And Operational Layer
 
-`src/integrations/*`、`src/review/*`、`src/notes/*`、`src/app/*`
+`src/integrations/*`、`src/checkin/*`、`src/review/*`、`src/notes/*`、`src/app/*`
 
 这几层共同构成更接近“陪伴感”和“节奏感”的工作流表面。
 
 其中：
 
 - `src/integrations/*` 负责接上游能力，例如 timeline
+- `src/checkin/*` 负责 proactive checkin 的 target resolution、wake schedule truth 与 bridge poller scheduling
 - `src/review/*` 负责 nightly / weekly / monthly review
 - `src/notes/*` 负责 durable note routing 与写入
 - `src/app/*` 负责公开 CLI 入口命令

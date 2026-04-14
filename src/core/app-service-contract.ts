@@ -10,6 +10,14 @@ import type {
 } from "./config-value-types";
 import type { ReviewSemanticHost } from "./review-semantic-host-policy";
 import type {
+  CheckinRuntimeConfig,
+  IdentityAndTimeConfig,
+  RuntimeHostConfig,
+  SchemaAndTemplateConfig,
+  WeixinBridgeConfig,
+  WorkspacePathsConfig,
+} from "./config-slices";
+import type {
   ChannelAdapterOperations,
   HostCapabilities,
   RuntimeAdapterOperations,
@@ -33,68 +41,13 @@ import type {
 // Keep the app/runtime/store seam in one place so app.ts, the factory, and the
 // three lifecycle classes do not silently drift into incompatible local *Like
 // copies again.
-export interface AppRuntimeConfig {
-  stateDir: string;
-  codekseiHome: string;
-  workspaceId: string;
-  workspaceRoot: string;
-  timezone: string;
-  timezoneSource: string;
-  timezoneExplicit: boolean;
-  timelineStateTimezone: string;
-  diaryDir: string;
-  timelineStateDir: string;
-  userName: string;
-  userGender: string;
-  allowedUserIds: string[];
-  channel: CodekseiChannel;
-  channelProvider: CodekseiChannelProvider;
-  runtime: CodekseiRuntimeProvider;
-  accountId: string;
-  weixinBaseUrl: string;
-  weixinCdnBaseUrl: string;
-  weixinAdapterVariant: string;
-  weixinReplyMode: WeixinReplyMode;
-  weixinDeliveryTrace: boolean;
-  weixinQrBotType: string;
-  weixinRouteTag: string;
-  weixinProtocolClientVersion: string;
-  accountsDir: string;
-  logDir: string;
-  reminderQueueFile: string;
-  checkinConfigFile: string;
-  checkinScheduleStateFile: string;
-  systemMessageQueueFile: string;
-  systemMessageDeadLetterFile: string;
-  timelineScreenshotQueueFile: string;
-  cliIdempotencyLedgerFile: string;
-  weixinInstructionsFile: string;
-  weixinInstructionsOverlayFile: string;
-  weixinOperationsFile: string;
-  weixinOperationsOverlayFile: string;
-  syncBufferDir: string;
-  runtimeEndpoint: string;
-  runtimeCommand: string;
-  runtimeAccessMode: CodekseiRuntimeAccessMode;
-  codexAccessMode: CodekseiRuntimeAccessMode;
-  hermesCommand: string;
-  hermesHome: string;
-  hermesRepoRoot: string;
-  hermesRepoLocalShimPath: string;
-  hermesPythonCommand: string;
-  sessionsFile: string;
-  workspaceBootstrapConfigFile: string;
-  projectRadarConfigFile: string;
-  durableNoteSchemaConfigFile: string;
-  reviewSchemaConfigFile: string;
-  reviewSemanticMode: string;
-  reviewSemanticHost: ReviewSemanticHost;
-  reviewSemanticModel: string;
-  reviewSemanticTimeoutMs: number;
-  sharedBridgeHeartbeatFile: string;
-  sharedWatchdogStateFile: string;
-  startWithCheckin: boolean;
-}
+export interface AppRuntimeConfig extends
+  WorkspacePathsConfig,
+  IdentityAndTimeConfig,
+  WeixinBridgeConfig,
+  RuntimeHostConfig,
+  SchemaAndTemplateConfig,
+  CheckinRuntimeConfig {}
 
 export interface ChannelAccount {
   accountId: string;
@@ -206,7 +159,7 @@ export interface ChannelAdapterLike {
   }>;
   loadSyncBuffer(): string;
   login(): Promise<unknown>;
-  normalizeIncomingMessage(message: unknown): unknown;
+  normalizeIncomingMessage(message: unknown): NormalizedIncomingMessage | null;
   printAccounts(): void;
   resolveAccount(): ChannelAccount;
   sendFile(payload: { userId: string; filePath: string; contextToken?: string }): Promise<unknown>;
@@ -229,8 +182,9 @@ export interface RuntimeAdapterLike {
   close(): Promise<void>;
   describe(): RuntimeAdapterDescriptor;
   getSessionStore(): SessionStoreLike;
+  getSessionWriter(): SessionStoreWriterLike;
   initialize(): Promise<RuntimeAdapterState>;
-  onEvent(listener: (event: RuntimeEvent<UnknownRecord>) => void): unknown;
+  onEvent(listener: (event: RuntimeEvent<UnknownRecord>) => void): () => void;
   probeRuntimeCapabilities?(command: string): unknown;
   refreshThreadInstructions(args: {
     bindingKey: string;
@@ -429,15 +383,6 @@ export interface StreamDeliveryLike {
 
 export interface CreateAppServicesArgs {
   config: AppRuntimeConfig;
-  handlePreparedMessage(
-    normalized: NormalizedIncomingMessage,
-    options: HandlePreparedMessageOptions,
-  ): Promise<void | RuntimeTurnSendResult>;
-  handleReplyDeliveryFailure(payload: DeliveryFailurePayload): Promise<void>;
-  resolveDefaultTerminalUser(): string;
-  resolveReplyTargetForBinding(bindingKey: string): ReplyTarget | null;
-  resolveWorkspaceRoot(bindingKey: string): string;
-  sendTimelineScreenshot(payload: TimelineScreenshotRequest): Promise<unknown>;
 }
 
 export type AppServiceFactory = (args: CreateAppServicesArgs) => AppServices;

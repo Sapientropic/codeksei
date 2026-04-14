@@ -1,7 +1,7 @@
 import { normalizeText } from "./text-normalization";
 import type { SystemMessage } from "../contracts/queue-items";
 import type { NormalizedIncomingMessage } from "./runtime-types";
-import { resolvePromptPersonEn } from "./person-reference";
+import { resolvePromptPersonEn } from "../contracts/person-reference";
 
 interface SystemMessageDispatcherConfig {
   workspaceId: string;

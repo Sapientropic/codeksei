@@ -25,11 +25,16 @@ import {
   syncReviewContent,
 } from "./review-document";
 import { maybeGenerateSemanticReview } from "./review-semantic";
+import type {
+  IdentityAndTimeConfig,
+  RuntimeHostConfig,
+  SchemaAndTemplateConfig,
+  WorkspacePathsConfig,
+} from "../core/config-slices";
 import {
   collectDiaryEntries,
   collectNightlyEntries,
 } from "./review-sources";
-import type { AppRuntimeConfig } from "../core/app-service-contract";
 import type {
   DiaryReviewEntry,
   NightlyReviewEntry,
@@ -66,7 +71,15 @@ interface ReviewSchemaWorkspaceProfile {
   reviews?: Record<string, Record<string, unknown>>;
 }
 
-type ReviewConfig = Partial<AppRuntimeConfig>;
+type ReviewConfig = Partial<
+  Pick<WorkspacePathsConfig, "diaryDir" | "workspaceRoot">
+  & Pick<IdentityAndTimeConfig, "timezone">
+  & Pick<RuntimeHostConfig, "hermesCommand" | "runtimeCommand" | "runtimeEndpoint">
+  & Pick<SchemaAndTemplateConfig, "reviewSchemaConfigFile" | "reviewSemanticHost" | "reviewSemanticMode" | "reviewSemanticModel" | "reviewSemanticTimeoutMs">
+  & {
+    reviewSemanticGenerator?: unknown;
+  }
+>;
 
 function loadReviewSchemaConfig(config: ReviewConfig = {}): NormalizedWorkspaceSchemaConfig {
   const filePath = normalizeText(config.reviewSchemaConfigFile);

@@ -32,11 +32,6 @@ import {
   sendRuntimeLocalFile,
   sendRuntimeTimelineScreenshot,
 } from "./app-runtime-delegates";
-import {
-  resolveAppDefaultTerminalUser,
-  resolveAppWorkspaceRoot,
-  resolveReplyTargetForBinding,
-} from "./app-target-resolution";
 import { assertBridgeMode } from "./host-mode";
 import { logError } from "./logging";
 
@@ -58,37 +53,7 @@ export class CodekseiApp {
     { createAppServices: createAppServicesOverride = createAppServices }: CodekseiAppOptions = {},
   ) {
     this.config = config;
-    this.services = createAppServicesOverride({
-      config,
-      resolveDefaultTerminalUser: () => resolveAppDefaultTerminalUser({
-        config: this.config,
-        channelAdapter: this.channelAdapter,
-        runtimeAdapter: this.runtimeAdapter,
-      }),
-      resolveReplyTargetForBinding: (bindingKey: string) => resolveReplyTargetForBinding({
-        bindingKey,
-        channelAdapter: this.channelAdapter,
-        runtimeAdapter: this.runtimeAdapter,
-      }),
-      resolveWorkspaceRoot: (bindingKey: string) => resolveAppWorkspaceRoot({
-        bindingKey,
-        config: this.config,
-        runtimeAdapter: this.runtimeAdapter,
-      }),
-      handlePreparedMessage: (
-        normalized: NormalizedIncomingMessage,
-        options: HandlePreparedMessageOptions,
-      ) => handlePreparedRuntimeMessage({
-        normalized,
-        options,
-        runtimeTurnLifecycle: this.runtimeTurnLifecycle,
-      }),
-      sendTimelineScreenshot: (payload: TimelineScreenshotRequest) => sendRuntimeTimelineScreenshot({
-        payload,
-        runtimeTurnLifecycle: this.runtimeTurnLifecycle,
-      }),
-      handleReplyDeliveryFailure: (payload: DeliveryFailurePayload) => this.handleReplyDeliveryFailure(payload),
-    });
+    this.services = createAppServicesOverride({ config });
 
     attachRuntimeEventPipeline({
       runtimeAdapter: this.runtimeAdapter,

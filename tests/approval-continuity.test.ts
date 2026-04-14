@@ -148,7 +148,7 @@ test("restoreBoundThreadSubscriptions rehydrates persisted approval into thread 
       return {};
     },
     normalizeIncomingMessage(message: unknown) {
-      return message;
+      return message as import("../src/core/runtime-types").NormalizedIncomingMessage | null;
     },
     printAccounts() {},
     resolveAccount() {
@@ -174,6 +174,9 @@ test("restoreBoundThreadSubscriptions rehydrates persisted approval into thread 
     },
     getSessionStore() {
       return sessionStore;
+    },
+    getSessionWriter() {
+      return sessionWriter;
     },
     async initialize() {
       return {

@@ -31,7 +31,7 @@ export async function handleIncomingRuntimeMessage({
   message: unknown;
   runtimeTurnLifecycle: Pick<RuntimeTurnLifecycleLike, "handlePreparedMessage">;
 }): Promise<void> {
-  const normalized = channelAdapter.normalizeIncomingMessage(message) as NormalizedIncomingMessage | null;
+  const normalized = channelAdapter.normalizeIncomingMessage(message);
   if (!normalized) {
     return;
   }

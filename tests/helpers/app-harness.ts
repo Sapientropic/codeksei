@@ -320,11 +320,14 @@ function createTestAppHarness({
     getSessionStore() {
       return sessionStore;
     },
+    getSessionWriter() {
+      return sessionWriter;
+    },
     async initialize() {
       return { endpoint: "ws://127.0.0.1:8765", models: [] };
     },
     onEvent() {
-      return undefined;
+      return () => undefined;
     },
     async refreshThreadInstructions() {},
     async respondApproval() {},
@@ -417,12 +420,6 @@ function createTestAppHarness({
 
   const createAppServices: AppServiceFactory = ({
     config,
-    handlePreparedMessage,
-    handleReplyDeliveryFailure,
-    resolveDefaultTerminalUser,
-    resolveReplyTargetForBinding,
-    resolveWorkspaceRoot,
-    sendTimelineScreenshot,
   }: CreateAppServicesArgs) => {
     const systemMessageDispatcherState: SystemMessageDispatcherRef = { current: null };
     const channelCommandRouter: ChannelCommandRouterLike = {
@@ -430,6 +427,13 @@ function createTestAppHarness({
         return false;
       },
     };
+    const resolveDefaultTerminalUser = () => "user-1";
+    const resolveReplyTargetForBinding = () => ({
+      userId: "user-1",
+      contextToken: "ctx-1",
+      provider: "weixin",
+    });
+    const resolveWorkspaceRoot = () => workspaceRoot;
 
     const runtimeWatchdogLifecycle: RuntimeWatchdogLifecycleLike = new RuntimeWatchdogLifecycle({
       buildApprovalPromptSignature: () => "",
@@ -481,13 +485,13 @@ function createTestAppHarness({
       formatErrorMessage,
       getSystemMessageDispatcher: () => systemMessageDispatcherState.current,
       getSystemMessageFailureRetryDelayMs: () => 30_000,
-      handlePreparedMessage,
+      handlePreparedMessage: (normalized, options) => runtimeTurnLifecycle.handlePreparedMessage(normalized, options),
       hasRpcId: (requestId: unknown) => normalizeText(requestId).length > 0,
       normalizeText,
       reminderQueue,
       resolveWorkspaceRoot,
       runtimeAdapter,
-      sendTimelineScreenshot,
+      sendTimelineScreenshot: (payload) => runtimeTurnLifecycle.sendTimelineScreenshot(payload),
       systemMessageBusyRetryMs: 30_000,
       systemMessageQueue,
       threadStateStore,

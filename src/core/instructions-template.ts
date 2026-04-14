@@ -3,7 +3,7 @@ import {
   resolveConfiguredPersonName,
   resolvePromptPersonEn,
   resolvePromptPersonZh,
-} from "./person-reference";
+} from "../contracts/person-reference";
 
 interface InstructionTemplateConfigInput {
   codekseiHome?: unknown;

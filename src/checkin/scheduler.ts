@@ -1,21 +1,7 @@
 import * as crypto from "node:crypto";
 
-import { readPrefixedEnv } from "../contracts/app-env";
-import type { AppRuntimeConfig } from "./app-service-contract";
-import { resolvePromptPersonEn } from "./person-reference";
-import type { PreferredTargetResolution } from "../workspace/default-targets";
-import {
-  inspectPreferredSenderId,
-  inspectPreferredWorkspaceRoot,
-} from "../workspace/default-targets";
-import { normalizeText } from "./text-normalization";
-import { parseCompactDurationMs } from "./duration";
-import type { ResolvedCheckinConfig } from "../state/checkin-config";
-import {
-  DEFAULT_CHECKIN_MAX_INTERVAL_MS,
-  DEFAULT_CHECKIN_MIN_INTERVAL_MS,
-  resolveCheckinConfig,
-} from "../state/checkin-config";
+import type { AppRuntimeConfig } from "../core/app-service-contract";
+import { parseCompactDurationMs } from "../core/duration";
 import type {
   CheckinActiveWake,
   CheckinCompletionResult,
@@ -27,43 +13,25 @@ import type {
 import {
   normalizeCheckinCompletionResult,
 } from "../contracts/checkin-schedule-state";
+import { resolvePromptPersonEn } from "../contracts/person-reference";
+import { normalizeText } from "../contracts/text-normalization";
+import type { ResolvedCheckinConfig } from "../state/checkin-config";
+import {
+  DEFAULT_CHECKIN_MAX_INTERVAL_MS,
+  DEFAULT_CHECKIN_MIN_INTERVAL_MS,
+  resolveCheckinConfig,
+} from "../state/checkin-config";
 import { CheckinScheduleStateStore } from "../state/checkin-schedule-state-store";
-import type { SystemMessageQueueLike } from "./app-service-contract";
+import {
+  buildCheckinTargetKey,
+  type CheckinResolvedTarget,
+} from "./target-resolution";
 
 const INTERNAL_CHECKIN_TRIGGER_TEMPLATE = "Take a quiet look at whether now is a good moment to reach out to %PERSON%. You may stay silent, send one short WeChat message, update diary/timeline, or take another useful backstage action. If no user-visible message should be sent, output exactly SILENT. If you do send a message, output only the message text.";
 const CHECKIN_MAX_SILENCE_MS = 24 * 60 * 60_000;
 export const CHECKIN_ACTIVE_WAKE_TIMEOUT_MS = 30 * 60_000;
 
-interface CheckinSessionStoreLike {
-  buildBindingKey(args: { accountId: string; senderId: string; workspaceId: string }): string;
-  getActiveWorkspaceRoot(bindingKey: string): string;
-  getBinding(bindingKey: string): Record<string, unknown> | null;
-  state?: {
-    bindings?: Record<string, Record<string, unknown>>;
-  };
-}
-
-type CheckinTargetConfig = Partial<Pick<AppRuntimeConfig, "allowedUserIds" | "userName" | "workspaceId" | "workspaceRoot">>;
 type CheckinTickConfig = Pick<AppRuntimeConfig, "checkinConfigFile" | "checkinScheduleStateFile"> & Partial<Pick<AppRuntimeConfig, "userName">>;
-type BridgeCheckinPollerConfig = Pick<
-  AppRuntimeConfig,
-  | "allowedUserIds"
-  | "checkinConfigFile"
-  | "checkinScheduleStateFile"
-  | "systemMessageDeadLetterFile"
-  | "systemMessageQueueFile"
-  | "userName"
-  | "workspaceId"
-  | "workspaceRoot"
-> & Partial<Pick<AppRuntimeConfig, "userName">>;
-
-interface CheckinTargetResolutionArgs {
-  accountId?: string;
-  config: CheckinTargetConfig;
-  explicitUser?: string;
-  explicitWorkspace?: string;
-  sessionStore?: CheckinSessionStoreLike | null;
-}
 
 interface CheckinTickArgs {
   ack?: string;
@@ -80,28 +48,6 @@ interface CheckinCompleteArgs {
   sleepFor?: string;
   target: CheckinResolvedTarget;
   triggerId: string;
-}
-
-interface BridgeCheckinPollerIterationArgs {
-  accountId: string;
-  config: BridgeCheckinPollerConfig;
-  nowMs?: number;
-  queueStore: Pick<SystemMessageQueueLike, "enqueue" | "hasPendingForAccount">;
-  sessionStore: CheckinSessionStoreLike;
-}
-
-export interface CheckinResolvedTarget {
-  senderId: string;
-  senderSource: string;
-  workspaceRoot: string;
-  workspaceSource: string;
-}
-
-export interface CheckinTargetResolution {
-  ok: boolean;
-  senderResolution: PreferredTargetResolution;
-  value: CheckinResolvedTarget | null;
-  workspaceResolution: PreferredTargetResolution;
 }
 
 export interface CheckinTriggerPayload {
@@ -137,22 +83,6 @@ export interface CheckinCompleteResult {
   target: CheckinResolvedTarget;
 }
 
-export interface BridgeCheckinPollerIterationResult {
-  action: "enqueue_and_ack" | "waiting" | "waiting_for_queue";
-  tick: CheckinTickResult;
-}
-
-export function buildCheckinTargetResolutionErrorMessage(resolution: CheckinTargetResolution): string {
-  if (!resolution.senderResolution.value) {
-    return resolution.senderResolution.ambiguous
-      ? "checkin target 无法确定唯一 sender；请显式传 --user"
-      : "checkin target 缺少可用 sender；请显式传 --user 或设置稳定默认值";
-  }
-  return resolution.workspaceResolution.ambiguous
-    ? "checkin target 无法确定唯一 workspace；请显式传 --workspace"
-    : "checkin target 缺少可用 workspace；请显式传 --workspace 或设置稳定默认值";
-}
-
 export function buildCheckinTriggerPayload(
   config: Partial<Pick<AppRuntimeConfig, "userName">>,
   target: CheckinResolvedTarget,
@@ -174,108 +104,6 @@ export function buildCheckinTriggerPayload(
       ? buildScheduledCheckinPrompt(person, target, triggerId)
       : INTERNAL_CHECKIN_TRIGGER_TEMPLATE.replace("%PERSON%", person),
     workspaceRoot: target.workspaceRoot,
-  };
-}
-
-export function processBridgeCheckinPollerIteration({
-  accountId,
-  config,
-  nowMs = Date.now(),
-  queueStore,
-  sessionStore,
-}: BridgeCheckinPollerIterationArgs): BridgeCheckinPollerIterationResult {
-  const resolution = resolveCheckinTarget({
-    accountId,
-    config,
-    explicitUser: readPrefixedEnv(process.env, "CHECKIN_USER_ID") || "",
-    explicitWorkspace: readPrefixedEnv(process.env, "CHECKIN_WORKSPACE") || "",
-    sessionStore,
-  });
-  if (!resolution.ok || !resolution.value) {
-    throw new Error(buildCheckinTargetResolutionErrorMessage(resolution));
-  }
-
-  const tick = runCheckinTick({
-    config,
-    nowMs,
-    target: resolution.value,
-  });
-  if (!tick.due || !tick.payload) {
-    return {
-      action: "waiting",
-      tick,
-    };
-  }
-  if (queueStore.hasPendingForAccount(accountId)) {
-    return {
-      action: "waiting_for_queue",
-      tick,
-    };
-  }
-
-  queueStore.enqueue({
-    accountId,
-    checkinTriggerId: tick.payload.triggerId,
-    createdAt: tick.payload.createdAt,
-    id: crypto.randomUUID(),
-    kind: "checkin",
-    senderId: tick.payload.senderId,
-    text: tick.payload.text,
-    workspaceRoot: tick.payload.workspaceRoot,
-  });
-
-  const acked = runCheckinTick({
-    ack: tick.payload.triggerId,
-    config,
-    nowMs,
-    target: resolution.value,
-  });
-  return {
-    action: "enqueue_and_ack",
-    tick: acked,
-  };
-}
-
-export function resolveCheckinTarget({
-  accountId = "",
-  config,
-  explicitUser = "",
-  explicitWorkspace = "",
-  sessionStore = null,
-}: CheckinTargetResolutionArgs): CheckinTargetResolution {
-  const senderResolution = inspectPreferredSenderId({
-    accountId,
-    config,
-    explicitUser,
-    sessionStore,
-  });
-  const workspaceResolution = inspectCheckinWorkspaceRoot({
-    accountId,
-    config,
-    explicitWorkspace,
-    senderId: senderResolution.value,
-    sessionStore,
-  });
-
-  if (!senderResolution.value || !workspaceResolution.value) {
-    return {
-      ok: false,
-      senderResolution,
-      value: null,
-      workspaceResolution,
-    };
-  }
-
-  return {
-    ok: true,
-    senderResolution,
-    value: {
-      senderId: senderResolution.value,
-      senderSource: senderResolution.source,
-      workspaceRoot: workspaceResolution.value,
-      workspaceSource: workspaceResolution.source,
-    },
-    workspaceResolution,
   };
 }
 
@@ -457,53 +285,6 @@ export function runCheckinComplete({
     state: nextState,
     target,
   };
-}
-
-function inspectCheckinWorkspaceRoot({
-  accountId,
-  config,
-  explicitWorkspace,
-  senderId,
-  sessionStore,
-}: {
-  accountId: string;
-  config: CheckinTargetConfig;
-  explicitWorkspace: string;
-  senderId: string;
-  sessionStore: CheckinSessionStoreLike | null;
-}): PreferredTargetResolution {
-  const normalizedExplicitWorkspace = normalizeText(explicitWorkspace);
-  if (normalizedExplicitWorkspace) {
-    return {
-      ambiguous: false,
-      candidates: [normalizedExplicitWorkspace],
-      reason: "explicit_workspace",
-      source: "explicit_workspace",
-      value: normalizedExplicitWorkspace,
-    };
-  }
-
-  const configuredWorkspace = normalizeText(config.workspaceRoot);
-  if (configuredWorkspace) {
-    return {
-      ambiguous: false,
-      candidates: [configuredWorkspace],
-      reason: "config_workspace_root",
-      source: "config.workspaceRoot",
-      value: configuredWorkspace,
-    };
-  }
-
-  return inspectPreferredWorkspaceRoot({
-    accountId,
-    config: {
-      ...config,
-      workspaceRoot: "",
-    },
-    explicitWorkspace: "",
-    senderId,
-    sessionStore,
-  });
 }
 
 function resolveCheckinIntervalConfig(config: Pick<AppRuntimeConfig, "checkinConfigFile">): ResolvedCheckinConfig {
@@ -848,10 +629,6 @@ function buildScheduledCheckinPrompt(
     `codeksei --workspace-root ${quotedWorkspace} system checkin-complete --user ${quotedSender} --workspace ${quotedWorkspace} --trigger ${triggerId} --result silent --sleep-for 6h`,
     "You may replace --sleep-for with --next-wake-at 2026-04-15T09:00:00+08:00 if you want an exact wake time.",
   ].join("\n");
-}
-
-export function buildCheckinTargetKey(target: Pick<CheckinResolvedTarget, "senderId" | "workspaceRoot">): string {
-  return `${target.senderId}::${target.workspaceRoot}`;
 }
 
 export function pickRandomDelayMs(minIntervalMs: number, maxIntervalMs: number): number {

@@ -3,7 +3,12 @@ import type { CommandExecutionResult } from "../contracts/cli-contract";
 import { parseCliArgs } from "../core/cli-args";
 import { runCliMutation } from "../core/cli-mutation";
 import { buildTerminalLeafHelp } from "../core/command-registry";
-import type { AppRuntimeConfig } from "../core/app-service-contract";
+import type {
+  IdentityAndTimeConfig,
+  RuntimeHostConfig,
+  SchemaAndTemplateConfig,
+  WorkspacePathsConfig,
+} from "../core/config-slices";
 import { buildReview, writeReview } from "../review/review";
 
 type ReviewKind = "nightly" | "weekly" | "monthly";
@@ -20,7 +25,15 @@ interface ReviewOptions extends Record<string, unknown> {
   model: string;
 }
 
-type ReviewConfig = Partial<AppRuntimeConfig>;
+type ReviewConfig = Partial<
+  Pick<WorkspacePathsConfig, "cliIdempotencyLedgerFile" | "diaryDir" | "workspaceRoot">
+  & Pick<IdentityAndTimeConfig, "timezone">
+  & Pick<RuntimeHostConfig, "hermesCommand" | "runtimeCommand" | "runtimeEndpoint">
+  & Pick<SchemaAndTemplateConfig, "reviewSchemaConfigFile" | "reviewSemanticHost" | "reviewSemanticMode" | "reviewSemanticModel" | "reviewSemanticTimeoutMs">
+  & {
+    reviewSemanticGenerator?: unknown;
+  }
+>;
 
 async function runReviewCommand(config: ReviewConfig, kind: ReviewKind, args: string[] = []) {
   const options = parseReviewArgs(args, kind);

@@ -11,6 +11,7 @@ import type {
   WeixinFileSendResult,
   WeixinMediaApi,
 } from "./media-types";
+import { isWeixinMediaGapError } from "./route-matrix";
 
 
 const WEIXIN_MEDIA_TYPE = {
@@ -383,9 +384,7 @@ async function sendWeixinMediaFile({
 }
 
 function isMissingUploadParamError(error: unknown): boolean {
-  const message = formatErrorMessage(error);
-  return message.includes("getUploadUrl returned no upload_param")
-    || message.includes("getUploadUrl returned neither upload_full_url nor upload_param");
+  return isWeixinMediaGapError(error);
 }
 
 function resolveFallbackWeixinMediaApi(apiVariant: unknown): WeixinMediaApi | null {

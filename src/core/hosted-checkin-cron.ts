@@ -9,7 +9,7 @@ import {
   buildCheckinTargetKey,
   type CheckinResolvedTarget,
   type CheckinTickResult,
-} from "./checkin-core";
+} from "../checkin";
 import { resolveHostMode } from "./host-mode";
 import { resolveHermesHomePath } from "./hermes-repo-local";
 import { resolvePackageRoot } from "./path-utils";

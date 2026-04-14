@@ -1,33 +1,29 @@
 import { createWeixinChannelAdapter } from "../adapters/channel/weixin";
 import { createCodexRuntimeAdapter } from "../adapters/runtime/codex";
+import { createTimelineIntegration } from "../integrations/timeline";
+import { BackstageTaskLifecycle } from "../runtime/backstage-task-lifecycle";
+import { StreamDelivery } from "../runtime/stream-delivery";
+import { ThreadStateStore } from "../runtime/thread-state-store";
+import { RuntimeTurnLifecycle } from "../runtime/runtime-turn-lifecycle";
+import { RuntimeWatchdogLifecycle } from "../runtime/runtime-watchdog-lifecycle";
+import { ReminderQueueStore } from "../state/reminder-queue-store";
+import { SystemMessageQueueStore } from "../state/system-message-queue-store";
+import { TimelineScreenshotQueueStore } from "../state/timeline-screenshot-queue-store";
+import { persistIncomingWeixinAttachments } from "../adapters/channel/weixin/media-receive";
 import type {
   AppRuntimeConfig,
   AppServices,
-  ChannelAdapterLike,
   ChannelCommandRouterLike,
   CreateAppServicesArgs,
-  ReminderQueueLike,
-  RuntimeAdapterLike,
-  StreamDeliveryLike,
-  SystemMessageDispatcherLike,
   SystemMessageDispatcherRef,
-  SystemMessageQueueLike,
-  ThreadStateStoreLike,
-  TimelineIntegrationLike,
-  TimelineScreenshotQueueLike,
 } from "./app-service-contract";
-import { BackstageTaskLifecycle } from "../runtime/backstage-task-lifecycle";
-import { RuntimeTurnLifecycle } from "../runtime/runtime-turn-lifecycle";
 import type {
   DeliveryFailurePayload,
-  HandlePreparedMessageOptions,
   NormalizedIncomingMessage,
   PreparedRuntimeMessage,
   ReplyTarget,
   TimelineScreenshotRequest,
 } from "./runtime-types";
-import { RuntimeWatchdogLifecycle } from "../runtime/runtime-watchdog-lifecycle";
-import { createTimelineIntegration } from "../integrations/timeline";
 import { ChannelCommandRouter } from "./channel-command-router";
 import { createControlCommandHandlers } from "./channel-command-control-handlers";
 import { createWorkspaceCommandHandlers } from "./channel-command-workspace-handlers";
@@ -39,20 +35,20 @@ import {
   normalizeCommandArgument,
   normalizeTrimmedText,
 } from "./approval-command-policy";
-import { StreamDelivery } from "../runtime/stream-delivery";
-import { ThreadStateStore } from "../runtime/thread-state-store";
-import { ReminderQueueStore } from "../state/reminder-queue-store";
-import { SystemMessageQueueStore } from "../state/system-message-queue-store";
-import { TimelineScreenshotQueueStore } from "../state/timeline-screenshot-queue-store";
-import { persistIncomingWeixinAttachments } from "../adapters/channel/weixin/media-receive";
 import {
-  buildRuntimeInboundText,
   buildReminderSystemTrigger,
+  buildRuntimeInboundText,
   getSystemMessageFailureRetryDelayMs,
   hasRpcId,
   resolveTimelineScreenshotOutput,
 } from "./app-runtime-helpers";
 import { formatErrorMessage } from "./app-poll-loop";
+import { handleReplyDeliveryFailureDelegate } from "./app-runtime-delegates";
+import {
+  resolveAppDefaultTerminalUser,
+  resolveAppWorkspaceRoot,
+  resolveReplyTargetForBinding as resolveAppReplyTargetForBinding,
+} from "./app-target-resolution";
 import { createHostedChannelAdapter, createHostedRuntimeAdapter } from "./hosted-mode-adapters";
 import { resolveHostMode } from "./host-mode";
 
@@ -65,20 +61,16 @@ const SYSTEM_MESSAGE_BUSY_RETRY_MS = 30_000;
 const STREAM_SETTLEMENT_TIMEOUT_MS = 5 * 60_000;
 
 type AppFactoryConfig = AppRuntimeConfig;
+type ReplyFailureHandler = (payload: DeliveryFailurePayload) => Promise<void>;
 
-type ResolveDefaultTerminalUser = () => string;
-type ResolveReplyTargetForBinding = (bindingKey: string) => ReplyTarget | null;
-type ResolveWorkspaceRoot = (bindingKey: string) => string;
-type HandlePreparedMessage = (
-  normalized: NormalizedIncomingMessage,
-  options: HandlePreparedMessageOptions,
-) => Promise<{ status: string; reason?: string } | void>;
-type SendTimelineScreenshot = (payload: TimelineScreenshotRequest) => Promise<unknown>;
-type HandleReplyDeliveryFailure = (payload: DeliveryFailurePayload) => Promise<void>;
+interface ReplyFailureHandlerRef {
+  current: ReplyFailureHandler;
+}
 
 interface AppInfrastructure {
   channelAdapter: AppServices["channelAdapter"];
   reminderQueue: AppServices["reminderQueue"];
+  replyFailureHandlerRef: ReplyFailureHandlerRef;
   runtimeAdapter: AppServices["runtimeAdapter"];
   sessionWriter: AppServices["sessionWriter"];
   streamDelivery: AppServices["streamDelivery"];
@@ -88,22 +80,10 @@ interface AppInfrastructure {
   timelineScreenshotQueue: AppServices["timelineScreenshotQueue"];
 }
 
-interface AppWorkflowArgs {
-  infrastructure: AppInfrastructure;
-  config: AppFactoryConfig;
-  resolveDefaultTerminalUser: ResolveDefaultTerminalUser;
-  resolveReplyTargetForBinding: ResolveReplyTargetForBinding;
-  resolveWorkspaceRoot: ResolveWorkspaceRoot;
-  handlePreparedMessage: HandlePreparedMessage;
-  sendTimelineScreenshot: SendTimelineScreenshot;
-}
-
 function createAppInfrastructure({
   config,
-  handleReplyDeliveryFailure,
 }: {
   config: AppFactoryConfig;
-  handleReplyDeliveryFailure: HandleReplyDeliveryFailure;
 }): AppInfrastructure {
   const hostMode = resolveHostMode(config);
   const channelAdapter = hostMode.mode === "bridge"
@@ -121,17 +101,21 @@ function createAppInfrastructure({
   });
   const timelineScreenshotQueue = new TimelineScreenshotQueueStore({ filePath: config.timelineScreenshotQueueFile });
   const reminderQueue = new ReminderQueueStore({ filePath: config.reminderQueueFile });
+  const replyFailureHandlerRef: ReplyFailureHandlerRef = {
+    current: async () => undefined,
+  };
   const streamDelivery = new StreamDelivery({
     channelAdapter,
     sessionStore: runtimeAdapter.getSessionStore(),
     weixinReplyMode: config.weixinReplyMode,
     deliveryTraceEnabled: Boolean(config.weixinDeliveryTrace),
-    onDeliveryFailure: (payload: DeliveryFailurePayload) => handleReplyDeliveryFailure(payload),
+    onDeliveryFailure: (payload: DeliveryFailurePayload) => replyFailureHandlerRef.current(payload),
   });
 
   return {
     channelAdapter,
     reminderQueue,
+    replyFailureHandlerRef,
     runtimeAdapter,
     sessionWriter,
     streamDelivery,
@@ -145,18 +129,17 @@ function createAppInfrastructure({
 function createRuntimeWorkflowServices({
   infrastructure,
   config,
-  resolveDefaultTerminalUser,
-  resolveReplyTargetForBinding,
-  resolveWorkspaceRoot,
-  handlePreparedMessage,
-  sendTimelineScreenshot,
-}: AppWorkflowArgs): Pick<
+}: {
+  infrastructure: AppInfrastructure;
+  config: AppFactoryConfig;
+}): Pick<
   AppServices,
   "backstageTaskLifecycle" | "channelCommandRouter" | "runtimeTurnLifecycle" | "runtimeWatchdogLifecycle" | "systemMessageDispatcherState"
 > {
   const {
     channelAdapter,
     reminderQueue,
+    replyFailureHandlerRef,
     runtimeAdapter,
     sessionWriter,
     streamDelivery,
@@ -165,6 +148,22 @@ function createRuntimeWorkflowServices({
     timelineIntegration,
     timelineScreenshotQueue,
   } = infrastructure;
+
+  const resolveDefaultTerminalUser = () => resolveAppDefaultTerminalUser({
+    config,
+    channelAdapter,
+    runtimeAdapter,
+  });
+  const resolveReplyTargetForBinding = (bindingKey: string): ReplyTarget | null => resolveAppReplyTargetForBinding({
+    bindingKey,
+    channelAdapter,
+    runtimeAdapter,
+  });
+  const resolveWorkspaceRoot = (bindingKey: string) => resolveAppWorkspaceRoot({
+    bindingKey,
+    config,
+    runtimeAdapter,
+  });
 
   const runtimeWatchdogLifecycle = new RuntimeWatchdogLifecycle({
     buildApprovalPromptSignature,
@@ -232,7 +231,22 @@ function createRuntimeWorkflowServices({
     }) => runtimeWatchdogLifecycle.scheduleRuntimeEventWatchdog(payload),
     streamDelivery,
     timelineIntegration,
-    buildRuntimeInboundText,
+    buildRuntimeInboundText: (normalized, persisted) => buildRuntimeInboundText(
+      normalized,
+      persisted,
+      {
+        timezone: config.timezone,
+        userName: config.userName,
+      },
+    ),
+  });
+
+  replyFailureHandlerRef.current = (payload: DeliveryFailurePayload) => handleReplyDeliveryFailureDelegate({
+    payload,
+    runtimeAdapter,
+    runtimeWatchdogLifecycle,
+    sessionWriter,
+    threadStateStore,
   });
 
   const systemMessageDispatcherState: SystemMessageDispatcherRef = { current: null };
@@ -242,12 +256,12 @@ function createRuntimeWorkflowServices({
     formatErrorMessage,
     getSystemMessageDispatcher: () => systemMessageDispatcherState.current,
     getSystemMessageFailureRetryDelayMs,
-    handlePreparedMessage,
+    handlePreparedMessage: (normalized, options) => runtimeTurnLifecycle.handlePreparedMessage(normalized, options),
     hasRpcId,
     normalizeText: normalizeTrimmedText,
     reminderQueue,
     runtimeAdapter,
-    sendTimelineScreenshot,
+    sendTimelineScreenshot: (payload: TimelineScreenshotRequest) => runtimeTurnLifecycle.sendTimelineScreenshot(payload),
     systemMessageBusyRetryMs: SYSTEM_MESSAGE_BUSY_RETRY_MS,
     systemMessageQueue,
     threadStateStore,
@@ -267,25 +281,11 @@ function createRuntimeWorkflowServices({
 
 export function createAppServices({
   config,
-  resolveDefaultTerminalUser,
-  resolveReplyTargetForBinding,
-  resolveWorkspaceRoot,
-  handlePreparedMessage,
-  sendTimelineScreenshot,
-  handleReplyDeliveryFailure,
 }: CreateAppServicesArgs): AppServices {
-  const infrastructure = createAppInfrastructure({
-    config,
-    handleReplyDeliveryFailure,
-  });
+  const infrastructure = createAppInfrastructure({ config });
   const workflows = createRuntimeWorkflowServices({
     infrastructure,
     config,
-    resolveDefaultTerminalUser,
-    resolveReplyTargetForBinding,
-    resolveWorkspaceRoot,
-    handlePreparedMessage,
-    sendTimelineScreenshot,
   });
 
   return {

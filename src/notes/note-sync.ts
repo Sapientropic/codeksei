@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { PRIMARY_NOTE_SYNC_MARKER_PREFIX } from "../core/branding";
-import { listTrackedProjects } from "../core/project-radar";
+import { listTrackedProjects } from "../workspace/project-radar";
 import {
   normalizeDisplayPath,
   resolveCrossPlatformPath,

@@ -9,7 +9,7 @@ import type { AppRuntimeConfig } from "../core/app-service-contract";
 import { createTimelineIntegration } from "../integrations/timeline";
 import { writeForeignTextDocument } from "../state/json-state";
 import { resolvePackageRoot } from "../core/path-utils";
-import { resolveConfiguredPersonName } from "../core/person-reference";
+import { resolveConfiguredPersonName } from "../contracts/person-reference";
 import type { GlobalCliOptions } from "../contracts/cli-contract";
 import type { TerminalCommandManifestEntry } from "../contracts/command-surface";
 

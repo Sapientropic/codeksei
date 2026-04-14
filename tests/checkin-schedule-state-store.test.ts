@@ -8,7 +8,7 @@ const { CheckinConfigStore }: typeof import("../src/state/checkin-config-store")
 const {
   runCheckinComplete,
   runCheckinTick,
-}: typeof import("../src/core/checkin-core") = require("../src/core/checkin-core");
+}: typeof import("../src/checkin") = require("../src/checkin");
 const {
   CheckinScheduleStateStore,
 }: typeof import("../src/state/checkin-schedule-state-store") = require("../src/state/checkin-schedule-state-store");

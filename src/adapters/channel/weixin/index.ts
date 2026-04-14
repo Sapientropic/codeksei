@@ -3,8 +3,14 @@ import { runV2LoginFlow } from "./login-v2";
 import { sendWeixinMediaFile } from "./media-send";
 import { createWeixinDeliveryFacade, packChunksForWeixinDelivery, sendV2TextChunk } from "./delivery";
 import type { ChannelAdapterDescriptor } from "../../../core/app-service-contract";
+import type { NormalizedIncomingMessage } from "../../../core/runtime-types";
 import type { SendWeixinMediaFileArgs, SendWeixinMediaFileResult } from "./media-types";
 import { createWeixinUpdateState, type GetUpdatesResponse, type WeixinAccount, type WeixinConfig } from "./updates";
+import {
+  describeWeixinAdapterVariant,
+  getWeixinRouteRule,
+  normalizeWeixinAdapterVariantKey,
+} from "./route-matrix";
 
 
 interface SendTextChunksArgs {
@@ -42,14 +48,14 @@ interface WeixinChannelAdapter {
   saveSyncBuffer(buffer: string): void;
   rememberContextToken(userId: unknown, contextToken: unknown): string;
   getUpdates(args?: GetUpdatesArgs): Promise<GetUpdatesResponse>;
-  normalizeIncomingMessage(message: unknown): unknown;
+  normalizeIncomingMessage(message: unknown): NormalizedIncomingMessage | null;
   sendText(args: SendTextChunksArgs): Promise<void>;
   sendTyping(args: SendTypingArgs): Promise<void>;
   sendFile(args: SendFileArgs): Promise<SendWeixinMediaFileResult>;
 }
 
 export function createWeixinChannelAdapter(config: WeixinConfig): WeixinChannelAdapter {
-  const variant = normalizeAdapterVariantKey(config.weixinAdapterVariant);
+  const variant = normalizeWeixinAdapterVariantKey(config.weixinAdapterVariant);
   if (variant === "legacy") {
     return createLegacyWeixinChannelAdapter(config);
   }
@@ -65,7 +71,7 @@ export function createWeixinChannelAdapter(config: WeixinConfig): WeixinChannelA
     describe() {
       return {
         id: "weixin",
-        variant: "v2",
+        variant: describeWeixinAdapterVariant(variant),
         kind: "channel",
         provider: "weixin",
         operations: {
@@ -108,7 +114,7 @@ export function createWeixinChannelAdapter(config: WeixinConfig): WeixinChannelA
     async getUpdates(args: GetUpdatesArgs = {}) {
       return updates.getUpdates(args);
     },
-    normalizeIncomingMessage(message: unknown) {
+    normalizeIncomingMessage(message: unknown): NormalizedIncomingMessage | null {
       return updates.normalizeIncomingMessage(message);
     },
     async sendText(args: SendTextChunksArgs) {
@@ -123,12 +129,7 @@ export function createWeixinChannelAdapter(config: WeixinConfig): WeixinChannelA
       if (!resolvedToken) {
         throw new Error(`缺少 context_token，无法发送文件给用户 ${userId}`);
       }
-      // Text polling/sending lives on the v2 stack, but attachments intentionally
-      // stay on the legacy media API. The original repo never moved sendFile onto
-      // v2, and live timeline screenshot failures ("getUploadUrl returned no
-      // upload_param") only appeared after we forced media onto the v2 headers.
-      // Keep this split explicit so future "cleanup" work does not silently route
-      // screenshots/files back onto the broken stack.
+      const sendFileRoute = getWeixinRouteRule("sendFile", variant);
       const sendArgs = {
         filePath,
         to: userId,
@@ -136,18 +137,13 @@ export function createWeixinChannelAdapter(config: WeixinConfig): WeixinChannelA
         baseUrl: account.baseUrl,
         token: account.token,
         cdnBaseUrl: normalizeWeixinConfigText(config.weixinCdnBaseUrl),
-        apiVariant: "legacy",
+        apiVariant: sendFileRoute.stack,
         clientVersion: normalizeWeixinConfigText(config.weixinProtocolClientVersion),
       };
       const routeTag = normalizeWeixinConfigText(account.routeTag);
       return sendWeixinMediaFile(routeTag ? { ...sendArgs, routeTag } : sendArgs);
     },
   };
-}
-
-function normalizeAdapterVariantKey(value: unknown): "legacy" | "v2" {
-  const normalized = normalizeWeixinConfigText(value).toLowerCase();
-  return normalized === "legacy" ? "legacy" : "v2";
 }
 
 function normalizeWeixinConfigText(value: unknown): string {

@@ -1,6 +1,6 @@
 import type { ReminderQueueEntry, SystemMessage } from "../contracts/queue-items";
+import type { CheckinRuntimeConfig } from "../core/config-slices";
 import type {
-  AppRuntimeConfig,
   ChannelAdapterLike,
   ReminderQueueLike,
   RuntimeAdapterLike,
@@ -43,7 +43,7 @@ type SendTimelineScreenshot = (payload: TimelineScreenshotRequest) => Promise<un
 type BuildReminderSystemTrigger = (reminder: ReminderQueueEntry, config: BackstageConfig) => string;
 type ResolveWorkspaceRoot = (bindingKey: string) => string;
 
-type BackstageConfig = AppRuntimeConfig;
+type BackstageConfig = Pick<CheckinRuntimeConfig, "workspaceId" | "workspaceRoot" | "userName">;
 
 interface BackstageTaskLifecycleDependencies {
   channelAdapter: ChannelAdapterLike;

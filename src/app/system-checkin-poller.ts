@@ -1,19 +1,26 @@
 import { normalizeText } from "../core/text-normalization";
+import type {
+  CheckinRuntimeConfig,
+  WeixinBridgeConfig,
+  WorkspacePathsConfig,
+} from "../core/config-slices";
 
 import { PACKAGE_NAME } from "../contracts/app-env";
 import { resolveSelectedAccount } from "../adapters/channel/weixin/account-store";
 import { SessionStore } from "../adapters/runtime/codex/session-store";
 import {
   processBridgeCheckinPollerIteration,
-} from "../core/checkin-core";
-import type { AppRuntimeConfig } from "../core/app-service-contract";
+} from "../checkin";
 import { logInfo } from "../core/logging";
 import { formatCheckinRange } from "../state/checkin-config";
 import { SystemMessageQueueStore } from "../state/system-message-queue-store";
 
 const CHECKIN_POLLER_HEARTBEAT_MS = 30_000;
 
-type CheckinPollerConfig = AppRuntimeConfig;
+type CheckinPollerConfig =
+  & Pick<WorkspacePathsConfig, "sessionsFile">
+  & Pick<WeixinBridgeConfig, "accountId" | "accountsDir" | "weixinBaseUrl" | "weixinRouteTag">
+  & Pick<CheckinRuntimeConfig, "allowedUserIds" | "checkinConfigFile" | "checkinScheduleStateFile" | "systemMessageDeadLetterFile" | "systemMessageQueueFile" | "userName" | "workspaceId" | "workspaceRoot">;
 
 export async function runSystemCheckinPoller(config: CheckinPollerConfig) {
   const account = resolveSelectedAccount(config);

@@ -66,6 +66,11 @@ const rules: Array<{
     reason: "workspace continuity should stay below runtime/app wiring and outside domain logic",
   },
   {
+    sourcePrefix: "src/checkin/",
+    forbiddenPrefixes: ["src/app/", "src/adapters/", "src/review/", "src/notes/"],
+    reason: "checkin scheduling should stay below CLI entrypoints and outside adapter/domain implementation layers",
+  },
+  {
     sourcePrefix: "src/adapters/",
     forbiddenPrefixes: ["src/app/", "src/review/", "src/notes/"],
     reason: "adapters should not depend on app CLI or domain workflow implementations",

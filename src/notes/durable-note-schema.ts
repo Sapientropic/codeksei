@@ -7,7 +7,7 @@ import {
   type NormalizedWorkspaceSchemaConfig,
 } from "../contracts/config-files";
 import { loadJsonConfig } from "../core/config-loader";
-import { listTrackedProjects } from "../core/project-radar";
+import { listTrackedProjects } from "../workspace/project-radar";
 import {
   normalizeDisplayPath,
   resolveCrossPlatformPath,

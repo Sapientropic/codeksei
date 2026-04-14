@@ -39,3 +39,29 @@ test("workspace bootstrap treats timeline contract as relevant for cutover bookk
   );
   assert.match(instructions, /\.codex\/timeline\/README\.md - timeline write\/read contract for this workspace/u);
 });
+
+test("workspace bootstrap ignores invalid regex and polluted config entries", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-bootstrap-config-"));
+  const configFile = path.join(tempRoot, "workspace-bootstrap.json");
+  fs.writeFileSync(path.join(tempRoot, "AGENTS.md"), "# Public\n", "utf8");
+  fs.writeFileSync(path.join(tempRoot, "README.md"), "# Readme\n", "utf8");
+  fs.writeFileSync(configFile, JSON.stringify({
+    defaults: {
+      primaryFiles: [
+        { path: "AGENTS.md", role: ["bad role"] },
+        { path: "README.md", role: "readme" },
+      ],
+      recentFiles: [
+        { directory: "notes", pattern: "[unterminated", role: "bad regex" },
+      ],
+    },
+  }, null, 2), "utf8");
+
+  const instructions = buildWorkspaceContinuityInstructions(tempRoot, {
+    workspaceBootstrapConfigFile: configFile,
+  });
+
+  assert.match(instructions, /AGENTS\.md - workspace entry file/u);
+  assert.match(instructions, /README\.md - readme/u);
+  assert.doesNotMatch(instructions, /bad regex/u);
+});
