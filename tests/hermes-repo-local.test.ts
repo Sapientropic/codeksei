@@ -203,11 +203,87 @@ test("repo-local bridge can sync hosted checkin one-shot jobs", () => {
     assert.equal(Array.isArray(jobs.jobs), true);
     assert.equal(jobs.jobs.length, 1);
     assert.equal(jobs.jobs[0].codeksei_checkin_role, "wake");
+    assert.equal(jobs.jobs[0].deliver, "origin");
+    assert.deepEqual(jobs.jobs[0].origin, {
+      platform: "weixin",
+      chat_id: "wxid_sender",
+      chat_name: "Test Chat",
+      thread_id: "",
+    });
   } finally {
     if (previousSessionKey === undefined) {
       delete process.env.HERMES_SESSION_KEY;
     } else {
       process.env.HERMES_SESSION_KEY = previousSessionKey;
+    }
+  }
+});
+
+test("repo-local bridge can sync hosted checkin jobs from cron/session env origin metadata", () => {
+  const fixture = createFakeHermesRepoLocalFixture(
+    fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-hermes-repo-local-sync-checkin-origin-fallback-"))
+  );
+  const previousSessionKey = process.env.HERMES_SESSION_KEY;
+  const previousPlatform = process.env.HERMES_SESSION_PLATFORM;
+  const previousChatId = process.env.HERMES_SESSION_CHAT_ID;
+  const previousChatName = process.env.HERMES_SESSION_CHAT_NAME;
+  const previousThreadId = process.env.HERMES_CRON_AUTO_DELIVER_THREAD_ID;
+  delete process.env.HERMES_SESSION_KEY;
+  process.env.HERMES_SESSION_PLATFORM = "weixin";
+  process.env.HERMES_SESSION_CHAT_ID = "wxid_cron";
+  process.env.HERMES_SESSION_CHAT_NAME = "Cron Origin";
+  process.env.HERMES_CRON_AUTO_DELIVER_THREAD_ID = "thread-9";
+
+  try {
+    const result = syncCheckinCronViaHermesRepoLocal({
+      CODEKSEI_HERMES_HOME: fixture.hermesHome,
+      CODEKSEI_HERMES_REPO_LOCAL_SHIM_PATH: fixture.shimPath,
+      CODEKSEI_HERMES_REPO_ROOT: fixture.repoRoot,
+    }, {
+      due_at_iso: "2026-04-14T12:30:00.000Z",
+      name: "ck-checkin-wake-cron-origin",
+      prompt: "sync me from cron env",
+      role: "wake",
+      sender_id: "wx-user",
+      target_key: "wx-user::/workspace",
+      workspace_root: "/workspace",
+    });
+
+    assert.equal(result.chatId, "wxid_cron");
+    const jobs = JSON.parse(fs.readFileSync(fixture.jobsFile, "utf8"));
+    assert.equal(jobs.jobs.length, 1);
+    assert.equal(jobs.jobs[0].deliver, "origin");
+    assert.deepEqual(jobs.jobs[0].origin, {
+      platform: "weixin",
+      chat_id: "wxid_cron",
+      chat_name: "Cron Origin",
+      thread_id: "thread-9",
+    });
+  } finally {
+    if (previousSessionKey === undefined) {
+      delete process.env.HERMES_SESSION_KEY;
+    } else {
+      process.env.HERMES_SESSION_KEY = previousSessionKey;
+    }
+    if (previousPlatform === undefined) {
+      delete process.env.HERMES_SESSION_PLATFORM;
+    } else {
+      process.env.HERMES_SESSION_PLATFORM = previousPlatform;
+    }
+    if (previousChatId === undefined) {
+      delete process.env.HERMES_SESSION_CHAT_ID;
+    } else {
+      process.env.HERMES_SESSION_CHAT_ID = previousChatId;
+    }
+    if (previousChatName === undefined) {
+      delete process.env.HERMES_SESSION_CHAT_NAME;
+    } else {
+      process.env.HERMES_SESSION_CHAT_NAME = previousChatName;
+    }
+    if (previousThreadId === undefined) {
+      delete process.env.HERMES_CRON_AUTO_DELIVER_THREAD_ID;
+    } else {
+      process.env.HERMES_CRON_AUTO_DELIVER_THREAD_ID = previousThreadId;
     }
   }
 });

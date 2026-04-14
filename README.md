@@ -273,6 +273,7 @@ Codeksei 自己负责 Weixin bridge 和共享线程。
 - 由 Codeksei CLI + 官方受管的 Hermes skill 提供 companion workflows
 - `channel send-file`、`timeline screenshot --send`、`reminder write` 现在会走 Hermes repo-local shim；`system send` 仍保持 blocked，因为还没有 source-backed backstage-only host primitive
 - 主动 checkin 由 Hermes 执行 one-shot wake/recovery job；Codeksei 提供 `system checkin-trigger` / `system checkin-tick` / `system checkin-complete` 维护 `tick -> ack -> complete` 的调度真相，并通过 `operator hermes sync-checkin` 把下一次 one-shot wake 重新 arm 回 Hermes
+- `sync-checkin` 创建/更新 job 时才需要 origin context；真正 cron 裸跑时，Hermes 直接按持久化的 `job.origin` 投递，不再反查 live session
 - 若 sibling checkout 不在默认位置，可显式设置 `CODEKSEI_HERMES_REPO_ROOT`；`codeksei operator hermes status` / `smoke` 会把 repo-local readiness 和 commit 打出来
 - 可先用 `codeksei operator hermes --help` 或 `codeksei operator schema operator hermes` 看 4 个 leaf action
 - 推荐先执行：

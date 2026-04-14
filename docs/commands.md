@@ -101,6 +101,7 @@ operator / bootstrap：
 - 如果当前配置是 `Hermes Hosted Mode`，`codeksei start` 与 `shared:start` 会明确提示“改由 Hermes gateway 托管”，不会隐式回退到 Codex app-server
 - `codeksei system checkin-poller` 现在只保留 bridge 宿主包装；host-neutral 真相层是 `checkin-trigger`、`checkin-tick` 与 `checkin-complete`
 - `checkin-complete` 在 Hermes Hosted Mode 下会在写回 state 后自动 re-arm 下一条 wake one-shot job，并清理未来 recovery job
+- `sync-checkin` 创建/更新 job 时需要 origin context；真正 cron 投递时，Hermes 直接读取持久化的 `job.origin`，不会再按 target 反查 live session
 - `system checkin --range` 现在是 fallback window，不再代表 agent 的真实唤醒节奏
 
 ## 微信命令

@@ -171,6 +171,9 @@ function createHostedCheckinCronPlan(
   if (!normalizedWakeAt) {
     throw new Error(`非法的 hosted checkin wake 时间：${plannedWakeAt}`);
   }
+  // Codeksei decides which single future one-shot job should exist. Hermes only
+  // persists that schedule plus origin metadata so runtime delivery can use the
+  // stored job.origin target without re-discovering a live session later.
   return {
     name: buildHostedCheckinJobName(targetKey, role),
     plannedWakeAt: normalizedWakeAt,
@@ -187,6 +190,8 @@ function buildHostedCheckinCronPrompt(
   config: Partial<HostedCheckinConfig>,
   target: CheckinResolvedTarget,
 ): string {
+  // The prompt teaches Hermes when to tick/ack/complete, while actual delivery
+  // routing comes from the persisted cron job origin metadata written by sync-checkin.
   const tickCommand = buildHostedCheckinCliCommand(target.workspaceRoot, [
     "system",
     "checkin-tick",

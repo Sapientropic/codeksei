@@ -139,6 +139,15 @@ test("operator hermes sync-checkin creates a wake job for scheduled hosted check
   assert.equal(result.data.planned.role, "wake");
   assert.equal(result.data.summary.wakeJobs.length, 1);
   assert.equal(result.data.summary.recoveryJobs.length, 0);
+  const jobsState = JSON.parse(fs.readFileSync(repoLocal.jobsFile, "utf8"));
+  assert.equal(jobsState.jobs.length, 1);
+  assert.equal(jobsState.jobs[0].deliver, "origin");
+  assert.deepEqual(jobsState.jobs[0].origin, {
+    platform: "weixin",
+    chat_id: "wxid_sender",
+    chat_name: "Test Chat",
+    thread_id: "",
+  });
 });
 
 test("operator hermes sync-checkin creates an immediate wake job when checkin is already due", async () => {

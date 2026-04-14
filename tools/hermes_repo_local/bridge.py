@@ -114,6 +114,9 @@ def _origin_from_env() -> Dict[str, str]:
 
 
 def _resolve_origin_context(hermes_home: Path, session_key: str) -> Dict[str, Any]:
+    # Repo-local cron/reminder writes only need origin at create/update time.
+    # Once the job is stored, Hermes runtime delivery resolves `deliver="origin"`
+    # from the persisted job.origin payload instead of reloading live session state.
     if session_key:
         try:
             entry = _load_session_entry(hermes_home, session_key)
@@ -326,6 +329,8 @@ def _build_checkin_job_updates(
     from cron.jobs import parse_schedule
 
     schedule = parse_schedule(due_at_iso)
+    # Keep origin/deliver on every update so bare cron runs can still deliver
+    # to the original Weixin chat without needing a session lookup at send time.
     return {
         "codeksei_checkin_role": role,
         "codeksei_checkin_target_key": target_key,

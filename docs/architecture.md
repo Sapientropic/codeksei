@@ -251,7 +251,7 @@
 - Hermes 集成当前优先走 skill / CLI / operator contract，而不是把 Hermes gateway 逻辑重新 vendoring 进来
 - Hermes Hosted Mode 的 repo-local send-back / cron 现在通过 Codeksei 自己的薄 Python shim 对接 sibling `hermes-agent` checkout，不在 TS 里重写 Weixin/CDN/context_token/cron 细节
 - review hybrid 现在由宿主策略层选择 semantic host：Bridge Mode 默认走 Codex，Hermes Hosted Mode 默认走 Hermes，文件路由与落盘逻辑仍保留在 Codeksei 自己手里
-- checkin 现在按 host-neutral core 收口：`system checkin-trigger` 提供 one-shot payload，`system checkin-tick` / `system checkin-complete` 维护调度真相；Hermes Hosted Mode 通过 `operator hermes sync-checkin` + repo-local shim 只保留一个未来 wake 或 recovery one-shot job，`system checkin-poller` 退回 bridge-only wrapper
+- checkin 现在按 host-neutral core 收口：`system checkin-trigger` 提供 one-shot payload，`system checkin-tick` / `system checkin-complete` 维护调度真相；Hermes Hosted Mode 通过 `operator hermes sync-checkin` + repo-local shim 只保留一个未来 wake 或 recovery one-shot job，运行时 delivery 直接读持久化的 `job.origin`，`system checkin-poller` 退回 bridge-only wrapper
 - project radar 现在保持“本地 git 真相优先”，只有 git unavailable 时才补 GitHub activity fallback
 
 架构保护规则默认守住：

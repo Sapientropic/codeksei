@@ -279,4 +279,11 @@ test("hosted checkin-complete re-arms the next wake and clears future recovery j
   const jobsState = JSON.parse(fs.readFileSync(repoLocal.jobsFile, "utf8"));
   assert.equal(jobsState.jobs.length, 1);
   assert.equal(jobsState.jobs[0].codeksei_checkin_role, "wake");
+  assert.equal(jobsState.jobs[0].deliver, "origin");
+  assert.deepEqual(jobsState.jobs[0].origin, {
+    platform: "weixin",
+    chat_id: "wxid_sender",
+    chat_name: "Test Chat",
+    thread_id: "",
+  });
 });

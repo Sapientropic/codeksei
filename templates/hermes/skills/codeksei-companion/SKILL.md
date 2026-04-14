@@ -92,6 +92,11 @@ Flow:
 5. After the proactive pass actually finishes, Hermes must call `checkin-complete` to record `sent_message|silent|backstage_only`; Hosted Mode will then auto-arm the next wake one-shot job.
 6. `checkin-trigger` is only for one-shot payload generation; it does not own schedule state.
 
+Delivery note:
+
+- `sync-checkin` only needs session/env origin metadata when creating or updating the Hermes cron job.
+- When the cron job later fires, Hermes delivers to the persisted `job.origin` target directly; it does not need a second live-session lookup.
+
 If Hermes only wants a one-shot payload without schedule state:
 
 ```bash
