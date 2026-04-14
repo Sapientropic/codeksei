@@ -77,7 +77,7 @@ interface ReadyState {
 interface CodexRuntimeAdapter {
   describe(): RuntimeAdapterDescriptor;
   createClient(): RuntimeClientLike;
-  onEvent(listener: (event: RuntimeEvent<UnknownRecord>, message: UnknownRecord) => void): () => void;
+  onEvent(listener: (event: RuntimeEvent<UnknownRecord>) => void): () => void;
   getSessionStore(): SessionStore;
   getSessionWriter(): SessionStoreWriter;
   initialize(): Promise<ReadyState>;
@@ -108,7 +108,7 @@ export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRunt
       return runtimeClient.onMessage((message) => {
         const event = mapCodexMessageToRuntimeEvent(message);
         if (event) {
-          listener(event, message);
+          listener(event);
         }
       });
     },

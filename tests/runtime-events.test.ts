@@ -65,3 +65,24 @@ test("runtime event type guards keep usage out of reply and progress checks", ()
   assert.equal(isRuntimeFirstProgressEventType(RUNTIME_EVENT_TYPES.TURN_STARTED), true);
   assert.equal(isRuntimeFirstProgressEventType(RUNTIME_EVENT_TYPES.USAGE_UPDATED), false);
 });
+
+test("runtime approval payload drops polluted values and normalizes numeric request ids", () => {
+  const payload = normalizeRuntimeEventPayload(RUNTIME_EVENT_TYPES.APPROVAL_REQUESTED, {
+    threadId: " thread-1 ",
+    requestId: 42,
+    reason: " Need shell ",
+    commandTokens: ["npm", "", "review:weekly", 99],
+    signature: { invalid: true },
+    promptedAt: "not-a-date",
+  });
+
+  assert.deepEqual(payload, {
+    threadId: "thread-1",
+    requestId: "42",
+    reason: "Need shell",
+    command: "npm review:weekly",
+    commandTokens: ["npm", "review:weekly"],
+    signature: "",
+    promptedAt: "",
+  });
+});

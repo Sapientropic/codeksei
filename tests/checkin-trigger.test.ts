@@ -11,7 +11,7 @@ const {
 }: typeof import("../src/app/system-checkin-complete-cli") = require("../src/app/system-checkin-complete-cli");
 const {
   runCheckinTick,
-}: typeof import("../src/core/checkin-core") = require("../src/core/checkin-core");
+}: typeof import("../src/checkin") = require("../src/checkin");
 const {
   runSystemCheckinTickCommand,
 }: typeof import("../src/app/system-checkin-tick-cli") = require("../src/app/system-checkin-tick-cli");

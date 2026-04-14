@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import type { AppRuntimeConfig } from "./app-service-contract";
+import { composeAppRuntimeConfig } from "./config-slices";
 import {
   resolveCrossPlatformPathFromRoot,
   resolvePackageRoot,
@@ -66,81 +67,97 @@ function parseEnvConfig(env: EnvSource, options: ReadConfigOptions = {}): AppRun
   ) || (runtime === "hermes" ? "hermes" : "codeksei");
   const channel = normalizeCodekseiChannel(readPrefixedEnv(env, "CHANNEL")) || "weixin";
 
-  return {
-    stateDir,
-    codekseiHome: appHome,
-    workspaceId: readPrefixedEnv(env, "WORKSPACE_ID") || "default",
-    workspaceRoot,
-    timezone: timezoneConfig.timezone,
-    timezoneSource: timezoneConfig.source,
-    timezoneExplicit: timezoneConfig.explicit,
-    timelineStateTimezone: timezoneConfig.timelineStateTimezone,
-    diaryDir: readPrefixedEnv(env, "DIARY_DIR") || path.join(stateDir, "diary"),
-    timelineStateDir,
-    userName: readPrefixedEnv(env, "USER_NAME") || "",
-    userGender: readPrefixedEnv(env, "USER_GENDER") || "female",
-    allowedUserIds: readPrefixedListEnv(env, "ALLOWED_USER_IDS"),
-    channel,
-    runtime,
-    channelProvider,
-    accountId: readPrefixedEnv(env, "ACCOUNT_ID") || "",
-    weixinBaseUrl: readPrefixedEnv(env, "WEIXIN_BASE_URL") || "https://ilinkai.weixin.qq.com",
-    weixinCdnBaseUrl: readPrefixedEnv(env, "WEIXIN_CDN_BASE_URL") || "https://novac2c.cdn.weixin.qq.com/c2c",
-    weixinAdapterVariant: readPrefixedEnv(env, "WEIXIN_ADAPTER") || "v2",
-    weixinReplyMode: normalizeWeixinReplyMode(readPrefixedEnv(env, "WEIXIN_REPLY_MODE") || "stream"),
-    weixinDeliveryTrace: readPrefixedBoolEnv(env, "WEIXIN_DELIVERY_TRACE"),
-    weixinQrBotType: readPrefixedEnv(env, "WEIXIN_QR_BOT_TYPE") || "3",
-    weixinRouteTag: readPrefixedEnv(env, "WEIXIN_ROUTE_TAG") || "",
-    weixinProtocolClientVersion: readPrefixedEnv(env, "WEIXIN_PROTOCOL_CLIENT_VERSION") || "2.1.1",
-    accountsDir: path.join(stateDir, "accounts"),
-    logDir: path.join(stateDir, "logs"),
-    reminderQueueFile: path.join(stateDir, "reminder-queue.json"),
-    checkinConfigFile: path.join(stateDir, "checkin-config.json"),
-    checkinScheduleStateFile: path.join(stateDir, "checkin-schedule-state.json"),
-    systemMessageQueueFile: path.join(stateDir, "system-message-queue.json"),
-    systemMessageDeadLetterFile: path.join(stateDir, "system-message-dead-letter.json"),
-    timelineScreenshotQueueFile: path.join(stateDir, "timeline-screenshot-queue.json"),
-    cliIdempotencyLedgerFile: path.join(stateDir, "cli-idempotency-ledger.json"),
-    weixinInstructionsFile: readPrefixedEnv(env, "WEIXIN_INSTRUCTIONS_FILE")
-      || path.join(packageRoot, "templates", "weixin-instructions.md"),
-    weixinInstructionsOverlayFile: readPrefixedEnv(env, "WEIXIN_INSTRUCTIONS_OVERLAY_FILE")
-      || path.join(stateDir, "weixin-instructions.local.md"),
-    weixinOperationsFile: path.join(packageRoot, "templates", "weixin-operations.md"),
-    weixinOperationsOverlayFile: readPrefixedEnv(env, "WEIXIN_OPERATIONS_OVERLAY_FILE")
-      || path.join(stateDir, "weixin-operations.local.md"),
-    syncBufferDir: path.join(stateDir, "sync-buffers"),
-    runtimeEndpoint: readPrefixedEnv(env, "RUNTIME_ENDPOINT")
-      || readPrefixedEnv(env, "CODEX_ENDPOINT")
-      || "",
-    runtimeCommand: readPrefixedEnv(env, "RUNTIME_COMMAND")
-      || readPrefixedEnv(env, "CODEX_COMMAND")
-      || "",
-    runtimeAccessMode,
-    codexAccessMode,
-    hermesCommand: readPrefixedEnv(env, "HERMES_COMMAND")
-      || env.HERMES_COMMAND
-      || "hermes",
-    hermesHome,
-    hermesRepoRoot,
-    hermesRepoLocalShimPath,
-    hermesPythonCommand: readPrefixedEnv(env, "HERMES_PYTHON_COMMAND") || "",
-    sessionsFile: path.join(stateDir, "sessions.json"),
-    workspaceBootstrapConfigFile: readPrefixedEnv(env, "WORKSPACE_BOOTSTRAP_CONFIG")
-      || path.join(stateDir, "workspace-bootstrap.json"),
-    projectRadarConfigFile: readPrefixedEnv(env, "PROJECT_RADAR_CONFIG")
-      || resolveCrossPlatformPathFromRoot(workspaceRoot, ".codex", "code-projects.json"),
-    durableNoteSchemaConfigFile: readPrefixedEnv(env, "DURABLE_NOTE_SCHEMA_CONFIG")
-      || resolveCrossPlatformPathFromRoot(workspaceRoot, ".codex", "durable-note-schema.json"),
-    reviewSchemaConfigFile: readPrefixedEnv(env, "REVIEW_SCHEMA_CONFIG")
-      || resolveCrossPlatformPathFromRoot(workspaceRoot, ".codex", "review-schema.json"),
-    reviewSemanticMode: readPrefixedEnv(env, "REVIEW_SEMANTIC_MODE") || "hybrid",
-    reviewSemanticHost: normalizeReviewSemanticHost(readPrefixedEnv(env, "REVIEW_SEMANTIC_HOST")),
-    reviewSemanticModel: readPrefixedEnv(env, "REVIEW_SEMANTIC_MODEL") || "",
-    reviewSemanticTimeoutMs: readPrefixedIntEnv(env, "REVIEW_SEMANTIC_TIMEOUT_MS") || 120000,
-    sharedBridgeHeartbeatFile: path.join(stateDir, "logs", "shared-wechat-heartbeat.json"),
-    sharedWatchdogStateFile: path.join(stateDir, "logs", "shared-watchdog-state.json"),
-    startWithCheckin: readPrefixedBoolEnv(env, "ENABLE_CHECKIN"),
-  };
+  return composeAppRuntimeConfig({
+    workspacePaths: {
+      stateDir,
+      codekseiHome: appHome,
+      workspaceId: readPrefixedEnv(env, "WORKSPACE_ID") || "default",
+      workspaceRoot,
+      diaryDir: readPrefixedEnv(env, "DIARY_DIR") || path.join(stateDir, "diary"),
+      timelineStateDir,
+      logDir: path.join(stateDir, "logs"),
+      reminderQueueFile: path.join(stateDir, "reminder-queue.json"),
+      timelineScreenshotQueueFile: path.join(stateDir, "timeline-screenshot-queue.json"),
+      cliIdempotencyLedgerFile: path.join(stateDir, "cli-idempotency-ledger.json"),
+      syncBufferDir: path.join(stateDir, "sync-buffers"),
+      sessionsFile: path.join(stateDir, "sessions.json"),
+      sharedBridgeHeartbeatFile: path.join(stateDir, "logs", "shared-wechat-heartbeat.json"),
+      sharedWatchdogStateFile: path.join(stateDir, "logs", "shared-watchdog-state.json"),
+    },
+    identityAndTime: {
+      timezone: timezoneConfig.timezone,
+      timezoneSource: timezoneConfig.source,
+      timezoneExplicit: timezoneConfig.explicit,
+      timelineStateTimezone: timezoneConfig.timelineStateTimezone,
+      userName: readPrefixedEnv(env, "USER_NAME") || "",
+      userGender: readPrefixedEnv(env, "USER_GENDER") || "female",
+      allowedUserIds: readPrefixedListEnv(env, "ALLOWED_USER_IDS"),
+    },
+    weixinBridge: {
+      accountId: readPrefixedEnv(env, "ACCOUNT_ID") || "",
+      accountsDir: path.join(stateDir, "accounts"),
+      weixinBaseUrl: readPrefixedEnv(env, "WEIXIN_BASE_URL") || "https://ilinkai.weixin.qq.com",
+      weixinCdnBaseUrl: readPrefixedEnv(env, "WEIXIN_CDN_BASE_URL") || "https://novac2c.cdn.weixin.qq.com/c2c",
+      weixinAdapterVariant: readPrefixedEnv(env, "WEIXIN_ADAPTER") || "v2",
+      weixinReplyMode: normalizeWeixinReplyMode(readPrefixedEnv(env, "WEIXIN_REPLY_MODE") || "stream"),
+      weixinDeliveryTrace: readPrefixedBoolEnv(env, "WEIXIN_DELIVERY_TRACE"),
+      weixinQrBotType: readPrefixedEnv(env, "WEIXIN_QR_BOT_TYPE") || "3",
+      weixinRouteTag: readPrefixedEnv(env, "WEIXIN_ROUTE_TAG") || "",
+      weixinProtocolClientVersion: readPrefixedEnv(env, "WEIXIN_PROTOCOL_CLIENT_VERSION") || "2.1.1",
+    },
+    runtimeHost: {
+      channel,
+      runtime,
+      channelProvider,
+      runtimeEndpoint: readPrefixedEnv(env, "RUNTIME_ENDPOINT")
+        || readPrefixedEnv(env, "CODEX_ENDPOINT")
+        || "",
+      runtimeCommand: readPrefixedEnv(env, "RUNTIME_COMMAND")
+        || readPrefixedEnv(env, "CODEX_COMMAND")
+        || "",
+      runtimeAccessMode,
+      codexAccessMode,
+      hermesCommand: readPrefixedEnv(env, "HERMES_COMMAND")
+        || env.HERMES_COMMAND
+        || "hermes",
+      hermesHome,
+      hermesRepoRoot,
+      hermesRepoLocalShimPath,
+      hermesPythonCommand: readPrefixedEnv(env, "HERMES_PYTHON_COMMAND") || "",
+    },
+    schemaAndTemplate: {
+      weixinInstructionsFile: readPrefixedEnv(env, "WEIXIN_INSTRUCTIONS_FILE")
+        || path.join(packageRoot, "templates", "weixin-instructions.md"),
+      weixinInstructionsOverlayFile: readPrefixedEnv(env, "WEIXIN_INSTRUCTIONS_OVERLAY_FILE")
+        || path.join(stateDir, "weixin-instructions.local.md"),
+      weixinOperationsFile: path.join(packageRoot, "templates", "weixin-operations.md"),
+      weixinOperationsOverlayFile: readPrefixedEnv(env, "WEIXIN_OPERATIONS_OVERLAY_FILE")
+        || path.join(stateDir, "weixin-operations.local.md"),
+      workspaceBootstrapConfigFile: readPrefixedEnv(env, "WORKSPACE_BOOTSTRAP_CONFIG")
+        || path.join(stateDir, "workspace-bootstrap.json"),
+      projectRadarConfigFile: readPrefixedEnv(env, "PROJECT_RADAR_CONFIG")
+        || resolveCrossPlatformPathFromRoot(workspaceRoot, ".codex", "code-projects.json"),
+      durableNoteSchemaConfigFile: readPrefixedEnv(env, "DURABLE_NOTE_SCHEMA_CONFIG")
+        || resolveCrossPlatformPathFromRoot(workspaceRoot, ".codex", "durable-note-schema.json"),
+      reviewSchemaConfigFile: readPrefixedEnv(env, "REVIEW_SCHEMA_CONFIG")
+        || resolveCrossPlatformPathFromRoot(workspaceRoot, ".codex", "review-schema.json"),
+      reviewSemanticMode: readPrefixedEnv(env, "REVIEW_SEMANTIC_MODE") || "hybrid",
+      reviewSemanticHost: normalizeReviewSemanticHost(readPrefixedEnv(env, "REVIEW_SEMANTIC_HOST")),
+      reviewSemanticModel: readPrefixedEnv(env, "REVIEW_SEMANTIC_MODEL") || "",
+      reviewSemanticTimeoutMs: readPrefixedIntEnv(env, "REVIEW_SEMANTIC_TIMEOUT_MS") || 120000,
+    },
+    checkinRuntime: {
+      workspaceId: readPrefixedEnv(env, "WORKSPACE_ID") || "default",
+      workspaceRoot,
+      allowedUserIds: readPrefixedListEnv(env, "ALLOWED_USER_IDS"),
+      userName: readPrefixedEnv(env, "USER_NAME") || "",
+      checkinConfigFile: path.join(stateDir, "checkin-config.json"),
+      checkinScheduleStateFile: path.join(stateDir, "checkin-schedule-state.json"),
+      systemMessageQueueFile: path.join(stateDir, "system-message-queue.json"),
+      systemMessageDeadLetterFile: path.join(stateDir, "system-message-dead-letter.json"),
+      startWithCheckin: readPrefixedBoolEnv(env, "ENABLE_CHECKIN"),
+    },
+  });
 }
 
 export { parseEnvConfig, readConfig };

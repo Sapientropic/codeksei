@@ -7,7 +7,7 @@ import {
 import {
   resolveConfiguredPersonName,
   resolvePromptPersonEn,
-} from "./person-reference";
+} from "../contracts/person-reference";
 import type { AppRuntimeConfig } from "./app-service-contract";
 import type {
   PersistIncomingWeixinAttachmentsResult,

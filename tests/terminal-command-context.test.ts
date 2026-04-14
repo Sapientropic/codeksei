@@ -11,7 +11,7 @@ test("createTerminalCommandContext derives leafArgs and checkin from the provide
   const timelineIntegrationModulePath = require.resolve("../src/integrations/timeline");
   const jsonStateModulePath = require.resolve("../src/state/json-state");
   const pathUtilsModulePath = require.resolve("../src/core/path-utils");
-  const personReferenceModulePath = require.resolve("../src/core/person-reference");
+  const personReferenceModulePath = require.resolve("../src/contracts/person-reference");
 
   const originals = new Map<string, NodeJS.Module | undefined>();
   for (const modulePath of [

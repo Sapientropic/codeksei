@@ -84,7 +84,7 @@ function createDelivery({
     },
     async login() {},
     normalizeIncomingMessage(message) {
-      return message;
+      return message as import("../src/core/runtime-types").NormalizedIncomingMessage | null;
     },
     printAccounts() {},
     resolveAccount() {
@@ -542,7 +542,7 @@ test("persistent send failure abandons the run and reports delivery degradation"
       },
       async login() {},
       normalizeIncomingMessage(message) {
-        return message;
+        return message as import("../src/core/runtime-types").NormalizedIncomingMessage | null;
       },
       printAccounts() {},
       resolveAccount() {

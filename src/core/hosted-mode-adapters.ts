@@ -174,7 +174,7 @@ export function createHostedRuntimeAdapter(config: HostedModeConfig): HostedRunt
       return Promise.reject(createModeError(resolved, "codeksei start"));
     },
     async close() {},
-    onEvent(_listener: (event: RuntimeEvent<UnknownRecord>) => void) {
+    onEvent(_listener: (event: RuntimeEvent<UnknownRecord>) => void): () => void {
       return () => {};
     },
     probeRuntimeCapabilities() {

@@ -7,7 +7,7 @@ const assert: typeof import("node:assert/strict") = require("node:assert/strict"
 
 const {
   collectProjectRadars,
-}: typeof import("../src/core/project-radar") = require("../src/core/project-radar");
+}: typeof import("../src/workspace/project-radar") = require("../src/workspace/project-radar");
 
 function createWorkspaceFixture(projects: unknown[]) {
   const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-project-radar-"));

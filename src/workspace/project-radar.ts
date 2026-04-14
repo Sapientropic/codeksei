@@ -1,4 +1,4 @@
-import { normalizeText } from "./text-normalization";
+import { normalizeText } from "../contracts/text-normalization";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -6,13 +6,13 @@ import {
   normalizeProjectRadarConfig,
   type NormalizedProjectRadarConfig,
 } from "../contracts/config-files";
-import { loadJsonConfig } from "./config-loader";
+import { loadJsonConfig } from "../core/config-loader";
 import {
   normalizeDisplayPath,
   resolveCrossPlatformPath,
   resolveCrossPlatformPathFromRoot,
-} from "./path-utils";
-import { captureSubprocess } from "./subprocess-capture";
+} from "../core/path-utils";
+import { captureSubprocess } from "../core/subprocess-capture";
 
 interface ProjectRadarConfigInput {
   ghCommand?: unknown;

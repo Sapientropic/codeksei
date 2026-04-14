@@ -50,9 +50,19 @@ test("runtime event chain keeps later events alive after an earlier handler fail
               getActiveWorkspaceRoot: () => "",
               getBinding: () => null,
             }),
+            getSessionWriter: () => ({
+              rememberApprovalPrefixForWorkspace: async () => [],
+              rememberPendingApprovalForThread: async () => undefined,
+              rememberWorkspaceBootstrapForThread: async () => undefined,
+              setActiveWorkspaceRoot: async () => undefined,
+              setRuntimeParamsForWorkspace: async () => undefined,
+              setThreadIdForWorkspace: async () => undefined,
+              clearThreadIdForWorkspace: async () => undefined,
+            }),
             initialize: async () => ({ endpoint: "ws://127.0.0.1", models: [] }),
             onEvent(listener: RuntimeEventListener) {
               runtimeEventListener = listener;
+              return () => undefined;
             },
           },
           sessionWriter: {

@@ -2,7 +2,7 @@ import { getCommandArgsSchema } from "../contracts/command-args";
 import type { CommandExecutionResult } from "../contracts/cli-contract";
 import { parseCliArgs } from "../core/cli-args";
 import { buildTerminalLeafHelp } from "../core/command-registry";
-import { collectProjectRadars, listTrackedProjects, loadProjectRadarConfig } from "../core/project-radar";
+import { collectProjectRadars, listTrackedProjects, loadProjectRadarConfig } from "../workspace/project-radar";
 
 interface ProjectRadarOptions {
   help: boolean;

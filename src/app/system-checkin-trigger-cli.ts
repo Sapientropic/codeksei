@@ -7,7 +7,7 @@ import {
   buildCheckinTargetResolutionErrorMessage,
   buildCheckinTriggerPayload,
   resolveCheckinTarget,
-} from "../core/checkin-core";
+} from "../checkin";
 import { buildTerminalLeafHelp } from "../core/command-registry";
 import type { AppRuntimeConfig } from "../core/app-service-contract";
 import { normalizeText } from "../core/text-normalization";

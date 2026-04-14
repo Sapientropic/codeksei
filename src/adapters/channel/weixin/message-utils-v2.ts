@@ -1,4 +1,5 @@
 import { normalizeText } from "../../../core/text-normalization";
+import type { NormalizedIncomingMessage } from "../../../core/runtime-types";
 const MESSAGE_TYPE_USER = 1;
 const MESSAGE_TYPE_BOT = 2;
 const MESSAGE_ITEM_TEXT = 1;
@@ -41,7 +42,7 @@ function createInboundFilter() {
   const seen = new Map<string, number>();
 
   return {
-    normalize(message: unknown, config: WeixinIncomingConfig, accountId: unknown) {
+    normalize(message: unknown, config: WeixinIncomingConfig, accountId: unknown): NormalizedIncomingMessage | null {
       if (!isRecord(message)) {
         return null;
       }

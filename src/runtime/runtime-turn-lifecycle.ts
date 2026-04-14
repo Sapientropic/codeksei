@@ -3,9 +3,13 @@ import * as path from "node:path";
 import { ignoreBestEffortError } from "../core/error-handling";
 import { resolveRequiredFilePath } from "../core/local-file-path";
 import { userFacingMessages } from "../core/message-catalog";
+import type {
+  RuntimeHostConfig,
+  WeixinBridgeConfig,
+  WorkspacePathsConfig,
+} from "../core/config-slices";
 import type { SessionStore } from "../adapters/runtime/codex/session-store";
 import type {
-  AppRuntimeConfig,
   ChannelAdapterLike,
   RuntimeAdapterLike,
   StreamDeliveryLike,
@@ -30,7 +34,10 @@ import { supportsChannelOperation as canUseChannelOperation, supportsRuntimeOper
 
 type PersistedAttachmentResult = PersistIncomingWeixinAttachmentsResult;
 
-type RuntimeTurnConfig = AppRuntimeConfig;
+type RuntimeTurnConfig =
+  & Pick<WorkspacePathsConfig, "stateDir" | "workspaceId" | "workspaceRoot">
+  & Pick<RuntimeHostConfig, "runtimeAccessMode">
+  & Pick<WeixinBridgeConfig, "weixinCdnBaseUrl">;
 
 type FormatErrorMessage = (error: unknown) => string;
 type MaybeDispatchCommand = (normalized: NormalizedIncomingMessage) => Promise<boolean>;

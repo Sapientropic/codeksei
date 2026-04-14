@@ -1,4 +1,5 @@
 import { normalizeText } from "../../../core/text-normalization";
+import type { NormalizedIncomingMessage } from "../../../core/runtime-types";
 const TEXT_ITEM_TYPE = 1;
 const IMAGE_ITEM_TYPE = 2;
 const VOICE_ITEM_TYPE = 3;
@@ -39,7 +40,7 @@ function normalizeWeixinIncomingMessage(
   message: unknown,
   config: WeixinIncomingConfig,
   accountId: unknown,
-) {
+): NormalizedIncomingMessage | null {
   if (!isRecord(message)) {
     return null;
   }
