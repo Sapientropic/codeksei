@@ -13,7 +13,7 @@
   Hermes 托管 agent + 官方 Weixin；Codeksei 通过 CLI / operator / skill surface 暴露领域能力
 
 这次不会把 Hermes 的 Python Weixin adapter 硬塞进 Node/TS。Hermes Weixin 仍由 Hermes 官方维护，Codeksei 负责 timeline / diary / reminder / review / note / project radar 这些领域能力，并通过 `operator hermes` 入口管理 skill/status/smoke。
-主动 checkin 也按同一条边界收口：Codeksei 负责 trigger generation、`tick -> ack -> complete` 调度真相与下一次唤醒决策，Bridge / Hermes 只负责各自宿主侧的 heartbeat、派发与超时兜底。
+主动 checkin 也按同一条边界收口：Codeksei 负责 trigger generation、`tick -> ack -> complete` 调度真相与下一次唤醒决策；Bridge 继续持有本地 poller，Hermes Hosted Mode 则只执行由 Codeksei 重新 arm 的 one-shot wake/recovery job。
 运行配置入口也已经收口成 `src/core/config.ts` 的 `parseEnvConfig()`：env/CLI override 先规范化成显式字段的 `AppRuntimeConfig`，下游 factory / host policy / CLI 命令不再各自做一轮局部 `typeof config.xxx === "string"` 补丁式收口。
 
 当前质量基线也已经同步到结构层：
@@ -251,7 +251,7 @@
 - Hermes 集成当前优先走 skill / CLI / operator contract，而不是把 Hermes gateway 逻辑重新 vendoring 进来
 - Hermes Hosted Mode 的 repo-local send-back / cron 现在通过 Codeksei 自己的薄 Python shim 对接 sibling `hermes-agent` checkout，不在 TS 里重写 Weixin/CDN/context_token/cron 细节
 - review hybrid 现在由宿主策略层选择 semantic host：Bridge Mode 默认走 Codex，Hermes Hosted Mode 默认走 Hermes，文件路由与落盘逻辑仍保留在 Codeksei 自己手里
-- checkin 现在按 host-neutral core 收口：`system checkin-trigger` 提供 one-shot payload，`system checkin-tick` / `system checkin-complete` 维护调度真相，`system checkin-poller` 退回 bridge-only wrapper
+- checkin 现在按 host-neutral core 收口：`system checkin-trigger` 提供 one-shot payload，`system checkin-tick` / `system checkin-complete` 维护调度真相；Hermes Hosted Mode 通过 `operator hermes sync-checkin` + repo-local shim 只保留一个未来 wake 或 recovery one-shot job，运行时 delivery 直接读持久化的 `job.origin`，`system checkin-poller` 退回 bridge-only wrapper
 - project radar 现在保持“本地 git 真相优先”，只有 git unavailable 时才补 GitHub activity fallback
 
 架构保护规则默认守住：

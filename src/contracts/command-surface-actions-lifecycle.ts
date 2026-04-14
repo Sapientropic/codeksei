@@ -42,6 +42,26 @@ export const LIFECYCLE_COMMAND_ACTION_DEFINITIONS = [
     help: { topic: "", leafKey: "operator.hermes.status", detail: "leaf" },
   },
   {
+    action: "operator.hermes.sync_checkin",
+    groupId: "lifecycle",
+    summary: "按 Codeksei 当前 checkin state 为 Hermes 同步 one-shot wake/recovery job",
+    terminal: ["operator hermes sync-checkin"],
+    weixin: [],
+    status: "active",
+    entrypointType: "cli",
+    command: "operator",
+    subcommand: "hermes sync-checkin",
+    runner: "operator.hermes.sync_checkin",
+    argsSchemaKey: "hermesSyncCheckin",
+    help: { topic: "", leafKey: "operator.hermes.sync_checkin", detail: "leaf" },
+    sideEffects: [
+      {
+        kind: "sync_hermes_checkin_cron_job",
+        target: "~/.hermes/cron/jobs.json",
+      },
+    ],
+  },
+  {
     action: "operator.hermes.smoke",
     groupId: "lifecycle",
     summary: "执行 Hermes hosted 前置检查与 skill parity smoke",

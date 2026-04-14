@@ -112,7 +112,7 @@ codeksei operator hermes smoke
 - `Diary`：Todo、碎片、补充记录、总结，以及和 timeline 紧密联动的时间线事实，帮你把零散日常慢慢收成可用痕迹
 - `Check-ins`：主动唤醒与主动分忧。发一句消息只是其中一种；它也会先回看上下文、整理后台、补一条 diary / timeline、留一个提醒，再决定是不是该主动露个面，并在每次 proactive pass 结束后自己写回下一次何时再醒
 - `Check-ins`
-  Codeksei 负责生成 proactive trigger、维护 `tick -> ack -> complete` 的调度真相，并在 `checkin-complete` 时写回下一次唤醒；Bridge Mode 下由本地 poller 包装 heartbeat 与入队，Hermes Hosted Mode 下由 Hermes heartbeat / automation 调 `checkin-tick`
+  Codeksei 负责生成 proactive trigger、维护 `tick -> ack -> complete` 的调度真相，并在 `checkin-complete` 时写回下一次唤醒；Bridge Mode 下由本地 poller 包装 heartbeat 与入队，Hermes Hosted Mode 下由 Hermes 只持有 one-shot wake/recovery job，真正的下一次唤醒仍由 Codeksei 在 `checkin-complete` 里决定
 - `Reminders`：提醒写入与调度，给生活节奏和待办推进一个外部支点
 - `Review`：nightly / weekly / monthly，把日常记录压成更稳定的节奏校准与复盘材料
 - `Project support`：workspace bootstrap、project radar、按 workspace 恢复共享线程。项目切走再回来时，不用先把整条线在脑子里重建一遍；本地 git 仍是第一真相，只有 repo 缺失或不是 git repo 时才回退到 GitHub activity continuity signal
@@ -272,11 +272,13 @@ Codeksei 自己负责 Weixin bridge 和共享线程。
 - 由 Hermes 负责 gateway / agent loop / Weixin
 - 由 Codeksei CLI + 官方受管的 Hermes skill 提供 companion workflows
 - `channel send-file`、`timeline screenshot --send`、`reminder write` 现在会走 Hermes repo-local shim；`system send` 仍保持 blocked，因为还没有 source-backed backstage-only host primitive
-- 主动 checkin 由 Hermes 调度；Codeksei 提供 `system checkin-trigger` / `system checkin-tick` / `system checkin-complete` 维护 `tick -> ack -> complete` 的调度真相
+- 主动 checkin 由 Hermes 执行 one-shot wake/recovery job；Codeksei 提供 `system checkin-trigger` / `system checkin-tick` / `system checkin-complete` 维护 `tick -> ack -> complete` 的调度真相，并通过 `operator hermes sync-checkin` 把下一次 one-shot wake 重新 arm 回 Hermes
+- `sync-checkin` 创建/更新 job 时才需要 origin context；真正 cron 裸跑时，Hermes 直接按持久化的 `job.origin` 投递，不再反查 live session
 - 若 sibling checkout 不在默认位置，可显式设置 `CODEKSEI_HERMES_REPO_ROOT`；`codeksei operator hermes status` / `smoke` 会把 repo-local readiness 和 commit 打出来
-- 可先用 `codeksei operator hermes --help` 或 `codeksei operator schema operator hermes` 看 3 个 leaf action
+- 可先用 `codeksei operator hermes --help` 或 `codeksei operator schema operator hermes` 看 4 个 leaf action
 - 推荐先执行：
   `codeksei operator hermes install-skill`
+  `codeksei operator hermes sync-checkin --user <wechat_user_id> --workspace /absolute/workspace`
   `codeksei operator hermes status`
   `codeksei operator hermes smoke`
 
@@ -375,6 +377,7 @@ codeksei system checkin-trigger --user <wechat_user_id> --workspace /absolute/wo
 codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace
 codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace --ack <triggerId>
 codeksei system checkin-complete --user <wechat_user_id> --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for 6h
+codeksei operator hermes sync-checkin --user <wechat_user_id> --workspace /absolute/workspace
 ```
 
 更完整的命令与架构说明见：

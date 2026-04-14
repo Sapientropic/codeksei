@@ -125,6 +125,24 @@ test("operator hermes install-skill schema exposes dry-run and side effects", ()
   assert.equal(Array.isArray(data.sideEffects), true);
 });
 
+test("operator hermes sync-checkin schema exposes dry-run and side effects", () => {
+  const result = runCli(["operator", "schema", "operator", "hermes", "sync-checkin"]);
+  assert.equal(result.status, 0, result.stderr || "expected operator hermes sync-checkin schema to succeed");
+
+  const payload = parseEnvelope(result.stdout);
+  const data = asRecord(payload.data);
+  const args = asCommandArgs(asRecord(data.args).command);
+  const argNames = args.map((entry) => entry.name);
+  assert.equal(data.action, "operator.hermes.sync_checkin");
+  assert.equal(data.mutability, "write");
+  assert.equal(data.supportsDryRun, true);
+  assert.ok(argNames.includes("dryRun"));
+  assert.ok(argNames.includes("idempotencyKey"));
+  assert.ok(argNames.includes("user"));
+  assert.ok(argNames.includes("workspace"));
+  assert.equal(Array.isArray(data.sideEffects), true);
+});
+
 test("operator hermes prefix schema lists leaf actions progressively", () => {
   const result = runCli(["operator", "schema", "operator", "hermes"]);
   assert.equal(result.status, 0, result.stderr || "expected operator hermes schema topic to succeed");
@@ -137,6 +155,7 @@ test("operator hermes prefix schema lists leaf actions progressively", () => {
     "operator.hermes.install_skill",
     "operator.hermes.smoke",
     "operator.hermes.status",
+    "operator.hermes.sync_checkin",
   ]);
 });
 
@@ -159,6 +178,46 @@ test("operator hermes install-skill dry-run previews without writing files", () 
   const meta = asRecord(payload.meta);
   assert.equal(meta.dryRun, true);
   assert.equal(fs.existsSync(path.join(hermesHome, "skills", "codeksei-companion", "SKILL.md")), false);
+});
+
+test("operator hermes sync-checkin routes through Hermes repo-local shim and updates managed jobs", () => {
+  const tempRoot = createCliFixture();
+  const repoLocal = createFakeHermesRepoLocalFixture(
+    fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-cli-hermes-sync-checkin-"))
+  );
+  const result = runCli([
+    "operator",
+    "hermes",
+    "sync-checkin",
+    "--user",
+    "wx-user",
+    "--workspace",
+    tempRoot.workspaceRoot,
+  ], {
+    ...tempRoot.env,
+    ...repoLocal.env,
+  });
+
+  assert.equal(result.status, 0, result.stderr || "expected operator hermes sync-checkin to succeed");
+  const payload = parseEnvelope(result.stdout);
+  assert.equal(payload.ok, true);
+  assert.equal(asRecord(asRecord(payload.data).planned).role, "wake");
+  assert.equal(asRecord(asRecord(payload.data).sync).jobId ? true : false, true);
+  assert.equal(asRecord(asRecord(payload.data).summary).wakeJobs ? true : false, true);
+
+  const requests = readFakeHermesRepoLocalLog(repoLocal.logFile);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].action, "sync_checkin_cron");
+  assert.equal(asRecord(requests[0].payload).sender_id, "wx-user");
+  const jobsState = JSON.parse(fs.readFileSync(repoLocal.jobsFile, "utf8"));
+  assert.equal(jobsState.jobs.length, 1);
+  assert.equal(jobsState.jobs[0].deliver, "origin");
+  assert.deepEqual(jobsState.jobs[0].origin, {
+    platform: "weixin",
+    chat_id: "wxid_sender",
+    chat_name: "Test Chat",
+    thread_id: "",
+  });
 });
 
 test("operator hermes invalid leaf returns validation_error instead of unknown_command", () => {
@@ -378,6 +437,9 @@ function createCliFixture({
 
   return {
     env: {
+      CODEKSEI_CHANNEL: "weixin",
+      CODEKSEI_CHANNEL_PROVIDER: "codeksei",
+      CODEKSEI_RUNTIME: "codex",
       CODEKSEI_STATE_DIR: stateDir,
       CODEKSEI_WORKSPACE_ROOT: workspaceRoot,
     },

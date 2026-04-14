@@ -51,6 +51,7 @@ test("command surface can resolve routed terminal commands from a single manifes
   assert.equal(findTerminalCommandManifest("timeline", "screenshot")?.runner, "timeline.screenshot");
   assert.equal(findTerminalCommandManifest("review", "weekly")?.argsSchemaKey, "review");
   assert.equal(findTerminalCommandManifest("operator", "hermes install-skill")?.action, "operator.hermes.install_skill");
+  assert.equal(findTerminalCommandManifest("operator", "hermes sync-checkin")?.action, "operator.hermes.sync_checkin");
   assert.equal(findTerminalCommandManifestFromArgv(["operator", "hermes", "status"])?.action, "operator.hermes.status");
   assert.equal(findTerminalManifestByScriptName("note:auto")?.action, "note.auto");
   assert.equal(findTerminalCommandManifest(" NOTE ", " AUTO ")?.action, "note.auto");

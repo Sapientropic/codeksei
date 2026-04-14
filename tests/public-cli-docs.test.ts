@@ -17,6 +17,7 @@ test("README public quickstart prefers codeksei CLI while shared mode keeps repo
   assert.ok(readme.includes("codeksei review weekly --help"));
   assert.ok(readme.includes("codeksei system checkin-trigger"));
   assert.ok(readme.includes("codeksei system checkin-complete"));
+  assert.ok(readme.includes("codeksei operator hermes sync-checkin"));
   assert.ok(readme.includes(buildTerminalEntryUsage("app.shared_start", "repo")));
   assert.ok(readme.includes("./docs/timeline-integration.md"));
   assert.ok(readme.includes("CODEKSEI_TIMELINE_LOCALE"));
@@ -28,6 +29,7 @@ test("docs/commands keeps public CLI examples aligned with the terminal usage so
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("system.checkin_trigger", "public")));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("system.checkin_tick", "public")));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("system.checkin_complete", "public")));
+  assert.ok(commandsDoc.includes(buildTerminalEntryUsage("operator.hermes.sync_checkin", "public")));
   assert.ok(commandsDoc.includes(buildTerminalActionExample("review.weekly", { audience: "public", includeArgs: false })));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("app.shared_status", "repo")));
   assert.ok(commandsDoc.includes("./timeline-integration.md"));

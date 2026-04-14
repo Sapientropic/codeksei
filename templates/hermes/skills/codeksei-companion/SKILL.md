@@ -49,6 +49,7 @@ codeksei review nightly
 codeksei review weekly
 codeksei review monthly
 codeksei project radar --project <slug> --json
+codeksei operator hermes sync-checkin --user <wechatUserId> --workspace /absolute/workspace
 codeksei system checkin-trigger --user <wechatUserId> --workspace /absolute/workspace
 codeksei system checkin-tick --user <wechatUserId> --workspace /absolute/workspace
 codeksei system checkin-complete --user <wechatUserId> --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for 6h
@@ -66,16 +67,17 @@ codeksei system checkin-complete --user <wechatUserId> --workspace /absolute/wor
    - `note` for durable memory
    - `review` for structured reflection
    - `project radar` for repo continuity
-   - `system checkin-trigger` / `system checkin-tick` / `system checkin-complete` for hosted proactive checkin
+   - `operator hermes sync-checkin` / `system checkin-trigger` / `system checkin-tick` / `system checkin-complete` for hosted proactive checkin
 3. When the command returns JSON, use the returned facts directly instead of paraphrasing from memory.
 4. If a command fails because local state or dependencies are missing, explain the missing prerequisite exactly and stop instead of guessing.
 5. Hosted send-back / reminder commands depend on the active Hermes session plus the sibling `hermes-agent` repo-local checkout. If `operator hermes status` says `repo_local: missing`, fix that first instead of improvising another delivery path.
 
 ## Hosted Proactive Checkin
 
-When Hermes wants Codeksei to decide whether a proactive checkin is due:
+When Hermes wants Codeksei to decide whether a proactive checkin is due and then re-arm the next one-shot wake:
 
 ```bash
+codeksei --workspace-root /absolute/repo operator hermes sync-checkin --user <wechatUserId> --workspace /absolute/repo
 codeksei --workspace-root /absolute/repo system checkin-tick --user <wechatUserId> --workspace /absolute/repo
 codeksei --workspace-root /absolute/repo system checkin-tick --user <wechatUserId> --workspace /absolute/repo --ack <triggerId>
 codeksei --workspace-root /absolute/repo system checkin-complete --user <wechatUserId> --workspace /absolute/repo --trigger <triggerId> --result silent --sleep-for 6h
@@ -83,10 +85,17 @@ codeksei --workspace-root /absolute/repo system checkin-complete --user <wechatU
 
 Flow:
 
-1. `checkin-tick` asks Codeksei whether a wake is due.
-2. If a trigger is due, Hermes consumes it and immediately acks with `checkin-tick --ack <triggerId>`.
-3. After the proactive pass actually finishes, Hermes must call `checkin-complete` to record `sent_message|silent|backstage_only` plus the next wake.
-4. `checkin-trigger` is only for one-shot payload generation; it does not own schedule state.
+1. `sync-checkin` creates or updates the only future Hermes one-shot job that should exist for this target.
+2. `checkin-tick` asks Codeksei whether a wake is due.
+3. If a trigger is due, Hermes consumes it and immediately acks with `checkin-tick --ack <triggerId>`.
+4. Right after ack, Hermes should run `sync-checkin` again so Hermes only keeps the 30 minute recovery fallback while the active pass is in progress.
+5. After the proactive pass actually finishes, Hermes must call `checkin-complete` to record `sent_message|silent|backstage_only`; Hosted Mode will then auto-arm the next wake one-shot job.
+6. `checkin-trigger` is only for one-shot payload generation; it does not own schedule state.
+
+Delivery note:
+
+- `sync-checkin` only needs session/env origin metadata when creating or updating the Hermes cron job.
+- When the cron job later fires, Hermes delivers to the persisted `job.origin` target directly; it does not need a second live-session lookup.
 
 If Hermes only wants a one-shot payload without schedule state:
 
