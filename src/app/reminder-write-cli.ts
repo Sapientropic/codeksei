@@ -1,5 +1,6 @@
 import { normalizeText } from "../core/text-normalization";
 import * as crypto from "node:crypto";
+import * as path from "node:path";
 
 import { SessionStore } from "../adapters/runtime/codex/session-store";
 import {
@@ -13,18 +14,17 @@ import { parseCliArgs } from "../core/cli-args";
 import { buildAuthRequiredError, buildTargetResolutionRequiredError } from "../core/cli-contract";
 import { runCliMutation } from "../core/cli-mutation";
 import {
+  createReminderViaHermesRepoLocal,
+  resolveHermesHomePath,
+} from "../core/hermes-repo-local";
+import { resolveHostMode } from "../core/host-mode";
+import {
   LEGACY_TIMELINE_TIMEZONE,
   coerceLocalDateTimeToIso,
 } from "../core/timezone";
+import { parseCompactDurationMs } from "../core/duration";
 import { ReminderQueueStore } from "../state/reminder-queue-store";
 import { inspectPreferredSenderId } from "../workspace/default-targets";
-
-const DELAY_UNIT_MS = {
-  s: 1_000,
-  m: 60_000,
-  h: 60 * 60_000,
-  d: 24 * 60 * 60_000,
-} as const;
 
 export interface ReminderWriteConfig extends WeixinAccountConfig {
   cliIdempotencyLedgerFile?: string;
@@ -32,6 +32,7 @@ export interface ReminderWriteConfig extends WeixinAccountConfig {
   reminderQueueFile: string;
   sessionsFile: string;
   timezone?: unknown;
+  workspaceRoot?: unknown;
 }
 
 interface ReminderWriteOptions extends Record<string, unknown> {
@@ -67,6 +68,81 @@ async function runReminderWriteCommand(
     throw new Error(
       `缺少有效时间，使用 --delay 30s|10m|1h30m|2d4h20m 或 --at ${buildAbsoluteTimeExample(timezone)}`
     );
+  }
+  const hostMode = resolveHostMode(config);
+  if (hostMode.profile === "hosted-hermes-weixin") {
+    const dueAtIso = new Date(dueAtMs).toISOString();
+    const workspaceRoot = normalizeText(config.workspaceRoot) || process.cwd();
+    const jobsFile = path.join(resolveHermesHomePath(config), "cron", "jobs.json");
+    return runCliMutation<Record<string, unknown>>({
+      commandKey: "reminder.write",
+      config,
+      configSource: {
+        hermesHome: resolveHermesHomePath(config),
+        timezone,
+        workspaceRoot,
+      },
+      dryRun: Boolean(options.dryRun),
+      dryRunResult: {
+        data: {
+          deliveryMode: "hermes_repo_local_origin",
+          dueAtIso,
+          dueAtMs,
+          senderId: normalizeText(options.user) || "",
+          text: body,
+          workspaceRoot,
+        },
+        text: [
+          "reminder dry-run",
+          "delivery: hermes_repo_local_origin",
+          `dueAt: ${dueAtIso}`,
+          `workspace: ${workspaceRoot}`,
+        ].join("\n"),
+      },
+      execute: async () => {
+        const reminder = createReminderViaHermesRepoLocal(config, {
+          due_at_iso: dueAtIso,
+          sender_id: normalizeText(options.user),
+          text: body,
+          workspace_root: workspaceRoot,
+        });
+        return {
+          data: {
+            chatId: reminder.chatId,
+            dueAtMs,
+            jobId: reminder.jobId,
+            name: reminder.name,
+            nextRunAt: reminder.nextRunAt,
+            platform: reminder.platform,
+            text: body,
+            threadId: reminder.threadId,
+          },
+          text: `reminder scheduled via Hermes cron: ${reminder.jobId}`,
+        };
+      },
+      idempotencyKey: normalizeText(options.idempotencyKey),
+      request: {
+        at: options.at,
+        delay: options.delay,
+        deliveryMode: "hermes_repo_local_origin",
+        dueAtIso,
+        senderId: normalizeText(options.user),
+        text: body,
+        workspaceRoot,
+      },
+      resolvedTargets: {
+        deliver: "origin",
+        jobsFile,
+        senderId: normalizeText(options.user) || "(active-session)",
+        workspaceRoot,
+      },
+      sideEffects: [
+        {
+          kind: "create_hermes_cron_job",
+          target: jobsFile,
+        },
+      ],
+    });
   }
 
   const account = resolveSelectedAccount(config);
@@ -182,38 +258,7 @@ function resolveDueAtMs(
 }
 
 function parseDelay(rawValue: unknown): number {
-  const normalized = normalizeText(rawValue).toLowerCase();
-  if (!normalized) {
-    return 0;
-  }
-
-  let totalMs = 0;
-  let index = 0;
-  while (index < normalized.length) {
-    while (index < normalized.length && /\s/.test(normalized[index] || "")) {
-      index += 1;
-    }
-    if (index >= normalized.length) {
-      break;
-    }
-
-    const match = normalized.slice(index).match(/^(\d+)\s*([smhd])/);
-    if (!match) {
-      return 0;
-    }
-
-    const amount = Number.parseInt(match[1] || "", 10);
-    const unitKey = normalizeText(match[2]).toLowerCase() as keyof typeof DELAY_UNIT_MS;
-    const unitMs = DELAY_UNIT_MS[unitKey] || 0;
-    if (!Number.isFinite(amount) || amount <= 0 || !unitMs) {
-      return 0;
-    }
-
-    totalMs += amount * unitMs;
-    index += match[0].length;
-  }
-
-  return totalMs > 0 ? totalMs : 0;
+  return parseCompactDurationMs(rawValue);
 }
 
 function parseAbsoluteTime(rawValue: unknown, timezone: string = LEGACY_TIMELINE_TIMEZONE): number {

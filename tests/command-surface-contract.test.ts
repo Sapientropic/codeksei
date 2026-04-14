@@ -18,10 +18,14 @@ const {
   COMMAND_ACTION_DEFINITIONS,
   COMMAND_AUDIENCE_OVERRIDES,
   COMMAND_AUTH_OVERRIDES,
+  COMMAND_HOST_PROFILE_OVERRIDES,
+  COMMAND_HOST_SUPPORT_TIER_OVERRIDES,
   COMMAND_MUTABILITY_OVERRIDES,
   COMMAND_SAFETY_OVERRIDES,
   resolveCommandAudienceDefinition,
   resolveCommandAuthRequirementDefinition,
+  resolveCommandHostProfileIdsDefinition,
+  resolveCommandHostSupportTierDefinition,
   resolveCommandMutabilityDefinition,
   resolveCommandSafetyTierDefinition,
 } = require("../src/contracts/command-surface-definitions");
@@ -102,6 +106,7 @@ test("package scripts keep runtime entrypoints aligned with the published-runtim
     "system:send": buildNodeRuntimeInvocation("cli", ["system", "send"]),
     "system:checkin-trigger": buildNodeRuntimeInvocation("cli", ["system", "checkin-trigger"]),
     "system:checkin-tick": buildNodeRuntimeInvocation("cli", ["system", "checkin-tick"]),
+    "system:checkin-complete": buildNodeRuntimeInvocation("cli", ["system", "checkin-complete"]),
     "system:checkin": buildNodeRuntimeInvocation("cli", ["system", "checkin-poller"]),
     "timeline:event": buildNodeRuntimeInvocation("cli", ["timeline", "event"]),
     "timeline:write": buildNodeRuntimeInvocation("cli", ["timeline", "write"]),
@@ -163,11 +168,16 @@ test("command classification helpers cover representative explicit and default b
   assert.equal(resolveCommandMutabilityDefinition("app.help"), "read");
   assert.equal(resolveCommandSafetyTierDefinition("timeline.write"), "warned");
   assert.equal(resolveCommandSafetyTierDefinition("app.schema"), "open");
+  assert.equal(resolveCommandHostSupportTierDefinition("timeline.write"), "host_neutral");
+  assert.equal(resolveCommandHostSupportTierDefinition("timeline.screenshot"), "hosted_ready");
+  assert.deepEqual(resolveCommandHostProfileIdsDefinition("timeline.screenshot"), ["bridge-codex-weixin", "hosted-hermes-weixin"]);
 });
 
 test("every command action resolves through either an explicit classification override or the documented default", () => {
   const audienceOverrideIds = new Set(Object.keys(COMMAND_AUDIENCE_OVERRIDES));
   const authOverrideIds = new Set(Object.keys(COMMAND_AUTH_OVERRIDES));
+  const hostProfileOverrideIds = new Set(Object.keys(COMMAND_HOST_PROFILE_OVERRIDES));
+  const hostTierOverrideIds = new Set(Object.keys(COMMAND_HOST_SUPPORT_TIER_OVERRIDES));
   const mutabilityOverrideIds = new Set(Object.keys(COMMAND_MUTABILITY_OVERRIDES));
   const safetyOverrideIds = new Set(Object.keys(COMMAND_SAFETY_OVERRIDES));
 
@@ -181,6 +191,16 @@ test("every command action resolves through either an explicit classification ov
     const resolvedAuth = resolveCommandAuthRequirementDefinition(action.action);
     if (!authOverrideIds.has(action.action)) {
       assert.equal(resolvedAuth, "none", `${action.action} should use the default auth requirement when not overridden`);
+    }
+
+    const resolvedHostTier = resolveCommandHostSupportTierDefinition(action.action);
+    if (!hostTierOverrideIds.has(action.action)) {
+      assert.equal(resolvedHostTier, "host_neutral", `${action.action} should use the default host support tier when not overridden`);
+    }
+
+    const resolvedHostProfiles = resolveCommandHostProfileIdsDefinition(action.action);
+    if (!hostProfileOverrideIds.has(action.action)) {
+      assert.deepEqual(resolvedHostProfiles, ["bridge-codex-weixin", "hosted-hermes-weixin"], `${action.action} should use the default host profile set when not overridden`);
     }
 
     const resolvedMutability = resolveCommandMutabilityDefinition(action.action);

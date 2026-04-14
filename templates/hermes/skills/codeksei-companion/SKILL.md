@@ -39,7 +39,9 @@ This skill is designed for **Hermes Hosted Mode**.
 
 ```bash
 codeksei doctor
+codeksei channel send-file --path /absolute/file
 codeksei timeline event --date YYYY-MM-DD --start HH:mm --end HH:mm --title "..."
+codeksei timeline screenshot --send --selector timeline
 codeksei diary write --section todo --state open --text "..."
 codeksei reminder write --delay 30m --text "..."
 codeksei note auto --project <slug> --kind recent --text "..."
@@ -49,21 +51,25 @@ codeksei review monthly
 codeksei project radar --project <slug> --json
 codeksei system checkin-trigger --user <wechatUserId> --workspace /absolute/workspace
 codeksei system checkin-tick --user <wechatUserId> --workspace /absolute/workspace
+codeksei system checkin-complete --user <wechatUserId> --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for 6h
 ```
 
 ## Procedure
 
 1. Confirm `codeksei` is available on PATH. If it is missing, tell the user you need the Codeksei CLI installed or the repo checked out first.
 2. Prefer the narrowest CLI entrypoint that matches the task:
+   - `channel send-file` for explicit local artifact send-back
    - `timeline` for concrete time blocks
+   - `timeline screenshot --send` for dashboard screenshot send-back
    - `diary` for lived notes / supplements / todo transitions
    - `reminder` for future nudges
    - `note` for durable memory
    - `review` for structured reflection
    - `project radar` for repo continuity
-   - `system checkin-trigger` / `system checkin-tick` for hosted proactive checkin
+   - `system checkin-trigger` / `system checkin-tick` / `system checkin-complete` for hosted proactive checkin
 3. When the command returns JSON, use the returned facts directly instead of paraphrasing from memory.
 4. If a command fails because local state or dependencies are missing, explain the missing prerequisite exactly and stop instead of guessing.
+5. Hosted send-back / reminder commands depend on the active Hermes session plus the sibling `hermes-agent` repo-local checkout. If `operator hermes status` says `repo_local: missing`, fix that first instead of improvising another delivery path.
 
 ## Hosted Proactive Checkin
 
@@ -72,7 +78,15 @@ When Hermes wants Codeksei to decide whether a proactive checkin is due:
 ```bash
 codeksei --workspace-root /absolute/repo system checkin-tick --user <wechatUserId> --workspace /absolute/repo
 codeksei --workspace-root /absolute/repo system checkin-tick --user <wechatUserId> --workspace /absolute/repo --ack <triggerId>
+codeksei --workspace-root /absolute/repo system checkin-complete --user <wechatUserId> --workspace /absolute/repo --trigger <triggerId> --result silent --sleep-for 6h
 ```
+
+Flow:
+
+1. `checkin-tick` asks Codeksei whether a wake is due.
+2. If a trigger is due, Hermes consumes it and immediately acks with `checkin-tick --ack <triggerId>`.
+3. After the proactive pass actually finishes, Hermes must call `checkin-complete` to record `sent_message|silent|backstage_only` plus the next wake.
+4. `checkin-trigger` is only for one-shot payload generation; it does not own schedule state.
 
 If Hermes only wants a one-shot payload without schedule state:
 

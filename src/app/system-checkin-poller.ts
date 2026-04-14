@@ -23,7 +23,8 @@ export async function runSystemCheckinPoller(config: CheckinPollerConfig) {
   });
   const sessionStore = new SessionStore({ filePath: normalizeText(config.sessionsFile) });
   let lastRangeLabel = "";
-  let lastNextDueAt = "";
+  let lastNextWakeAt = "";
+  let lastActiveTriggerId = "";
   let lastPendingTriggerId = "";
 
   logInfo(`[${PACKAGE_NAME}] checkin poller ready account=${account.accountId}`);
@@ -44,14 +45,13 @@ export async function runSystemCheckinPoller(config: CheckinPollerConfig) {
     switch (result.action) {
       case "enqueue_and_ack":
         lastPendingTriggerId = "";
-        if (result.tick.nextDueAt && result.tick.nextDueAt !== lastNextDueAt) {
-          logInfo(`[${PACKAGE_NAME}] checkin queued; next due at ${result.tick.nextDueAt}`);
-          lastNextDueAt = result.tick.nextDueAt;
-        } else {
-          logInfo(`[${PACKAGE_NAME}] checkin queued`);
+        if (result.tick.activeWake?.triggerId && result.tick.activeWake.triggerId !== lastActiveTriggerId) {
+          logInfo(`[${PACKAGE_NAME}] checkin queued; awaiting completion trigger=${result.tick.activeWake.triggerId}`);
+          lastActiveTriggerId = result.tick.activeWake.triggerId;
         }
         break;
       case "waiting_for_queue":
+        lastActiveTriggerId = "";
         if (result.tick.payload?.triggerId && result.tick.payload.triggerId !== lastPendingTriggerId) {
           logInfo(`[${PACKAGE_NAME}] checkin waiting for queue drain trigger=${result.tick.payload.triggerId}`);
           lastPendingTriggerId = result.tick.payload.triggerId;
@@ -60,9 +60,15 @@ export async function runSystemCheckinPoller(config: CheckinPollerConfig) {
       case "waiting":
       default:
         lastPendingTriggerId = "";
-        if (result.tick.nextDueAt && result.tick.nextDueAt !== lastNextDueAt) {
-          logInfo(`[${PACKAGE_NAME}] next checkin due at ${result.tick.nextDueAt}`);
-          lastNextDueAt = result.tick.nextDueAt;
+        if (result.tick.activeWake?.triggerId && result.tick.activeWake.triggerId !== lastActiveTriggerId) {
+          logInfo(`[${PACKAGE_NAME}] checkin in progress trigger=${result.tick.activeWake.triggerId}`);
+          lastActiveTriggerId = result.tick.activeWake.triggerId;
+          break;
+        }
+        lastActiveTriggerId = "";
+        if (result.tick.nextWakeAt && result.tick.nextWakeAt !== lastNextWakeAt) {
+          logInfo(`[${PACKAGE_NAME}] next checkin wake at ${result.tick.nextWakeAt}`);
+          lastNextWakeAt = result.tick.nextWakeAt;
         }
         break;
     }

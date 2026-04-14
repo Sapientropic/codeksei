@@ -1,7 +1,7 @@
-import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { ignoreBestEffortError } from "../core/error-handling";
+import { resolveRequiredFilePath } from "../core/local-file-path";
 import { userFacingMessages } from "../core/message-catalog";
 import type { SessionStore } from "../adapters/runtime/codex/session-store";
 import type {
@@ -177,18 +177,9 @@ export class RuntimeTurnLifecycle {
       throw new Error(`找不到用户 ${targetUserId} 的 context token，先让这个用户和 bot 聊过一次`);
     }
 
-    const requestedPath = this.normalizeText(filePath);
-    if (!requestedPath) {
-      throw new Error("缺少要发送的文件路径");
-    }
-    const resolvedPath = path.resolve(requestedPath);
-    if (!fs.existsSync(resolvedPath)) {
-      throw new Error(`文件不存在: ${resolvedPath}`);
-    }
-    const stat = fs.statSync(resolvedPath);
-    if (!stat.isFile()) {
-      throw new Error(`只能发送文件，不能发送目录: ${resolvedPath}`);
-    }
+    const resolvedPath = resolveRequiredFilePath(filePath, {
+      empty: "缺少要发送的文件路径",
+    });
 
     return this.withUserTyping({
       userId: targetUserId,
@@ -400,12 +391,20 @@ export class RuntimeTurnLifecycle {
           bindingKey,
           workspaceRoot,
           text: prepared.text,
-          metadata: {
-            workspaceId: prepared.workspaceId,
-            accountId: prepared.accountId,
-            senderId: prepared.senderId,
-          },
         };
+        const metadata: Record<string, unknown> = {
+          workspaceId: prepared.workspaceId,
+          accountId: prepared.accountId,
+          senderId: prepared.senderId,
+        };
+        if (prepared.provider === "system") {
+          metadata.systemMessage = {
+            kind: this.normalizeText(prepared.systemMessageKind) || "manual",
+            messageId: prepared.messageId,
+            checkinTriggerId: this.normalizeText(prepared.checkinTriggerId),
+          };
+        }
+        sendArgs.metadata = metadata;
         const runtimeParams = this.runtimeAdapter.getSessionStore().getRuntimeParamsForWorkspace(bindingKey, workspaceRoot);
         const model = runtimeParams.model;
         if (model) {

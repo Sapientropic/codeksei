@@ -27,6 +27,7 @@ test("system message contract normalizes delivery metadata", () => {
   assert.deepEqual(normalized, {
     id: "msg-1",
     accountId: "acct-1",
+    checkinTriggerId: "",
     senderId: "user-1",
     workspaceRoot: "E:/repo/current",
     text: "后台消息",
@@ -104,6 +105,7 @@ test("system message queue schema canonicalizes legacy queue payloads at ingress
   assert.deepEqual(parsed.data.messages, [{
     id: "reminder:legacy",
     accountId: "acct-1",
+    checkinTriggerId: "",
     senderId: "user-1",
     workspaceRoot: "E:/repo/current",
     text: "Reminder trigger",
@@ -141,6 +143,7 @@ test("system message dead letter schema canonicalizes legacy entries at ingress"
   assert.deepEqual(parsed.data.entries, [{
     id: "dead-letter-1",
     accountId: "acct-1",
+    checkinTriggerId: "",
     senderId: "user-1",
     workspaceRoot: "E:/repo/current",
     text: "后台消息",

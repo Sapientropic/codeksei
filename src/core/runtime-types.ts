@@ -27,6 +27,8 @@ export interface NormalizedIncomingMessage extends UnknownRecord {
   command: string;
   contextToken: string;
   receivedAt: string;
+  systemMessageKind?: string;
+  checkinTriggerId?: string;
   workspaceRoot?: string;
 }
 

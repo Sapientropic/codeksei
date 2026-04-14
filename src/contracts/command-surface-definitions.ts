@@ -37,11 +37,25 @@ export interface CommandActionDefinition {
   timelineSubcommand?: string;
   help?: CommandHelpDefinition;
   approval?: CommandApprovalDefinition;
+  hostDependencies?: readonly CommandHostDependencyDefinition[];
+  hostSupportTier?: CommandHostSupportTierDefinition;
   sideEffects?: readonly CommandSideEffectDefinition[];
 }
 
 export type CommandAudienceDefinition = "operator" | "public";
 export type CommandAuthRequirementDefinition = "context_token" | "none" | "runtime_bootstrap" | "weixin_account";
+export type CommandHostDependencyDefinition =
+  | "bridge_file_delivery"
+  | "bridge_queue"
+  | "bridge_runtime"
+  | "context_token"
+  | "hosted_repo_local_cron"
+  | "hosted_repo_local_delivery"
+  | "hosted_companion_skill"
+  | "hosted_session_lookup"
+  | "weixin_account";
+export type CommandHostProfileIdDefinition = "bridge-codex-weixin" | "hosted-hermes-weixin";
+export type CommandHostSupportTierDefinition = "bridge_only" | "bridge_state_dependent" | "host_neutral" | "hosted_ready";
 export type CommandMutabilityDefinition = "bootstrap" | "long_running" | "read" | "write";
 export type CommandSafetyTierDefinition = "open" | "operator" | "warned";
 // endregion
@@ -278,7 +292,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
   {
     action: "system.checkin_config",
     groupId: "lifecycle",
-    summary: "查看或修改主动 check-in 的随机区间",
+    summary: "查看或修改主动 check-in 的 fallback 区间",
     terminal: ["system checkin"],
     weixin: [],
     status: "active",
@@ -307,7 +321,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
   {
     action: "system.checkin_tick",
     groupId: "lifecycle",
-    summary: "轮询或确认 host-neutral check-in 调度状态",
+    summary: "轮询或确认 host-neutral check-in 调度状态（tick/ack）",
     terminal: ["system checkin-tick"],
     weixin: [],
     status: "active",
@@ -318,6 +332,21 @@ export const COMMAND_ACTION_DEFINITIONS = [
     runner: "system.checkin-tick",
     argsSchemaKey: "systemCheckinTick",
     help: { topic: "system", leafKey: "system.checkin_tick", detail: "leaf" },
+  },
+  {
+    action: "system.checkin_complete",
+    groupId: "lifecycle",
+    summary: "写回这轮 proactive check-in 的完成结果与下一次唤醒时间",
+    terminal: ["system checkin-complete"],
+    weixin: [],
+    status: "active",
+    entrypointType: "cli",
+    scriptName: "system:checkin-complete",
+    command: "system",
+    subcommand: "checkin-complete",
+    runner: "system.checkin-complete",
+    argsSchemaKey: "systemCheckinComplete",
+    help: { topic: "system", leafKey: "system.checkin_complete", detail: "leaf" },
   },
   {
     action: "system.checkin_poller",
@@ -821,6 +850,9 @@ export type CommandGroupId = typeof COMMAND_GROUP_DEFINITIONS[number]["id"];
 export type CommandHelpDetail = CommandHelpDefinition["detail"];
 export type CommandHelpLeafKey = ExtractHelpStringField<ActionWithHelp, "leafKey">;
 export type CommandHelpTopic = ExtractHelpStringField<ActionWithHelp, "topic">;
+export type CommandHostDependency = CommandHostDependencyDefinition;
+export type CommandHostProfileId = CommandHostProfileIdDefinition;
+export type CommandHostSupportTier = CommandHostSupportTierDefinition;
 export type CommandKind = ExtractStringField<CommandActionDefinitionRecord, "kind">;
 export type CommandMutability = CommandMutabilityDefinition;
 export type CommandRunnerId = ExtractStringField<CommandActionDefinitionRecord, "runner">;
@@ -885,6 +917,7 @@ export const COMMAND_SAFETY_OVERRIDES: Readonly<Partial<Record<CommandActionId, 
   "review.nightly": "warned",
   "review.weekly": "warned",
   "system.checkin_config": "warned",
+  "system.checkin_complete": "warned",
   "system.checkin_tick": "warned",
   "system.checkin_trigger": "open",
   "system.checkin_poller": "operator",
@@ -929,6 +962,7 @@ export const COMMAND_MUTABILITY_OVERRIDES: Readonly<Partial<Record<CommandAction
   "review.nightly": "write",
   "review.weekly": "write",
   "system.checkin_config": "write",
+  "system.checkin_complete": "write",
   "system.checkin_tick": "write",
   "system.checkin_trigger": "read",
   "system.checkin_poller": "long_running",
@@ -957,6 +991,83 @@ export const COMMAND_AUTH_OVERRIDES: Readonly<Partial<Record<CommandActionId, Co
   "system.send": "context_token",
   "timeline.screenshot": "context_token",
 });
+
+export const COMMAND_HOST_SUPPORT_TIER_OVERRIDES: Readonly<Partial<Record<CommandActionId, CommandHostSupportTierDefinition>>> = Object.freeze({
+  "app.accounts": "bridge_only",
+  "app.doctor": "hosted_ready",
+  "app.login": "bridge_only",
+  "app.shared_open": "bridge_only",
+  "app.shared_start": "bridge_only",
+  "app.shared_status": "bridge_only",
+  "app.shared_watchdog": "bridge_only",
+  "app.start": "bridge_only",
+  "background.install": "bridge_only",
+  "background.uninstall": "bridge_only",
+  "channel.send_file": "hosted_ready",
+  "diary.append": "host_neutral",
+  "note.auto": "host_neutral",
+  "note.maybe": "host_neutral",
+  "note.sync": "host_neutral",
+  "operator.hermes.install_skill": "hosted_ready",
+  "operator.hermes.smoke": "hosted_ready",
+  "operator.hermes.status": "hosted_ready",
+  "project.radar": "host_neutral",
+  "reminder.create": "hosted_ready",
+  "review.monthly": "host_neutral",
+  "review.nightly": "host_neutral",
+  "review.weekly": "host_neutral",
+  "system.checkin_complete": "host_neutral",
+  "system.checkin_poller": "bridge_only",
+  "system.checkin_tick": "host_neutral",
+  "system.checkin_trigger": "host_neutral",
+  "system.send": "bridge_state_dependent",
+  "timeline.build": "host_neutral",
+  "timeline.categories": "host_neutral",
+  "timeline.dev": "host_neutral",
+  "timeline.event": "host_neutral",
+  "timeline.proposals": "host_neutral",
+  "timeline.read": "host_neutral",
+  "timeline.screenshot": "hosted_ready",
+  "timeline.serve": "host_neutral",
+  "timeline.write": "host_neutral",
+});
+
+export const COMMAND_HOST_DEPENDENCY_OVERRIDES: Readonly<Partial<Record<CommandActionId, readonly CommandHostDependencyDefinition[]>>> = Object.freeze({
+  "app.accounts": ["weixin_account"] as const,
+  "app.login": ["weixin_account"] as const,
+  "app.shared_open": ["bridge_runtime"] as const,
+  "app.shared_start": ["bridge_runtime"] as const,
+  "app.shared_status": ["bridge_runtime"] as const,
+  "app.shared_watchdog": ["bridge_runtime"] as const,
+  "app.start": ["bridge_runtime"] as const,
+  "background.install": ["bridge_runtime"] as const,
+  "background.uninstall": ["bridge_runtime"] as const,
+  "channel.send_file": ["bridge_file_delivery", "hosted_repo_local_delivery", "hosted_session_lookup"] as const,
+  "operator.hermes.install_skill": ["hosted_companion_skill"] as const,
+  "operator.hermes.smoke": ["hosted_companion_skill"] as const,
+  "operator.hermes.status": ["hosted_companion_skill"] as const,
+  "reminder.create": ["bridge_queue", "context_token", "weixin_account", "hosted_repo_local_cron", "hosted_session_lookup"] as const,
+  "system.checkin_poller": ["bridge_queue", "bridge_runtime", "weixin_account"] as const,
+  "system.send": ["bridge_queue", "context_token", "weixin_account"] as const,
+  "timeline.screenshot": ["bridge_file_delivery", "bridge_queue", "context_token", "hosted_repo_local_delivery", "hosted_session_lookup"] as const,
+});
+
+export const COMMAND_HOST_PROFILE_OVERRIDES: Readonly<Partial<Record<CommandActionId, readonly CommandHostProfileIdDefinition[]>>> = Object.freeze({
+  "app.accounts": ["bridge-codex-weixin"] as const,
+  "app.login": ["bridge-codex-weixin"] as const,
+  "app.shared_open": ["bridge-codex-weixin"] as const,
+  "app.shared_start": ["bridge-codex-weixin"] as const,
+  "app.shared_status": ["bridge-codex-weixin"] as const,
+  "app.shared_watchdog": ["bridge-codex-weixin"] as const,
+  "app.start": ["bridge-codex-weixin"] as const,
+  "background.install": ["bridge-codex-weixin"] as const,
+  "background.uninstall": ["bridge-codex-weixin"] as const,
+  "channel.send_file": ["bridge-codex-weixin", "hosted-hermes-weixin"] as const,
+  "reminder.create": ["bridge-codex-weixin", "hosted-hermes-weixin"] as const,
+  "system.checkin_poller": ["bridge-codex-weixin"] as const,
+  "system.send": ["bridge-codex-weixin"] as const,
+  "timeline.screenshot": ["bridge-codex-weixin", "hosted-hermes-weixin"] as const,
+});
 // endregion
 
 // region Resolution helpers
@@ -972,6 +1083,19 @@ export function resolveCommandAudienceDefinition(
 
 export function resolveCommandAuthRequirementDefinition(actionId: CommandActionId): CommandAuthRequirementDefinition {
   return COMMAND_AUTH_OVERRIDES[actionId] || "none";
+}
+
+export function resolveCommandHostDependenciesDefinition(actionId: CommandActionId): readonly CommandHostDependencyDefinition[] {
+  return COMMAND_HOST_DEPENDENCY_OVERRIDES[actionId] || Object.freeze([]);
+}
+
+export function resolveCommandHostProfileIdsDefinition(actionId: CommandActionId): readonly CommandHostProfileIdDefinition[] {
+  return COMMAND_HOST_PROFILE_OVERRIDES[actionId]
+    || Object.freeze(["bridge-codex-weixin", "hosted-hermes-weixin"]);
+}
+
+export function resolveCommandHostSupportTierDefinition(actionId: CommandActionId): CommandHostSupportTierDefinition {
+  return COMMAND_HOST_SUPPORT_TIER_OVERRIDES[actionId] || "host_neutral";
 }
 
 export function resolveCommandMutabilityDefinition(actionId: CommandActionId): CommandMutabilityDefinition {

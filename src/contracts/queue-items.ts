@@ -6,6 +6,7 @@ type PlainObject = Record<string, unknown>;
 interface NormalizedSystemMessageShape {
   id: string;
   accountId: string;
+  checkinTriggerId: string;
   senderId: string;
   workspaceRoot: string;
   text: string;
@@ -23,6 +24,7 @@ interface NormalizedSystemMessageShape {
 const systemMessageIngressSchema = z.object({
   id: z.unknown().optional(),
   accountId: z.unknown().optional(),
+  checkinTriggerId: z.unknown().optional(),
   senderId: z.unknown().optional(),
   workspaceRoot: z.unknown().optional(),
   text: z.unknown().optional(),
@@ -109,6 +111,7 @@ export function normalizeSystemMessage(message: unknown): SystemMessage | null {
 function normalizeSystemMessageRecord(message: z.input<typeof systemMessageIngressSchema> & PlainObject): NormalizedSystemMessageShape | null {
   const id = normalizeText(message.id);
   const accountId = normalizeText(message.accountId);
+  const checkinTriggerId = normalizeText(message.checkinTriggerId);
   const senderId = normalizeText(message.senderId);
   const workspaceRoot = normalizeText(message.workspaceRoot);
   const text = normalizeText(message.text);
@@ -137,6 +140,7 @@ function normalizeSystemMessageRecord(message: z.input<typeof systemMessageIngre
   return {
     id,
     accountId,
+    checkinTriggerId,
     senderId,
     workspaceRoot,
     text,

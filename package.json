@@ -68,6 +68,7 @@
     "system:send": "node ./dist/src/index.js system send",
     "system:checkin-trigger": "node ./dist/src/index.js system checkin-trigger",
     "system:checkin-tick": "node ./dist/src/index.js system checkin-tick",
+    "system:checkin-complete": "node ./dist/src/index.js system checkin-complete",
     "system:checkin": "node ./dist/src/index.js system checkin-poller",
     "timeline:event": "node ./dist/src/index.js timeline event",
     "timeline:write": "node ./dist/src/index.js timeline write",

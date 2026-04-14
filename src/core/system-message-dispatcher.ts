@@ -95,6 +95,8 @@ class SystemMessageDispatcher {
       command: "message",
       contextToken,
       receivedAt: normalizeIsoTime(message.createdAt) || new Date().toISOString(),
+      systemMessageKind: normalizeText(message.kind),
+      checkinTriggerId: normalizeText(message.checkinTriggerId),
       workspaceRoot: this.resolveWorkspaceRoot(message),
     };
   }

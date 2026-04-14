@@ -11,6 +11,9 @@ import {
   type CommandHelpDetail,
   type CommandHelpLeafKey,
   type CommandHelpTopic,
+  type CommandHostDependency,
+  type CommandHostProfileId,
+  type CommandHostSupportTier,
   type CommandKind,
   type CommandMutability,
   type CommandRunnerId,
@@ -21,6 +24,9 @@ import {
   type CommandTimelineSubcommand,
   resolveCommandAudienceDefinition,
   resolveCommandAuthRequirementDefinition,
+  resolveCommandHostDependenciesDefinition,
+  resolveCommandHostProfileIdsDefinition,
+  resolveCommandHostSupportTierDefinition,
   resolveCommandMutabilityDefinition,
   resolveCommandSafetyTierDefinition,
 } from "./command-surface-definitions";
@@ -35,6 +41,9 @@ export type {
   CommandHelpDetail,
   CommandHelpLeafKey,
   CommandHelpTopic,
+  CommandHostDependency,
+  CommandHostProfileId,
+  CommandHostSupportTier,
   CommandKind,
   CommandMutability,
   CommandRunnerId,
@@ -68,6 +77,9 @@ export interface CommandAction {
   audience: CommandAudience;
   authRequirement: CommandAuthRequirement;
   groupId: CommandGroupId;
+  hostDependencies: ReadonlyArray<CommandHostDependency>;
+  hostProfileIds: ReadonlyArray<CommandHostProfileId>;
+  hostSupportTier: CommandHostSupportTier;
   summary: string;
   terminal: string[];
   weixin: string[];
@@ -94,6 +106,9 @@ export interface TerminalCommandManifestEntry {
   command: string;
   subcommand: string;
   action: CommandActionId;
+  hostDependencies: ReadonlyArray<CommandHostDependency>;
+  hostProfileIds: ReadonlyArray<CommandHostProfileId>;
+  hostSupportTier: CommandHostSupportTier;
   runner: CommandRunnerId;
   argsSchemaKey: CommandArgsSchemaKey | "";
   helpTopic: CommandHelpTopic | "";
@@ -139,6 +154,9 @@ const TERMINAL_COMMAND_MANIFEST = Object.freeze<readonly TerminalCommandManifest
       command: entry.command,
       subcommand: entry.subcommand,
       action: entry.action,
+      hostDependencies: [...entry.hostDependencies],
+      hostProfileIds: [...entry.hostProfileIds],
+      hostSupportTier: entry.hostSupportTier,
       runner: entry.runner,
       argsSchemaKey: entry.argsSchemaKey,
       helpTopic: entry.help.topic,
@@ -176,6 +194,9 @@ function defineAction(entry: CommandActionDefinition): CommandAction {
     audience: resolveCommandAudienceDefinition(actionId, entry.entrypointType),
     authRequirement: resolveCommandAuthRequirementDefinition(actionId),
     groupId: normalizeCommandLookupKey(entry.groupId) as CommandGroupId,
+    hostDependencies: Object.freeze([...resolveCommandHostDependenciesDefinition(actionId)]),
+    hostProfileIds: Object.freeze([...resolveCommandHostProfileIdsDefinition(actionId)]),
+    hostSupportTier: resolveCommandHostSupportTierDefinition(actionId),
     summary: String(entry.summary || "").trim(),
     terminal: normalizeStringList(entry.terminal),
     weixin: normalizeStringList(entry.weixin),
@@ -230,6 +251,8 @@ function listCommandGroups(): CommandGroup[] {
 function listTerminalCommandManifest(): TerminalCommandManifestEntry[] {
   return TERMINAL_COMMAND_MANIFEST.map((entry) => ({
     ...entry,
+    hostDependencies: [...entry.hostDependencies],
+    hostProfileIds: [...entry.hostProfileIds],
     pathTokens: [...(entry.pathTokens || [])],
     sideEffects: (entry.sideEffects || []).map((effect) => ({ ...effect })),
     approval: { ...entry.approval },
@@ -242,6 +265,8 @@ function findTerminalCommandManifest(command: unknown, subcommand: string = ""):
   return entry
     ? {
       ...entry,
+      hostDependencies: [...entry.hostDependencies],
+      hostProfileIds: [...entry.hostProfileIds],
       pathTokens: [...(entry.pathTokens || [])],
       sideEffects: (entry.sideEffects || []).map((effect) => ({ ...effect })),
       approval: { ...entry.approval },
@@ -254,6 +279,8 @@ function findTerminalManifestByScriptName(scriptName: unknown): TerminalCommandM
   return entry
     ? {
       ...entry,
+      hostDependencies: [...entry.hostDependencies],
+      hostProfileIds: [...entry.hostProfileIds],
       pathTokens: [...(entry.pathTokens || [])],
       sideEffects: (entry.sideEffects || []).map((effect) => ({ ...effect })),
       approval: { ...entry.approval },
@@ -276,6 +303,8 @@ function findTerminalCommandManifestFromArgv(argv: readonly unknown[]): Terminal
     if (pathTokens.every((token, index) => normalizedTokens[index] === token)) {
       return {
         ...entry,
+        hostDependencies: [...entry.hostDependencies],
+        hostProfileIds: [...entry.hostProfileIds],
         pathTokens: [...pathTokens],
         sideEffects: (entry.sideEffects || []).map((effect) => ({ ...effect })),
         approval: { ...entry.approval },
@@ -300,6 +329,8 @@ function listTerminalCommandManifestByPrefix(prefixTokens: readonly unknown[]): 
     .filter((entry) => normalizedPrefix.every((token, index) => (entry.pathTokens || [])[index] === token))
     .map((entry) => ({
       ...entry,
+      hostDependencies: [...entry.hostDependencies],
+      hostProfileIds: [...entry.hostProfileIds],
       pathTokens: [...(entry.pathTokens || [])],
       sideEffects: (entry.sideEffects || []).map((effect) => ({ ...effect })),
       approval: { ...entry.approval },
@@ -309,6 +340,8 @@ function listTerminalCommandManifestByPrefix(prefixTokens: readonly unknown[]): 
 function cloneAction(entry: CommandAction): CommandAction {
   return {
     ...entry,
+    hostDependencies: [...entry.hostDependencies],
+    hostProfileIds: [...entry.hostProfileIds],
     terminal: [...entry.terminal],
     weixin: [...entry.weixin],
     sideEffects: entry.sideEffects.map((effect) => ({ ...effect })),

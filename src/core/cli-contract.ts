@@ -100,6 +100,21 @@ export function buildTargetResolutionRequiredError(
   });
 }
 
+export function buildUnsupportedHostCapabilityError(
+  message: string,
+  context: Record<string, unknown> = {},
+  hint: string = "",
+): CliError {
+  return new CliError({
+    code: "unsupported_host_capability",
+    context,
+    exitCode: 5,
+    hint,
+    message,
+    retryable: false,
+  });
+}
+
 export function buildValidationError(
   message: string,
   context: Record<string, unknown> = {},

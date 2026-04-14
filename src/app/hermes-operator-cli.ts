@@ -106,6 +106,8 @@ export async function runHermesStatusCommand(
       `profile: ${report.hostProfile.profile}`,
       `supported: ${report.hostProfile.supported ? "yes" : "no"}`,
       `hermes_command: ${report.hermes.available ? "ok" : "missing"}`,
+      `repo_local: ${report.hermes.repoLocal.ready ? "ready" : "missing"}`,
+      `repo_local_commit: ${report.hermes.repoLocal.commit || "(unknown)"}`,
       `weixin_accounts: ${report.hermes.weixinAccounts.count}`,
       `installed_skill: ${report.hermes.installedSkill.exists ? "yes" : "no"}`,
       `skill_in_sync: ${report.hermes.installedSkill.inSync ? "yes" : "no"}`,

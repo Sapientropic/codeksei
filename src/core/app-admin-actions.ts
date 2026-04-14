@@ -1,4 +1,5 @@
 import { writeSharedBridgeHeartbeat } from "../shared/shared-bridge-heartbeat";
+import { listCommandActions } from "../contracts/command-surface";
 import { formatCheckinRange, resolveCheckinConfig } from "../state/checkin-config";
 import { normalizeTrimmedText } from "./approval-command-policy";
 import { formatErrorMessage } from "./app-poll-loop";
@@ -64,6 +65,7 @@ export function collectDoctorReport({
     hostedHermes: hostMode.mode === "hosted"
       ? collectHermesHostedDoctorReport(config)
       : null,
+    hostCommandMatrix: buildHostCommandMatrix(hostMode.profile),
     channel: channelAdapter.describe(),
     runtime: runtimeAdapter.describe(),
     runtimeCapabilities: typeof runtimeAdapter.probeRuntimeCapabilities === "function"
@@ -77,6 +79,23 @@ export function collectDoctorReport({
       }
       : null,
     threads: threadStateStore.snapshot(),
+  };
+}
+
+function buildHostCommandMatrix(currentProfile: string): Record<string, unknown> {
+  const actions = listCommandActions()
+    .filter((action) => action.terminal.length)
+    .map((action) => ({
+      action: action.action,
+      hostDependencies: [...action.hostDependencies],
+      hostProfileIds: [...action.hostProfileIds],
+      hostSupportTier: action.hostSupportTier,
+      supportedNow: action.hostProfileIds.includes(currentProfile as "bridge-codex-weixin" | "hosted-hermes-weixin"),
+    }));
+  return {
+    currentProfile,
+    blockedActions: actions.filter((action) => !action.supportedNow),
+    supportedActions: actions.filter((action) => action.supportedNow),
   };
 }
 

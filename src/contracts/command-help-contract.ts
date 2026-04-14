@@ -48,7 +48,7 @@ const TOPIC_HELP = {
   }),
   system: () => ({
     usage: [
-      `${buildExample("system.send", true)} / ${buildTerminalActionExample("system.checkin_config", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("system.checkin_trigger", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("system.checkin_tick", { audience: "public", includeArgs: true })} / ${buildTerminalEntryUsage("system.checkin_poller", "public")}`,
+      `${buildExample("system.send", true)} / ${buildTerminalActionExample("system.checkin_config", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("system.checkin_trigger", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("system.checkin_tick", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("system.checkin_complete", { audience: "public", includeArgs: true })} / ${buildTerminalEntryUsage("system.checkin_poller", "public")}`,
     ],
   }),
   timeline: () => ({
@@ -61,7 +61,7 @@ const TOPIC_HELP = {
       "  如果必须用 timeline:write --stdin，传完整 JSON 对象 {\"events\":[...]}，不要传裸数组",
       `  timeline 查分类先用 ${buildTerminalEntryUsage("timeline.categories", "public")}；改已有日程前先用 ${buildTerminalEntryUsage("timeline.read", "public")} --date YYYY-MM-DD`,
       "  不带 offset 的本地时间按当前 timezone 解释；如果 timeline state 已声明非 legacy timezone，会优先沿用它",
-      `  timeline 截图稳定入口是 ${buildTerminalActionExample("timeline.screenshot", { audience: "public", includeArgs: true })}，它会把任务交给当前微信桥执行`,
+      `  timeline 截图稳定入口是 ${buildTerminalActionExample("timeline.screenshot", { audience: "public", includeArgs: true })}；Bridge Mode 下会走本地桥接队列，Hermes Hosted Mode 下会走 repo-local send-back`,
     ],
   }),
   project: () => ({
@@ -126,7 +126,7 @@ const LEAF_HELP = {
     usage: [buildTerminalEntryUsage("operator.hermes.status", "public")],
     bodyLabel: "说明：",
     body: [
-      "  查看 Hermes 命令、Weixin 账号、skill 同步状态、skills catalog 和 hosted semantic review 可用性。",
+      "  查看 Hermes 命令、repo-local sibling checkout、Weixin 账号、skill 同步状态、skills catalog 和 hosted semantic review 可用性。",
       "  这是只读检查，不会修改本机 Hermes 状态。",
     ],
     examples: [
@@ -138,7 +138,7 @@ const LEAF_HELP = {
     usage: [buildTerminalEntryUsage("operator.hermes.smoke", "public")],
     bodyLabel: "说明：",
     body: [
-      "  做 hosted 前置检查与 skill parity 检查，不伪造 live Weixin 成功。",
+      "  做 hosted 前置检查与 skill parity / repo-local 检查，不伪造 live Weixin 成功。",
       "  这是 assisted smoke：只验证本地准备度与宿主边界，不接管 Hermes gateway 的真实消息流。",
     ],
     examples: [
@@ -151,7 +151,7 @@ const LEAF_HELP = {
     bodyLabel: "说明：",
     body: [
       "  输出当前 public CLI 相关的运行时快照，包括 host mode、runtime/channel provider、timeline 描述与 thread state 摘要。",
-      "  Hermes hosted mode 下会额外检查 hermes 命令、仓内 skill 资产是否已同步、本机 Hermes Weixin 配置痕迹，以及 hosted semantic review 可用性。",
+      "  Hermes hosted mode 下会额外检查 hermes 命令、repo-local sibling checkout / shim、仓内 skill 资产是否已同步、本机 Hermes Weixin 配置痕迹，以及 hosted semantic review 可用性。",
       "  非 TTY 下默认走 JSON envelope；TTY 下默认走文本。",
     ],
   }),
@@ -160,7 +160,8 @@ const LEAF_HELP = {
     bodyLabel: "说明：",
     body: [
       "  将本地文件作为附件发回当前微信聊天。",
-      "  默认会解析当前唯一稳定 sender；若目标不唯一，会直接返回 target_resolution_required。",
+      "  Bridge Mode 下默认会解析当前唯一稳定 sender；若目标不唯一，会直接返回 target_resolution_required。",
+      "  Hermes Hosted Mode 下会通过 repo-local shim + 当前 Hermes session 把文件发回 origin chat，不再依赖 Codeksei 自己的 bridge。",
     ],
     examples: [`  ${buildExample("channel.send_file")}`],
     includeFlagBlock: true,
@@ -238,8 +239,9 @@ const LEAF_HELP = {
     usage: [buildExample("reminder.create", true)],
     bodyLabel: "说明：",
     body: [
-      "  创建提醒并放入本地 reminder queue。",
-      "  默认会解析唯一稳定 sender，并检查对应 context_token；缺失时直接报 auth_required。",
+      "  Bridge Mode 下会创建提醒并放入本地 reminder queue。",
+      "  Bridge Mode 仍会解析唯一稳定 sender，并检查对应 context_token；缺失时直接报 auth_required。",
+      "  Hermes Hosted Mode 下会改走 repo-local Hermes cron，并把 deliver 绑定到当前 origin chat。",
     ],
     examples: [
       "  codeksei reminder write --delay 30m --text \"起身喝水\"",
@@ -266,6 +268,7 @@ const LEAF_HELP = {
     body: [
       "  向内部 system queue 写一条不可见触发消息。",
       "  --workspace 和 --user 可以显式传；没传时只会接受唯一稳定默认值，否则直接报 target_resolution_required。",
+      "  Hermes Hosted Mode 下仍会返回 unsupported_host_capability：上游源码里还没有可证实的 backstage-only 宿主原语，所以不会偷偷降级成可见消息。",
     ],
     examples: [
       "  codeksei system send --text \"提醒她今天早点睡\" --workspace \"$(pwd)\"",
@@ -276,7 +279,7 @@ const LEAF_HELP = {
     usage: [buildTerminalActionExample("system.checkin_config", { audience: "public", includeArgs: true })],
     bodyLabel: "说明：",
     body: [
-      "  查看或修改主动 check-in 的随机分钟区间。",
+      "  查看或修改 check-in fallback window；它只在 agent 没写回下一次唤醒、状态损坏或 guardrail recovery 时生效。",
       "  持久化配置优先于 CODEKSEI_CHECKIN_MIN_INTERVAL_MS / MAX_INTERVAL_MS；--reset 会清除本地覆盖。",
     ],
     examples: [
@@ -305,11 +308,25 @@ const LEAF_HELP = {
     body: [
       "  轮询 host-neutral check-in 调度状态；到点时返回稳定 trigger id 与 payload。",
       "  pending trigger 未 ack 前，重复 poll 会返回同一个 trigger。",
-      "  传 --ack <triggerId> 只确认当前 pending trigger，并推进下一次随机调度。",
+      "  传 --ack <triggerId> 只表示“宿主已经消费并启动这轮 proactive pass”；真正的下一次唤醒要靠 checkin-complete 回写。",
     ],
     examples: [
       "  codeksei system checkin-tick --user wxid_xxx --workspace /absolute/workspace",
       "  codeksei system checkin-tick --user wxid_xxx --workspace /absolute/workspace --ack <triggerId>",
+    ],
+    includeFlagBlock: true,
+  }),
+  "system.checkin_complete": () => ({
+    usage: [buildTerminalActionExample("system.checkin_complete", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  记录这轮 proactive check-in 的完成结果，并由 agent 显式写回下一次唤醒时间。",
+      "  --trigger / --result 必填；--next-wake-at 与 --sleep-for 二选一。",
+      "  agent 给出过长时间会被 clamp 到 24h guardrail；缺失或无效时间会回退 fallback window。",
+    ],
+    examples: [
+      "  codeksei system checkin-complete --user wxid_xxx --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for 6h",
+      "  codeksei system checkin-complete --user wxid_xxx --workspace /absolute/workspace --trigger <triggerId> --result sent_message --next-wake-at 2026-04-15T09:00:00+08:00",
     ],
     includeFlagBlock: true,
   }),
@@ -388,8 +405,9 @@ const LEAF_HELP = {
     usage: [buildExample("timeline.screenshot", true)],
     bodyLabel: "说明：",
     body: [
-      "  这条命令只负责把截图任务排进本地队列，真正截图和发送由正在运行的微信 bridge 异步执行。",
-      "  queued 不等于“已经发到微信”；只有 bridge 真正送达后，用户那边才会看到图片或文件。",
+      "  Bridge Mode 下会先把截图任务排进本地队列，再由正在运行的微信 bridge 异步执行。",
+      "  Hermes Hosted Mode 下会先本地生成截图，再通过 repo-local shim 直接发回当前 Hermes origin chat。",
+      "  Bridge Mode 里 queued 不等于“已经发到微信”；只有 bridge 真正送达后，用户那边才会看到图片或文件。",
       "  泛泛地说“截个图”时，默认就是整页；只有明确说时间轴/分析区/事件列表这类局部区域时，才额外传 --selector。",
     ],
     examples: [

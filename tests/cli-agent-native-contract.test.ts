@@ -7,6 +7,10 @@ const { spawnSync }: typeof import("node:child_process") = require("node:child_p
 const {
   resolveRuntimeEntrypointAbsolute,
 }: typeof import("../src/contracts/runtime-entrypoints") = require("../src/contracts/runtime-entrypoints");
+const {
+  createFakeHermesRepoLocalFixture,
+  readFakeHermesRepoLocalLog,
+} = require("./helpers/fake-hermes-repo-local.ts");
 
 const repoRoot = path.join(__dirname, "..");
 const cliEntrypoint = resolveRuntimeEntrypointAbsolute(repoRoot, "cli");
@@ -66,11 +70,43 @@ test("channel send-file schema exposes warned mutation flags", () => {
   assert.equal(result.status, 0, result.stderr || "expected channel send-file schema to succeed");
 
   const payload = parseEnvelope(result.stdout);
+  assert.equal(asRecord(payload.data).hostSupportTier, "hosted_ready");
+  assert.deepEqual(asRecord(payload.data).hostProfileIds, ["bridge-codex-weixin", "hosted-hermes-weixin"]);
   const args = asCommandArgs(asRecord(asRecord(payload.data).args).command);
   const argNames = args.map((entry) => entry.name);
   assert.ok(argNames.includes("dryRun"));
   assert.ok(argNames.includes("idempotencyKey"));
   assert.match(String(asRecord(payload.data).helpText || ""), /--dry-run/u);
+});
+
+test("hosted mode channel send-file routes through Hermes repo-local shim", () => {
+  const tempRoot = createCliFixture();
+  const repoLocal = createFakeHermesRepoLocalFixture(
+    fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-cli-hermes-repo-local-file-"))
+  );
+  const artifactPath = path.join(tempRoot.env.CODEKSEI_WORKSPACE_ROOT, "artifact.txt");
+  fs.writeFileSync(artifactPath, "artifact", "utf8");
+
+  const result = runCli([
+    "channel",
+    "send-file",
+    "--path",
+    artifactPath,
+  ], {
+    ...tempRoot.env,
+    ...repoLocal.env,
+  });
+
+  assert.equal(result.status, 0, result.stderr || "expected hosted channel send-file to succeed");
+  const payload = parseEnvelope(result.stdout);
+  assert.equal(payload.ok, true);
+  assert.equal(asRecord(payload.data).filePath, artifactPath);
+  assert.equal(asRecord(payload.data).platform, "weixin");
+
+  const requests = readFakeHermesRepoLocalLog(repoLocal.logFile);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].action, "send_file");
+  assert.equal(asRecord(requests[0].payload).file_path, artifactPath);
 });
 
 test("operator hermes install-skill schema exposes dry-run and side effects", () => {
@@ -268,6 +304,53 @@ test("system send surfaces auth_required when sender lacks context token", () =>
   const payload = parseEnvelope(result.stdout);
   assert.equal(payload.ok, false);
   assert.equal(payload.error.code, "auth_required");
+});
+
+test("hosted mode reminder write routes through Hermes repo-local shim and skips local reminder queue", () => {
+  const tempRoot = createCliFixture();
+  const repoLocal = createFakeHermesRepoLocalFixture(
+    fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-cli-hermes-repo-local-reminder-"))
+  );
+  const result = runCli([
+    "reminder",
+    "write",
+    "--delay",
+    "30m",
+    "--text",
+    "hello",
+  ], {
+    ...tempRoot.env,
+    ...repoLocal.env,
+  });
+
+  assert.equal(result.status, 0, result.stderr || "expected hosted reminder write to succeed");
+  const payload = parseEnvelope(result.stdout);
+  assert.equal(payload.ok, true);
+  assert.equal(asRecord(payload.data).jobId, "cron-123");
+  assert.equal(fs.existsSync(path.join(tempRoot.stateDir, "reminder-queue.json")), false);
+
+  const requests = readFakeHermesRepoLocalLog(repoLocal.logFile);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].action, "create_reminder");
+  assert.equal(asRecord(requests[0].payload).text, "hello");
+});
+
+test("hosted mode system send still fails fast with unsupported_host_capability", () => {
+  const tempRoot = createCliFixture();
+  const result = runCli([
+    "system",
+    "send",
+    "--text",
+    "hello",
+  ], {
+    ...tempRoot.env,
+    CODEKSEI_RUNTIME: "hermes",
+    CODEKSEI_CHANNEL_PROVIDER: "hermes",
+  });
+  assert.equal(result.status, 5);
+  const payload = parseEnvelope(result.stdout);
+  assert.equal(payload.ok, false);
+  assert.equal(payload.error.code, "unsupported_host_capability");
 });
 
 function createCliFixture({

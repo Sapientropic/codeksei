@@ -11,6 +11,7 @@ import { runProjectRadarCommand } from "./project-radar-cli";
 import { runReminderWriteCommand } from "./reminder-write-cli";
 import { runReviewCommand } from "./review-cli";
 import { runSystemCheckinConfigCommand } from "./system-checkin-config-cli";
+import { runSystemCheckinCompleteCommand } from "./system-checkin-complete-cli";
 import { runSystemCheckinTickCommand } from "./system-checkin-tick-cli";
 import { runSystemCheckinTriggerCommand } from "./system-checkin-trigger-cli";
 import { runSystemCheckinPoller } from "./system-checkin-poller";
@@ -25,6 +26,8 @@ import type {
 import type { TerminalCommandContext } from "./terminal-command-context";
 import { buildCommandSchema } from "../core/command-schema";
 import { buildOperatorHelpText, buildTerminalHelpText } from "../core/command-registry";
+import { buildUnsupportedHostCapabilityError } from "../core/cli-contract";
+import { resolveHostMode } from "../core/host-mode";
 import { runTimelineBuildCommand } from "../timeline/runtime/app/timeline-build-cli";
 import { runTimelineCategoriesCommand } from "../timeline/runtime/app/timeline-categories-cli";
 import { runTimelineDevCommand } from "../timeline/runtime/app/timeline-dev-cli";
@@ -58,6 +61,7 @@ export async function runTerminalManifestCommand(
   manifest: TerminalCommandManifestEntry,
   context: TerminalCommandContext,
 ): Promise<CommandExecutionResult | void> {
+  assertTerminalCommandSupportedForCurrentHost(manifest, context);
   const handler = RUNNERS[manifest.runner];
   if (!handler) {
     throw new Error(`未知命令: ${manifest.command}${manifest.subcommand ? ` ${manifest.subcommand}` : ""}`);
@@ -156,6 +160,9 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
   "system.checkin-config": async (_manifest, context) => {
     return runSystemCheckinConfigCommand(context.config, context.leafArgs);
   },
+  "system.checkin-complete": async (_manifest, context) => {
+    return runSystemCheckinCompleteCommand(context.config, context.leafArgs);
+  },
   "system.checkin-tick": async (_manifest, context) => {
     return runSystemCheckinTickCommand(context.config, context.leafArgs);
   },
@@ -240,4 +247,55 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
 
 function asPrettyJsonText(value: unknown): string {
   return JSON.stringify(value, null, 2);
+}
+
+function assertTerminalCommandSupportedForCurrentHost(
+  manifest: TerminalCommandManifestEntry,
+  context: TerminalCommandContext,
+): void {
+  const hostMode = resolveHostMode(context.config);
+  const currentProfile = hostMode.profile === "unsupported" ? "" : hostMode.profile;
+  if (currentProfile && manifest.hostProfileIds.includes(currentProfile)) {
+    return;
+  }
+  throw buildUnsupportedHostCapabilityError(
+    buildUnsupportedHostCapabilityMessage(manifest, hostMode.profile),
+    {
+      action: manifest.action,
+      currentHostProfile: hostMode.profile,
+      hostDependencies: [...manifest.hostDependencies],
+      hostSupportTier: manifest.hostSupportTier,
+      supportedHostProfiles: [...manifest.hostProfileIds],
+    },
+    buildUnsupportedHostCapabilityHint(manifest.hostSupportTier),
+  );
+}
+
+function buildUnsupportedHostCapabilityMessage(
+  manifest: TerminalCommandManifestEntry,
+  currentProfile: string,
+): string {
+  const usage = manifest.entrypointType === "cli"
+    ? ["codeksei", manifest.command, manifest.subcommand].filter(Boolean).join(" ")
+    : (manifest.scriptName ? `npm run ${manifest.scriptName}` : manifest.action);
+  const dependencyText = manifest.hostDependencies.length
+    ? manifest.hostDependencies.join(", ")
+    : "none";
+  return [
+    `${usage || manifest.action} 在当前宿主下不可用。`,
+    `hostSupportTier: ${manifest.hostSupportTier}`,
+    `currentProfile: ${currentProfile}`,
+    `supportedProfiles: ${manifest.hostProfileIds.join(", ") || "(none)"}`,
+    `hostDependencies: ${dependencyText}`,
+  ].join("\n");
+}
+
+function buildUnsupportedHostCapabilityHint(tier: TerminalCommandManifestEntry["hostSupportTier"]): string {
+  if (tier === "bridge_only") {
+    return "这条命令是 Bridge Mode 专用入口；切回 bridge-codex-weixin，或改走 Hermes gateway 的宿主控制路径。";
+  }
+  if (tier === "bridge_state_dependent") {
+    return "这条命令当前还缺少 Hermes Hosted Mode 的 source-backed 宿主原语；不会自动降级成可见消息，先改走 bridge-codex-weixin 或 Hermes 原生 backstage 路径。";
+  }
+  return "切换到兼容的 host profile，或改用对应宿主的官方入口。";
 }

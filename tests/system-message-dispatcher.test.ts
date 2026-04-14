@@ -8,6 +8,7 @@ function createSystemMessage(overrides: Record<string, unknown> = {}) {
   const message = normalizeSystemMessage({
     id: "system-msg-1",
     accountId: "acct-1",
+    checkinTriggerId: "",
     senderId: "user-1",
     workspaceRoot: "E:/repo/message",
     text: "Follow up quietly.",
@@ -60,6 +61,8 @@ test("SystemMessageDispatcher builds backstage prepared messages with fallback w
   assert.equal(prepared.workspaceId, "workspace-1");
   assert.equal(prepared.workspaceRoot, "E:/repo/message");
   assert.equal(prepared.contextToken, "ctx-1");
+  assert.equal(prepared.systemMessageKind, "manual");
+  assert.equal(prepared.checkinTriggerId, "");
   assert.match(prepared.text, /^System trigger\./u);
   assert.match(prepared.text, /stays backstage/u);
   assert.match(prepared.text, /Follow up quietly\./u);

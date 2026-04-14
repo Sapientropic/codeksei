@@ -6,6 +6,7 @@ const assert: typeof import("node:assert/strict") = require("node:assert/strict"
 
 const { CheckinConfigStore }: typeof import("../src/state/checkin-config-store") = require("../src/state/checkin-config-store");
 const {
+  runCheckinComplete,
   runCheckinTick,
 }: typeof import("../src/core/checkin-core") = require("../src/core/checkin-core");
 const {
@@ -29,14 +30,18 @@ function createTickFixture() {
   };
 }
 
-test("checkin tick creates the first nextDueAt, reuses pending trigger, and advances after ack", () => {
-  const fixture = createTickFixture();
-  const target = {
+function createTarget() {
+  return {
     senderId: "wx-user",
     senderSource: "explicit_user",
     workspaceRoot: "E:/repo/current",
     workspaceSource: "explicit_workspace",
   };
+}
+
+test("checkin tick uses scheduled -> due -> in_progress -> complete semantics", () => {
+  const fixture = createTickFixture();
+  const target = createTarget();
   const startMs = Date.parse("2026-04-14T10:00:00Z");
 
   const first = runCheckinTick({
@@ -44,7 +49,9 @@ test("checkin tick creates the first nextDueAt, reuses pending trigger, and adva
     nowMs: startMs,
     target,
   });
+  assert.equal(first.status, "scheduled");
   assert.equal(first.due, false);
+  assert.equal(first.nextWakeAt, "2026-04-14T10:01:00.000Z");
   assert.equal(first.nextDueAt, "2026-04-14T10:01:00.000Z");
 
   const due = runCheckinTick({
@@ -52,6 +59,7 @@ test("checkin tick creates the first nextDueAt, reuses pending trigger, and adva
     nowMs: startMs + 60_000,
     target,
   });
+  assert.equal(due.status, "due");
   assert.equal(due.due, true);
   assert.ok(due.payload?.triggerId);
 
@@ -60,7 +68,7 @@ test("checkin tick creates the first nextDueAt, reuses pending trigger, and adva
     nowMs: startMs + 61_000,
     target,
   });
-  assert.equal(repeated.due, true);
+  assert.equal(repeated.status, "due");
   assert.equal(repeated.payload?.triggerId, due.payload?.triggerId);
   assert.equal(repeated.payload?.text, due.payload?.text);
 
@@ -71,8 +79,126 @@ test("checkin tick creates the first nextDueAt, reuses pending trigger, and adva
     target,
   });
   assert.equal(acked.acknowledged, true);
+  assert.equal(acked.status, "in_progress");
   assert.equal(acked.due, false);
-  assert.equal(acked.nextDueAt, "2026-04-14T10:02:02.000Z");
+  assert.equal(acked.activeWake?.triggerId, due.payload?.triggerId);
+  assert.equal(acked.nextWakeAt, "");
+
+  const inProgress = runCheckinTick({
+    config: fixture.config,
+    nowMs: startMs + 63_000,
+    target,
+  });
+  assert.equal(inProgress.status, "in_progress");
+  assert.equal(inProgress.activeWake?.triggerId, due.payload?.triggerId);
+
+  const completed = runCheckinComplete({
+    config: fixture.config,
+    nowMs: startMs + 64_000,
+    result: "silent",
+    sleepFor: "2h",
+    target,
+    triggerId: String(due.payload?.triggerId || ""),
+  });
+  assert.equal(completed.completion.result, "silent");
+  assert.equal(completed.completion.scheduleSource, "agent");
+  assert.equal(completed.nextWakeAt, "2026-04-14T12:01:04.000Z");
+  assert.equal(completed.nextDueAt, "2026-04-14T12:01:04.000Z");
+
+  const scheduledAgain = runCheckinTick({
+    config: fixture.config,
+    nowMs: startMs + 65_000,
+    target,
+  });
+  assert.equal(scheduledAgain.status, "scheduled");
+  assert.equal(scheduledAgain.nextWakeAt, "2026-04-14T12:01:04.000Z");
+});
+
+test("checkin tick recovers timed-out active wake with a fallback schedule", () => {
+  const fixture = createTickFixture();
+  const target = createTarget();
+  const startMs = Date.parse("2026-04-14T10:00:00Z");
+
+  runCheckinTick({
+    config: fixture.config,
+    nowMs: startMs,
+    target,
+  });
+  const due = runCheckinTick({
+    config: fixture.config,
+    nowMs: startMs + 60_000,
+    target,
+  });
+  const acked = runCheckinTick({
+    ack: String(due.payload?.triggerId || ""),
+    config: fixture.config,
+    nowMs: startMs + 61_000,
+    target,
+  });
+  assert.equal(acked.status, "in_progress");
+
+  const recovered = runCheckinTick({
+    config: fixture.config,
+    nowMs: startMs + 61_000 + 31 * 60_000,
+    target,
+  });
+  assert.equal(recovered.status, "scheduled");
+  assert.equal(recovered.state.scheduleSource, "recovery");
+  assert.equal(recovered.activeWake, null);
+  assert.equal(recovered.nextWakeAt, "2026-04-14T10:33:01.000Z");
+});
+
+test("checkin complete clamps overlong next wake to the 24h guardrail", () => {
+  const fixture = createTickFixture();
+  const target = createTarget();
+  const startMs = Date.parse("2026-04-14T10:00:00Z");
+
+  runCheckinTick({
+    config: fixture.config,
+    nowMs: startMs,
+    target,
+  });
+  const due = runCheckinTick({
+    config: fixture.config,
+    nowMs: startMs + 60_000,
+    target,
+  });
+  runCheckinTick({
+    ack: String(due.payload?.triggerId || ""),
+    config: fixture.config,
+    nowMs: startMs + 61_000,
+    target,
+  });
+
+  const completed = runCheckinComplete({
+    config: fixture.config,
+    nextWakeAt: "2026-04-20T10:00:00.000Z",
+    nowMs: startMs + 62_000,
+    result: "backstage_only",
+    target,
+    triggerId: String(due.payload?.triggerId || ""),
+  });
+  assert.equal(completed.completion.scheduleSource, "guardrail_clamped");
+  assert.equal(completed.nextWakeAt, "2026-04-15T10:01:02.000Z");
+});
+
+test("checkin schedule state store still accepts legacy nextDueAt state", () => {
+  const fixture = createTickFixture();
+  const filePath = fixture.config.checkinScheduleStateFile;
+  fs.writeFileSync(filePath, JSON.stringify({
+    lastConfirmedAt: "2026-04-14T09:00:00.000Z",
+    nextDueAt: "2026-04-14T10:05:00.000Z",
+    pendingTrigger: null,
+    senderId: "wx-user",
+    targetKey: "wx-user::E:/repo/current",
+    updatedAt: "2026-04-14T09:00:00.000Z",
+    workspaceRoot: "E:/repo/current",
+  }, null, 2), "utf8");
+
+  const state = new CheckinScheduleStateStore({ filePath }).getState();
+  assert.ok(state);
+  assert.equal(state.nextWakeAt, "2026-04-14T10:05:00.000Z");
+  assert.equal(state.scheduleSource, "fallback");
 });
 
 test("checkin schedule state store quarantines invalid state", () => {

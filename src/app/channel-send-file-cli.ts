@@ -3,6 +3,11 @@ import type { CommandExecutionResult } from "../contracts/cli-contract";
 import { parseCliArgs } from "../core/cli-args";
 import { buildTerminalLeafHelp } from "../core/command-registry";
 import { runCliMutation } from "../core/cli-mutation";
+import {
+  sendFileViaHermesRepoLocal,
+} from "../core/hermes-repo-local";
+import { resolveHostMode } from "../core/host-mode";
+import { resolveRequiredFilePath } from "../core/local-file-path";
 import { normalizeText } from "../core/text-normalization";
 
 interface ChannelSendFileOptions {
@@ -24,7 +29,7 @@ interface ChannelSendFileApp {
   }): Promise<ChannelSendFileResult>;
 }
 
-interface ChannelSendFileConfig {
+interface ChannelSendFileConfig extends Record<string, unknown> {
   cliIdempotencyLedgerFile?: string;
 }
 
@@ -44,6 +49,13 @@ async function runChannelSendFileCommand(
   if (!options.path) {
     throw new Error("缺少 --path，指定要发回微信的本地文件路径");
   }
+  const hostMode = resolveHostMode(config);
+  const resolvedFilePath = resolveRequiredFilePath(options.path, {
+    empty: "缺少 --path，指定要发回微信的本地文件路径",
+  });
+  const deliveryMode = hostMode.profile === "hosted-hermes-weixin"
+    ? "hermes_repo_local"
+    : "bridge";
   return runCliMutation<Record<string, unknown>>({
     commandKey: "channel.send-file",
     config,
@@ -51,19 +63,38 @@ async function runChannelSendFileCommand(
     dryRun: Boolean(options.dryRun),
     dryRunResult: {
       data: {
-        filePath: options.path,
+        deliveryMode,
+        filePath: resolvedFilePath,
         senderId: normalizeText(options.user) || "",
       },
       text: [
         "channel send-file dry-run",
-        `file: ${options.path}`,
-        `sender: ${normalizeText(options.user) || "(runtime-default)"}`,
+        `file: ${resolvedFilePath}`,
+        `delivery: ${deliveryMode}`,
+        `sender: ${normalizeText(options.user) || "(session-or-runtime-default)"}`,
       ].join("\n"),
     },
     execute: async () => {
+      if (hostMode.profile === "hosted-hermes-weixin") {
+        const result = sendFileViaHermesRepoLocal(config, {
+          file_path: resolvedFilePath,
+          sender_id: normalizeText(options.user),
+        });
+        return {
+          data: {
+            chatId: result.chatId,
+            filePath: result.filePath,
+            platform: result.platform,
+            sessionId: result.sessionId,
+            sessionKey: result.sessionKey,
+            threadId: result.threadId,
+          },
+          text: `file sent via Hermes repo-local: ${result.filePath}`,
+        };
+      }
       const result = await app.sendLocalFileToCurrentChat({
         senderId: options.user,
-        filePath: options.path,
+        filePath: resolvedFilePath,
       });
       return {
         data: {
@@ -74,17 +105,19 @@ async function runChannelSendFileCommand(
     },
     idempotencyKey: normalizeText(options.idempotencyKey),
     request: {
-      filePath: options.path,
+      deliveryMode,
+      filePath: resolvedFilePath,
       senderId: normalizeText(options.user),
     },
     resolvedTargets: {
-      filePath: options.path,
-      senderId: normalizeText(options.user) || "(runtime-default)",
+      deliveryMode,
+      filePath: resolvedFilePath,
+      senderId: normalizeText(options.user) || (hostMode.profile === "hosted-hermes-weixin" ? "(active-session)" : "(runtime-default)"),
     },
     sideEffects: [
       {
         kind: "send_wechat_file",
-        target: options.path,
+        target: resolvedFilePath,
       },
     ],
   });

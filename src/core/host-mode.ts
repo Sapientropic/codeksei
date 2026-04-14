@@ -1,10 +1,14 @@
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import { resolvePackageRoot } from "../contracts/path-utils";
 import { normalizeText } from "../contracts/text-normalization";
 import { captureSubprocess, resolveCommandOnPath } from "./subprocess-capture";
+import {
+  collectHermesRepoLocalReport,
+  resolveHermesHomePath,
+  type HermesRepoLocalReport,
+} from "./hermes-repo-local";
 
 export type CodekseiRuntimeProvider = "codex" | "hermes" | "openclaw-reserved";
 export type CodekseiChannelProvider = "codeksei" | "hermes";
@@ -44,6 +48,7 @@ export interface HermesHostedDoctorReport {
   binaryPath: string;
   available: boolean;
   hermesHome: string;
+  repoLocal: HermesRepoLocalReport;
   configFile: {
     path: string;
     exists: boolean;
@@ -116,6 +121,10 @@ export interface HermesHostedSmokeReport {
       reason: string;
     };
     weixinAccounts: {
+      ok: boolean;
+      reason: string;
+    };
+    repoLocal: {
       ok: boolean;
       reason: string;
     };
@@ -253,6 +262,7 @@ export function collectHermesHostedDoctorReport(
 ): HermesHostedDoctorReport {
   const hermesCommand = resolveHermesCommand(config);
   const hermesHome = resolveHermesHome(config);
+  const repoLocal = collectHermesRepoLocalReport(config);
   const repoSkillAsset = readSkillAssetState(resolveRepoHermesSkillAssetPath());
   const installedSkill = readSkillAssetState(resolveInstalledHermesSkillPath(hermesHome));
   const binaryPath = resolveCommandOnPath(hermesCommand);
@@ -267,6 +277,7 @@ export function collectHermesHostedDoctorReport(
     binaryPath,
     available: Boolean(binaryPath),
     hermesHome,
+    repoLocal,
     configFile: {
       path: path.join(hermesHome, "config.yaml"),
       exists: fs.existsSync(path.join(hermesHome, "config.yaml")),
@@ -390,6 +401,12 @@ export function runHermesHostedSmoke(
         ? ""
         : `未发现 Hermes Weixin 账号：${hermes.weixinAccounts.dir}`,
     },
+    repoLocal: {
+      ok: hermes.repoLocal.ready,
+      reason: hermes.repoLocal.ready
+        ? ""
+        : hermes.repoLocal.reason || "Hermes repo-local checkout / shim 未就绪。",
+    },
     installedSkill: {
       ok: hermes.installedSkill.inSync,
       reason: hermes.installedSkill.inSync
@@ -414,6 +431,9 @@ export function runHermesHostedSmoke(
   }
   if (!checks.weixinAccounts.ok) {
     next.push("先执行 `hermes gateway setup` 并完成 Weixin QR 登录。");
+  }
+  if (!checks.repoLocal.ok) {
+    next.push("补上 Hermes sibling repo（或设置 CODEKSEI_HERMES_REPO_ROOT），并确认 repo-local shim 可见。");
   }
   if (!checks.installedSkill.ok) {
     next.push("执行 `codeksei operator hermes install-skill` 同步 companion skill。");
@@ -561,8 +581,7 @@ function resolveHermesCommand(config: Record<string, unknown>): string {
 }
 
 function resolveHermesHome(config: Record<string, unknown>): string {
-  return normalizeText(config.hermesHome || config.CODEKSEI_HERMES_HOME)
-    || path.join(os.homedir(), ".hermes");
+  return resolveHermesHomePath(config);
 }
 
 function resolveInstalledHermesSkillPath(hermesHome: string): string {

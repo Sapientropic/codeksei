@@ -10,6 +10,9 @@ const {
   runHermesStatusCommand,
 } = require("../src/app/hermes-operator-cli");
 const { createFakeHermesCommand } = require("./helpers/fake-hermes-command.ts");
+const {
+  createFakeHermesRepoLocalFixture,
+} = require("./helpers/fake-hermes-repo-local.ts");
 
 test("operator hermes install-skill installs and syncs the companion skill", async () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-hermes-install-"));
@@ -45,6 +48,9 @@ test("operator hermes status reports catalog and semantic availability", async (
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-hermes-status-"));
   const hermesHome = path.join(tempRoot, ".hermes");
   const accountsDir = path.join(hermesHome, "weixin", "accounts");
+  const repoLocal = createFakeHermesRepoLocalFixture(
+    fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-hermes-status-repo-local-"))
+  );
   fs.mkdirSync(accountsDir, { recursive: true });
   fs.writeFileSync(path.join(accountsDir, "acct-1.json"), JSON.stringify({ accountId: "acct-1" }), "utf8");
 
@@ -61,13 +67,17 @@ test("operator hermes status reports catalog and semantic availability", async (
     reviewSemanticHost: "hermes",
     runtime: "hermes",
     channelProvider: "hermes",
+    hermesRepoRoot: repoLocal.repoRoot,
+    hermesRepoLocalShimPath: repoLocal.shimPath,
     workspaceRoot: tempRoot,
   });
 
   assert.equal(result.data.hostProfile.profile, "hosted-hermes-weixin");
   assert.equal(result.data.hermes.installedSkill.inSync, true);
+  assert.equal(result.data.hermes.repoLocal.ready, true);
   assert.equal(result.data.skillCatalog.listed, true);
   assert.equal(result.data.hermes.semanticReview.available, true);
+  assert.match(result.text, /repo_local: ready/u);
 });
 
 test("operator hermes smoke returns partial when hosted prerequisites are missing", async () => {

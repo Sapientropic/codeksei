@@ -79,13 +79,16 @@ export async function runSystemCheckinTickCommand(
   return {
     data: {
       acknowledged: tickResult.acknowledged,
+      activeWake: tickResult.activeWake,
       due: tickResult.due,
       interval: {
         range: formatCheckinRange(tickResult.intervalConfig),
         source: tickResult.intervalConfig.source,
       },
       nextDueAt: tickResult.nextDueAt,
+      nextWakeAt: tickResult.nextWakeAt,
       payload: tickResult.payload,
+      status: tickResult.status,
       target: tickResult.target,
     },
     text: renderCheckinTickText(tickResult),
@@ -95,13 +98,23 @@ export async function runSystemCheckinTickCommand(
 function renderCheckinTickText(tickResult: ReturnType<typeof runCheckinTick>): string {
   const lines = [
     `interval: ${formatCheckinRange(tickResult.intervalConfig)} [${tickResult.intervalConfig.source}]`,
+    `status: ${tickResult.status}`,
     `user: ${tickResult.target.senderId} [${tickResult.target.senderSource || "unknown"}]`,
     `workspace: ${tickResult.target.workspaceRoot} [${tickResult.target.workspaceSource || "unknown"}]`,
   ];
 
   if (tickResult.acknowledged) {
     lines.unshift("checkin tick acked");
-    lines.push(`nextDueAt: ${tickResult.nextDueAt}`);
+    if (tickResult.activeWake?.startedAt) {
+      lines.push(`startedAt: ${tickResult.activeWake.startedAt}`);
+      lines.push(`triggerId: ${tickResult.activeWake.triggerId}`);
+    }
+    return lines.join("\n");
+  }
+
+  if (tickResult.status === "in_progress" && tickResult.activeWake) {
+    lines.unshift(`checkin in progress: ${tickResult.activeWake.triggerId}`);
+    lines.push(`startedAt: ${tickResult.activeWake.startedAt}`);
     return lines.join("\n");
   }
 
@@ -114,6 +127,7 @@ function renderCheckinTickText(tickResult: ReturnType<typeof runCheckinTick>): s
   }
 
   lines.unshift("checkin scheduled");
+  lines.push(`nextWakeAt: ${tickResult.nextWakeAt}`);
   lines.push(`nextDueAt: ${tickResult.nextDueAt}`);
   return lines.join("\n");
 }

@@ -8,6 +8,7 @@ const { SessionStore }: typeof import("../src/adapters/runtime/codex/session-sto
 const { CheckinConfigStore }: typeof import("../src/state/checkin-config-store") = require("../src/state/checkin-config-store");
 const {
   processBridgeCheckinPollerIteration,
+  runCheckinComplete,
 } = require("../src/core/checkin-core");
 
 function createPollerFixture() {
@@ -56,7 +57,7 @@ test("bridge checkin poller keeps pending trigger until queue drains and only ac
     sessionStore,
   });
   assert.equal(initial.action, "waiting");
-  assert.equal(initial.tick.nextDueAt, "2026-04-14T10:01:00.000Z");
+  assert.equal(initial.tick.nextWakeAt, "2026-04-14T10:01:00.000Z");
 
   const blocked = processBridgeCheckinPollerIteration({
     accountId: "acct-1",
@@ -92,6 +93,83 @@ test("bridge checkin poller keeps pending trigger until queue drains and only ac
   });
   assert.equal(flushed.action, "enqueue_and_ack");
   assert.equal(flushed.tick.acknowledged, true);
+  assert.equal(flushed.tick.status, "in_progress");
+  assert.equal(flushed.tick.activeWake?.triggerId, blocked.tick.payload?.triggerId);
   assert.equal(enqueued.length, 1);
   assert.equal(enqueued[0]?.kind, "checkin");
+  assert.equal(enqueued[0]?.checkinTriggerId, blocked.tick.payload?.triggerId);
+});
+
+test("bridge checkin poller does not schedule the next wake until completion is recorded", () => {
+  const fixture = createPollerFixture();
+  const sessionStore = new SessionStore({ filePath: fixture.config.sessionsFile });
+  const startMs = Date.parse("2026-04-14T10:00:00Z");
+
+  processBridgeCheckinPollerIteration({
+    accountId: "acct-1",
+    config: fixture.config,
+    nowMs: startMs,
+    queueStore: {
+      enqueue() {},
+      hasPendingForAccount() {
+        return false;
+      },
+    },
+    sessionStore,
+  });
+  const queued = processBridgeCheckinPollerIteration({
+    accountId: "acct-1",
+    config: fixture.config,
+    nowMs: startMs + 60_000,
+    queueStore: {
+      enqueue() {},
+      hasPendingForAccount() {
+        return false;
+      },
+    },
+    sessionStore,
+  });
+  assert.equal(queued.tick.status, "in_progress");
+  assert.equal(queued.tick.nextWakeAt, "");
+
+  const waiting = processBridgeCheckinPollerIteration({
+    accountId: "acct-1",
+    config: fixture.config,
+    nowMs: startMs + 61_000,
+    queueStore: {
+      enqueue() {},
+      hasPendingForAccount() {
+        return false;
+      },
+    },
+    sessionStore,
+  });
+  assert.equal(waiting.action, "waiting");
+  assert.equal(waiting.tick.status, "in_progress");
+  assert.equal(waiting.tick.nextWakeAt, "");
+
+  runCheckinComplete({
+    config: fixture.config,
+    nowMs: startMs + 62_000,
+    result: "silent",
+    sleepFor: "2h",
+    target: waiting.tick.target,
+    triggerId: String(waiting.tick.activeWake?.triggerId || ""),
+  });
+
+  const afterComplete = processBridgeCheckinPollerIteration({
+    accountId: "acct-1",
+    config: fixture.config,
+    nowMs: startMs + 63_000,
+    queueStore: {
+      enqueue() {},
+      hasPendingForAccount() {
+        return false;
+      },
+    },
+    sessionStore,
+  });
+  assert.equal(afterComplete.action, "waiting");
+  assert.equal(afterComplete.tick.status, "scheduled");
+  assert.equal(afterComplete.tick.nextWakeAt, "2026-04-14T12:01:02.000Z");
 });

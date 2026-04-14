@@ -29,7 +29,7 @@ interface TimelineScreenshotInput {
 }
 
 async function runTimelineScreenshotCommand(config: TimelineRuntimeConfig): Promise<void> {
-  const options = parseArgs(process.argv.slice(3), config);
+  const options = parseTimelineScreenshotRuntimeArgs(process.argv.slice(3), config);
   if (options.help) {
     printHelp();
     return;
@@ -38,7 +38,7 @@ async function runTimelineScreenshotCommand(config: TimelineRuntimeConfig): Prom
   writeStdoutLine(`timeline screenshot saved: ${result.outputFile}`);
 }
 
-function parseArgs(args: string[], config: TimelineRuntimeConfig): TimelineScreenshotCliParseResult {
+function parseTimelineScreenshotRuntimeArgs(args: string[], config: TimelineRuntimeConfig): TimelineScreenshotCliParseResult {
   const options: TimelineScreenshotInput = { help: false };
 
   for (let index = 0; index < args.length; index += 1) {
@@ -170,3 +170,4 @@ ${Object.entries(SCREENSHOT_SELECTOR_MAP)
 }
 
 export { runTimelineScreenshotCommand };
+export { parseTimelineScreenshotRuntimeArgs };

@@ -110,9 +110,9 @@ codeksei operator hermes smoke
 
 - `Timeline`：把已经发生过的时间块、切换点和生活事实钉成时间感与记忆锚点，不让一天只剩模糊印象
 - `Diary`：Todo、碎片、补充记录、总结，以及和 timeline 紧密联动的时间线事实，帮你把零散日常慢慢收成可用痕迹
-- `Check-ins`：随机唤醒与主动分忧。发一句消息只是其中一种；它也会先回看上下文、整理后台、补一条 diary / timeline、留一个提醒，再决定是不是该主动露个面
+- `Check-ins`：主动唤醒与主动分忧。发一句消息只是其中一种；它也会先回看上下文、整理后台、补一条 diary / timeline、留一个提醒，再决定是不是该主动露个面，并在每次 proactive pass 结束后自己写回下一次何时再醒
 - `Check-ins`
-  Codeksei 负责生成 proactive trigger；Bridge Mode 下由本地 poller 包装并入队，Hermes Hosted Mode 下由 Hermes heartbeat / automation 调 `checkin-trigger` 或 `checkin-tick`
+  Codeksei 负责生成 proactive trigger、维护 `tick -> ack -> complete` 的调度真相，并在 `checkin-complete` 时写回下一次唤醒；Bridge Mode 下由本地 poller 包装 heartbeat 与入队，Hermes Hosted Mode 下由 Hermes heartbeat / automation 调 `checkin-tick`
 - `Reminders`：提醒写入与调度，给生活节奏和待办推进一个外部支点
 - `Review`：nightly / weekly / monthly，把日常记录压成更稳定的节奏校准与复盘材料
 - `Project support`：workspace bootstrap、project radar、按 workspace 恢复共享线程。项目切走再回来时，不用先把整条线在脑子里重建一遍；本地 git 仍是第一真相，只有 repo 缺失或不是 git repo 时才回退到 GitHub activity continuity signal
@@ -253,6 +253,7 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - 如果你在共享模式下使用多 workspace，建议启动前就设置好 `CODEKSEI_WORKSPACE_ROOT`
 - `CODEKSEI_TIMEZONE` 可选；若显式设置，它会统一驱动 reminder / diary / review / timeline 的本地时间解释
 - `CODEKSEI_TIMELINE_LOCALE` 可选；当前用于 timeline dashboard 的文案、日期格式和 demo data 语言切换，支持 `zh-CN` 与 `en`
+- `CODEKSEI_HERMES_REPO_ROOT` 可选；Hermes Hosted Mode 下若 sibling `../hermes-agent` 不成立，用它显式指向 repo-local upstream checkout
 - 如果不设 `CODEKSEI_TIMEZONE`，Codeksei 会优先沿用 timeline state 里已声明的非 legacy timezone；否则回退到系统时区
 - 旧的 `Asia/Shanghai` legacy timeline state 在需要时会在下一次 timeline 命令时自动迁移到当前统一 timezone
 - `CODEKSEI_TIMELINE_STATE_DIR` 默认指向 Codeksei timeline 数据根；当前主布局会在它下面使用 `timeline/*.json`
@@ -270,7 +271,9 @@ Codeksei 自己负责 Weixin bridge 和共享线程。
 
 - 由 Hermes 负责 gateway / agent loop / Weixin
 - 由 Codeksei CLI + 官方受管的 Hermes skill 提供 companion workflows
-- 主动 checkin 由 Hermes 调度；Codeksei 提供 `system checkin-trigger` / `system checkin-tick` 生成 trigger 与随机调度真相
+- `channel send-file`、`timeline screenshot --send`、`reminder write` 现在会走 Hermes repo-local shim；`system send` 仍保持 blocked，因为还没有 source-backed backstage-only host primitive
+- 主动 checkin 由 Hermes 调度；Codeksei 提供 `system checkin-trigger` / `system checkin-tick` / `system checkin-complete` 维护 `tick -> ack -> complete` 的调度真相
+- 若 sibling checkout 不在默认位置，可显式设置 `CODEKSEI_HERMES_REPO_ROOT`；`codeksei operator hermes status` / `smoke` 会把 repo-local readiness 和 commit 打出来
 - 可先用 `codeksei operator hermes --help` 或 `codeksei operator schema operator hermes` 看 3 个 leaf action
 - 推荐先执行：
   `codeksei operator hermes install-skill`
@@ -371,6 +374,7 @@ codeksei system checkin --reset
 codeksei system checkin-trigger --user <wechat_user_id> --workspace /absolute/workspace
 codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace
 codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace --ack <triggerId>
+codeksei system checkin-complete --user <wechat_user_id> --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for 6h
 ```
 
 更完整的命令与架构说明见：

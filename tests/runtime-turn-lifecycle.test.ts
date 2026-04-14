@@ -194,6 +194,43 @@ test("sendPreparedMessageToRuntime forwards model effort and access mode, then s
   }]);
 });
 
+test("sendPreparedMessageToRuntime forwards structured system metadata for checkin wakes", async () => {
+  const harness = createLifecycle();
+
+  await harness.lifecycle.sendPreparedMessageToRuntime({
+    bindingKey: "workspace-1:acct-1:user-1",
+    workspaceRoot: "E:/repo/current",
+    normalized: buildIncomingMessage({
+      provider: "system",
+      systemMessageKind: "checkin",
+      checkinTriggerId: "trigger-77",
+    }),
+    prepared: {
+      ...buildIncomingMessage({
+        provider: "system",
+        systemMessageKind: "checkin",
+        checkinTriggerId: "trigger-77",
+      }),
+      originalText: "wake",
+      text: "prepared wake",
+      attachments: [],
+      attachmentFailures: [],
+      workspaceRoot: "E:/repo/current",
+    },
+  });
+
+  assert.deepEqual(harness.sendTextTurnCalls[0]?.metadata, {
+    workspaceId: "workspace-1",
+    accountId: "acct-1",
+    senderId: "user-1",
+    systemMessage: {
+      kind: "checkin",
+      messageId: "msg-1",
+      checkinTriggerId: "trigger-77",
+    },
+  });
+});
+
 test("handlePreparedMessage can throw retryable runtime failures without sending a user notice", async () => {
   const harness = createLifecycle();
   harness.lifecycle.prepareIncomingMessageForRuntime = async () => ({

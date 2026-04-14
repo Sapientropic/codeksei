@@ -78,8 +78,15 @@ function readConfig(options: ReadConfigOptions = {}) {
       || readPrefixedEnv(process.env, "CODEX_COMMAND"),
     runtimeAccessMode: readPrefixedEnv(process.env, "RUNTIME_ACCESS_MODE")
       || readPrefixedEnv(process.env, "CODEX_ACCESS_MODE"),
-    hermesCommand: readPrefixedEnv(process.env, "HERMES_COMMAND") || "hermes",
-    hermesHome: readPrefixedEnv(process.env, "HERMES_HOME") || path.join(os.homedir(), ".hermes"),
+    hermesCommand: readPrefixedEnv(process.env, "HERMES_COMMAND")
+      || process.env.HERMES_COMMAND
+      || "hermes",
+    hermesHome: readPrefixedEnv(process.env, "HERMES_HOME")
+      || process.env.HERMES_HOME
+      || path.join(os.homedir(), ".hermes"),
+    hermesRepoRoot: readPrefixedEnv(process.env, "HERMES_REPO_ROOT"),
+    hermesRepoLocalShimPath: readPrefixedEnv(process.env, "HERMES_REPO_LOCAL_SHIM_PATH"),
+    hermesPythonCommand: readPrefixedEnv(process.env, "HERMES_PYTHON_COMMAND"),
     sessionsFile: path.join(stateDir, "sessions.json"),
     workspaceBootstrapConfigFile: readPrefixedEnv(process.env, "WORKSPACE_BOOTSTRAP_CONFIG")
       || path.join(stateDir, "workspace-bootstrap.json"),

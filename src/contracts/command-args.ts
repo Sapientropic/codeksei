@@ -198,6 +198,17 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "ack", keys: ["--ack"], type: "string", defaultValue: "", description: "确认当前 pending trigger id 并推进下一次调度" },
     ],
   }),
+  systemCheckinComplete: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id" },
+      { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "显式绝对 workspace 路径" },
+      { name: "trigger", keys: ["--trigger"], type: "string", defaultValue: "", required: true, description: "当前 active wake 的 trigger id" },
+      { name: "result", keys: ["--result"], type: "string", defaultValue: "", required: true, description: "sent_message|silent|backstage_only" },
+      { name: "nextWakeAt", keys: ["--next-wake-at"], type: "string", defaultValue: "", description: "显式下次唤醒时间（ISO 8601）" },
+      { name: "sleepFor", keys: ["--sleep-for"], type: "string", defaultValue: "", description: "相对延迟，如 6h / 1d4h" },
+    ],
+  }),
   systemCheckinTrigger: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,

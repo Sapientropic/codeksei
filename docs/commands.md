@@ -20,7 +20,8 @@
 
 - `Bridge Mode` 下，Codeksei 自己托管 bridge / shared 线程
 - `Hermes Hosted Mode` 下，宿主控制命令交给 Hermes；Codeksei 主要暴露 timeline / diary / reminder / review / note / project radar / doctor / schema，并提供 Hermes operator 入口做 skill/status/smoke
-- `Hermes Hosted Mode` 下，主动 checkin 的调度也交给 Hermes；Codeksei 只提供 trigger / tick generation
+- `channel send-file`、`timeline screenshot --send`、`reminder write` 已接上 Hermes repo-local 路径；`system send` 仍因缺少 backstage-only 宿主原语而保持 blocked
+- `Hermes Hosted Mode` 下，主动 checkin 的调度也交给 Hermes；Codeksei 只提供 `tick -> ack -> complete` 的调度真相与 one-shot trigger generation
 
 ## 命名
 
@@ -61,6 +62,7 @@ operator / bootstrap：
 - `codeksei start` `Bridge Mode only`
 - `codeksei system checkin-trigger`
 - `codeksei system checkin-tick`
+- `codeksei system checkin-complete`
 - `codeksei system checkin-poller`
 
 仓库脚本 / shared 模式：
@@ -80,6 +82,7 @@ operator / bootstrap：
 - `codeksei system checkin-trigger --user <senderId> --workspace /absolute/workspace`
 - `codeksei system checkin-tick --user <senderId> --workspace /absolute/workspace`
 - `codeksei system checkin-tick --user <senderId> --workspace /absolute/workspace --ack <triggerId>`
+- `codeksei system checkin-complete --user <senderId> --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for 6h`
 
 说明：
 
@@ -93,7 +96,8 @@ operator / bootstrap：
 - 日常使用默认走共享模式，让微信入口和终端执行落在同一条线上
 - `codeksei start` / `npm run start:checkin` 更适合 operator 调试，不再视作默认 public discovery 面
 - 如果当前配置是 `Hermes Hosted Mode`，`codeksei start` 与 `shared:start` 会明确提示“改由 Hermes gateway 托管”，不会隐式回退到 Codex app-server
-- `codeksei system checkin-poller` 现在只保留 bridge 宿主包装；host-neutral 真相层是 `checkin-trigger` 与 `checkin-tick`
+- `codeksei system checkin-poller` 现在只保留 bridge 宿主包装；host-neutral 真相层是 `checkin-trigger`、`checkin-tick` 与 `checkin-complete`
+- `system checkin --range` 现在是 fallback window，不再代表 agent 的真实唤醒节奏
 
 ## 微信命令
 
@@ -147,7 +151,7 @@ operator / bootstrap：
 - `timeline:write --stdin` 也要传完整 JSON 对象 `{"events":[...]}`，不要传裸数组
 - 不确定分类 id 时先跑 `timeline:categories`，改已有日程前先跑 `timeline:read`
 - 不带 offset 的本地时间按当前 runtime timezone 解释；如果 timeline state 已声明非 legacy timezone，会优先沿用它
-- 截图回微信统一走 `timeline:screenshot -- --send`
+- 截图回微信统一走 `timeline:screenshot -- --send`；Bridge Mode 下经本地截图队列，Hosted Mode 下经 Hermes repo-local send-back
 
 这一层更接近生活事实层，优先留下发生过什么。
 
@@ -185,6 +189,7 @@ Diary 用来接那些更琐碎、更生活化、也最容易散掉的东西。
 
 - 适合写那些不想只靠脑子记住的事
 - 提醒最好短、明确、可执行
+- Bridge Mode 下写本地 reminder queue；Hosted Mode 下会创建 Hermes cron 并 deliver 回当前 origin chat
 - 如果一条事同时需要后续回看，可以配合 `diary:write` 或 `timeline:event`
 
 ## Durable Notes
@@ -272,7 +277,7 @@ maintainer 仍需额外补一次真实账号 smoke：
 - 这三条脚本都会在 `shared-wechat.log` / `shared-app-server.log` 里写 `[codeksei-smoke] stage=...` checkpoint，排查时优先从这些 marker 往后看。
 - `[⚠️ 需确认]` 这组真实 smoke 依赖可用的 WeChat 登录态、绑定 thread 和能触发 approval 的活跃 Codex runtime；环境不满足时脚本会直接报错，而不是静默跳过。
 - Hermes Hosted Mode 的真实验证不走这套 shared smoke；那条线要验证的是 Hermes gateway + Hermes Weixin + Codeksei companion skill。
-- Hosted operator 侧的前置检查入口是 `codeksei operator hermes smoke`；它只验证 Hermes CLI / Weixin account / skill parity / hosted semantic review 准备度，不伪造 live Weixin 成功。
+- Hosted operator 侧的前置检查入口是 `codeksei operator hermes smoke`；它会验证 Hermes CLI / repo-local sibling checkout / Weixin account / skill parity / hosted semantic review 准备度，不伪造 live Weixin 成功。
 - 最近一次 recorded 结果入口统一看 [docs/maintainer/live-smoke.md](./maintainer/live-smoke.md)
 
 ## Maintainer Quality Gates

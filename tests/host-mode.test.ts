@@ -12,6 +12,9 @@ const {
   installHermesCompanionSkill,
 } = require("../src/core/host-mode");
 const { main: runSharedStart } = require("../src/shared/shared-start");
+const {
+  createFakeHermesRepoLocalFixture,
+} = require("./helpers/fake-hermes-repo-local.ts");
 
 function withPatchedEnv<T>(patch: Record<string, string>, fn: () => T): T {
   const original = { ...process.env };
@@ -65,11 +68,16 @@ test("readConfig infers Hermes hosted mode from runtime", () => {
 test("doctor reports host mode and hosted Hermes diagnostics", () => {
   const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-hosted-doctor-"));
   const hermesHome = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-hosted-hermes-home-"));
+  const repoLocal = createFakeHermesRepoLocalFixture(
+    fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-hosted-hermes-repo-local-"))
+  );
   const config = withPatchedEnv({
     CODEKSEI_STATE_DIR: stateDir,
     CODEKSEI_RUNTIME: "hermes",
     CODEKSEI_CHANNEL_PROVIDER: "hermes",
     CODEKSEI_HERMES_HOME: hermesHome,
+    CODEKSEI_HERMES_REPO_ROOT: repoLocal.repoRoot,
+    CODEKSEI_HERMES_REPO_LOCAL_SHIM_PATH: repoLocal.shimPath,
   }, () => readConfig());
 
   installHermesCompanionSkill(config);
@@ -83,6 +91,7 @@ test("doctor reports host mode and hosted Hermes diagnostics", () => {
   assert.ok(report.hostedHermes);
   assert.equal(report.hostedHermes.repoSkillAsset.exists, true);
   assert.equal(report.hostedHermes.installedSkill.inSync, true);
+  assert.equal(report.hostedHermes.repoLocal.ready, true);
 });
 
 test("codeksei start fails fast in Hermes hosted mode", async () => {
