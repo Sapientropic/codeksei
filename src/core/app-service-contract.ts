@@ -2,6 +2,19 @@ import type { RuntimeEvent } from "../contracts/runtime-events";
 import type { ReminderQueueEntry, SystemMessage } from "../contracts/queue-items";
 import type { AvailableModelCatalogView } from "../contracts/model-catalog";
 import type {
+  CodekseiChannel,
+  CodekseiChannelProvider,
+  CodekseiRuntimeAccessMode,
+  CodekseiRuntimeProvider,
+  WeixinReplyMode,
+} from "./config-value-types";
+import type { ReviewSemanticHost } from "./review-semantic-host-policy";
+import type {
+  ChannelAdapterOperations,
+  HostCapabilities,
+  RuntimeAdapterOperations,
+} from "./host-profile-matrix";
+import type {
   DeliveryFailurePayload,
   HandlePreparedMessageOptions,
   NormalizedIncomingMessage,
@@ -34,14 +47,14 @@ export interface AppRuntimeConfig {
   userName: string;
   userGender: string;
   allowedUserIds: string[];
-  channel: string;
-  channelProvider: string;
-  runtime: string;
+  channel: CodekseiChannel;
+  channelProvider: CodekseiChannelProvider;
+  runtime: CodekseiRuntimeProvider;
   accountId: string;
   weixinBaseUrl: string;
   weixinCdnBaseUrl: string;
   weixinAdapterVariant: string;
-  weixinReplyMode: string;
+  weixinReplyMode: WeixinReplyMode;
   weixinDeliveryTrace: boolean;
   weixinQrBotType: string;
   weixinRouteTag: string;
@@ -62,8 +75,8 @@ export interface AppRuntimeConfig {
   syncBufferDir: string;
   runtimeEndpoint: string;
   runtimeCommand: string;
-  runtimeAccessMode: string;
-  codexAccessMode: string;
+  runtimeAccessMode: CodekseiRuntimeAccessMode;
+  codexAccessMode: CodekseiRuntimeAccessMode;
   hermesCommand: string;
   hermesHome: string;
   hermesRepoRoot: string;
@@ -75,7 +88,7 @@ export interface AppRuntimeConfig {
   durableNoteSchemaConfigFile: string;
   reviewSchemaConfigFile: string;
   reviewSemanticMode: string;
-  reviewSemanticHost: string;
+  reviewSemanticHost: ReviewSemanticHost;
   reviewSemanticModel: string;
   reviewSemanticTimeoutMs: number;
   sharedBridgeHeartbeatFile: string;
@@ -86,15 +99,6 @@ export interface AppRuntimeConfig {
 export interface ChannelAccount {
   accountId: string;
   baseUrl: string;
-}
-
-export interface ChannelAdapterOperations {
-  pollUpdates: boolean;
-  login: boolean;
-  resolveAccount: boolean;
-  visibleTextDelivery: boolean;
-  visibleTypingDelivery: boolean;
-  visibleFileDelivery: boolean;
 }
 
 export interface ChannelAdapterDescriptor {
@@ -113,16 +117,7 @@ export interface ChannelAdapterDescriptor {
   mode?: string | undefined;
   supported?: boolean | undefined;
   channel?: string | undefined;
-  capabilities?: unknown;
-}
-
-export interface RuntimeAdapterOperations {
-  initialize: boolean;
-  interactiveTurn: boolean;
-  refreshThreadInstructions: boolean;
-  respondApproval: boolean;
-  resumeThread: boolean;
-  cancelTurn: boolean;
+  capabilities?: HostCapabilities;
 }
 
 export interface RuntimeAdapterDescriptor {
@@ -136,7 +131,7 @@ export interface RuntimeAdapterDescriptor {
   mode?: string | undefined;
   supported?: boolean | undefined;
   channelProvider?: string | undefined;
-  capabilities?: unknown;
+  capabilities?: HostCapabilities;
 }
 
 export interface RuntimeAdapterState {

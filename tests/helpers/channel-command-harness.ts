@@ -257,7 +257,7 @@ function createWorkspaceCommandHarness({
     workspaceRoot: currentWorkspaceRoot,
     runtimeAccessMode: "workspace-write",
     codexAccessMode: "workspace-write",
-  };
+  } as const;
 
   const sessionStore = {
     buildBindingKey() {

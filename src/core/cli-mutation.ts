@@ -6,23 +6,50 @@ interface CliMutationConfig {
   cliIdempotencyLedgerFile?: string;
 }
 
-interface RunCliMutationOptions<T> {
-  commandKey: string;
-  config: CliMutationConfig;
-  configSource?: Record<string, unknown>;
+export interface CliMutationMeta<
+  TConfigSource extends Record<string, unknown> = Record<string, unknown>,
+  TResolvedTargets extends Record<string, unknown> = Record<string, unknown>,
+  TSideEffect extends Record<string, unknown> | string = Record<string, unknown> | string,
+> extends Record<string, unknown> {
+  configSource: TConfigSource;
   dryRun?: boolean;
-  dryRunResult: CommandExecutionResult<T>;
-  execute: () => Promise<CommandExecutionResult<T>>;
-  idempotencyKey?: string;
-  request: unknown;
-  resolvedTargets: Record<string, unknown>;
-  sideEffects: Array<Record<string, unknown> | string>;
+  idempotency: {
+    provided: boolean;
+    replayed: boolean;
+  };
+  resolvedTargets: TResolvedTargets;
+  sideEffects: TSideEffect[];
 }
 
-export async function runCliMutation<T>({
+interface RunCliMutationOptions<
+  TData,
+  TRequest = unknown,
+  TResolvedTargets extends Record<string, unknown> = Record<string, unknown>,
+  TSideEffect extends Record<string, unknown> | string = Record<string, unknown> | string,
+  TConfigSource extends Record<string, unknown> = Record<string, unknown>,
+> {
+  commandKey: string;
+  config: CliMutationConfig;
+  configSource?: TConfigSource;
+  dryRun?: boolean;
+  dryRunResult: CommandExecutionResult<TData>;
+  execute: () => Promise<CommandExecutionResult<TData>>;
+  idempotencyKey?: string;
+  request: TRequest;
+  resolvedTargets: TResolvedTargets;
+  sideEffects: TSideEffect[];
+}
+
+export async function runCliMutation<
+  TData,
+  TRequest = unknown,
+  TResolvedTargets extends Record<string, unknown> = Record<string, unknown>,
+  TSideEffect extends Record<string, unknown> | string = Record<string, unknown> | string,
+  TConfigSource extends Record<string, unknown> = Record<string, unknown>,
+>({
   commandKey,
   config,
-  configSource = {},
+  configSource = {} as TConfigSource,
   dryRun = false,
   dryRunResult,
   execute,
@@ -30,12 +57,18 @@ export async function runCliMutation<T>({
   request,
   resolvedTargets,
   sideEffects,
-}: RunCliMutationOptions<T>): Promise<CommandExecutionResult<T>> {
+}: RunCliMutationOptions<TData, TRequest, TResolvedTargets, TSideEffect, TConfigSource>): Promise<
+  CommandExecutionResult<TData, CliMutationMeta<TConfigSource, TResolvedTargets, TSideEffect>>
+> {
   const normalizedIdempotencyKey = normalizeText(idempotencyKey);
-  const metaBase = {
+  const metaBase: CliMutationMeta<TConfigSource, TResolvedTargets, TSideEffect> = {
     configSource,
     resolvedTargets,
     sideEffects,
+    idempotency: {
+      provided: false,
+      replayed: false,
+    },
   };
   if (dryRun) {
     return {
@@ -44,10 +77,7 @@ export async function runCliMutation<T>({
         ...metaBase,
         ...(dryRunResult.meta || {}),
         dryRun: true,
-        idempotency: {
-          provided: Boolean(normalizedIdempotencyKey),
-          replayed: false,
-        },
+        idempotency: { provided: Boolean(normalizedIdempotencyKey), replayed: false },
       },
     };
   }
@@ -62,13 +92,13 @@ export async function runCliMutation<T>({
       resolvedTargets,
     });
     if (record) {
-      return envelopeToExecutionResult<T>(record.envelope as CommandEnvelope<T>, {
+      return envelopeToExecutionResult<TData, TConfigSource, TResolvedTargets, TSideEffect>(
+        record.envelope as CommandEnvelope<TData, CliMutationMeta<TConfigSource, TResolvedTargets, TSideEffect>>,
+        {
         ...metaBase,
-        idempotency: {
-          provided: true,
-          replayed: true,
-        },
-      });
+        idempotency: { provided: true, replayed: true },
+      },
+      );
     }
   }
 
@@ -79,13 +109,10 @@ export async function runCliMutation<T>({
     meta: {
       ...metaBase,
       ...(result.meta || {}),
-      idempotency: {
-        provided: Boolean(normalizedIdempotencyKey),
-        replayed: false,
-      },
+      idempotency: { provided: Boolean(normalizedIdempotencyKey), replayed: false },
     },
     next: result.next,
-  } satisfies CommandEnvelope<T>;
+  } satisfies CommandEnvelope<TData, CliMutationMeta<TConfigSource, TResolvedTargets, TSideEffect>>;
 
   if (normalizedIdempotencyKey && ledgerFile) {
     recordCliIdempotencyResult({
@@ -103,10 +130,15 @@ export async function runCliMutation<T>({
   };
 }
 
-function envelopeToExecutionResult<T>(
-  envelope: CommandEnvelope<T>,
-  metaOverride: Record<string, unknown>,
-): CommandExecutionResult<T> {
+function envelopeToExecutionResult<
+  TData,
+  TConfigSource extends Record<string, unknown>,
+  TResolvedTargets extends Record<string, unknown>,
+  TSideEffect extends Record<string, unknown> | string,
+>(
+  envelope: CommandEnvelope<TData, CliMutationMeta<TConfigSource, TResolvedTargets, TSideEffect>>,
+  metaOverride: CliMutationMeta<TConfigSource, TResolvedTargets, TSideEffect>,
+): CommandExecutionResult<TData, CliMutationMeta<TConfigSource, TResolvedTargets, TSideEffect>> {
   return {
     ok: envelope.ok === false ? true : envelope.ok,
     data: envelope.data,

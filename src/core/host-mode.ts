@@ -10,6 +10,11 @@ export {
   type HostProfileId,
 } from "./host-mode-resolution";
 export {
+  formatHostSupportTierHint,
+  isSupportedHostProfileId,
+  listSupportedHostProfileIds,
+} from "./host-profile-matrix";
+export {
   collectHermesHostedDoctorReport,
   collectHermesHostedStatusReport,
   collectHermesSkillCatalogProbe,
