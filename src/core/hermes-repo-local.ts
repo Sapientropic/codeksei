@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { spawnSync } from "node:child_process";
+import * as dotenv from "dotenv";
 
 import { resolvePackageRoot } from "../contracts/path-utils";
 import { captureSubprocess, resolveCommandOnPath } from "./subprocess-capture";
@@ -333,6 +334,10 @@ function resolvePythonInvocation(config: HermesRepoLocalConfigInput): {
   if (python) {
     return { command: python, argsPrefix: [] };
   }
+  const python3 = resolveCommandOnPath("python3");
+  if (python3) {
+    return { command: python3, argsPrefix: [] };
+  }
   const pyLauncher = resolveCommandOnPath("py");
   if (pyLauncher) {
     return { command: pyLauncher, argsPrefix: ["-3"] };
@@ -347,12 +352,26 @@ function buildHermesRepoLocalEnv({
   hermesHome: string;
   repoRoot: string;
 }): NodeJS.ProcessEnv {
-  const existingPythonPath = normalizeText(process.env.PYTHONPATH);
-  return {
+  const env: NodeJS.ProcessEnv = {
     ...process.env,
-    HERMES_HOME: hermesHome,
-    PYTHONPATH: existingPythonPath ? `${repoRoot}${path.delimiter}${existingPythonPath}` : repoRoot,
   };
+  const hermesEnvPath = path.join(hermesHome, ".env");
+  if (fs.existsSync(hermesEnvPath)) {
+    // Mirror Hermes CLI behavior so repo-local bridge flows can see platform
+    // credentials/config even when Codeksei is launched from a plain shell.
+    dotenv.config({
+      path: hermesEnvPath,
+      processEnv: env as Record<string, string>,
+      override: true,
+    });
+  }
+  const existingPythonPath = normalizeText(env.PYTHONPATH);
+  // Repo-local invocations must keep their explicit repo/home wiring even when
+  // Hermes home .env overrides stale shell exports for secrets and platform
+  // credentials. Do not let .env replace these two bridge-critical values.
+  env.HERMES_HOME = hermesHome;
+  env.PYTHONPATH = existingPythonPath ? `${repoRoot}${path.delimiter}${existingPythonPath}` : repoRoot;
+  return env;
 }
 
 function normalizeBridgeOutput(value: unknown): string {

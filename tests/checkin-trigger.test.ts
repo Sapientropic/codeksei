@@ -143,7 +143,11 @@ test("checkin-complete writes the next wake after tick ack", async () => {
     workspaceRoot: fixture.workspaceRoot,
     workspaceSource: "explicit_workspace",
   };
-  const startMs = Date.parse("2026-04-14T10:00:00Z");
+  // Keep the active wake within the 30-minute timeout window so this test
+  // keeps asserting tick -> ack -> complete semantics instead of depending on
+  // when the suite happens to run in real time.
+  const completionNowMs = Date.now();
+  const startMs = completionNowMs - 2 * 60_000;
 
   runCheckinTick({
     config: baseConfig,
