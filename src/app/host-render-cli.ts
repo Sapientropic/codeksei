@@ -4,6 +4,7 @@ import type { CommandExecutionResult } from "../contracts/cli-contract";
 import { getCommandArgsSchema } from "../contracts/command-args";
 import { parseCliArgs } from "../core/cli-args";
 import { buildTerminalLeafHelp } from "../core/command-registry";
+import { normalizeLineEndings } from "../core/text-normalization";
 import { resolveRepoHermesSkillAssetPath } from "../host/recipes/hermes/skill";
 import { renderHermesCompanionSkill } from "../host/renderers/hermes-skill";
 
@@ -43,7 +44,7 @@ export async function runHostRenderCommand(
   const tracked = fs.existsSync(templatePath)
     ? fs.readFileSync(templatePath, "utf8")
     : "";
-  const matchesTrackedTemplate = tracked === rendered;
+  const matchesTrackedTemplate = normalizeLineEndings(tracked) === normalizeLineEndings(rendered);
   return {
     ok: options.validate && !matchesTrackedTemplate ? "partial" : true,
     data: {
