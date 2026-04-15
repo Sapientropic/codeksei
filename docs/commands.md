@@ -105,6 +105,7 @@ operator / bootstrap：
 - `codeksei operator hermes --help` / `codeksei operator schema operator hermes` 会列出 Hermes Hosted Mode 的 4 个 leaf action
 - `codeksei operator hermes install-skill` 是唯一会改本机 Hermes skill 状态的 leaf action；支持 `--dry-run`
 - `codeksei operator hermes sync-checkin` 会按当前 target 的 checkin state 为 Hermes 创建/更新唯一需要存在的 one-shot wake/recovery job；支持 `--dry-run`
+- `Codeksei` 当前 hosted check-in 主链不再要求 Hermes upstream 先支持 cron `env`；若想把 Hermes 原生 cron `env` 能力也补上，可选补丁统一看 [`docs/hermes-cron-env-patch.md`](./hermes-cron-env-patch.md)
 - 非 TTY 默认返回 JSON envelope；TTY 默认返回 text
 - `stdout` 留给结果数据，`stderr` 留给诊断与 debug 信息
 - 全局参数统一支持：`--format json|text`、`--verbose`、`--workspace-root /absolute/path`
@@ -114,6 +115,7 @@ operator / bootstrap：
 - `codeksei system checkin-poller` 现在只保留 bridge 宿主包装；host-neutral 真相层是 `checkin-trigger`、`checkin-tick` 与 `checkin-complete`
 - `checkin-complete` 在 Hermes Hosted Mode 下会在写回 state 后自动 re-arm 下一条 wake one-shot job，并清理未来 recovery job
 - `sync-checkin` 创建/更新 job 时需要 origin context；真正 cron 投递时，Hermes 直接读取持久化的 `job.origin`，不会再按 target 反查 live session
+- `sync-checkin` 现在会先确保目标 wake/recovery job 已成功存在，再 best-effort 清理旧 job；中途失败时不会先把最后一条 recovery wake 删掉
 - `system checkin --range` 现在是 fallback window，不再代表 agent 的真实唤醒节奏
 
 ## Host Attachment Contract

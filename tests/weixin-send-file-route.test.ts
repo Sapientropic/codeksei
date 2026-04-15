@@ -44,7 +44,7 @@ function restoreModules(originals: Map<string, NodeJS.Module | undefined>): void
   }
 }
 
-test("v2 weixin adapter keeps media sends on the legacy stack", async () => {
+test("official weixin adapter keeps v2 as the primary file-delivery stack", async () => {
   const originals = new Map<string, NodeJS.Module | undefined>();
   let capturedArgs: SendWeixinMediaFileArgs | null = null;
 
@@ -83,11 +83,6 @@ test("v2 weixin adapter keeps media sends on the legacy stack", async () => {
       async sendTextV2() {},
       async sendTypingV2() {},
     }, originals);
-    stubModule("src/adapters/channel/weixin/legacy.ts", {
-      createLegacyWeixinChannelAdapter() {
-        throw new Error("legacy adapter should not be constructed in this test");
-      },
-    }, originals);
     stubModule("src/adapters/channel/weixin/message-utils-v2.ts", {
       createInboundFilter() {
         return {
@@ -116,7 +111,6 @@ test("v2 weixin adapter keeps media sends on the legacy stack", async () => {
 
     const adapter = createWeixinChannelAdapter({
       stateDir: path.join(repoRoot, ".tmp-weixin-route"),
-      weixinAdapterVariant: "v2",
       weixinCdnBaseUrl: "http://cdn.example.test",
       weixinProtocolClientVersion: "9.9.9",
     });
@@ -135,7 +129,7 @@ test("v2 weixin adapter keeps media sends on the legacy stack", async () => {
       baseUrl: "http://wx.example.test",
       token: "token-1",
       cdnBaseUrl: "http://cdn.example.test",
-      apiVariant: "legacy",
+      apiVariant: "v2",
       routeTag: "route-1",
       clientVersion: "9.9.9",
     });

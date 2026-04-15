@@ -96,6 +96,7 @@ interface HermesRepoLocalReminderPayload {
 
 interface HermesRepoLocalSyncCheckinCronPayload {
   due_at_iso: string;
+  env?: Record<string, string>;
   name: string;
   prompt: string;
   role: "recovery" | "wake";

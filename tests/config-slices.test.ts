@@ -38,7 +38,6 @@ test("config slices compose into the legacy-compatible app runtime surface", () 
       accountsDir: "E:/state/accounts",
       weixinBaseUrl: "http://127.0.0.1",
       weixinCdnBaseUrl: "https://cdn.example.com",
-      weixinAdapterVariant: "v2",
       weixinReplyMode: "stream",
       weixinDeliveryTrace: false,
       weixinQrBotType: "3",

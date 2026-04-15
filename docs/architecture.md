@@ -193,15 +193,15 @@
 - `delivery-text.ts` 负责文本归一化、chunk、packing、stream 边界
 - `delivery-trace.ts` 负责 trace context、retry backoff、stable client id 重试
 - `updates.ts` 负责 account / context token / sync buffer / getUpdates
-- `route-matrix.ts` 是当前唯一的 dual-stack 真相源：默认 adapter 下 `login/getUpdates/sendText/sendTyping -> v2`，`sendFile -> legacy`
+- `route-matrix.ts` 是当前唯一的 Weixin route contract：正式 public adapter 只有 `v2`；`sendFile` 先走 `v2`，命中 media gap 才在 `media-send.ts` 内部回落到 legacy media API
 - `login-*`、`message-utils*`、`protocol.ts`、`account-store.ts`、`context-token-store.ts` 各自承担 owner-local 边界
 - channel adapter 现在通过 `describe().operations` 显式声明 `pollUpdates` / `login` / `resolveAccount` / `visibleTextDelivery` / `visibleTypingDelivery` / `visibleFileDelivery`
 
 实现约束：
 
 - 源码内部统一走标准 `import / export`
-- media 兼容路径与 v2 text delivery 的分工继续显式保留，避免“顺手统一”把文件发送重新路由回错误栈
-- dual-stack 的维护入口统一看 [`docs/maintainer/weixin-dual-stack.md`](./maintainer/weixin-dual-stack.md)，不要只靠内联注释记忆
+- media 兼容路径与 v2 text delivery 的分工继续显式保留，但不要再把 legacy media fallback 上升成第二个 public adapter
+- Weixin 媒体 fallback 的维护入口统一看 [`docs/maintainer/weixin-media-fallback.md`](./maintainer/weixin-media-fallback.md)，不要只靠内联注释记忆
 
 不负责：
 

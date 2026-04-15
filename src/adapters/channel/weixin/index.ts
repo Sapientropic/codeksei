@@ -1,4 +1,3 @@
-import { createLegacyWeixinChannelAdapter } from "./legacy";
 import { runV2LoginFlow } from "./login-v2";
 import { sendWeixinMediaFile } from "./media-send";
 import { createWeixinDeliveryFacade, packChunksForWeixinDelivery, sendV2TextChunk } from "./delivery";
@@ -9,7 +8,6 @@ import { createWeixinUpdateState, type GetUpdatesResponse, type WeixinAccount, t
 import {
   describeWeixinAdapterVariant,
   getWeixinRouteRule,
-  normalizeWeixinAdapterVariantKey,
 } from "./route-matrix";
 
 
@@ -55,11 +53,6 @@ interface WeixinChannelAdapter {
 }
 
 export function createWeixinChannelAdapter(config: WeixinConfig): WeixinChannelAdapter {
-  const variant = normalizeWeixinAdapterVariantKey(config.weixinAdapterVariant);
-  if (variant === "legacy") {
-    return createLegacyWeixinChannelAdapter(config);
-  }
-
   const updates = createWeixinUpdateState(config);
   const delivery = createWeixinDeliveryFacade({
     config,
@@ -69,11 +62,11 @@ export function createWeixinChannelAdapter(config: WeixinConfig): WeixinChannelA
 
   return {
     describe() {
-      return {
-        id: "weixin",
-        variant: describeWeixinAdapterVariant(variant),
-        kind: "channel",
-        provider: "weixin",
+        return {
+          id: "weixin",
+          variant: describeWeixinAdapterVariant(),
+          kind: "channel",
+          provider: "weixin",
         operations: {
           pollUpdates: true,
           login: true,
@@ -129,7 +122,7 @@ export function createWeixinChannelAdapter(config: WeixinConfig): WeixinChannelA
       if (!resolvedToken) {
         throw new Error(`缺少 context_token，无法发送文件给用户 ${userId}`);
       }
-      const sendFileRoute = getWeixinRouteRule("sendFile", variant);
+      const sendFileRoute = getWeixinRouteRule("sendFile");
       const sendArgs = {
         filePath,
         to: userId,

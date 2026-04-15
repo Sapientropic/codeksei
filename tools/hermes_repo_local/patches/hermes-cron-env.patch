@@ -1,0 +1,345 @@
+diff --git a/cron/jobs.py b/cron/jobs.py
+index 47e0b66e..b12b72f7 100644
+--- a/cron/jobs.py
++++ b/cron/jobs.py
+@@ -36,6 +36,10 @@ CRON_DIR = HERMES_DIR / "cron"
+ JOBS_FILE = CRON_DIR / "jobs.json"
+ OUTPUT_DIR = CRON_DIR / "output"
+ ONESHOT_GRACE_SECONDS = 120
++_ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
++_MAX_JOB_ENV_ITEMS = 64
++_MAX_JOB_ENV_KEY_LENGTH = 128
++_MAX_JOB_ENV_VALUE_LENGTH = 8192
+ 
+ 
+ def _normalize_skill_list(skill: Optional[str] = None, skills: Optional[Any] = None) -> List[str]:
+@@ -64,6 +68,40 @@ def _apply_skill_fields(job: Dict[str, Any]) -> Dict[str, Any]:
+     return normalized
+ 
+ 
++def _normalize_job_env(env: Optional[Any]) -> Dict[str, str]:
++    """Validate and normalize per-job environment overrides."""
++    if env is None:
++        return {}
++    if not isinstance(env, dict):
++        raise ValueError("env must be an object mapping ENV_KEY to string values")
++    if len(env) > _MAX_JOB_ENV_ITEMS:
++        raise ValueError(f"env may contain at most {_MAX_JOB_ENV_ITEMS} entries")
++
++    normalized: Dict[str, str] = {}
++    for raw_key, raw_value in env.items():
++        key = str(raw_key or "").strip()
++        if not key:
++            continue
++        if len(key) > _MAX_JOB_ENV_KEY_LENGTH or not _ENV_KEY_RE.fullmatch(key):
++            raise ValueError(f"invalid env key: {raw_key!r}")
++        value = "" if raw_value is None else str(raw_value)
++        if len(value) > _MAX_JOB_ENV_VALUE_LENGTH:
++            raise ValueError(f"env value for {key!r} exceeds {_MAX_JOB_ENV_VALUE_LENGTH} characters")
++        normalized[key] = value
++    return normalized
++
++
++def _normalize_stored_job(job: Dict[str, Any]) -> Dict[str, Any]:
++    """Return a stored job with backward-compatible fields normalized."""
++    normalized = _apply_skill_fields(job)
++    try:
++        normalized["env"] = _normalize_job_env(normalized.get("env"))
++    except ValueError:
++        logger.warning("Dropping invalid stored cron env on job %s", normalized.get("id", "?"))
++        normalized["env"] = {}
++    return normalized
++
++
+ def _secure_dir(path: Path):
+     """Set directory to owner-only access (0700). No-op on Windows."""
+     try:
+@@ -377,6 +415,7 @@ def create_job(
+     model: Optional[str] = None,
+     provider: Optional[str] = None,
+     base_url: Optional[str] = None,
++    env: Optional[Dict[str, Any]] = None,
+     script: Optional[str] = None,
+ ) -> Dict[str, Any]:
+     """
+@@ -425,6 +464,7 @@ def create_job(
+     normalized_model = normalized_model or None
+     normalized_provider = normalized_provider or None
+     normalized_base_url = normalized_base_url or None
++    normalized_env = _normalize_job_env(env)
+     normalized_script = str(script).strip() if isinstance(script, str) else None
+     normalized_script = normalized_script or None
+ 
+@@ -458,6 +498,7 @@ def create_job(
+         # Delivery configuration
+         "deliver": deliver,
+         "origin": origin,  # Tracks where job was created for "origin" delivery
++        "env": normalized_env,
+     }
+ 
+     jobs = load_jobs()
+@@ -472,13 +513,13 @@ def get_job(job_id: str) -> Optional[Dict[str, Any]]:
+     jobs = load_jobs()
+     for job in jobs:
+         if job["id"] == job_id:
+-            return _apply_skill_fields(job)
++            return _normalize_stored_job(job)
+     return None
+ 
+ 
+ def list_jobs(include_disabled: bool = False) -> List[Dict[str, Any]]:
+     """List all jobs, optionally including disabled ones."""
+-    jobs = [_apply_skill_fields(j) for j in load_jobs()]
++    jobs = [_normalize_stored_job(j) for j in load_jobs()]
+     if not include_disabled:
+         jobs = [j for j in jobs if j.get("enabled", True)]
+     return jobs
+@@ -491,7 +532,11 @@ def update_job(job_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]
+         if job["id"] != job_id:
+             continue
+ 
+-        updated = _apply_skill_fields({**job, **updates})
++        if "env" in updates:
++            updates = dict(updates)
++            updates["env"] = _normalize_job_env(updates.get("env"))
++
++        updated = _normalize_stored_job({**job, **updates})
+         schedule_changed = "schedule" in updates
+ 
+         if "skills" in updates or "skill" in updates:
+diff --git a/cron/scheduler.py b/cron/scheduler.py
+index 83b7abb9..54f5a461 100644
+--- a/cron/scheduler.py
++++ b/cron/scheduler.py
+@@ -48,7 +48,7 @@ _KNOWN_DELIVERY_PLATFORMS = frozenset({
+     "qqbot",
+ })
+ 
+-from cron.jobs import get_due_jobs, mark_job_run, save_job_output, advance_next_run
++from cron.jobs import _normalize_job_env, get_due_jobs, mark_job_run, save_job_output, advance_next_run
+ 
+ # Sentinel: when a cron agent has nothing new to report, it can start its
+ # response with this marker to suppress delivery.  Output is still saved
+@@ -594,21 +594,17 @@ def run_job(job: dict) -> tuple[bool, str, str, Optional[str]]:
+     
+     job_id = job["id"]
+     job_name = job["name"]
+-    prompt = _build_job_prompt(job)
++    prompt = job.get("prompt", "") or ""
+     origin = _resolve_origin(job)
+     _cron_session_id = f"cron_{job_id}_{_hermes_now().strftime('%Y%m%d_%H%M%S')}"
++    restore_env: dict[str, Optional[str]] = {}
++    job_env: dict[str, str] = {}
+ 
+     logger.info("Running job '%s' (ID: %s)", job_name, job_id)
+     logger.info("Prompt: %s", prompt[:100])
+ 
+     try:
+-        # Inject origin context so the agent's send_message tool knows the chat.
+-        # Must be INSIDE the try block so the finally cleanup always runs.
+-        if origin:
+-            os.environ["HERMES_SESSION_PLATFORM"] = origin["platform"]
+-            os.environ["HERMES_SESSION_CHAT_ID"] = str(origin["chat_id"])
+-            if origin.get("chat_name"):
+-                os.environ["HERMES_SESSION_CHAT_NAME"] = origin["chat_name"]
++        job_env = _normalize_job_env(job.get("env"))
+         # Re-read .env and config.yaml fresh every run so provider/key
+         # changes take effect without a gateway restart.
+         from dotenv import load_dotenv
+@@ -617,12 +613,29 @@ def run_job(job: dict) -> tuple[bool, str, str, Optional[str]]:
+         except UnicodeDecodeError:
+             load_dotenv(str(_hermes_home / ".env"), override=True, encoding="latin-1")
+ 
++        # Job-scoped runtime context must win over persisted shell/.env values.
++        # Hosted check-in jobs depend on this so CODEKSEI_* host-mode flags and
++        # per-job routing metadata survive clean cron sessions.
++        if origin:
++            _set_job_env(restore_env, "HERMES_SESSION_PLATFORM", origin.get("platform"))
++            _set_job_env(restore_env, "HERMES_SESSION_CHAT_ID", str(origin.get("chat_id") or ""))
++            _set_job_env(restore_env, "HERMES_SESSION_CHAT_NAME", origin.get("chat_name"))
++            _set_job_env(restore_env, "HERMES_SESSION_THREAD_ID", origin.get("thread_id"))
++
+         delivery_target = _resolve_delivery_target(job)
+         if delivery_target:
+-            os.environ["HERMES_CRON_AUTO_DELIVER_PLATFORM"] = delivery_target["platform"]
+-            os.environ["HERMES_CRON_AUTO_DELIVER_CHAT_ID"] = str(delivery_target["chat_id"])
+-            if delivery_target.get("thread_id") is not None:
+-                os.environ["HERMES_CRON_AUTO_DELIVER_THREAD_ID"] = str(delivery_target["thread_id"])
++            _set_job_env(restore_env, "HERMES_CRON_AUTO_DELIVER_PLATFORM", delivery_target.get("platform"))
++            _set_job_env(restore_env, "HERMES_CRON_AUTO_DELIVER_CHAT_ID", str(delivery_target.get("chat_id") or ""))
++            _set_job_env(restore_env, "HERMES_CRON_AUTO_DELIVER_THREAD_ID", delivery_target.get("thread_id"))
++        else:
++            _set_job_env(restore_env, "HERMES_CRON_AUTO_DELIVER_PLATFORM", None)
++            _set_job_env(restore_env, "HERMES_CRON_AUTO_DELIVER_CHAT_ID", None)
++            _set_job_env(restore_env, "HERMES_CRON_AUTO_DELIVER_THREAD_ID", None)
++
++        for key, value in job_env.items():
++            _set_job_env(restore_env, key, value)
++
++        prompt = _build_job_prompt(job)
+ 
+         model = job.get("model") or os.getenv("HERMES_MODEL") or ""
+ 
+@@ -875,16 +888,11 @@ def run_job(job: dict) -> tuple[bool, str, str, Optional[str]]:
+         return False, output, "", error_msg
+ 
+     finally:
+-        # Clean up injected env vars so they don't leak to other jobs
+-        for key in (
+-            "HERMES_SESSION_PLATFORM",
+-            "HERMES_SESSION_CHAT_ID",
+-            "HERMES_SESSION_CHAT_NAME",
+-            "HERMES_CRON_AUTO_DELIVER_PLATFORM",
+-            "HERMES_CRON_AUTO_DELIVER_CHAT_ID",
+-            "HERMES_CRON_AUTO_DELIVER_THREAD_ID",
+-        ):
+-            os.environ.pop(key, None)
++        for key, previous in restore_env.items():
++            if previous is None:
++                os.environ.pop(key, None)
++            else:
++                os.environ[key] = previous
+         if _session_db:
+             try:
+                 _session_db.end_session(_cron_session_id, "cron_complete")
+@@ -896,6 +904,15 @@ def run_job(job: dict) -> tuple[bool, str, str, Optional[str]]:
+                 logger.debug("Job '%s': failed to close SQLite session store: %s", job_id, e)
+ 
+ 
++def _set_job_env(restore_env: dict[str, Optional[str]], key: str, value: Optional[object]) -> None:
++    if key not in restore_env:
++        restore_env[key] = os.environ.get(key)
++    if value is None:
++        os.environ.pop(key, None)
++        return
++    os.environ[key] = str(value)
++
++
+ def tick(verbose: bool = True, adapters=None, loop=None) -> int:
+     """
+     Check and run all due jobs.
+diff --git a/gateway/platforms/api_server.py b/gateway/platforms/api_server.py
+index 9a499046..6eabe84b 100644
+--- a/gateway/platforms/api_server.py
++++ b/gateway/platforms/api_server.py
+@@ -1188,7 +1188,7 @@ class APIServerAdapter(BasePlatformAdapter):
+ 
+     _JOB_ID_RE = __import__("re").compile(r"[a-f0-9]{12}")
+     # Allowed fields for update — prevents clients injecting arbitrary keys
+-    _UPDATE_ALLOWED_FIELDS = {"name", "schedule", "prompt", "deliver", "skills", "skill", "repeat", "enabled"}
++    _UPDATE_ALLOWED_FIELDS = {"name", "schedule", "prompt", "deliver", "skills", "skill", "repeat", "enabled", "env"}
+     _MAX_NAME_LENGTH = 200
+     _MAX_PROMPT_LENGTH = 5000
+ 
+@@ -1238,6 +1238,7 @@ class APIServerAdapter(BasePlatformAdapter):
+             schedule = (body.get("schedule") or "").strip()
+             prompt = body.get("prompt", "")
+             deliver = body.get("deliver", "local")
++            env = body.get("env")
+             skills = body.get("skills")
+             repeat = body.get("repeat")
+ 
+@@ -1255,6 +1256,8 @@ class APIServerAdapter(BasePlatformAdapter):
+                 )
+             if repeat is not None and (not isinstance(repeat, int) or repeat < 1):
+                 return web.json_response({"error": "Repeat must be a positive integer"}, status=400)
++            if env is not None and not isinstance(env, dict):
++                return web.json_response({"error": "env must be an object"}, status=400)
+ 
+             kwargs = {
+                 "prompt": prompt,
+@@ -1262,6 +1265,8 @@ class APIServerAdapter(BasePlatformAdapter):
+                 "name": name,
+                 "deliver": deliver,
+             }
++            if env is not None:
++                kwargs["env"] = env
+             if skills:
+                 kwargs["skills"] = skills
+             if repeat is not None:
+diff --git a/hermes_cli/web_server.py b/hermes_cli/web_server.py
+index f73104ce..4f7e9d86 100644
+--- a/hermes_cli/web_server.py
++++ b/hermes_cli/web_server.py
+@@ -1705,6 +1705,7 @@ class CronJobCreate(BaseModel):
+     schedule: str
+     name: str = ""
+     deliver: str = "local"
++    env: Dict[str, str] = {}
+ 
+ 
+ class CronJobUpdate(BaseModel):
+@@ -1731,7 +1732,7 @@ async def create_cron_job(body: CronJobCreate):
+     from cron.jobs import create_job
+     try:
+         job = create_job(prompt=body.prompt, schedule=body.schedule,
+-                         name=body.name, deliver=body.deliver)
++                         name=body.name, deliver=body.deliver, env=body.env)
+         return job
+     except Exception as e:
+         _log.exception("POST /api/cron/jobs failed")
+diff --git a/tools/cronjob_tools.py b/tools/cronjob_tools.py
+index 75dd4c31..7af9ac42 100644
+--- a/tools/cronjob_tools.py
++++ b/tools/cronjob_tools.py
+@@ -190,6 +190,7 @@ def _validate_cron_script_path(script: Optional[str]) -> Optional[str]:
+ def _format_job(job: Dict[str, Any]) -> Dict[str, Any]:
+     prompt = job.get("prompt", "")
+     skills = _canonical_skills(job.get("skill"), job.get("skills"))
++    env = job.get("env") if isinstance(job.get("env"), dict) else {}
+     result = {
+         "job_id": job["id"],
+         "name": job["name"],
+@@ -210,6 +211,7 @@ def _format_job(job: Dict[str, Any]) -> Dict[str, Any]:
+         "state": job.get("state", "scheduled" if job.get("enabled", True) else "paused"),
+         "paused_at": job.get("paused_at"),
+         "paused_reason": job.get("paused_reason"),
++        "env_keys": sorted(str(key) for key in env.keys()),
+     }
+     if job.get("script"):
+         result["script"] = job["script"]
+@@ -230,6 +232,7 @@ def cronjob(
+     model: Optional[str] = None,
+     provider: Optional[str] = None,
+     base_url: Optional[str] = None,
++    env: Optional[Dict[str, Any]] = None,
+     reason: Optional[str] = None,
+     script: Optional[str] = None,
+     task_id: str = None,
+@@ -268,6 +271,7 @@ def cronjob(
+                 model=_normalize_optional_job_value(model),
+                 provider=_normalize_optional_job_value(provider),
+                 base_url=_normalize_optional_job_value(base_url, strip_trailing_slash=True),
++                env=env,
+                 script=_normalize_optional_job_value(script),
+             )
+             return json.dumps(
+@@ -351,6 +355,8 @@ def cronjob(
+                 updates["provider"] = _normalize_optional_job_value(provider)
+             if base_url is not None:
+                 updates["base_url"] = _normalize_optional_job_value(base_url, strip_trailing_slash=True)
++            if env is not None:
++                updates["env"] = env
+             if script is not None:
+                 # Pass empty string to clear an existing script
+                 if script:
+@@ -436,6 +442,11 @@ Important safety rule: cron-run sessions should not recursively schedule more cr
+                 "items": {"type": "string"},
+                 "description": "Optional ordered list of skill names to load before executing the cron prompt. On update, pass an empty array to clear attached skills."
+             },
++            "env": {
++                "type": "object",
++                "description": "Optional per-job environment variables injected only for this cron run. Use for runtime/context flags such as CODEKSEI_*; values are stored with the job.",
++                "additionalProperties": {"type": "string"},
++            },
+             "model": {
+                 "type": "object",
+                 "description": "Optional per-job model override. If provider is omitted, the current main provider is pinned at creation time so the job stays stable.",
+@@ -497,6 +508,7 @@ registry.register(
+         model=_mo[1],
+         provider=_mo[0] or args.get("provider"),
+         base_url=args.get("base_url"),
++        env=args.get("env"),
+         reason=args.get("reason"),
+         script=args.get("script"),
+         task_id=kw.get("task_id"),

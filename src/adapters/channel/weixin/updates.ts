@@ -18,7 +18,6 @@ export interface WeixinConfig {
   weixinDeliveryTrace?: boolean;
   weixinRouteTag?: string;
   weixinProtocolClientVersion?: string;
-  weixinAdapterVariant?: string;
   workspaceId?: unknown;
 }
 

@@ -260,7 +260,6 @@ CODEKSEI_RUNTIME_COMMAND=codex
 CODEKSEI_HERMES_COMMAND=hermes
 CODEKSEI_REVIEW_SEMANTIC_HOST=auto
 CODEKSEI_CODEX_ENDPOINT=ws://127.0.0.1:8765
-CODEKSEI_WEIXIN_ADAPTER=v2
 CODEKSEI_WEIXIN_REPLY_MODE=stream
 CODEKSEI_WEIXIN_ROUTE_TAG=
 CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION=2.1.1
@@ -284,6 +283,7 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - `CODEKSEI_WEIXIN_REPLY_MODE=stream` 现在表示“半实时增量流”：会按小窗口持续发送用户可见增量，保留段落结构，可读性优先于减少气泡数量
 - `CODEKSEI_WEIXIN_REPLY_MODE=stream` 现在更接近 hybrid stream：优先在自然句边界或已完成块发送，避免把半句 final 提前裂成多个微信气泡
 - `CODEKSEI_WEIXIN_REPLY_MODE=settled` 仍表示“等整轮收口后再发”：只发送最新的可见最终回复
+- 微信桥的正式 adapter 现在只保留 `v2`；issue #4 对应的媒体上传缺口只作为内部 legacy media fallback 处理，不再通过第二个 public adapter 暴露
 - `CODEKSEI_RUNTIME` / `CODEKSEI_CHANNEL_PROVIDER` 决定当前是 `Bridge Mode` 还是 `Hermes Hosted Mode`
 - `CODEKSEI_RUNTIME_ENDPOINT` / `CODEKSEI_RUNTIME_COMMAND` 是新的 host-neutral runtime 入口；旧的 `CODEKSEI_CODEX_*` 变量仍保留兼容
 - `CODEKSEI_REVIEW_SEMANTIC_HOST=auto|codex|hermes|deterministic` 可显式指定 review hybrid 语义宿主；默认 `auto`
@@ -294,6 +294,7 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - `CODEKSEI_TIMEZONE` 可选；若显式设置，它会统一驱动 reminder / diary / review / timeline 的本地时间解释
 - `CODEKSEI_TIMELINE_LOCALE` 可选；当前用于 timeline dashboard 的文案、日期格式和 demo data 语言切换，支持 `zh-CN` 与 `en`
 - `CODEKSEI_HERMES_REPO_ROOT` 可选；Hermes Hosted Mode 下若 sibling `../hermes-agent` 不成立，用它显式指向 repo-local upstream checkout
+- Hermes 原生 cron `env` 透传补丁现在作为可选资产跟仓发布；详细适用范围与 `git apply` 用法统一看 [`docs/hermes-cron-env-patch.md`](./docs/hermes-cron-env-patch.md)
 - 如果不设 `CODEKSEI_TIMEZONE`，Codeksei 会优先沿用 timeline state 里已声明的非 legacy timezone；否则回退到系统时区
 - 旧的 `Asia/Shanghai` legacy timeline state 在需要时会在下一次 timeline 命令时自动迁移到当前统一 timezone
 - `CODEKSEI_TIMELINE_STATE_DIR` 默认指向 Codeksei timeline 数据根；当前主布局会在它下面使用 `timeline/*.json`
@@ -384,6 +385,7 @@ codeksei operator hermes sync-checkin --user <wechat_user_id> --workspace /absol
 - [docs/commands.md](./docs/commands.md)
 - [docs/timeline-integration.md](./docs/timeline-integration.md)
 - [docs/architecture.md](./docs/architecture.md)
+- [docs/hermes-cron-env-patch.md](./docs/hermes-cron-env-patch.md) `Hermes Hosted Mode 可选补丁`
 
 如果你在维护这个仓库，当前质量门分工是：
 

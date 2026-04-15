@@ -9,17 +9,19 @@ const {
   WEIXIN_MEDIA_GAP_DIAGNOSTIC,
 }: typeof import("../src/adapters/channel/weixin/route-matrix") = require("../src/adapters/channel/weixin/route-matrix");
 
-test("v2 adapter exposes a dual-stack public variant and keeps file delivery on legacy", () => {
-  assert.equal(describeWeixinAdapterVariant("v2"), "dual:v2-text+legacy-media");
+test("weixin public contract stays on a single v2 adapter and keeps legacy only as internal media fallback", () => {
+  assert.equal(describeWeixinAdapterVariant("v2"), "v2");
   assert.equal(getWeixinRouteRule("sendText", "v2").stack, "v2");
   assert.equal(getWeixinRouteRule("sendTyping", "v2").stack, "v2");
-  assert.equal(getWeixinRouteRule("sendFile", "v2").stack, "legacy");
+  assert.equal(getWeixinRouteRule("sendFile", "v2").stack, "v2");
+  assert.equal(getWeixinRouteRule("sendFile", "v2").automaticFallbackTo, "legacy");
   assert.match(getWeixinRouteRule("sendFile", "v2").reason, /legacy media API/u);
 });
 
-test("legacy adapter route matrix stays single-stack", () => {
-  const rules = listWeixinRouteRules("legacy");
-  assert.equal(rules.every((rule) => rule.stack === "legacy"), true);
+test("route matrix exposes exactly one official stack per operation", () => {
+  const rules = listWeixinRouteRules("v2");
+  assert.equal(rules.every((rule) => rule.stack === "v2"), true);
+  assert.equal(rules.find((rule) => rule.operation === "sendFile")?.automaticFallbackTo, "legacy");
 });
 
 test("weixin media gap diagnostic matches current upload-param failures", () => {
@@ -33,5 +35,5 @@ test("weixin media gap diagnostic matches current upload-param failures", () => 
   );
   assert.equal(isWeixinMediaGapError(new Error("network timeout")), false);
   assert.equal(WEIXIN_MEDIA_GAP_DIAGNOSTIC.issueUrl, "https://github.com/Sapientropic/codeksei/issues/4");
-  assert.match(WEIXIN_MEDIA_GAP_DIAGNOSTIC.summary, /legacy media stack/u);
+  assert.match(WEIXIN_MEDIA_GAP_DIAGNOSTIC.summary, /official v2 adapter/u);
 });

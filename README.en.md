@@ -252,7 +252,6 @@ CODEKSEI_RUNTIME_COMMAND=codex
 CODEKSEI_HERMES_COMMAND=hermes
 CODEKSEI_REVIEW_SEMANTIC_HOST=auto
 CODEKSEI_CODEX_ENDPOINT=ws://127.0.0.1:8765
-CODEKSEI_WEIXIN_ADAPTER=v2
 CODEKSEI_WEIXIN_REPLY_MODE=stream
 CODEKSEI_WEIXIN_ROUTE_TAG=
 CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION=2.1.1
@@ -275,6 +274,7 @@ Notes:
 
 - `CODEKSEI_WEIXIN_REPLY_MODE=stream` now behaves more like a hybrid stream: it prefers natural sentence boundaries or completed blocks so unfinished final sentences are not split into multiple WeChat bubbles
 - `CODEKSEI_WEIXIN_REPLY_MODE=settled` still means “wait until the whole turn settles”: only the latest visible final reply is sent
+- The Weixin bridge now exposes only one official `v2` adapter; the issue #4 media gap is handled as an internal legacy media fallback instead of a second public adapter
 - `CODEKSEI_RUNTIME` / `CODEKSEI_CHANNEL_PROVIDER` decide whether the current runtime is `Bridge Mode` or `Hermes Hosted Mode`
 - `CODEKSEI_RUNTIME_ENDPOINT` / `CODEKSEI_RUNTIME_COMMAND` are the new host-neutral runtime ingress; legacy `CODEKSEI_CODEX_*` variables still remain for compatibility
 - `CODEKSEI_REVIEW_SEMANTIC_HOST=auto|codex|hermes|deterministic` lets you pin the semantic review host explicitly; default is `auto`
@@ -285,6 +285,7 @@ Notes:
 - `CODEKSEI_TIMEZONE` is optional; when set, it becomes the single local-time contract for reminder / diary / review / timeline flows
 - `CODEKSEI_TIMELINE_LOCALE` is optional; it currently switches timeline dashboard copy, date formatting, and demo data between `zh-CN` and `en`
 - `CODEKSEI_HERMES_REPO_ROOT` is optional; if the default sibling checkout `../hermes-agent` is not available in Hermes Hosted Mode, point it at the repo-local upstream checkout explicitly
+- The Hermes native cron-env passthrough patch now ships as an optional Codeksei asset; see [docs/hermes-cron-env-patch.md](./docs/hermes-cron-env-patch.md) for applicability and `git apply` usage
 - If `CODEKSEI_TIMEZONE` is unset, Codeksei first reuses any non-legacy timezone already declared by the timeline state; otherwise it falls back to the system timezone
 - Legacy `Asia/Shanghai` timeline state can auto-migrate to the unified timezone the next time you run a timeline command
 - `CODEKSEI_TIMELINE_STATE_DIR` points at the Codeksei timeline data root; the current primary layout stores runtime files under `timeline/*.json`
@@ -375,6 +376,7 @@ More detailed references:
 - [docs/commands.md](./docs/commands.md)
 - [docs/timeline-integration.md](./docs/timeline-integration.md)
 - [docs/architecture.md](./docs/architecture.md)
+- [docs/hermes-cron-env-patch.md](./docs/hermes-cron-env-patch.md) `Optional Hermes Hosted Mode patch`
 
 If you maintain this repository, the current quality-gate split is:
 

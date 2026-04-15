@@ -59,7 +59,6 @@ function createRuntimeConfig(): AppRuntimeConfig {
     timezoneSource: "system",
     userGender: "female",
     userName: "Tester",
-    weixinAdapterVariant: "v2",
     weixinBaseUrl: "http://127.0.0.1",
     weixinCdnBaseUrl: "https://cdn.example.com",
     weixinDeliveryTrace: false,

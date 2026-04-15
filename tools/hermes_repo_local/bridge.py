@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import inspect
 import json
 import os
 import sys
@@ -315,9 +316,24 @@ def _normalize_checkin_role(value: Any) -> str:
     return text if text in {"wake", "recovery"} else ""
 
 
+def _normalize_job_env(value: Any) -> Dict[str, str]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise RuntimeError("sync_checkin_cron payload env must be an object")
+    normalized: Dict[str, str] = {}
+    for raw_key, raw_value in value.items():
+        key = str(raw_key or "").strip()
+        if not key:
+            continue
+        normalized[key] = str(raw_value if raw_value is not None else "")
+    return normalized
+
+
 def _build_checkin_job_updates(
     *,
     due_at_iso: str,
+    env: Dict[str, str],
     name: str,
     origin: Dict[str, str],
     prompt: str,
@@ -338,6 +354,7 @@ def _build_checkin_job_updates(
         "codeksei_workspace_root": workspace_root,
         "deliver": "origin",
         "enabled": True,
+        "env": env,
         "name": name,
         "origin": {
             "platform": origin["platform"],
@@ -356,6 +373,58 @@ def _build_checkin_job_updates(
     }
 
 
+def _supports_kwarg(func: Any, name: str) -> bool:
+    try:
+        return name in inspect.signature(func).parameters
+    except (TypeError, ValueError):
+        return False
+
+
+def _create_checkin_job(
+    *,
+    create_job: Any,
+    deliver: str,
+    env: Dict[str, str],
+    name: str,
+    origin: Dict[str, str],
+    prompt: str,
+    skills: list[str],
+    due_at_iso: str,
+) -> Dict[str, Any]:
+    kwargs: Dict[str, Any] = {
+        "prompt": prompt,
+        "schedule": due_at_iso,
+        "name": name,
+        "repeat": 1,
+        "deliver": deliver,
+        "origin": origin,
+        "skills": skills,
+    }
+    # Hermes upstream releases before the cron-env patch do not accept an
+    # `env` kwarg on create_job. Hosted check-in commands now self-bootstrap
+    # from codeksei.config.json, so we degrade gracefully instead of failing
+    # the whole re-arm flow on an older Hermes checkout.
+    if env and _supports_kwarg(create_job, "env"):
+        kwargs["env"] = env
+    return create_job(**kwargs)
+
+
+def _update_checkin_job(
+    *,
+    job_id: str,
+    updates: Dict[str, Any],
+    update_job: Any,
+) -> Dict[str, Any]:
+    try:
+        return update_job(job_id, updates)
+    except TypeError as exc:
+        if "env" not in updates or "env" not in str(exc):
+            raise
+        fallback_updates = dict(updates)
+        fallback_updates.pop("env", None)
+        return update_job(job_id, fallback_updates)
+
+
 def _handle_sync_checkin_cron(request: Dict[str, Any], origin_context: Dict[str, Any]) -> Dict[str, Any]:
     from cron.jobs import create_job, list_jobs, remove_job, update_job
 
@@ -364,6 +433,7 @@ def _handle_sync_checkin_cron(request: Dict[str, Any], origin_context: Dict[str,
         raise RuntimeError("sync_checkin_cron payload must be an object")
 
     due_at_iso = _normalize_iso_timestamp(payload.get("due_at_iso"))
+    env = _normalize_job_env(payload.get("env"))
     prompt = str(payload.get("prompt") or "").strip()
     role = _normalize_checkin_role(payload.get("role"))
     target_key = str(payload.get("target_key") or "").strip()
@@ -402,20 +472,17 @@ def _handle_sync_checkin_cron(request: Dict[str, Any], origin_context: Dict[str,
         managed_jobs.append(job)
 
     desired_job = None
-    stale_job_ids = []
+    stale_jobs = []
     for job in managed_jobs:
         job_role = _normalize_checkin_role(job.get("codeksei_checkin_role"))
         if job_role == role and desired_job is None:
             desired_job = job
             continue
-        stale_job_ids.append(str(job.get("id") or "").strip())
-
-    for job_id in stale_job_ids:
-        if job_id:
-            remove_job(job_id)
+        stale_jobs.append(job)
 
     updates = _build_checkin_job_updates(
         due_at_iso=due_at_iso,
+        env=env,
         name=name,
         origin=origin,
         prompt=prompt,
@@ -426,24 +493,48 @@ def _handle_sync_checkin_cron(request: Dict[str, Any], origin_context: Dict[str,
     )
     created = False
     if desired_job:
-        job = update_job(str(desired_job.get("id") or "").strip(), updates)
+        job = _update_checkin_job(
+            job_id=str(desired_job.get("id") or "").strip(),
+            updates=updates,
+            update_job=update_job,
+        )
     else:
         created = True
-        created_job = create_job(
-            prompt=prompt,
-            schedule=due_at_iso,
-            name=name,
-            repeat=1,
+        created_job = _create_checkin_job(
+            create_job=create_job,
             deliver="origin",
+            env=env,
+            name=name,
             origin={
                 "platform": origin["platform"],
                 "chat_id": origin["chat_id"],
                 "chat_name": origin.get("chat_name") or None,
                 "thread_id": origin.get("thread_id") or None,
             },
+            prompt=prompt,
             skills=["codeksei-companion"],
+            due_at_iso=due_at_iso,
         )
-        job = update_job(str(created_job.get("id") or "").strip(), updates)
+        job = _update_checkin_job(
+            job_id=str(created_job.get("id") or "").strip(),
+            updates=updates,
+            update_job=update_job,
+        )
+
+    removed_job_ids = []
+    # Only prune stale future jobs after the desired wake/recovery job already
+    # exists. Duplicates are acceptable for one sync cycle; removing the old
+    # recovery wake first can strand hosted check-in with zero future jobs if
+    # create/update fails midway.
+    for stale_job in stale_jobs:
+        job_id = str(stale_job.get("id") or "").strip()
+        if not job_id:
+            continue
+        try:
+            remove_job(job_id)
+            removed_job_ids.append(job_id)
+        except Exception:
+            continue
 
     if not job:
         raise RuntimeError("failed to create or update Hermes hosted checkin cron job")
@@ -454,7 +545,7 @@ def _handle_sync_checkin_cron(request: Dict[str, Any], origin_context: Dict[str,
         "job_id": str(job.get("id") or ""),
         "name": str(job.get("name") or ""),
         "next_run_at": str(job.get("next_run_at") or ""),
-        "removed_job_ids": stale_job_ids,
+        "removed_job_ids": removed_job_ids,
         "session_key": str(origin_context.get("session_key") or request.get("session_key") or ""),
         "session_id": str(origin_context.get("session_id") or ""),
         "origin": origin,
