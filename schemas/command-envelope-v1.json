@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeksei.dev/schemas/command-envelope-v1.json",
+  "type": "object",
+  "required": ["ok"],
+  "properties": {
+    "ok": {
+      "enum": [true, false, "partial"]
+    },
+    "data": {},
+    "error": {
+      "type": "object",
+      "required": ["code", "message", "retryable"],
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "retryable": { "type": "boolean" },
+        "hint": { "type": "string" },
+        "context": { "type": "object" }
+      }
+    },
+    "meta": { "type": "object" },
+    "next": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

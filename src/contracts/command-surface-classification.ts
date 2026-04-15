@@ -7,6 +7,12 @@ import type {
   CommandMutabilityDefinition,
   CommandSafetyTierDefinition,
 } from "./command-surface-definition-types";
+import {
+  listCommandHostAccessOverrideIds,
+  resolveLegacyCommandHostDependencies,
+  resolveLegacyCommandHostProfiles,
+  resolveLegacyCommandHostSupportTier,
+} from "../host/command-host-metadata";
 
 // Keep the tables data-only so command-surface-definitions.ts remains the only
 // place that defines fallback defaults and resolution semantics.
@@ -44,6 +50,10 @@ export const COMMAND_SAFETY_OVERRIDES = {
   "background.uninstall": "operator",
   "channel.send_file": "warned",
   "diary.append": "warned",
+  "host.bootstrap": "warned",
+  "host.claim_checkin": "warned",
+  "host.seed_proactive": "warned",
+  "host.settle_checkin": "warned",
   "note.auto": "warned",
   "note.maybe": "open",
   "note.sync": "warned",
@@ -90,6 +100,14 @@ export const COMMAND_MUTABILITY_OVERRIDES = {
   "background.uninstall": "bootstrap",
   "channel.send_file": "write",
   "diary.append": "write",
+  "host.bootstrap": "bootstrap",
+  "host.claim_checkin": "write",
+  "host.doctor": "read",
+  "host.manifest": "read",
+  "host.render": "read",
+  "host.seed_proactive": "write",
+  "host.settle_checkin": "write",
+  "host.smoke": "read",
   "note.auto": "write",
   "note.maybe": "read",
   "note.sync": "write",
@@ -135,82 +153,20 @@ export const COMMAND_AUTH_OVERRIDES = {
   "timeline.screenshot": "context_token",
 } as const satisfies Record<string, CommandAuthRequirementDefinition>;
 
-export const COMMAND_HOST_SUPPORT_TIER_OVERRIDES = {
-  "app.accounts": "bridge_only",
-  "app.doctor": "hosted_ready",
-  "app.login": "bridge_only",
-  "app.shared_open": "bridge_only",
-  "app.shared_start": "bridge_only",
-  "app.shared_status": "bridge_only",
-  "app.shared_watchdog": "bridge_only",
-  "app.start": "bridge_only",
-  "background.install": "bridge_only",
-  "background.uninstall": "bridge_only",
-  "channel.send_file": "hosted_ready",
-  "diary.append": "host_neutral",
-  "note.auto": "host_neutral",
-  "note.maybe": "host_neutral",
-  "note.sync": "host_neutral",
-  "operator.hermes.install_skill": "hosted_ready",
-  "operator.hermes.smoke": "hosted_ready",
-  "operator.hermes.status": "hosted_ready",
-  "operator.hermes.sync_checkin": "hosted_ready",
-  "project.radar": "host_neutral",
-  "reminder.create": "hosted_ready",
-  "review.monthly": "host_neutral",
-  "review.nightly": "host_neutral",
-  "review.weekly": "host_neutral",
-  "system.checkin_complete": "host_neutral",
-  "system.checkin_poller": "bridge_only",
-  "system.checkin_tick": "host_neutral",
-  "system.checkin_trigger": "host_neutral",
-  "system.send": "bridge_state_dependent",
-  "timeline.build": "host_neutral",
-  "timeline.categories": "host_neutral",
-  "timeline.dev": "host_neutral",
-  "timeline.event": "host_neutral",
-  "timeline.proposals": "host_neutral",
-  "timeline.read": "host_neutral",
-  "timeline.screenshot": "hosted_ready",
-  "timeline.serve": "host_neutral",
-  "timeline.write": "host_neutral",
-} as const satisfies Record<string, CommandHostSupportTierDefinition>;
+export const COMMAND_HOST_SUPPORT_TIER_OVERRIDES = Object.freeze(
+  Object.fromEntries(
+    listCommandHostAccessOverrideIds().map((actionId) => [actionId, resolveLegacyCommandHostSupportTier(actionId)]),
+  ),
+) as Readonly<Record<string, CommandHostSupportTierDefinition>>;
 
-export const COMMAND_HOST_DEPENDENCY_OVERRIDES = {
-  "app.accounts": ["weixin_account"] as const,
-  "app.login": ["weixin_account"] as const,
-  "app.shared_open": ["bridge_runtime"] as const,
-  "app.shared_start": ["bridge_runtime"] as const,
-  "app.shared_status": ["bridge_runtime"] as const,
-  "app.shared_watchdog": ["bridge_runtime"] as const,
-  "app.start": ["bridge_runtime"] as const,
-  "background.install": ["bridge_runtime"] as const,
-  "background.uninstall": ["bridge_runtime"] as const,
-  "channel.send_file": ["bridge_file_delivery", "hosted_repo_local_delivery", "hosted_session_lookup"] as const,
-  "operator.hermes.install_skill": ["hosted_companion_skill"] as const,
-  "operator.hermes.smoke": ["hosted_companion_skill"] as const,
-  "operator.hermes.status": ["hosted_companion_skill"] as const,
-  "operator.hermes.sync_checkin": ["hosted_companion_skill", "hosted_repo_local_cron", "hosted_session_lookup"] as const,
-  "reminder.create": ["bridge_queue", "context_token", "weixin_account", "hosted_repo_local_cron", "hosted_session_lookup"] as const,
-  "system.checkin_poller": ["bridge_queue", "bridge_runtime", "weixin_account"] as const,
-  "system.send": ["bridge_queue", "context_token", "weixin_account"] as const,
-  "timeline.screenshot": ["bridge_file_delivery", "bridge_queue", "context_token", "hosted_repo_local_delivery", "hosted_session_lookup"] as const,
-} as const satisfies Record<string, readonly CommandHostDependencyDefinition[]>;
+export const COMMAND_HOST_DEPENDENCY_OVERRIDES = Object.freeze(
+  Object.fromEntries(
+    listCommandHostAccessOverrideIds().map((actionId) => [actionId, resolveLegacyCommandHostDependencies(actionId)]),
+  ),
+) as Readonly<Record<string, readonly CommandHostDependencyDefinition[]>>;
 
-export const COMMAND_HOST_PROFILE_OVERRIDES = {
-  "app.accounts": ["bridge-codex-weixin"] as const,
-  "app.login": ["bridge-codex-weixin"] as const,
-  "app.shared_open": ["bridge-codex-weixin"] as const,
-  "app.shared_start": ["bridge-codex-weixin"] as const,
-  "app.shared_status": ["bridge-codex-weixin"] as const,
-  "app.shared_watchdog": ["bridge-codex-weixin"] as const,
-  "app.start": ["bridge-codex-weixin"] as const,
-  "background.install": ["bridge-codex-weixin"] as const,
-  "background.uninstall": ["bridge-codex-weixin"] as const,
-  "channel.send_file": ["bridge-codex-weixin", "hosted-hermes-weixin"] as const,
-  "operator.hermes.sync_checkin": ["hosted-hermes-weixin"] as const,
-  "reminder.create": ["bridge-codex-weixin", "hosted-hermes-weixin"] as const,
-  "system.checkin_poller": ["bridge-codex-weixin"] as const,
-  "system.send": ["bridge-codex-weixin"] as const,
-  "timeline.screenshot": ["bridge-codex-weixin", "hosted-hermes-weixin"] as const,
-} as const satisfies Record<string, readonly CommandHostProfileIdDefinition[]>;
+export const COMMAND_HOST_PROFILE_OVERRIDES = Object.freeze(
+  Object.fromEntries(
+    listCommandHostAccessOverrideIds().map((actionId) => [actionId, resolveLegacyCommandHostProfiles(actionId)]),
+  ),
+) as Readonly<Record<string, readonly CommandHostProfileIdDefinition[]>>;

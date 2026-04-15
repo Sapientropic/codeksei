@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeksei.dev/schemas/host-claim-checkin-v1.json",
+  "type": "object",
+  "required": ["status", "nextWakeAt"],
+  "properties": {
+    "status": {
+      "enum": ["idle", "claimed", "in_progress"]
+    },
+    "lease": {
+      "type": ["object", "null"],
+      "properties": {
+        "id": { "type": "string" },
+        "triggerId": { "type": "string" },
+        "claimedAt": { "type": "string" },
+        "expiresAt": { "type": "string" },
+        "recoveryOnExpiry": { "const": true }
+      }
+    },
+    "payload": {
+      "type": ["object", "null"],
+      "properties": {
+        "kind": { "const": "proactive_checkin" },
+        "format": { "const": "plain_text" },
+        "text": { "type": "string" }
+      }
+    },
+    "origin": {
+      "type": ["object", "null"]
+    },
+    "nextWakeAt": { "type": "string" }
+  }
+}

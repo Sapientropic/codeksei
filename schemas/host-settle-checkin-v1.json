@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeksei.dev/schemas/host-settle-checkin-v1.json",
+  "type": "object",
+  "required": ["nextWakeAt"],
+  "properties": {
+    "completion": {
+      "type": ["object", "null"]
+    },
+    "hostedWakeSync": {
+      "type": ["object", "null"]
+    },
+    "nextWakeAt": { "type": "string" }
+  }
+}

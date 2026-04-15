@@ -1,6 +1,30 @@
 import { runChannelSendFileCommand } from "./channel-send-file-cli";
 import { runDiaryWriteCommand } from "./diary-write-cli";
 import {
+  runHostBootstrapCommand,
+} from "./host-bootstrap-cli";
+import {
+  runHostClaimCheckinCommand,
+} from "./host-claim-checkin-cli";
+import {
+  runHostDoctorCommand,
+} from "./host-doctor-cli";
+import {
+  runHostManifestCommand,
+} from "./host-manifest-cli";
+import {
+  runHostRenderCommand,
+} from "./host-render-cli";
+import {
+  runHostSeedProactiveCommand,
+} from "./host-seed-proactive-cli";
+import {
+  runHostSettleCheckinCommand,
+} from "./host-settle-checkin-cli";
+import {
+  runHostSmokeCommand,
+} from "./host-smoke-cli";
+import {
   runHermesInstallSkillCommand,
   runHermesSmokeCommand,
   runHermesStatusCommand,
@@ -95,6 +119,30 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
       data,
       text: asPrettyJsonText(data),
     };
+  },
+  "host.manifest": async (_manifest, context) => {
+    return runHostManifestCommand(context.config, context.leafArgs);
+  },
+  "host.bootstrap": async (_manifest, context) => {
+    return runHostBootstrapCommand(context.config, context.leafArgs);
+  },
+  "host.doctor": async (_manifest, context) => {
+    return runHostDoctorCommand(context.config, context.leafArgs);
+  },
+  "host.smoke": async (_manifest, context) => {
+    return runHostSmokeCommand(context.config, context.leafArgs);
+  },
+  "host.seed_proactive": async (_manifest, context) => {
+    return runHostSeedProactiveCommand(context.config, context.leafArgs);
+  },
+  "host.claim_checkin": async (_manifest, context) => {
+    return runHostClaimCheckinCommand(context.config, context.leafArgs);
+  },
+  "host.settle_checkin": async (_manifest, context) => {
+    return runHostSettleCheckinCommand(context.config, context.leafArgs);
+  },
+  "host.render": async (_manifest, context) => {
+    return runHostRenderCommand(context.config, context.leafArgs);
   },
   "operator.hermes.install_skill": async (_manifest, context) => {
     return runHermesInstallSkillCommand(context.config, context.leafArgs);
@@ -247,6 +295,9 @@ function assertTerminalCommandSupportedForCurrentHost(
   manifest: TerminalCommandManifestEntry,
   context: TerminalCommandContext,
 ): void {
+  if (!manifest.hostProfileIds.length) {
+    return;
+  }
   const hostMode = resolveHostMode(context.config);
   const currentProfile = hostMode.profile === "unsupported" ? "" : hostMode.profile;
   if (currentProfile && manifest.hostProfileIds.includes(currentProfile)) {

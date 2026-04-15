@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeksei.dev/schemas/hostkit-v1.json",
+  "type": "object",
+  "required": [
+    "$schema",
+    "contractVersion",
+    "runtimeInvariant",
+    "package",
+    "install",
+    "io",
+    "daemon",
+    "entrypoints",
+    "config",
+    "contracts",
+    "attachmentPolicy",
+    "recipes"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "contractVersion": { "const": 1 },
+    "runtimeInvariant": { "const": "bridge-full" },
+    "package": {
+      "type": "object",
+      "required": ["name", "bin", "node"],
+      "properties": {
+        "name": { "type": "string" },
+        "bin": { "type": "string" },
+        "node": { "type": "string" }
+      }
+    },
+    "install": {
+      "type": "object",
+      "required": ["preferred", "fallback"],
+      "properties": {
+        "preferred": { "type": "array", "items": { "type": "string" } },
+        "fallback": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "io": {
+      "type": "object",
+      "required": ["defaultFormat", "stdout", "stderr"],
+      "properties": {
+        "defaultFormat": { "enum": ["json", "text"] },
+        "stdout": { "type": "string" },
+        "stderr": { "type": "string" }
+      }
+    },
+    "daemon": {
+      "type": "object",
+      "required": ["required", "ownership"],
+      "properties": {
+        "required": { "const": true },
+        "ownership": {
+          "type": "object",
+          "required": ["pollLoop", "scheduleTruth", "leaseRecovery"],
+          "properties": {
+            "pollLoop": { "const": "daemon" },
+            "scheduleTruth": { "const": "daemon" },
+            "leaseRecovery": { "const": "daemon" }
+          }
+        }
+      }
+    },
+    "entrypoints": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    },
+    "config": {
+      "type": "object",
+      "required": ["canonicalFile", "schema"],
+      "properties": {
+        "canonicalFile": { "type": "string" },
+        "schema": { "type": "string" }
+      }
+    },
+    "contracts": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "attachmentPolicy": {
+      "type": "object",
+      "required": ["daemonOwnsPollLoop", "daemonOwnsScheduleTruth", "leaseExpiryFallback"],
+      "properties": {
+        "daemonOwnsPollLoop": { "const": true },
+        "daemonOwnsScheduleTruth": { "const": true },
+        "leaseExpiryFallback": { "type": "string" }
+      }
+    },
+    "recipes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "supportsDelegatedCheckin", "supportsToolSurface"],
+        "properties": {
+          "id": { "type": "string" },
+          "kind": { "type": "string" },
+          "supportsDelegatedCheckin": { "type": "boolean" },
+          "supportsToolSurface": { "type": "boolean" }
+        }
+      }
+    },
+    "discovery": {
+      "type": "object",
+      "properties": {
+        "docs": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

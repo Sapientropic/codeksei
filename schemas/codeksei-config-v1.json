@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeksei.dev/schemas/codeksei-config-v1.json",
+  "type": "object",
+  "required": ["$schema", "modeClass", "workspaceRoot", "stateDir", "user", "host"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "modeClass": {
+      "enum": ["bridge-full", "hosted-proactive", "hosted-skill-only", "cli-only"]
+    },
+    "workspaceRoot": { "type": "string", "minLength": 1 },
+    "stateDir": { "type": "string", "minLength": 1 },
+    "user": {
+      "type": "object",
+      "required": ["id", "name", "timezone"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string" },
+        "timezone": { "type": "string", "minLength": 1 }
+      }
+    },
+    "host": {
+      "type": "object",
+      "required": ["provider", "channel"],
+      "properties": {
+        "provider": { "enum": ["hermes", "generic-shell"] },
+        "channel": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

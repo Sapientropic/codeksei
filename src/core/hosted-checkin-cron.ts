@@ -58,7 +58,7 @@ interface RawCronJob extends Record<string, unknown> {
   state?: unknown;
 }
 
-type HostedCheckinConfig = Pick<
+export type HostedCheckinConfig = Pick<
   AppRuntimeConfig,
   | "channel"
   | "channelProvider"

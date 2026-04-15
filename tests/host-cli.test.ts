@@ -1,0 +1,166 @@
+const fs: typeof import("node:fs") = require("node:fs");
+const os: typeof import("node:os") = require("node:os");
+const path: typeof import("node:path") = require("node:path");
+const test: typeof import("node:test") = require("node:test");
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
+
+const { CheckinConfigStore } = require("../src/state/checkin-config-store");
+const { CheckinScheduleStateStore } = require("../src/state/checkin-schedule-state-store");
+const { runHostBootstrapCommand } = require("../src/app/host-bootstrap-cli");
+const { runHostClaimCheckinCommand } = require("../src/app/host-claim-checkin-cli");
+const { runHostSettleCheckinCommand } = require("../src/app/host-settle-checkin-cli");
+const { runHostManifestCommand } = require("../src/app/host-manifest-cli");
+const { runHostRenderCommand } = require("../src/app/host-render-cli");
+const { createFakeHermesRepoLocalFixture } = require("./helpers/fake-hermes-repo-local.ts");
+
+function createHostFixture(prefix: string) {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  const stateDir = path.join(tempRoot, "state");
+  const workspaceRoot = path.join(tempRoot, "workspace");
+  fs.mkdirSync(stateDir, { recursive: true });
+  fs.mkdirSync(workspaceRoot, { recursive: true });
+  const checkinConfigFile = path.join(stateDir, "checkin-config.json");
+  new CheckinConfigStore({ filePath: checkinConfigFile }).setConfig({
+    minIntervalMs: 60_000,
+    maxIntervalMs: 60_000,
+  });
+  return {
+    tempRoot,
+    stateDir,
+    workspaceRoot,
+    config: {
+      allowedUserIds: ["wx-user"],
+      checkinConfigFile,
+      checkinScheduleStateFile: path.join(stateDir, "checkin-schedule-state.json"),
+      cliIdempotencyLedgerFile: path.join(stateDir, "cli-idempotency-ledger.json"),
+      sessionsFile: path.join(stateDir, "sessions.json"),
+      stateDir,
+      timezone: "Asia/Shanghai",
+      userName: "Tester",
+      workspaceRoot,
+    },
+  };
+}
+
+test("host manifest returns bridge-full invariant and hermes recipe", async () => {
+  const fixture = createHostFixture("codeksei-host-manifest-");
+  const result = await runHostManifestCommand(fixture.config);
+
+  assert.equal(result.data.runtimeInvariant, "bridge-full");
+  assert.equal(Array.isArray(result.data.recipes), true);
+  assert.equal(result.data.recipes.some((entry: { id: string }) => entry.id === "hermes"), true);
+});
+
+test("host bootstrap writes canonical config and previews Hermes bootstrap", async () => {
+  const fixture = createHostFixture("codeksei-host-bootstrap-");
+  const configPath = path.join(fixture.workspaceRoot, "codeksei.config.json");
+
+  const result = await runHostBootstrapCommand(fixture.config, [
+    "--provider", "hermes",
+    "--config", configPath,
+    "--ensure-daemon",
+    "--dry-run",
+  ]);
+
+  assert.equal(result.meta.dryRun, true);
+  assert.equal(result.data.provider, "hermes");
+  assert.equal(result.data.config.$schema, "./schemas/codeksei-config-v1.json");
+  assert.equal(fs.existsSync(configPath), false);
+});
+
+test("host claim-checkin and settle-checkin cover delegated proactive lease flow", async () => {
+  const fixture = createHostFixture("codeksei-host-claim-settle-");
+  const repoLocal = createFakeHermesRepoLocalFixture(
+    fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-host-claim-settle-repo-local-"))
+  );
+  const scheduleStore = new CheckinScheduleStateStore({ filePath: fixture.config.checkinScheduleStateFile });
+  scheduleStore.setState({
+    activeWake: null,
+    lastCompletion: null,
+    nextWakeAt: new Date(Date.now() - 60_000).toISOString(),
+    pendingTrigger: null,
+    scheduleSource: "agent",
+    senderId: "wx-user",
+    targetKey: `wx-user::${fixture.workspaceRoot}`,
+    updatedAt: new Date().toISOString(),
+    workspaceRoot: fixture.workspaceRoot,
+  });
+  const runtimeConfig = {
+    ...fixture.config,
+    ...repoLocal.env,
+    runtime: "hermes",
+    channelProvider: "hermes",
+    hermesHome: repoLocal.hermesHome,
+    hermesRepoRoot: repoLocal.repoRoot,
+    hermesRepoLocalShimPath: repoLocal.shimPath,
+  };
+
+  const claim = await runHostClaimCheckinCommand(runtimeConfig, [
+    "--provider", "hermes",
+    "--user", "wx-user",
+    "--workspace", fixture.workspaceRoot,
+  ]);
+  assert.equal(claim.data.status, "claimed");
+  assert.equal(typeof claim.data.lease.id, "string");
+  assert.equal(claim.data.payload.kind, "proactive_checkin");
+
+  const settle = await runHostSettleCheckinCommand(runtimeConfig, [
+    "--provider", "hermes",
+    "--user", "wx-user",
+    "--workspace", fixture.workspaceRoot,
+    "--lease", claim.data.lease.id,
+    "--result", "silent",
+    "--sleep-for", "6h",
+  ]);
+  assert.equal(settle.ok, true);
+  assert.match(String(settle.data.nextWakeAt || ""), /^\d{4}-\d{2}-\d{2}T/u);
+});
+
+test("host settle-checkin returns partial on failed delegated pass and keeps recovery ownership", async () => {
+  const fixture = createHostFixture("codeksei-host-settle-failed-");
+  const scheduleStore = new CheckinScheduleStateStore({ filePath: fixture.config.checkinScheduleStateFile });
+  const startedAt = new Date().toISOString();
+  scheduleStore.setState({
+    activeWake: {
+      createdAt: startedAt,
+      dueAt: startedAt,
+      kind: "checkin",
+      senderId: "wx-user",
+      source: "checkin_trigger",
+      startedAt,
+      text: "ping",
+      triggerId: "lease-1",
+      workspaceRoot: fixture.workspaceRoot,
+    },
+    lastCompletion: null,
+    nextWakeAt: "",
+    pendingTrigger: null,
+    scheduleSource: "agent",
+    senderId: "wx-user",
+    targetKey: `wx-user::${fixture.workspaceRoot}`,
+    updatedAt: startedAt,
+    workspaceRoot: fixture.workspaceRoot,
+  });
+
+  const settle = await runHostSettleCheckinCommand(fixture.config, [
+    "--provider", "generic-shell",
+    "--user", "wx-user",
+    "--workspace", fixture.workspaceRoot,
+    "--lease", "lease-1",
+    "--result", "failed",
+  ]);
+  assert.equal(settle.ok, "partial");
+  assert.equal(settle.data.completion, null);
+});
+
+test("host render returns the generated Hermes skill and validates tracked template", async () => {
+  const result = await runHostRenderCommand({}, [
+    "--provider", "hermes",
+    "--target", "skill",
+    "--validate",
+  ]);
+
+  assert.equal(result.ok, true);
+  assert.equal(result.data.matchesTrackedTemplate, true);
+  assert.match(String(result.text || ""), /# Codeksei Companion/u);
+});

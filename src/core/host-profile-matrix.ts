@@ -5,6 +5,7 @@ import type {
 import type {
   CodekseiExecutionMode,
 } from "./config-value-types";
+import { resolveHostAttachment } from "../host/attach/model";
 
 export type HostProfileId = CommandHostProfileIdDefinition | "unsupported";
 export type SupportedHostProfileId = CommandHostProfileIdDefinition;
@@ -49,96 +50,9 @@ export interface HostProfileMatrixEntry {
 }
 
 const HOST_PROFILE_MATRIX = Object.freeze<Record<HostProfileId, HostProfileMatrixEntry>>({
-  "bridge-codex-weixin": Object.freeze({
-    bridgeOnlyMessageKind: "bridge_ready",
-    capabilities: Object.freeze({
-      ownsBridgeLifecycle: true,
-      ownsSharedThreadControl: true,
-      ownsWeixinLogin: true,
-      supportsHostedSkillInstall: false,
-      supportsLiveHostedSmoke: false,
-      supportsSemanticReviewHybrid: true,
-    }),
-    channelOperations: Object.freeze({
-      pollUpdates: true,
-      login: true,
-      resolveAccount: true,
-      visibleTextDelivery: true,
-      visibleTypingDelivery: true,
-      visibleFileDelivery: true,
-    }),
-    mode: "bridge",
-    profile: "bridge-codex-weixin",
-    runtimeOperations: Object.freeze({
-      initialize: true,
-      interactiveTurn: true,
-      refreshThreadInstructions: true,
-      respondApproval: true,
-      resumeThread: true,
-      cancelTurn: true,
-    }),
-    supported: true,
-  }),
-  "hosted-hermes-weixin": Object.freeze({
-    bridgeOnlyMessageKind: "hosted_bridge_replaced",
-    capabilities: Object.freeze({
-      ownsBridgeLifecycle: false,
-      ownsSharedThreadControl: false,
-      ownsWeixinLogin: false,
-      supportsHostedSkillInstall: true,
-      supportsLiveHostedSmoke: true,
-      supportsSemanticReviewHybrid: true,
-    }),
-    channelOperations: Object.freeze({
-      pollUpdates: false,
-      login: false,
-      resolveAccount: false,
-      visibleTextDelivery: false,
-      visibleTypingDelivery: false,
-      visibleFileDelivery: false,
-    }),
-    mode: "hosted",
-    profile: "hosted-hermes-weixin",
-    runtimeOperations: Object.freeze({
-      initialize: false,
-      interactiveTurn: false,
-      refreshThreadInstructions: false,
-      respondApproval: false,
-      resumeThread: false,
-      cancelTurn: false,
-    }),
-    supported: true,
-  }),
-  unsupported: Object.freeze({
-    bridgeOnlyMessageKind: "unsupported_profile",
-    capabilities: Object.freeze({
-      ownsBridgeLifecycle: false,
-      ownsSharedThreadControl: false,
-      ownsWeixinLogin: false,
-      supportsHostedSkillInstall: false,
-      supportsLiveHostedSmoke: false,
-      supportsSemanticReviewHybrid: false,
-    }),
-    channelOperations: Object.freeze({
-      pollUpdates: false,
-      login: false,
-      resolveAccount: false,
-      visibleTextDelivery: false,
-      visibleTypingDelivery: false,
-      visibleFileDelivery: false,
-    }),
-    mode: "unsupported",
-    profile: "unsupported",
-    runtimeOperations: Object.freeze({
-      initialize: false,
-      interactiveTurn: false,
-      refreshThreadInstructions: false,
-      respondApproval: false,
-      resumeThread: false,
-      cancelTurn: false,
-    }),
-    supported: false,
-  }),
+  "bridge-codex-weixin": Object.freeze(buildCompatibilityEntry("bridge-codex-weixin")),
+  "hosted-hermes-weixin": Object.freeze(buildCompatibilityEntry("hosted-hermes-weixin")),
+  unsupported: Object.freeze(buildCompatibilityEntry("unsupported")),
 });
 
 const SUPPORTED_HOST_PROFILE_IDS = Object.freeze<readonly SupportedHostProfileId[]>([
@@ -167,4 +81,68 @@ export function isSupportedHostProfileId(value: unknown): value is SupportedHost
 
 export function listSupportedHostProfileIds(): SupportedHostProfileId[] {
   return [...SUPPORTED_HOST_PROFILE_IDS];
+}
+
+function buildCompatibilityEntry(profile: HostProfileId): HostProfileMatrixEntry {
+  const attachment = profile === "bridge-codex-weixin"
+    ? resolveHostAttachment({ runtime: "codex", channelProvider: "codeksei" })
+    : profile === "hosted-hermes-weixin"
+      ? resolveHostAttachment({ runtime: "hermes", channelProvider: "hermes" })
+      : resolveHostAttachment({ runtime: "openclaw-reserved" });
+
+  return {
+    bridgeOnlyMessageKind: profile === "bridge-codex-weixin"
+      ? "bridge_ready"
+      : profile === "hosted-hermes-weixin"
+        ? "hosted_bridge_replaced"
+        : "unsupported_profile",
+    capabilities: Object.freeze({ ...attachment.capabilities }),
+    channelOperations: Object.freeze(resolveChannelOperations(profile)),
+    mode: attachment.mode as CodekseiExecutionMode,
+    profile,
+    runtimeOperations: Object.freeze(resolveRuntimeOperations(profile)),
+    supported: attachment.supported,
+  };
+}
+
+function resolveChannelOperations(profile: HostProfileId): ChannelAdapterOperations {
+  if (profile === "bridge-codex-weixin") {
+    return {
+      pollUpdates: true,
+      login: true,
+      resolveAccount: true,
+      visibleTextDelivery: true,
+      visibleTypingDelivery: true,
+      visibleFileDelivery: true,
+    };
+  }
+  return {
+    pollUpdates: false,
+    login: false,
+    resolveAccount: false,
+    visibleTextDelivery: false,
+    visibleTypingDelivery: false,
+    visibleFileDelivery: false,
+  };
+}
+
+function resolveRuntimeOperations(profile: HostProfileId): RuntimeAdapterOperations {
+  if (profile === "bridge-codex-weixin") {
+    return {
+      initialize: true,
+      interactiveTurn: true,
+      refreshThreadInstructions: true,
+      respondApproval: true,
+      resumeThread: true,
+      cancelTurn: true,
+    };
+  }
+  return {
+    initialize: false,
+    interactiveTurn: false,
+    refreshThreadInstructions: false,
+    respondApproval: false,
+    resumeThread: false,
+    cancelTurn: false,
+  };
 }
