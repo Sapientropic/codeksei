@@ -39,6 +39,10 @@ const {
     },
   ): void;
 } = require("../src/runtime/stream-delivery/run-state");
+const {
+  advanceTimersAndMicrotasks,
+  enableMockTimers,
+}: typeof import("./helpers/mock-timers") = require("./helpers/mock-timers.ts");
 
 const RUNTIME_EVENT_TYPES = {
   REPLY_COMPLETED: "runtime.reply.completed",
@@ -68,10 +72,6 @@ interface FlushCall {
   trigger?: StreamingTrigger | null;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function nextTick(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
 }
@@ -96,7 +96,8 @@ function createStreamingState({
   return state;
 }
 
-test("flush scheduler only keeps idle timers for commentary-style streaming updates", async () => {
+test("flush scheduler only keeps idle timers for commentary-style streaming updates", async (t) => {
+  enableMockTimers(t);
   const flushCalls: FlushCall[] = [];
   const scheduler = createFlushScheduler({
     flushNow: async (_state: RunState, options: FlushCall) => {
@@ -138,7 +139,7 @@ test("flush scheduler only keeps idle timers for commentary-style streaming upda
   assert.ok(firstTimer);
   assert.equal(state.scheduledFlushTimer, firstTimer);
 
-  await sleep(20);
+  await advanceTimersAndMicrotasks(t, 20);
 
   assert.equal(flushCalls.length, 1);
   const firstFlushCall = flushCalls[0];
@@ -147,7 +148,8 @@ test("flush scheduler only keeps idle timers for commentary-style streaming upda
   assert.equal(state.scheduledFlushTimer, null);
 });
 
-test("flush scheduler skips idle timers for unfinished final fragments", async () => {
+test("flush scheduler skips idle timers for unfinished final fragments", async (t) => {
+  enableMockTimers(t);
   const flushCalls: FlushCall[] = [];
   const scheduler = createFlushScheduler({
     flushNow: async (_state: RunState, options: FlushCall) => {
@@ -176,13 +178,14 @@ test("flush scheduler skips idle timers for unfinished final fragments", async (
     },
   });
 
-  await sleep(20);
+  await advanceTimersAndMicrotasks(t, 20);
 
   assert.equal(flushCalls.length, 0);
   assert.equal(state.scheduledFlushTimer, null);
 });
 
-test("flush scheduler triggers immediate boundary flush without leaving an idle timer behind", async () => {
+test("flush scheduler triggers immediate boundary flush without leaving an idle timer behind", async (t) => {
+  enableMockTimers(t);
   const flushCalls: FlushCall[] = [];
   const scheduler = createFlushScheduler({
     flushNow: async (_state: RunState, options: FlushCall) => {
@@ -210,7 +213,7 @@ test("flush scheduler triggers immediate boundary flush without leaving an idle 
       fragmentKind: "delta",
     },
   });
-  await nextTick();
+  await advanceTimersAndMicrotasks(t);
 
   assert.equal(flushCalls.length, 1);
   const boundaryFlushCall = flushCalls[0];
@@ -219,7 +222,8 @@ test("flush scheduler triggers immediate boundary flush without leaving an idle 
   assert.equal(state.scheduledFlushTimer, null);
 });
 
-test("flush scheduler clears an existing idle timer before a force flush", async () => {
+test("flush scheduler clears an existing idle timer before a force flush", async (t) => {
+  enableMockTimers(t);
   const flushCalls: FlushCall[] = [];
   const scheduler = createFlushScheduler({
     flushNow: async (_state: RunState, options: FlushCall) => {
@@ -257,7 +261,7 @@ test("flush scheduler clears an existing idle timer before a force flush", async
       fragmentKind: "completed_snapshot",
     },
   });
-  await sleep(30);
+  await advanceTimersAndMicrotasks(t, 30);
 
   assert.equal(flushCalls.length, 1);
   const forcedFlushCall = flushCalls[0];
@@ -349,7 +353,8 @@ test("flush scheduler serializes sends and keeps later sends alive after a failu
   ]);
 });
 
-test("flush scheduler clearScheduledFlush cancels pending idle work", async () => {
+test("flush scheduler clearScheduledFlush cancels pending idle work", async (t) => {
+  enableMockTimers(t);
   const flushCalls: FlushCall[] = [];
   const scheduler = createFlushScheduler({
     flushNow: async (_state: RunState, options: FlushCall) => {
@@ -379,7 +384,7 @@ test("flush scheduler clearScheduledFlush cancels pending idle work", async () =
   });
   scheduler.clearScheduledFlush(state);
 
-  await sleep(20);
+  await advanceTimersAndMicrotasks(t, 20);
 
   assert.equal(flushCalls.length, 0);
   assert.equal(state.scheduledFlushTimer, null);

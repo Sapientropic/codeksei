@@ -44,7 +44,7 @@ test("config loader throws for invalid review schema json", () => {
   );
 });
 
-test("config loader re-reads cached json after the file changes", async () => {
+test("config loader re-reads cached json after the file changes", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-config-loader-"));
   const filePath = path.join(tempRoot, "review-schema.json");
   fs.writeFileSync(filePath, JSON.stringify({ workspaces: { "E:/repo": {} } }, null, 2), "utf8");
@@ -59,8 +59,10 @@ test("config loader re-reads cached json after the file changes", async () => {
   });
   assert.deepEqual(Object.keys(first.workspaces), ["E:/repo"]);
 
-  await new Promise((resolve) => setTimeout(resolve, 20));
   fs.writeFileSync(filePath, JSON.stringify({ workspaces: { "E:/repo-2": {} } }, null, 2), "utf8");
+  const initialStats = fs.statSync(filePath);
+  const updatedTime = new Date(initialStats.mtimeMs + 1_000);
+  fs.utimesSync(filePath, updatedTime, updatedTime);
 
   const second = loadJsonConfig({
     filePath,

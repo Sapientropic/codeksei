@@ -4,6 +4,10 @@ const assert: typeof import("node:assert/strict") = require("node:assert/strict"
 import type { ChannelAdapterLike, SessionStoreLike } from "../src/core/app-service-contract";
 import type { DeliveryFailurePayload } from "../src/core/runtime-types";
 const { StreamDelivery }: typeof import("../src/runtime/stream-delivery") = require("../src/runtime/stream-delivery");
+const {
+  advanceTimersAndMicrotasks,
+  enableMockTimers,
+}: typeof import("./helpers/mock-timers") = require("./helpers/mock-timers.ts");
 
 type StreamDeliveryInstance = import("../src/runtime/stream-delivery").StreamDelivery;
 
@@ -53,10 +57,6 @@ function buildTestChannelDescriptor(
       visibleFileDelivery: overrides.visibleFileDelivery ?? true,
     },
   };
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function createDelivery({
@@ -163,6 +163,45 @@ function createDelivery({
   return { delivery, sent, attach };
 }
 
+function buildFailingSendTextImpl(message: string): (payload: { text: string; preserveBlock?: boolean }) => Promise<void> {
+  return async () => {
+    throw new Error(message);
+  };
+}
+
+async function advanceDelivery(
+  context: import("node:test").TestContext,
+  delivery: StreamDeliveryInstance,
+  sent: SentMessage[],
+  {
+    ms = 0,
+    expectedLength = sent.length,
+  }: {
+    ms?: number;
+    expectedLength?: number;
+  } = {},
+): Promise<void> {
+  await advanceTimersAndMicrotasks(context, ms);
+  for (let index = 0; index < 32 && sent.length < expectedLength; index += 1) {
+    const runStates = Array.from((
+      delivery as StreamDeliveryInstance & {
+        stateByRunKey: Map<string, { flushPromise: Promise<void> | null; sendChain: Promise<void> }>;
+      }
+    ).stateByRunKey.values());
+    const pendingFlushes = runStates
+      .map((state) => state.flushPromise)
+      .filter((promise): promise is Promise<void> => Boolean(promise));
+    if (pendingFlushes.length) {
+      await Promise.all(pendingFlushes);
+    }
+    await Promise.all(runStates.map((state) => state.sendChain));
+    if (sent.length >= expectedLength) {
+      break;
+    }
+    await advanceTimersAndMicrotasks(context);
+  }
+}
+
 async function startTurn(delivery: StreamDeliveryInstance, threadId: string, turnId: string): Promise<void> {
   await delivery.handleRuntimeEvent({
     type: "runtime.turn.started",
@@ -217,7 +256,8 @@ async function completeTurn(delivery: StreamDeliveryInstance, threadId: string, 
   });
 }
 
-test("stream mode does not idle-flush unfinished final fragments", async () => {
+test("stream mode does not idle-flush unfinished final fragments", async (t) => {
+  enableMockTimers(t);
   const { delivery, sent, attach } = createDelivery({
     streamIdleFlushMs: 5,
     streamForceFlushChars: 100,
@@ -235,11 +275,12 @@ test("stream mode does not idle-flush unfinished final fragments", async () => {
   });
   assert.equal(sent.length, 0);
 
-  await sleep(20);
+  await advanceDelivery(t, delivery, sent, { ms: 20, expectedLength: 2 });
   assert.deepEqual(sent, []);
 });
 
-test("stream mode streams final items incrementally and turn completion only sends the tail", async () => {
+test("stream mode streams final items incrementally and turn completion only sends the tail", async (t) => {
+  enableMockTimers(t);
   const { delivery, sent, attach } = createDelivery({
     streamForceFlushChars: 100,
     streamBoundaryFlushChars: 1,
@@ -259,8 +300,9 @@ test("stream mode streams final items incrementally and turn completion only sen
     itemId: "final-1",
     text: "第二句。",
   });
-  await sleep(20);
+  await advanceDelivery(t, delivery, sent, { ms: 20, expectedLength: 2 });
   await completeTurn(delivery, "thread-final", "turn-final");
+  await advanceTimersAndMicrotasks(t);
 
   assert.deepEqual(sent, [
     { text: "第一句。", preserveBlock: true },
@@ -268,7 +310,8 @@ test("stream mode streams final items incrementally and turn completion only sen
   ]);
 });
 
-test("snapshot deltas replace the current item instead of concatenating duplicate prefixes", async () => {
+test("snapshot deltas replace the current item instead of concatenating duplicate prefixes", async (t) => {
+  enableMockTimers(t);
   const { delivery, sent, attach } = createDelivery({
     streamForceFlushChars: 100,
     streamBoundaryFlushChars: 1,
@@ -289,15 +332,17 @@ test("snapshot deltas replace the current item instead of concatenating duplicat
     text: "先给你一个开头。\n\n再补完整结论。",
     fragmentKind: "snapshot",
   });
-  await sleep(20);
+  await advanceDelivery(t, delivery, sent, { ms: 20, expectedLength: 2 });
 
-  assert.deepEqual(sent, [
-    { text: "先给你一个开头。", preserveBlock: true },
-    { text: "再补完整结论。", preserveBlock: true },
-  ]);
+  assert.equal(sent.length, 2);
+  assert.equal(sent[0]?.text, "先给你一个开头。");
+  assert.equal(sent[0]?.preserveBlock, true);
+  assert.equal(sent[1]?.text, "再补完整结论。");
+  assert.equal(sent[1]?.preserveBlock, true);
 });
 
-test("completed snapshots continue from the unseen tail after a snapshot rewrite", async () => {
+test("completed snapshots continue from the unseen tail after a snapshot rewrite", async (t) => {
+  enableMockTimers(t);
   const { delivery, sent, attach } = createDelivery({
     streamForceFlushChars: 100,
     streamBoundaryFlushChars: 1,
@@ -324,7 +369,7 @@ test("completed snapshots continue from the unseen tail after a snapshot rewrite
     itemId: "final-1",
     text: "第一段。\n\n第二段。\n\n第三段。",
   });
-  await sleep(20);
+  await advanceDelivery(t, delivery, sent, { ms: 20, expectedLength: 2 });
 
   assert.deepEqual(sent, [
     { text: "第一段。", preserveBlock: true },
@@ -332,7 +377,8 @@ test("completed snapshots continue from the unseen tail after a snapshot rewrite
   ]);
 });
 
-test("short snapshot rewrites below the old 40-char gate still replace without duplication", async () => {
+test("short snapshot rewrites below the old 40-char gate still replace without duplication", async (t) => {
+  enableMockTimers(t);
   const { delivery, sent, attach } = createDelivery({
     streamForceFlushChars: 100,
     streamBoundaryFlushChars: 1,
@@ -353,12 +399,13 @@ test("short snapshot rewrites below the old 40-char gate still replace without d
     text: "先说完整。",
     fragmentKind: "snapshot",
   });
-  await sleep(20);
+  await advanceDelivery(t, delivery, sent, { ms: 20, expectedLength: 2 });
 
-  assert.deepEqual(sent, [
-    { text: "先说。", preserveBlock: true },
-    { text: "完整。", preserveBlock: true },
-  ]);
+  assert.equal(sent.length, 2);
+  assert.equal(sent[0]?.text, "先说。");
+  assert.equal(sent[0]?.preserveBlock, true);
+  assert.equal(sent[1]?.text, "完整。");
+  assert.equal(sent[1]?.preserveBlock, true);
 });
 
 test("stream mode only emits brief natural-language commentary in real time", async () => {
@@ -484,7 +531,8 @@ test("settled mode waits for turn completion and only sends the latest visible r
   ]);
 });
 
-test("stream mode waits for a natural boundary before sending a final sentence", async () => {
+test("stream mode waits for a natural boundary before sending a final sentence", async (t) => {
+  enableMockTimers(t);
   const { delivery, sent, attach } = createDelivery({
     streamIdleFlushMs: 5,
     streamForceFlushChars: 100,
@@ -500,7 +548,7 @@ test("stream mode waits for a natural boundary before sending a final sentence",
     text: "我先把今天 tracked repos 的提交时间线和你今天的日记对起来，再直接帮你收成一版能回看的时间",
     phase: "final",
   });
-  await sleep(20);
+  await advanceTimersAndMicrotasks(t, 20);
   assert.deepEqual(sent, []);
 
   await sendDelta(delivery, {
@@ -510,7 +558,7 @@ test("stream mode waits for a natural boundary before sending a final sentence",
     text: "我先把今天 tracked repos 的提交时间线和你今天的日记对起来，再直接帮你收成一版能回看的时间线，不靠你自己回忆。",
     phase: "final",
   });
-  await sleep(20);
+  await advanceTimersAndMicrotasks(t, 20);
 
   assert.deepEqual(sent, [
     {
@@ -520,89 +568,19 @@ test("stream mode waits for a natural boundary before sending a final sentence",
   ]);
 });
 
-test("persistent send failure abandons the run and reports delivery degradation", async () => {
+test("persistent send failure abandons the run and reports delivery degradation", async (t) => {
+  enableMockTimers(t);
   const degraded: DeliveryFailurePayload[] = [];
-  const delivery = new StreamDelivery({
-    weixinReplyMode: "stream",
+  const { delivery, attach } = createDelivery({
     streamIdleFlushMs: 5,
     streamForceFlushChars: 6,
     streamBoundaryFlushChars: 6,
-    channelAdapter: {
-      describe() {
-        return buildTestChannelDescriptor("test-channel");
-      },
-      getKnownContextTokens() {
-        return {};
-      },
-      async getUpdates() {
-        return { ret: 0, msgs: [] };
-      },
-      loadSyncBuffer() {
-        return "";
-      },
-      async login() {},
-      normalizeIncomingMessage(message) {
-        return message as import("../src/core/runtime-types").NormalizedIncomingMessage | null;
-      },
-      printAccounts() {},
-      resolveAccount() {
-        return { accountId: "acct-1", baseUrl: "http://127.0.0.1" };
-      },
-      async sendFile() {
-        return undefined;
-      },
-      async sendText() {
-        throw new Error("sendMessage ret=-2 errcode= errmsg=");
-      },
-      async sendTyping() {
-        return undefined;
-      },
-    },
-    sessionStore: {
-      buildBindingKey() {
-        return "";
-      },
-      findBindingForThreadId(threadId) {
-        return { bindingKey: `binding-${threadId}`, workspaceRoot: "" };
-      },
-      getActiveWorkspaceRoot() {
-        return "";
-      },
-      getApprovalCommandAllowlistForWorkspace() {
-        return [];
-      },
-      getAvailableModelCatalog() {
-        return null;
-      },
-      getBinding() {
-        return null;
-      },
-      getRuntimeParamsForWorkspace() {
-        return { model: "" };
-      },
-      getPendingApprovalForThread() {
-        return null;
-      },
-      getThreadIdForWorkspace() {
-        return "";
-      },
-      listBindings() {
-        return [];
-      },
-      listPendingApprovals() {
-        return [];
-      },
-    },
+    sendTextImpl: buildFailingSendTextImpl("sendMessage ret=-2 errcode= errmsg="),
     onDeliveryFailure(payload: DeliveryFailurePayload) {
       degraded.push(payload);
     },
   });
-
-  delivery.queueReplyTargetForThread("thread-fail", {
-    userId: "user-thread-fail",
-    contextToken: "ctx-thread-fail",
-    provider: "weixin",
-  });
+  attach("thread-fail");
 
   await startTurn(delivery, "thread-fail", "turn-fail");
   await sendDelta(delivery, {
@@ -612,7 +590,7 @@ test("persistent send failure abandons the run and reports delivery degradation"
     text: "这条会失败。",
     phase: "final",
   });
-  await sleep(20);
+  await advanceTimersAndMicrotasks(t, 20);
 
   assert.equal(degraded.length, 1);
   const firstDegraded = degraded[0];
@@ -620,7 +598,8 @@ test("persistent send failure abandons the run and reports delivery degradation"
   assert.equal(firstDegraded.threadId, "thread-fail");
 });
 
-test("unsupported visible text delivery abandons the run before calling sendText", async () => {
+test("unsupported visible text delivery abandons the run before calling sendText", async (t) => {
+  enableMockTimers(t);
   const degraded: DeliveryFailurePayload[] = [];
   const sentPayloads: string[] = [];
   const { delivery, attach } = createDelivery({
@@ -642,7 +621,7 @@ test("unsupported visible text delivery abandons the run before calling sendText
     text: "这条不会真的发出去。",
     phase: "final",
   });
-  await sleep(20);
+  await advanceTimersAndMicrotasks(t, 20);
 
   assert.deepEqual(sentPayloads, []);
   assert.equal(degraded.length, 1);

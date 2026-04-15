@@ -95,9 +95,11 @@
     "typecheck:strict-libs": "npm run typecheck:strict-libs:node && npm run typecheck:strict-libs:web && npm run typecheck:strict-libs:tests",
     "typecheck:strict": "npm run typecheck:strict-libs",
     "check": "npm run lint && npm run typecheck && npm run typecheck:tests:ts",
+    "coverage:critical": "node --experimental-test-coverage --test-coverage-include=src/core/config.ts --test-coverage-include=src/adapters/channel/weixin/delivery-text.ts --test-coverage-include=src/runtime/runtime-turn-actions.ts --test-coverage-include=src/runtime/runtime-turn-preparation.ts --test-coverage-include=src/runtime/runtime-turn-send.ts --test-coverage-include=src/runtime/runtime-turn-lifecycle.ts --test-coverage-include=src/runtime/stream-delivery.ts --test-coverage-include=src/runtime/stream-delivery/*.ts --test-coverage-lines=88 --test-coverage-branches=75 --test-coverage-functions=85 --experimental-strip-types --require ./tests/helpers/build-path-resolver.ts --test tests/runtime-turn-lifecycle.test.ts tests/app-command-wiring.test.ts tests/app-typing.test.ts tests/weixin-delivery-text.test.ts tests/stream-delivery.test.ts tests/stream-delivery-flush-scheduler.test.ts tests/stream-delivery-transport.test.ts tests/stream-delivery-run-state.test.ts tests/stream-delivery-delta-merge.test.ts tests/stream-delivery-visible-text.test.ts tests/stream-delivery-trace-abandonment.test.ts tests/stream-delivery-reply-target-registry.test.ts tests/branding-config.test.ts tests/config-slices.test.ts",
+    "test:built-runtime": "tsx ./src/release/run-built-runtime-tests.ts",
     "pack:dry-run": "npm pack --dry-run --ignore-scripts",
     "smoke:package": "tsx ./src/release/smoke-package.ts",
-    "verify": "npm run check && npm run build && node --experimental-strip-types --require ./tests/helpers/build-path-resolver.ts --test tests/*.test.ts && npm run pack:dry-run"
+    "verify": "npm run check && npm run coverage:critical && npm run build && npm run test:built-runtime && npm run pack:dry-run"
   },
   "dependencies": {
     "@radix-ui/react-icons": "^1.3.2",
