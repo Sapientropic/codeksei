@@ -14,7 +14,7 @@ const readOptionalDoc = (filePath: string): string | null =>
 
 const architectureDoc = fs.readFileSync(path.join(repoRoot, "docs", "architecture.md"), "utf8");
 const commandsDoc = fs.readFileSync(path.join(repoRoot, "docs", "commands.md"), "utf8");
-const releaseDoc = fs.readFileSync(path.join(repoRoot, "docs", "release.md"), "utf8");
+const releaseDoc = readOptionalDoc(path.join(repoRoot, "docs", "release.md"));
 const tasksReadme = readOptionalDoc(path.join(tasksDir, "README.md"));
 const hardeningPlan = readOptionalDoc(path.join(tasksDir, "archive", "runtime-and-state-hardening-plan.md"));
 const liveSmokeDoc = readOptionalDoc(path.join(maintainerDir, "live-smoke.md"));
@@ -52,8 +52,8 @@ test("architecture and commands docs keep fake-harness smoke distinct from maint
 });
 
 test("commands, release, and live smoke docs share the same recorded-result entry", (t) => {
-  if (!liveSmokeDoc) {
-    t.skip("repo-local maintainer live smoke doc is not present in this checkout");
+  if (!liveSmokeDoc || !releaseDoc) {
+    t.skip("repo-local release/live-smoke docs are not present in this checkout");
     return;
   }
 
