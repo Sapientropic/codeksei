@@ -32,5 +32,6 @@ test("weixin media gap diagnostic matches current upload-param failures", () => 
     true,
   );
   assert.equal(isWeixinMediaGapError(new Error("network timeout")), false);
+  assert.equal(WEIXIN_MEDIA_GAP_DIAGNOSTIC.issueUrl, "https://github.com/Sapientropic/codeksei/issues/4");
   assert.match(WEIXIN_MEDIA_GAP_DIAGNOSTIC.summary, /legacy media stack/u);
 });
