@@ -1,5 +1,7 @@
 // @ts-check
 
+import { normalizeLineEndings } from "../../../core/text-normalization";
+
 export interface AssistantItemPayload {
   id?: unknown;
   type?: unknown;
@@ -143,10 +145,6 @@ export function extractFailureText(params: RuntimeMessageParams | null | undefin
 
 function normalizeIdentifier(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function normalizeLineEndings(value: unknown): string {
-  return String(value || "").replace(/\r\n/g, "\n");
 }
 
 export function normalizeAssistantPhase(value: unknown): string {

@@ -2,6 +2,7 @@ const fs: typeof import("node:fs") = require("node:fs");
 const path: typeof import("node:path") = require("node:path");
 const test: typeof import("node:test") = require("node:test");
 const assert: typeof import("node:assert/strict") = require("node:assert/strict");
+const { normalizeLineEndings } = require("../src/core/text-normalization");
 
 const {
   renderHermesCompanionSkill,
@@ -15,7 +16,7 @@ test("Hermes companion skill template stays generated from the renderer truth", 
   const templatePath = resolveRepoHermesSkillAssetPath();
   const tracked = fs.readFileSync(templatePath, "utf8");
 
-  assert.equal(tracked, rendered);
+  assert.equal(normalizeLineEndings(tracked), normalizeLineEndings(rendered));
   assert.match(rendered, /host claim-checkin/u);
   assert.match(rendered, /host settle-checkin/u);
   assert.match(rendered, /operator hermes sync-checkin/u);

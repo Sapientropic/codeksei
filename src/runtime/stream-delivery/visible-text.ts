@@ -1,4 +1,4 @@
-import { normalizeText } from "../../core/text-normalization";
+import { normalizeLineEndings, normalizeText } from "../../core/text-normalization";
 // @ts-check
 
 import { sanitizeProtocolLeakText } from "../../adapters/runtime/codex/protocol-leak-monitor";
@@ -19,11 +19,7 @@ export interface SanitizedReplyText {
   suppress: boolean;
   text: string;
 }
-export { normalizeText };
-
-export function normalizeLineEndings(value: unknown): string {
-  return String(value || "").replace(/\r\n/g, "\n");
-}
+export { normalizeLineEndings, normalizeText };
 
 export function trimOuterBlankLines(text: unknown): string {
   return String(text || "")

@@ -1,3 +1,5 @@
+import { normalizeLineEndings } from "../../../core/text-normalization";
+
 const SUSPICIOUS_PATTERNS: RegExp[] = [
   /\b(?:analysis|commentary|final|summary)\s+to=[a-z0-9_.-]+/i,
   /\bto=functions\.[a-z0-9_]+/i,
@@ -50,10 +52,6 @@ export function sanitizeProtocolLeakText(text: unknown): SanitizedProtocolLeakTe
     text: truncated,
     changed: truncated !== normalizedText,
   };
-}
-
-function normalizeLineEndings(value: unknown): string {
-  return String(value || "").replace(/\r\n/g, "\n");
 }
 
 function findSafeProtocolCutIndex(text: string, leakStartIndex: number): number {

@@ -1,4 +1,5 @@
 export {
+  normalizeLineEndings,
   normalizeComparableText,
   normalizeLookupText,
   normalizeText,

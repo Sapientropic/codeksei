@@ -15,3 +15,7 @@ export function normalizeLookupText(value: unknown): string {
 export function normalizeComparableText(value: unknown): string {
   return normalizeLookupText(value);
 }
+
+export function normalizeLineEndings(value: unknown): string {
+  return String(value || "").replace(/\r\n/g, "\n");
+}
