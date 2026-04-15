@@ -106,7 +106,7 @@ const LEGACY_ROUTE_MATRIX = Object.freeze<Record<WeixinRouteOperation, WeixinRou
 
 export const WEIXIN_MEDIA_GAP_DIAGNOSTIC = Object.freeze<WeixinMediaGapDiagnostic>({
   errorPattern: "getUploadUrl returned neither upload_full_url nor upload_param",
-  issueUrl: "",
+  issueUrl: "https://github.com/Sapientropic/codeksei/issues/4",
   maintainerDocPath: "docs/maintainer/weixin-dual-stack.md",
   summary: "Current routed-session media gap: v2 upload URL lookup can omit upload_param/upload_full_url, so visible file delivery stays on the legacy media stack by design.",
 });
