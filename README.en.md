@@ -9,14 +9,15 @@
     <a href="https://www.npmjs.com/package/codeksei"><img alt="npm version" src="https://img.shields.io/npm/v/codeksei"></a>
     <a href="./LICENSE"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/license-AGPL--3.0--only-111111.svg"></a>
   </p>
-  <p><a href="https://zread.ai/Sapientropic/codeksei" target="_blank"><img src="https://img.shields.io/badge/Ask_Zread-_.svg?style=for-the-badge&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS42MDE1NiA1LjMxMzU2IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff" alt="zread"/></a></p>
+  <p><a href="https://zread.ai/Sapientropic/codeksei" target="_blank"><img src="https://img.shields.io/badge/Ask_Zread-_.svg?style=for-the-badge&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff" alt="zread"/></a></p>
   <h3>A local-first companion that helps time hold shape and brings daily life and project threads back within reach</h3>
-  <p><strong>It uses WeChat as the main entry and connects timeline, diary, reminders, reviews, and project continuity in one shared thread.</strong></p>
-  <p>Codeksei is not just a chat box that waits for prompts. It can help capture what happened, reconnect loose threads, leave reminders, and make it easier to step back into a project while keeping state and logs local by default.</p>
+  <p><strong>It uses WeChat as the main entry and keeps timeline, diary, reminders, reviews, and project continuity on one shared thread.</strong></p>
+  <p>Codeksei is not just a chat box waiting for prompts, and it is not a second agent runtime. It helps capture what happened, reconnect loose threads, leave reminders, and make project re-entry gentler while keeping state, logs, and life traces local by default.</p>
   <p>
-    <a href="#try-codeksei">Try It</a> ·
+    <a href="#agent-quickstart">Agent Quickstart</a> ·
+    <a href="#setup">SETUP</a> ·
+    <a href="#mode-specific-bring-up">Mode-Specific Bring-Up</a> ·
     <a href="#a-day-with-codeksei">A Day With Codeksei</a> ·
-    <a href="#quick-start">Quick Start</a> ·
     <a href="#what-it-can-do">Capabilities</a> ·
     <a href="#why-the-name">Why the Name</a> ·
     <a href="./docs/commands.md">Commands</a> ·
@@ -24,22 +25,106 @@
   </p>
 </div>
 
-- **What it is**: a local-first companion that connects daily capture, reminders, reviews, and project continuity through WeChat + `codeksei`
-- **Who it fits**: people whose sense of time slips, whose project thread breaks easily, and who want help keeping loose ends in view
-- **How to try it**: start with `npm install -g codeksei` for the base CLI, then move into shared mode when you want the fuller experience
+- **What it is**: a local-first, `daemon-first / bridge-first` companion engine; for humans it is a companion assistant, and for hosts it is an attachable domain layer
+- **CLI contract**: `codeksei help`, `codeksei schema`, and `codeksei host manifest` are the public discovery surface; non-TTY runs default to JSON, `stdout` carries results, and `stderr` carries diagnostics
+- **Recommended start**: complete shared `SETUP` first, then choose `Bridge Mode` or `Hermes Hosted Mode`
 
-<a id="try-codeksei"></a>
+<a id="agent-quickstart"></a>
 
-## Try It First
+## Agent Quickstart
 
-If you want the shortest path to see whether Codeksei fits your workflow, start here:
+If you are an external agent, do not infer internal seams from long README prose. The recommended entry is:
+
+1. Read `CODEKSEI_HOSTKIT.json` in the repo root first
+2. Treat the README as human-facing guidance, and treat `HOSTKIT + codeksei host manifest/bootstrap/doctor/smoke` as the machine entrypoint
+3. Prefer `Hermes Hosted Mode` by default
+4. Treat `host bootstrap` as “Codeksei attachment/bootstrap completed”, not as proof that Hermes gateway or live Weixin bring-up is already complete
+
+Recommended order:
+
+```bash
+npx -y codeksei@latest host manifest
+npx -y codeksei@latest host bootstrap --provider hermes --ensure-daemon
+npx -y codeksei@latest host doctor --provider hermes
+npx -y codeksei@latest host smoke --provider hermes
+```
+
+- `operator hermes *` remains a compatibility entrypoint, not the new primary entrypoint
+- The README handles human onboarding; the machine contract lives in `CODEKSEI_HOSTKIT.json`, `codeksei host manifest`, and the public CLI schema
+
+## Host Modes
+
+Codeksei is now positioned as a **daemon-first / bridge-first / companion engine**, not a CLI tied to one fixed host.
+
+- `Bridge Mode`
+  Current default path: `Codeksei Weixin bridge + Codex runtime`
+- `Hermes Hosted Mode`
+  Hermes owns the agent loop and official Weixin; Codeksei exposes timeline, diary, reminder, review, note, and project radar through its CLI / skill surface
+- External hosts should attach through the `host attachment contract`:
+  `codeksei host manifest`, `codeksei host bootstrap`, `codeksei host doctor`, `codeksei host smoke`, `codeksei host seed-proactive`, `codeksei host claim-checkin`, `codeksei host settle-checkin`
+
+<a id="setup"></a>
+
+## SETUP
+
+This section only covers shared installation, contract discovery, and basic CLI verification. It does not force you to choose `Bridge Mode` or `Hermes Hosted Mode` first.
+
+### Common prerequisites
+
+- `Node.js >= 22`
+- Default machine entry at the repo root: `CODEKSEI_HOSTKIT.json`
+- Canonical host config filename: `codeksei.config.json`
+
+### Install paths
+
+1. Run it ephemerally without creating a global install:
+
+```bash
+npx -y codeksei@latest
+```
+
+2. Install the CLI globally first:
 
 ```bash
 npm install -g codeksei
-codeksei help
 ```
 
-If you want the fuller shape right away, with WeChat and the terminal attached to the same shared thread:
+3. Clone the repository when you want source, scripts, templates, and the full repo docs:
+
+```bash
+git clone https://github.com/Sapientropic/codeksei.git
+cd codeksei
+npm install
+```
+
+### Minimum verification
+
+After installation, make sure the CLI and machine contract are both discoverable:
+
+```bash
+codeksei help
+codeksei schema
+codeksei host manifest
+```
+
+If you are using the `npx` path and do not have a global `codeksei` binary on `PATH`, run the same subcommands through `npx -y codeksei@latest ...`.
+
+### SETUP boundaries
+
+- A successful setup only means the CLI, public schema, and host attachment contract / hostkit are discoverable
+- It does not mean `Bridge Mode` has already logged in
+- It also does not mean `Hermes Hosted Mode` is already live-attached to Hermes gateway / Weixin
+- It definitely does not mean reminders, check-ins, repo-local shims, or hosted send-back are all ready yet
+
+<a id="mode-specific-bring-up"></a>
+
+## Mode-Specific Bring-Up
+
+After `SETUP`, choose the bring-up path that matches how you want to run Codeksei.
+
+### Bridge Mode
+
+Use this when you want Codeksei to own the repo's existing shared-thread path.
 
 ```bash
 git clone https://github.com/Sapientropic/codeksei.git
@@ -49,9 +134,33 @@ npm run login
 npm run shared:start
 ```
 
-- `Start with the base CLI`: check the command surface, confirm local setup, and feel the product boundary first
-- `Move into shared mode`: experience continuity, proactive help, reminders, and project re-entry together
-- `Send feedback after trying it`: use [GitHub Issues](https://github.com/Sapientropic/codeksei/issues) to tell us what felt most useful, what felt awkward, and where Codeksei should be more proactive or more restrained
+Common follow-up commands:
+
+```bash
+npm run shared:open
+npm run shared:status
+```
+
+### Hermes Hosted Mode
+
+Use this when you already have Hermes runtime / gateway / official Weixin and want Codeksei to attach as a companion workflow surface.
+
+```bash
+codeksei host manifest
+codeksei host bootstrap --provider hermes --ensure-daemon
+codeksei host doctor --provider hermes
+codeksei host smoke --provider hermes
+```
+
+Boundaries:
+
+- `host manifest -> bootstrap -> doctor -> smoke` is the current primary path
+- `operator hermes *` remains a compatibility entrypoint, not the new primary path
+- `host bootstrap` only means Codeksei attachment/bootstrap is complete; it does not mean Hermes gateway or live Weixin bring-up is complete
+- Live gateway, official Weixin, approvals, and the runtime loop are still owned by Hermes
+- External agents should not infer internal TypeScript seams from README prose; they should attach through the host attachment contract
+
+<a id="a-day-with-codeksei"></a>
 
 ## A Day With Codeksei
 
@@ -71,13 +180,25 @@ npm run shared:start
 
 - `Timeline`: time blocks, switches, and lived facts become anchors for memory and time sense instead of fading into a blur
 - `Diary`: todos, fragments, supplements, summaries, and timeline-linked facts for daily traces that want to stay
-- `Check-ins`: random wake-ups and proactive help; it can message, stay quiet, write something down first, update diary/timeline, or leave a reminder for later before deciding whether it should step in
+- `Check-ins`: proactive wake-ups and background care. Messaging is only one output path; Codeksei can also reread context, clean up backstage state, update diary/timeline, or leave a reminder before deciding whether it should surface. It owns proactive trigger generation, the `tick -> ack -> complete` schedule truth, and the next wake decision written in `checkin-complete`; Bridge Mode wraps that truth with a local poller, while Hermes Hosted Mode only holds a one-shot wake/recovery job and still defers the true next wake to Codeksei
 - `Reminders`: reminder write and scheduling support for rhythm and follow-through
 - `Review`: nightly / weekly / monthly review, with hybrid semantic extraction by default
-- `Project support`: workspace bootstrap, project radar, and shared-thread recovery by workspace, so re-entry does not always start from scratch
-- `WeChat bridge`: QR login, long polling, file send-back, shared-thread attach
-- `Codex runtime`: shared `app-server`, thread/session binding, approvals, stop/resume
+- `Project support`: workspace bootstrap, project radar, and shared-thread recovery by workspace so re-entry does not always start from scratch; local git remains the first truth and GitHub activity is only a fallback continuity signal
+- `WeChat bridge`: owned by Codeksei in Bridge Mode; Hermes Hosted Mode should use Hermes official Weixin
+- `Runtime host`: Bridge Mode currently defaults to Codex; Hermes Hosted Mode lets Hermes own agent/runtime/approval/model switching
 - `Durable notes`: `note:auto`, `note:maybe`, `note:sync`
+
+## Who It Fits
+
+- People who want help looking after messy daily life, reminders, and unfinished loops
+- People with ADHD or executive-function friction who benefit from steady companionship and gentle external support
+- People whose days blur together and are hard to reconstruct afterward
+- People whose project thread feels severed after even a small interruption
+- People who want something that proactively checks in and helps carry the thread instead of waiting to be manually reopened every time
+- People who want projects, daily capture, and review to live in one workflow
+- People who want WeChat as the main interaction surface while keeping things local and editable
+
+<a id="why-the-name"></a>
 
 ## Why the Name
 
@@ -92,64 +213,44 @@ npm run shared:start
   <p><em>Your threads are watched over, and returning can still feel warm and continuous.</em></p>
 </div>
 
-## Who It Fits
+## CLI Contract
 
-- People who want help looking after messy daily life, reminders, and unfinished loops
-- People with ADHD or executive-function friction who benefit from steady companionship and gentle external support
-- People whose days blur together and are hard to reconstruct afterward
-- People whose project thread feels severed after even a small interruption
-- People who want something that proactively checks in and helps carry the thread, instead of waiting to be manually reopened every time
-- People who want projects, daily capture, and review to live in one workflow
-- People who want WeChat as the main interaction surface while keeping things local and editable
+- `codeksei help`
+  Only exposes the public finite CLI by default instead of mixing in shared / maintainer / background surfaces
+- `codeksei schema`
+  Returns the structured public CLI contract for agents and automation
+- `codeksei host manifest`
+  Returns the host attachment manifest / hostkit machine entrypoint
+- `codeksei host doctor`
+  Shows daemon, attachment, and provider recipe readiness
+- `codeksei operator help`
+  Shows bootstrap, shared, background, and maintainer operator surfaces
+- `codeksei operator schema`
+  Returns the structured schema for operator / bootstrap surfaces
+- Non-TTY runs default to a JSON envelope; TTY runs default to text
+- `stderr` is for diagnostics; `stdout` is for result data
+- Shared global flags:
+  `--format json|text`, `--verbose`, `--workspace-root /absolute/path`
 
-## Quick Start
+## Bridge Mode Runtime Config
 
-### 1. Choose your install path
+Bridge Mode still uses a deliberate two-stage environment-loading contract:
 
-If you want the full shared-mode path described in this README, clone the repository and use `npm run ...`:
-
-```bash
-git clone https://github.com/Sapientropic/codeksei.git
-cd codeksei
-npm install
-```
-
-If you only want the base CLI first:
-
-```bash
-npm install -g codeksei
-codeksei help
-```
-
-Notes:
-
-- The command examples below assume a repo checkout and `npm run ...`
-- Global install is a good way to try the base CLI; shared-mode scripts are most straightforward from the repository checkout
-
-### 2. Minimum env setup
-
-Runtime env is filled in two stages:
-
-1. Existing process environment stays in place first
+1. Keep any environment variables already present in the current process
 2. Load `.env` from the current project directory
 3. Recompute the state directory from the now-active `CODEKSEI_STATE_DIR`, then load `.env` from that state directory
 
-Earlier values win. Later `.env` files only fill missing keys and do not overwrite values that already exist. That means a repo `.env` is allowed to define `CODEKSEI_STATE_DIR`, and the state-dir `.env` path is recalculated only after the repo `.env` has been loaded.
-
-Minimum usable variables:
-
-```dotenv
-CODEKSEI_USER_NAME=YourName
-CODEKSEI_USER_GENDER=female
-CODEKSEI_ALLOWED_USER_IDS=bridge_observed_sender_id
-CODEKSEI_WORKSPACE_ROOT=/absolute/path/to/your/workspace
-```
+Earlier values win. Later `.env` files only fill missing keys and never overwrite keys that already exist. That means a repo `.env` is allowed to define `CODEKSEI_STATE_DIR`, and the state-dir `.env` path is recalculated only after the repo `.env` has been loaded.
 
 <details>
 <summary>Show common optional environment variables</summary>
 
 ```dotenv
 CODEKSEI_ACCOUNT_ID=
+CODEKSEI_RUNTIME_ENDPOINT=ws://127.0.0.1:8765
+CODEKSEI_RUNTIME_COMMAND=codex
+CODEKSEI_HERMES_COMMAND=hermes
+CODEKSEI_REVIEW_SEMANTIC_HOST=auto
 CODEKSEI_CODEX_ENDPOINT=ws://127.0.0.1:8765
 CODEKSEI_WEIXIN_ADAPTER=v2
 CODEKSEI_WEIXIN_REPLY_MODE=stream
@@ -159,10 +260,10 @@ CODEKSEI_TIMEZONE=Asia/Shanghai
 CODEKSEI_TIMELINE_LOCALE=zh-CN
 CODEKSEI_DIARY_DIR=/absolute/path/to/your/vault/diary
 CODEKSEI_TIMELINE_STATE_DIR=/absolute/path/to/your/vault/.codex/timeline
-CODEKSEI_WORKSPACE_BOOTSTRAP_CONFIG=/absolute/path/to/workspace-bootstrap.json
-CODEKSEI_PROJECT_RADAR_CONFIG=/absolute/path/to/.codex/code-projects.json
-CODEKSEI_DURABLE_NOTE_SCHEMA_CONFIG=/absolute/path/to/.codex/durable-note-schema.json
-CODEKSEI_REVIEW_SCHEMA_CONFIG=/absolute/path/to/.codex/review-schema.json
+CODEKSEI_WORKSPACE_BOOTSTRAP_CONFIG=/absolute/path/to/your/workspace-bootstrap.json
+CODEKSEI_PROJECT_RADAR_CONFIG=/absolute/path/to/your/workspace/.codex/code-projects.json
+CODEKSEI_DURABLE_NOTE_SCHEMA_CONFIG=/absolute/path/to/your/workspace/.codex/durable-note-schema.json
+CODEKSEI_REVIEW_SCHEMA_CONFIG=/absolute/path/to/your/workspace/.codex/review-schema.json
 CODEKSEI_SHARED_USE_BUNDLED_CODEX_BINARY=1
 CODEKSEI_SHARED_DISABLE_PLUGINS=0
 CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
@@ -172,46 +273,27 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 
 Notes:
 
-- `CODEKSEI_WEIXIN_REPLY_MODE=stream` now behaves more like a hybrid stream: it prefers natural sentence boundaries or completed blocks, so unfinished final sentences do not get split into multiple WeChat bubbles
+- `CODEKSEI_WEIXIN_REPLY_MODE=stream` now behaves more like a hybrid stream: it prefers natural sentence boundaries or completed blocks so unfinished final sentences are not split into multiple WeChat bubbles
 - `CODEKSEI_WEIXIN_REPLY_MODE=settled` still means “wait until the whole turn settles”: only the latest visible final reply is sent
-- `CODEKSEI_USER_NAME` is a display/persona field for chat, not a routing id
-- `CODEKSEI_ALLOWED_USER_IDS` must use the exact sender ids observed by the bridge; the easiest way to find them is `npm run accounts`
-- WeChat persona / continuity instructions now default to the repo template at `templates/weixin-instructions.md`; use `weixin-instructions.local.md` in the state directory only when you need a local overlay
-- If you use multiple workspaces in shared mode, set `CODEKSEI_WORKSPACE_ROOT` before starting
+- `CODEKSEI_RUNTIME` / `CODEKSEI_CHANNEL_PROVIDER` decide whether the current runtime is `Bridge Mode` or `Hermes Hosted Mode`
+- `CODEKSEI_RUNTIME_ENDPOINT` / `CODEKSEI_RUNTIME_COMMAND` are the new host-neutral runtime ingress; legacy `CODEKSEI_CODEX_*` variables still remain for compatibility
+- `CODEKSEI_REVIEW_SEMANTIC_HOST=auto|codex|hermes|deterministic` lets you pin the semantic review host explicitly; default is `auto`
+- `CODEKSEI_USER_NAME` is a display/persona field, not a routing id
+- `CODEKSEI_ALLOWED_USER_IDS` must use the exact sender ids observed by the bridge; the easiest path is `codeksei accounts`, or `npm run accounts` when you are already in a repo checkout
+- WeChat persona / continuity instructions default to `templates/weixin-instructions.md`; use `weixin-instructions.local.md` in the state directory only when you need a local overlay
+- If you use multiple workspaces in shared mode, set `CODEKSEI_WORKSPACE_ROOT` before startup
 - `CODEKSEI_TIMEZONE` is optional; when set, it becomes the single local-time contract for reminder / diary / review / timeline flows
 - `CODEKSEI_TIMELINE_LOCALE` is optional; it currently switches timeline dashboard copy, date formatting, and demo data between `zh-CN` and `en`
+- `CODEKSEI_HERMES_REPO_ROOT` is optional; if the default sibling checkout `../hermes-agent` is not available in Hermes Hosted Mode, point it at the repo-local upstream checkout explicitly
 - If `CODEKSEI_TIMEZONE` is unset, Codeksei first reuses any non-legacy timezone already declared by the timeline state; otherwise it falls back to the system timezone
-- Legacy `Asia/Shanghai` timeline state can be auto-migrated to the unified timezone the next time you run a timeline command
+- Legacy `Asia/Shanghai` timeline state can auto-migrate to the unified timezone the next time you run a timeline command
 - `CODEKSEI_TIMELINE_STATE_DIR` points at the Codeksei timeline data root; the current primary layout stores runtime files under `timeline/*.json`
-- Keep `.env` local; do not commit it into the repository
+- The `.env` loading order is intentionally two-stage: repo `.env` first, then state-dir `.env` after `CODEKSEI_STATE_DIR` has been resolved; this is also why `dotenv` still remains a runtime dependency
+- Keep `.env` local and out of version control
 
-### 3. Login
+## Windows Background Tasks
 
-```bash
-npm run login
-```
-
-### 4. Start shared mode
-
-Shared mode is the better day-to-day path when you want WeChat and terminal sessions attached to the same thread:
-
-```bash
-npm run shared:start
-```
-
-Attach the current WeChat-bound shared thread:
-
-```bash
-npm run shared:open
-```
-
-Check status:
-
-```bash
-npm run shared:status
-```
-
-### 5. Install Windows background tasks
+If you want Bridge Mode to auto-start after login and heal quickly after unlock or sleep recovery:
 
 ```powershell
 npm run background:install
@@ -230,13 +312,24 @@ This small set is enough to get started:
 Terminal:
 
 ```bash
+codeksei doctor
+codeksei help
+codeksei schema
+codeksei host manifest
+codeksei host bootstrap --provider hermes --ensure-daemon
+codeksei host doctor
+codeksei host smoke --provider hermes
+codeksei review weekly --help
+```
+
+Terminal (repo shared scripts):
+
+```bash
 npm run login
 npm run accounts
 npm run shared:start
 npm run shared:open
 npm run shared:status
-npm run doctor
-npm run help
 ```
 
 WeChat:
@@ -267,6 +360,14 @@ Terminal:
 codeksei system checkin --show
 codeksei system checkin --range 3-60
 codeksei system checkin --reset
+codeksei host seed-proactive --provider hermes --user <wechat_user_id> --workspace /absolute/workspace
+codeksei host claim-checkin --provider hermes --user <wechat_user_id> --workspace /absolute/workspace
+codeksei host settle-checkin --provider hermes --user <wechat_user_id> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for 6h
+codeksei system checkin-trigger --user <wechat_user_id> --workspace /absolute/workspace
+codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace
+codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace --ack <triggerId>
+codeksei system checkin-complete --user <wechat_user_id> --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for 6h
+codeksei operator hermes sync-checkin --user <wechat_user_id> --workspace /absolute/workspace
 ```
 
 More detailed references:
@@ -278,10 +379,18 @@ More detailed references:
 If you maintain this repository, the current quality-gate split is:
 
 - `npm run check`: source-only guardrails and typechecks; it does not rebuild `dist/`
+- `npm run coverage:critical`: the owner-focused coverage gate for `config`, `weixin delivery text`, `runtime turn`, and `stream delivery`; this stays in `verify`, not in `check`
 - `npm run verify`: runs `check`, then explicitly rebuilds published runtime artifacts, runs built-runtime tests, and finishes with `npm run pack:dry-run`
 - `npm run build`: use this only when you intentionally want to refresh the published runtime artifacts
 
 That split is intentional: do not rely on `prepare` or implicit `npm pack` lifecycle hooks to rebuild the package for you anymore.
+
+Two dependency/tooling choices are also intentionally kept:
+
+- `playwright-core` remains a runtime dependency because `timeline screenshot` is a public runtime capability, not just a maintainer script; browser lookup order is `CODEKSEI_SCREENSHOT_CHROME_PATH` -> Playwright managed browser path -> system Chrome/Chromium/Edge
+- `check` still treats repo-specific AST/type guards as the canonical lint truth; this round does not add Prettier or a whole-repo ESLint gate
+
+If you are opening the codebase for the first time, start with `docs/architecture.md` before drilling into directories.
 
 ## Local State and Public Boundary
 
@@ -307,7 +416,7 @@ Typical runtime contents:
 - `timeline/`
 - `logs/`
 
-The continuity-critical state files currently covered are `sessions.json`, `reminder-queue.json`, `system-message-queue.json`, and `timeline-screenshot-queue.json`. Those files now use atomic writes, and if JSON parsing or the critical top-level schema is invalid, the original file is moved aside as `*.corrupt-<timestamp>.json` before startup falls back to an empty default state.
+The continuity-critical state files currently covered are `sessions.json`, `reminder-queue.json`, `system-message-queue.json`, and `timeline-screenshot-queue.json`. Those files now use atomic writes, and if JSON parsing succeeds but the critical schema is broken, or if the file itself is corrupt, the runtime moves the original file aside as `*.corrupt-<timestamp>.json` before falling back to an empty default state.
 
 If you set `CODEKSEI_DIARY_DIR` or `CODEKSEI_TIMELINE_STATE_DIR`, business data is stored there and the state directory keeps runtime files only.
 
@@ -324,13 +433,12 @@ Codeksei grew from that starting point, and the project is grateful for it.
 
 ### Can I install it with `npm install -g codeksei`?
 
-You can.
-Use that path when you want the base CLI quickly; clone the repository when you want the full shared-mode flow from this README, source-level customization, or shared-script debugging.
+You can. Use that path when you want the base CLI quickly; clone the repository when you want the full Bridge Mode flow from this README, source-level customization, or shared-script debugging.
 
 ### How is shared mode different from `npm run start`?
 
 `npm run start` / `npm run start:checkin` is better for minimal-path debugging.  
-Shared mode is the default for daily use, WeChat + terminal continuity, recovery, and multi-window attach.
+Shared mode is the default for day-to-day use, WeChat + terminal continuity, recovery, and multi-window attach.
 
 ## License
 
