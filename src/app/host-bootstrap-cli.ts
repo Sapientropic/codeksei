@@ -57,15 +57,15 @@ export async function runHostBootstrapCommand(
     provider: options.provider,
     configFile: options.config,
   });
-  const configFilePath = resolveCodekseiConfigPath(options.config, normalizeText(config.workspaceRoot) || process.cwd());
-  const nextConfig = buildCanonicalHostConfig(config, resolvedProvider, options);
+  const bootstrapTarget = resolveHostBootstrapTarget(config, resolvedProvider, options);
+  const nextConfig = buildCanonicalHostConfig(config, bootstrapTarget, options);
 
   return runCliMutation<HostBootstrapResultData>({
     commandKey: "host.bootstrap",
     config,
     configSource: {
-      provider: resolvedProvider.provider,
-      resolvedConfigPath: configFilePath,
+      provider: bootstrapTarget.provider,
+      resolvedConfigPath: bootstrapTarget.configFilePath,
     },
     dryRun: Boolean(options.dryRun),
     dryRunResult: {
@@ -76,21 +76,21 @@ export async function runHostBootstrapCommand(
           ensured: Boolean(options.ensureDaemon),
           state: "local_cli_ready",
         },
-        provider: resolvedProvider.provider,
-        skillInstall: resolvedProvider.provider === "hermes"
+        provider: bootstrapTarget.provider,
+        skillInstall: bootstrapTarget.provider === "hermes"
           ? previewHermesCompanionSkillInstall(config)
           : null,
       },
       text: JSON.stringify({
         config: nextConfig,
-        provider: resolvedProvider.provider,
+        provider: bootstrapTarget.provider,
         ensureDaemon: Boolean(options.ensureDaemon),
       }, null, 2),
       next: ["codeksei host doctor --provider hermes"],
     },
     execute: async () => {
-      const written = writeCodekseiHostConfig(configFilePath, nextConfig);
-      const skillInstall = resolvedProvider.provider === "hermes"
+      const written = writeCodekseiHostConfig(bootstrapTarget.configFilePath, nextConfig);
+      const skillInstall = bootstrapTarget.provider === "hermes"
         ? installHermesCompanionSkill(config)
         : null;
       return {
@@ -101,16 +101,16 @@ export async function runHostBootstrapCommand(
             ensured: Boolean(options.ensureDaemon),
             state: "local_cli_ready",
           },
-          provider: resolvedProvider.provider,
+          provider: bootstrapTarget.provider,
           skillInstall,
         },
         text: [
-          `host bootstrap written: ${configFilePath}`,
-          `provider: ${resolvedProvider.provider}`,
+          `host bootstrap written: ${bootstrapTarget.configFilePath}`,
+          `provider: ${bootstrapTarget.provider}`,
           `modeClass: ${written.modeClass}`,
           `ensureDaemon: ${options.ensureDaemon ? "yes" : "no"}`,
         ].join("\n"),
-        next: resolvedProvider.provider === "hermes"
+        next: bootstrapTarget.provider === "hermes"
           ? ["codeksei host doctor --provider hermes", "codeksei host smoke --provider hermes"]
           : ["codeksei host doctor"],
       };
@@ -119,38 +119,63 @@ export async function runHostBootstrapCommand(
     request: {
       config: nextConfig,
       ensureDaemon: Boolean(options.ensureDaemon),
-      provider: resolvedProvider.provider,
+      provider: bootstrapTarget.provider,
     },
     resolvedTargets: {
-      configFile: configFilePath,
-      provider: resolvedProvider.provider,
+      configFile: bootstrapTarget.configFilePath,
+      provider: bootstrapTarget.provider,
     },
     sideEffects: [
-      { kind: "write_canonical_config", target: configFilePath },
-      ...(resolvedProvider.provider === "hermes"
+      { kind: "write_canonical_config", target: bootstrapTarget.configFilePath },
+      ...(bootstrapTarget.provider === "hermes"
         ? [{ kind: "install_companion_skill", target: "~/.hermes/skills/codeksei-companion/SKILL.md" }]
         : []),
     ],
   });
 }
 
-function buildCanonicalHostConfig(
+interface ResolvedHostBootstrapTarget {
+  configFilePath: string;
+  effectiveWorkspaceRoot: string;
+  existingConfig: CodekseiHostConfig | null;
+  provider: string;
+}
+
+function resolveHostBootstrapTarget(
   config: BootstrapConfig,
   resolvedProvider: ReturnType<typeof resolveHostProviderWithConfig>,
   options: HostBootstrapOptions,
-): CodekseiHostConfig {
-  const existing = resolvedProvider.canonicalConfig;
-  const workspaceRoot = normalizeText(options.workspace)
-    || normalizeText(existing?.workspaceRoot)
+): ResolvedHostBootstrapTarget {
+  const existingConfig = resolvedProvider.canonicalConfig;
+  const effectiveWorkspaceRoot = normalizeText(options.workspace)
+    || normalizeText(existingConfig?.workspaceRoot)
     || normalizeText(config.workspaceRoot)
     || process.cwd();
+  // `--workspace` is the default canonical-config location selector too; if path and content
+  // fall back independently, bootstrap can mutate workspace B while previewing workspace A.
+  const configFilePath = resolveCodekseiConfigPath(options.config, effectiveWorkspaceRoot);
+  return {
+    configFilePath,
+    effectiveWorkspaceRoot,
+    existingConfig,
+    provider: resolvedProvider.provider,
+  };
+}
+
+function buildCanonicalHostConfig(
+  config: BootstrapConfig,
+  bootstrapTarget: ResolvedHostBootstrapTarget,
+  options: HostBootstrapOptions,
+): CodekseiHostConfig {
+  const existing = bootstrapTarget.existingConfig;
+  const workspaceRoot = bootstrapTarget.effectiveWorkspaceRoot;
   const stateDir = normalizeText(options.stateDir)
     || normalizeText(existing?.stateDir)
     || normalizeText(config.stateDir)
     || workspaceRoot;
   const provider = normalizeText(options.provider)
     || normalizeText(existing?.host.provider)
-    || resolvedProvider.provider
+    || bootstrapTarget.provider
     || "generic-shell";
   return {
     $schema: "./schemas/codeksei-config-v1.json",

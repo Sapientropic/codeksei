@@ -42,6 +42,10 @@ function createHostFixture(prefix: string) {
   };
 }
 
+function normalizePathSeparators(value: string) {
+  return value.replace(/\\/gu, "/");
+}
+
 test("host manifest returns bridge-full invariant and hermes recipe", async () => {
   const fixture = createHostFixture("codeksei-host-manifest-");
   const result = await runHostManifestCommand(fixture.config);
@@ -66,6 +70,105 @@ test("host bootstrap writes canonical config and previews Hermes bootstrap", asy
   assert.equal(result.data.provider, "hermes");
   assert.equal(result.data.config.$schema, "./schemas/codeksei-config-v1.json");
   assert.equal(fs.existsSync(configPath), false);
+});
+
+test("host bootstrap dry-run resolves workspace-scoped config path when config is omitted", async () => {
+  const fixture = createHostFixture("codeksei-host-bootstrap-workspace-dry-run-");
+  const targetWorkspace = path.join(fixture.tempRoot, "target-workspace");
+  const targetConfigPath = path.join(targetWorkspace, "codeksei.config.json");
+  fs.mkdirSync(targetWorkspace, { recursive: true });
+
+  const result = await runHostBootstrapCommand(fixture.config, [
+    "--provider", "generic-shell",
+    "--workspace", targetWorkspace,
+    "--dry-run",
+  ]);
+
+  assert.equal(result.meta.dryRun, true);
+  assert.equal(result.meta.configSource.resolvedConfigPath, targetConfigPath);
+  assert.equal(result.meta.resolvedTargets.configFile, targetConfigPath);
+  assert.deepEqual(result.meta.sideEffects, [
+    { kind: "write_canonical_config", target: targetConfigPath },
+  ]);
+  assert.equal(result.data.config.workspaceRoot, targetWorkspace);
+  assert.equal(fs.existsSync(targetConfigPath), false);
+  assert.equal(fs.existsSync(path.join(fixture.workspaceRoot, "codeksei.config.json")), false);
+});
+
+test("host bootstrap writes canonical config into the explicit workspace when config is omitted", async () => {
+  const fixture = createHostFixture("codeksei-host-bootstrap-workspace-execute-");
+  const targetWorkspace = path.join(fixture.tempRoot, "target-workspace");
+  const targetConfigPath = path.join(targetWorkspace, "codeksei.config.json");
+  const ambientConfigPath = path.join(fixture.workspaceRoot, "codeksei.config.json");
+  fs.mkdirSync(targetWorkspace, { recursive: true });
+
+  const result = await runHostBootstrapCommand(fixture.config, [
+    "--provider", "generic-shell",
+    "--workspace", targetWorkspace,
+  ]);
+
+  assert.equal(result.meta.configSource.resolvedConfigPath, targetConfigPath);
+  assert.equal(result.meta.resolvedTargets.configFile, targetConfigPath);
+  assert.equal(result.data.config.workspaceRoot, targetWorkspace);
+  assert.equal(fs.existsSync(targetConfigPath), true);
+  assert.equal(fs.existsSync(ambientConfigPath), false);
+});
+
+test("host bootstrap keeps explicit config path even when workspace overrides config content", async () => {
+  const fixture = createHostFixture("codeksei-host-bootstrap-explicit-config-");
+  const targetWorkspace = path.join(fixture.tempRoot, "target-workspace");
+  const explicitConfigPath = path.join(fixture.tempRoot, "custom-config", "codeksei.config.json");
+  fs.mkdirSync(targetWorkspace, { recursive: true });
+
+  const result = await runHostBootstrapCommand(fixture.config, [
+    "--provider", "generic-shell",
+    "--config", explicitConfigPath,
+    "--workspace", targetWorkspace,
+    "--dry-run",
+  ]);
+
+  assert.equal(result.meta.configSource.resolvedConfigPath, normalizePathSeparators(explicitConfigPath));
+  assert.equal(result.meta.resolvedTargets.configFile, normalizePathSeparators(explicitConfigPath));
+  assert.deepEqual(result.meta.sideEffects, [
+    { kind: "write_canonical_config", target: normalizePathSeparators(explicitConfigPath) },
+  ]);
+  assert.equal(result.data.config.workspaceRoot, targetWorkspace);
+  assert.equal(fs.existsSync(explicitConfigPath), false);
+});
+
+test("host bootstrap hermes dry-run previews skill install without drifting the resolved config path", async () => {
+  const fixture = createHostFixture("codeksei-host-bootstrap-hermes-workspace-");
+  const repoLocal = createFakeHermesRepoLocalFixture(
+    fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-host-bootstrap-hermes-workspace-repo-local-"))
+  );
+  const targetWorkspace = path.join(fixture.tempRoot, "target-workspace");
+  const targetConfigPath = path.join(targetWorkspace, "codeksei.config.json");
+  fs.mkdirSync(targetWorkspace, { recursive: true });
+  const runtimeConfig = {
+    ...fixture.config,
+    ...repoLocal.env,
+    runtime: "hermes",
+    channelProvider: "hermes",
+    hermesHome: repoLocal.hermesHome,
+    hermesRepoRoot: repoLocal.repoRoot,
+    hermesRepoLocalShimPath: repoLocal.shimPath,
+  };
+
+  const result = await runHostBootstrapCommand(runtimeConfig, [
+    "--provider", "hermes",
+    "--workspace", targetWorkspace,
+    "--ensure-daemon",
+    "--dry-run",
+  ]);
+
+  assert.equal(result.meta.dryRun, true);
+  assert.equal(result.data.provider, "hermes");
+  assert.equal(result.meta.configSource.resolvedConfigPath, targetConfigPath);
+  assert.equal(result.meta.resolvedTargets.configFile, targetConfigPath);
+  assert.equal(result.data.config.workspaceRoot, targetWorkspace);
+  assert.equal(typeof result.data.skillInstall, "object");
+  assert.equal(fs.existsSync(targetConfigPath), false);
+  assert.equal(fs.existsSync(path.join(repoLocal.hermesHome, "skills", "codeksei-companion", "SKILL.md")), false);
 });
 
 test("host claim-checkin and settle-checkin cover delegated proactive lease flow", async () => {
