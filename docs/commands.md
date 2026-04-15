@@ -292,9 +292,17 @@ maintainer 仍需额外补一次真实账号 smoke：
 - `npm run check`
   source-only：跑 authored-source JS guard、published runtime artifact guard、其它 lint guard、源码 typecheck、tests TS typecheck；不会重建 `dist/`
   这里已经直接覆盖 duplicate helper、bare empty catch、redundant `typedXxx`、`!:`、explicit `any` 等结构债 guard
+- `npm run coverage:critical`
+  owner-focused coverage gate：只覆盖 `config`、`weixin delivery text`、`runtime turn`、`stream delivery` 这组关键 owner；不进入 `check`
 - `npm run verify`
-  built-runtime gate：先跑 `check`，再显式 `npm run build`，然后跑 built `dist` 的仓内 tests，最后跑 `npm run pack:dry-run`
+  built-runtime gate：先跑 `check` + `coverage:critical`，再显式 `npm run build`，然后跑 built `dist` 的仓内 tests，最后跑 `npm run pack:dry-run`
 - `npm run build`
   只在你明确要刷新 published runtime artifacts 时使用；默认不是 `check` 的副作用
+
+补充约定：
+
+- `check` 当前仍以 repo-specific guard 为 canonical lint truth；没有额外引入 Prettier 或 whole-repo ESLint gate
+- `playwright-core` 继续作为 runtime dependency，因为 `timeline screenshot` 是公开运行时能力；浏览器查找顺序固定为 `CODEKSEI_SCREENSHOT_CHROME_PATH` -> Playwright managed path -> 系统 Chrome/Chromium/Edge
+- `dotenv` 继续作为 runtime dependency，因为运行时要先读 repo `.env`，再按 `CODEKSEI_STATE_DIR` 补读 state-dir `.env`，Hermes repo-local 入口还要镜像 `~/.hermes/.env`
 
 这页只管“怎么使用这些入口”；维护与发布流程留在本地维护材料里。

@@ -5,6 +5,10 @@ const assert: typeof import("node:assert/strict") = require("node:assert/strict"
 const { RUNTIME_EVENT_TYPES }: typeof import("../src/contracts/runtime-events") = require("../src/contracts/runtime-events");
 const { RuntimeWatchdogLifecycle }: typeof import("../src/runtime/runtime-watchdog-lifecycle") = require("../src/runtime/runtime-watchdog-lifecycle");
 const { ThreadStateStore }: typeof import("../src/runtime/thread-state-store") = require("../src/runtime/thread-state-store");
+const {
+  advanceTimersAndMicrotasks,
+  enableMockTimers,
+}: typeof import("./helpers/mock-timers") = require("./helpers/mock-timers.ts");
 
 function buildTestChannelDescriptor(overrides: Partial<{
   visibleTextDelivery: boolean;
@@ -134,7 +138,8 @@ function createLifecycleHarness({
   return { lifecycle, resumedThreads, textCalls, threadStateStore, typingStops };
 }
 
-test("first-event watchdog still fires after an earlier turn left a stale turn id", async () => {
+test("first-event watchdog still fires after an earlier turn left a stale turn id", async (t) => {
+  enableMockTimers(t);
   const { lifecycle, textCalls, threadStateStore, typingStops } = createLifecycleHarness();
 
   threadStateStore.applyRuntimeEvent({
@@ -156,13 +161,14 @@ test("first-event watchdog still fires after an earlier turn left a stale turn i
     } as never,
   });
 
-  await new Promise((resolve) => setTimeout(resolve, 40));
+  await advanceTimersAndMicrotasks(t, 40);
 
   assert.equal(textCalls.some((entry) => entry.includes("没有返回首个事件")), true);
   assert.equal(typingStops.includes(0), true);
 });
 
-test("usage telemetry does not clear the first-event watchdog", async () => {
+test("usage telemetry does not clear the first-event watchdog", async (t) => {
+  enableMockTimers(t);
   const { lifecycle, textCalls } = createLifecycleHarness();
 
   lifecycle.scheduleRuntimeEventWatchdog({
@@ -182,7 +188,7 @@ test("usage telemetry does not clear the first-event watchdog", async () => {
     },
   } as never);
 
-  await new Promise((resolve) => setTimeout(resolve, 40));
+  await advanceTimersAndMicrotasks(t, 40);
 
   assert.equal(textCalls.some((entry) => entry.includes("没有返回首个事件")), true);
 });
@@ -220,7 +226,8 @@ test("real first-progress events clear the first-event watchdog", () => {
   }
 });
 
-test("first-event watchdog skips visible recovery when the host cannot deliver text or typing", async () => {
+test("first-event watchdog skips visible recovery when the host cannot deliver text or typing", async (t) => {
+  enableMockTimers(t);
   const { lifecycle, textCalls, typingStops } = createLifecycleHarness({
     channelOperations: {
       visibleTextDelivery: false,
@@ -239,7 +246,7 @@ test("first-event watchdog skips visible recovery when the host cannot deliver t
     } as never,
   });
 
-  await new Promise((resolve) => setTimeout(resolve, 40));
+  await advanceTimersAndMicrotasks(t, 40);
 
   assert.deepEqual(textCalls, []);
   assert.deepEqual(typingStops, []);

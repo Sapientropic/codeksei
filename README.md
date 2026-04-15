@@ -257,6 +257,7 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - 如果不设 `CODEKSEI_TIMEZONE`，Codeksei 会优先沿用 timeline state 里已声明的非 legacy timezone；否则回退到系统时区
 - 旧的 `Asia/Shanghai` legacy timeline state 在需要时会在下一次 timeline 命令时自动迁移到当前统一 timezone
 - `CODEKSEI_TIMELINE_STATE_DIR` 默认指向 Codeksei timeline 数据根；当前主布局会在它下面使用 `timeline/*.json`
+- 运行时的 `.env` 读取是刻意设计成“两阶段”：先读 repo `.env`，再根据新得到的 `CODEKSEI_STATE_DIR` 重新定位并补读 state-dir `.env`；这也是 `dotenv` 目前仍保留在 runtime dependency 的原因
 - `.env` 只应放在你的本地工作目录或状态目录里，不要提交进仓库
 
 ### 3. 选择运行模式
@@ -389,10 +390,16 @@ codeksei operator hermes sync-checkin --user <wechat_user_id> --workspace /absol
 如果你在维护这个仓库，当前质量门分工是：
 
 - `npm run check`：只跑 source-level guard、typecheck 和 tests TS typecheck，不会刷新 `dist/`
-- `npm run verify`：在 `check` 之后显式 `build`，再跑 built-runtime tests 和 `npm run pack:dry-run`
+- `npm run coverage:critical`：只对关键 owner 集跑 coverage gate，目前覆盖 `config`、`weixin delivery text`、`runtime turn` 与 `stream delivery`；这是 `verify` 层，不进入 `check`
+- `npm run verify`：在 `check` 与 `coverage:critical` 之后显式 `build`，再跑 built-runtime tests 和 `npm run pack:dry-run`
 - `npm run build`：只在你明确要刷新 published runtime artifacts 时运行
 
 这条分工是刻意收口的：以后不要再依赖 `prepare` 或 `npm pack` 的隐式 lifecycle 去偷偷帮你 build。
+
+依赖与工具链方面，当前仓库也有两条刻意保留的决定：
+
+- `playwright-core` 继续是 runtime dependency，因为 `timeline screenshot` 是公开运行时能力，不只是维护者脚本；浏览器查找顺序是 `CODEKSEI_SCREENSHOT_CHROME_PATH` -> Playwright managed browser path -> 系统 Chrome/Chromium/Edge
+- `check` 继续以 repo-specific AST/type guards 为 canonical lint truth；这轮没有额外引入 Prettier 或 whole-repo ESLint gate
 
 如果你是第一次读这个仓库的代码结构，先看 `docs/architecture.md`，再进具体目录会更快。
 

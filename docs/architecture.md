@@ -19,6 +19,7 @@
 当前质量基线也已经同步到结构层：
 
 - `npm run check` / `npm run verify` 默认全绿
+- `npm run coverage:critical` 现在是 verify 层的 owner-focused coverage gate，不进入 `check`
 - TS 源码侧的 CommonJS 过渡 allowlist 已清零
 - `@ts-nocheck` allowlist 已清零
 - repo-tracked authored source 里的 `.js/.jsx/.mjs` 已清零；timeline first-party runtime 现在通过 `tsconfig.node.json` + `tsconfig.web.json` 继续走同一条 TS build 主链，而不是把 DOM lib 默认挂给整仓 Node 代码
@@ -26,6 +27,8 @@
 - timeline build 现在只复制非代码资产（如 CSS / examples），不再把 source runtime 整树原样复制进 `dist`
 - 跨模块共享的基础 helper 现在统一收口到 `src/contracts/text-normalization.ts`、`src/core/error-handling.ts`、`src/core/message-catalog.ts`
 - `npm run check` 现在会直接守 bare `.catch(() => {})`、重复 `normalizeText`、冗余 `typedXxx`、`!:` 和 explicit `any` 这类结构债，不再只靠 review 口头约束
+- `RuntimeTurnLifecycle` 现在退回 façade，动作 / 输入准备 / runtime send 已拆到 sibling owner；后续不要把这三类逻辑再顺手耦回一个文件
+- `playwright-core` 与 `dotenv` 继续留在 runtime dependency：前者支撑公开 `timeline screenshot` 能力，后者负责 repo `.env` -> state `.env` 的两阶段加载以及 Hermes repo-local `.env` 镜像
 
 这一页只解释当前稳定结构，不复述实现细节清单。
 

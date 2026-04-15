@@ -4,6 +4,7 @@ const path = require("node:path");
 const repoRoot: string = path.resolve(__dirname, "..", "..");
 const distRoot: string = path.join(repoRoot, "dist");
 const sourceRoot: string = path.join(repoRoot, "src");
+const preferBuiltRuntime: boolean = process.env.CODEKSEI_TEST_RUNTIME_MODE === "built";
 
 function resolveRuntimeRequest(request: unknown, { parentFilename = "" }: { parentFilename?: string } = {}): unknown {
   if (typeof request !== "string" || !request) {
@@ -43,13 +44,17 @@ function remapSourceAbsolutePath(absolutePath: string): string {
   }
   const distCandidate = path.join(distRoot, path.relative(repoRoot, absolutePath));
   const resolvedSourcePath = resolveSourceModulePath(absolutePath);
+  const resolvedBuiltPath = resolveBuiltModulePath(distCandidate);
+  if (preferBuiltRuntime && resolvedBuiltPath) {
+    return resolvedBuiltPath;
+  }
   if (resolvedSourcePath) {
     return resolvedSourcePath;
   }
-  // Test runs should follow the current worktree first; build/pack already
-  // cover emitted artifacts separately, and stale dist output is a common
-  // source of false negatives during refactors.
-  return resolveBuiltModulePath(distCandidate) || distCandidate;
+  // Source-first is the default for targeted local test runs so refactors do
+  // not accidentally exercise stale build output. The verify pipeline flips
+  // this with CODEKSEI_TEST_RUNTIME_MODE=built to prove dist stays in sync.
+  return resolvedBuiltPath || distCandidate;
 }
 
 function resolveBuiltModulePath(distCandidate: string): string {

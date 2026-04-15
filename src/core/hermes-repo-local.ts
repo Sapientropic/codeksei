@@ -413,7 +413,7 @@ function resolvePythonInvocation(config: HermesRepoLocalConfigInput): {
   return { command: "python", argsPrefix: [] };
 }
 
-function buildHermesRepoLocalEnv({
+export function buildHermesRepoLocalEnv({
   hermesHome,
   repoRoot,
 }: {
@@ -423,6 +423,7 @@ function buildHermesRepoLocalEnv({
   const env: NodeJS.ProcessEnv = {
     ...process.env,
   };
+  const shellPythonPath = normalizeText(env.PYTHONPATH);
   const hermesEnvPath = path.join(hermesHome, ".env");
   if (fs.existsSync(hermesEnvPath)) {
     // Mirror Hermes CLI behavior so repo-local bridge flows can see platform
@@ -433,12 +434,11 @@ function buildHermesRepoLocalEnv({
       override: true,
     });
   }
-  const existingPythonPath = normalizeText(env.PYTHONPATH);
   // Repo-local invocations must keep their explicit repo/home wiring even when
   // Hermes home .env overrides stale shell exports for secrets and platform
   // credentials. Do not let .env replace these two bridge-critical values.
   env.HERMES_HOME = hermesHome;
-  env.PYTHONPATH = existingPythonPath ? `${repoRoot}${path.delimiter}${existingPythonPath}` : repoRoot;
+  env.PYTHONPATH = shellPythonPath ? `${repoRoot}${path.delimiter}${shellPythonPath}` : repoRoot;
   return env;
 }
 
