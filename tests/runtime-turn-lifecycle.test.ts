@@ -1,6 +1,8 @@
 const test: typeof import("node:test") = require("node:test");
 const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 const fs: typeof import("node:fs") = require("node:fs");
+const os: typeof import("node:os") = require("node:os");
+const path: typeof import("node:path") = require("node:path");
 
 const { normalizeText } = require("../src/core/text-normalization");
 const { RuntimeTurnLifecycle } = require("../src/runtime/runtime-turn-lifecycle");
@@ -246,23 +248,28 @@ test("sendTimelineScreenshot fails when the target user has no known context tok
   assert.deepEqual(harness.fileCalls, []);
 });
 
-test("sendLocalFileToCurrentChat sends the resolved file path to the active chat", async () => {
+test("sendLocalFileToCurrentChat sends the resolved file path to the active chat", async (t) => {
   const harness = createLifecycle();
-  fs.mkdirSync("E:/repo/current", { recursive: true });
-  fs.writeFileSync("E:/repo/current/report.txt", "report", "utf8");
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-runtime-turn-"));
+  t.after(() => {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+  const filePath = path.join(tempRoot, "report.txt");
+  const expectedPath = path.resolve(filePath);
+  fs.writeFileSync(filePath, "report", "utf8");
 
   const result = await harness.lifecycle.sendLocalFileToCurrentChat({
     senderId: "user-1",
-    filePath: "E:/repo/current/report.txt",
+    filePath,
   });
 
   assert.deepEqual(result, {
     userId: "user-1",
-    filePath: "E:\\repo\\current\\report.txt",
+    filePath: expectedPath,
   });
   assert.deepEqual(harness.fileCalls, [{
     userId: "user-1",
-    filePath: "E:\\repo\\current\\report.txt",
+    filePath: expectedPath,
     contextToken: "ctx-1",
   }]);
   assert.deepEqual(harness.sendTypingCalls.map((entry) => entry.status), [1, 0]);
