@@ -280,6 +280,8 @@ test("hosted checkin-complete re-arms the next wake and clears future recovery j
   assert.equal(jobsState.jobs.length, 1);
   assert.equal(jobsState.jobs[0].codeksei_checkin_role, "wake");
   assert.equal(jobsState.jobs[0].deliver, "origin");
+  assert.equal(jobsState.jobs[0].env.CODEKSEI_RUNTIME, "hermes");
+  assert.equal(jobsState.jobs[0].env.CODEKSEI_STATE_DIR, fixture.tempRoot);
   assert.deepEqual(jobsState.jobs[0].origin, {
     platform: "weixin",
     chat_id: "wxid_sender",

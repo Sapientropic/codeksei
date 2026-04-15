@@ -98,7 +98,6 @@ function parseEnvConfig(env: EnvSource, options: ReadConfigOptions = {}): AppRun
       accountsDir: path.join(stateDir, "accounts"),
       weixinBaseUrl: readPrefixedEnv(env, "WEIXIN_BASE_URL") || "https://ilinkai.weixin.qq.com",
       weixinCdnBaseUrl: readPrefixedEnv(env, "WEIXIN_CDN_BASE_URL") || "https://novac2c.cdn.weixin.qq.com/c2c",
-      weixinAdapterVariant: readPrefixedEnv(env, "WEIXIN_ADAPTER") || "v2",
       weixinReplyMode: normalizeWeixinReplyMode(readPrefixedEnv(env, "WEIXIN_REPLY_MODE") || "stream"),
       weixinDeliveryTrace: readPrefixedBoolEnv(env, "WEIXIN_DELIVERY_TRACE"),
       weixinQrBotType: readPrefixedEnv(env, "WEIXIN_QR_BOT_TYPE") || "3",

@@ -127,7 +127,6 @@ test("shared mode long-chain smoke covers status/open, approval continuity, and 
     CODEKSEI_WORKSPACE_ID: "workspace-1",
     CODEKSEI_ACCOUNT_ID: "acct-1",
     CODEKSEI_WEIXIN_BASE_URL: fakeWeixin.baseUrl,
-    CODEKSEI_WEIXIN_ADAPTER: "v2",
     CODEKSEI_ALLOWED_USER_IDS: "user-1",
     CODEKSEI_CODEX_COMMAND: commandPath,
     CODEKSEI_SHARED_USE_BUNDLED_CODEX_BINARY: "0",

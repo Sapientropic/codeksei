@@ -213,9 +213,11 @@ test("operator hermes sync-checkin routes through Hermes repo-local shim and upd
   assert.equal(requests.length, 1);
   assert.equal(requests[0].action, "sync_checkin_cron");
   assert.equal(asRecord(requests[0].payload).sender_id, "wx-user");
+  assert.equal(asRecord(asRecord(requests[0].payload).env).CODEKSEI_RUNTIME, "hermes");
   const jobsState = JSON.parse(fs.readFileSync(repoLocal.jobsFile, "utf8"));
   assert.equal(jobsState.jobs.length, 1);
   assert.equal(jobsState.jobs[0].deliver, "origin");
+  assert.equal(jobsState.jobs[0].env.CODEKSEI_STATE_DIR, tempRoot.stateDir);
   assert.deepEqual(jobsState.jobs[0].origin, {
     platform: "weixin",
     chat_id: "wxid_sender",

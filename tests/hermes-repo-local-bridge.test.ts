@@ -1,0 +1,256 @@
+const fs: typeof import("node:fs") = require("node:fs");
+const os: typeof import("node:os") = require("node:os");
+const path: typeof import("node:path") = require("node:path");
+const test: typeof import("node:test") = require("node:test");
+const assert: typeof import("node:assert/strict") = require("node:assert/strict");
+const { spawnSync }: typeof import("node:child_process") = require("node:child_process");
+
+const bridgePath = path.join(__dirname, "..", "tools", "hermes_repo_local", "bridge.py");
+const pythonCommand = process.env.CODEKSEI_TEST_PYTHON || "python";
+
+test("repo-local sync_checkin_cron keeps the existing recovery job when wake creation fails", () => {
+  const fixture = createBridgeFixture("create_failure", {
+    createJobBody: [
+      "raise RuntimeError('simulated wake creation failure')",
+    ],
+    initialJobs: [{
+      id: "cron-recovery-1",
+      name: "ck-checkin-recovery",
+      next_run_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+      enabled: true,
+      state: "scheduled",
+      deliver: "origin",
+      codeksei_checkin_target_key: "wx-user::/tmp/workspace",
+      codeksei_checkin_role: "recovery",
+    }],
+  });
+
+  const result = invokeBridge(fixture, {
+    due_at_iso: new Date(Date.now() + 10 * 60_000).toISOString(),
+    env: {
+      CODEKSEI_RUNTIME: "hermes",
+    },
+    name: "ck-checkin-wake",
+    prompt: "run hosted checkin",
+    role: "wake",
+    sender_id: "wx-user",
+    target_key: "wx-user::/tmp/workspace",
+    workspace_root: "/tmp/workspace",
+  });
+
+  assert.notEqual(result.status, 0);
+  const payload = JSON.parse(result.stdout || "{}");
+  assert.equal(payload.ok, false);
+  const jobsState = JSON.parse(fs.readFileSync(fixture.jobsFile, "utf8"));
+  assert.equal(jobsState.jobs.length, 1);
+  assert.equal(jobsState.jobs[0].id, "cron-recovery-1");
+  assert.equal(jobsState.jobs[0].codeksei_checkin_role, "recovery");
+});
+
+test("repo-local sync_checkin_cron degrades gracefully when Hermes create_job has no env kwarg", () => {
+  const fixture = createBridgeFixture("no_env_kwarg", {
+    createJobSignature: "def create_job(prompt, schedule, name=None, repeat=1, deliver='local', origin=None, skills=None):",
+    initialJobs: [{
+      id: "cron-recovery-1",
+      name: "ck-checkin-recovery",
+      next_run_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+      enabled: true,
+      state: "scheduled",
+      deliver: "origin",
+      codeksei_checkin_target_key: "wx-user::/tmp/workspace",
+      codeksei_checkin_role: "recovery",
+    }],
+  });
+
+  const result = invokeBridge(fixture, {
+    due_at_iso: new Date(Date.now() + 10 * 60_000).toISOString(),
+    env: {
+      CODEKSEI_RUNTIME: "hermes",
+      CODEKSEI_STATE_DIR: "/tmp/codeksei-state",
+    },
+    name: "ck-checkin-wake",
+    prompt: "run hosted checkin",
+    role: "wake",
+    sender_id: "wx-user",
+    target_key: "wx-user::/tmp/workspace",
+    workspace_root: "/tmp/workspace",
+  });
+
+  assert.equal(result.status, 0, result.stderr || "expected bridge to succeed");
+  const payload = JSON.parse(result.stdout || "{}");
+  assert.equal(payload.ok, true);
+  assert.equal(payload.data.job_id.startsWith("cron-created-"), true);
+  assert.deepEqual(payload.data.removed_job_ids, ["cron-recovery-1"]);
+
+  const jobsState = JSON.parse(fs.readFileSync(fixture.jobsFile, "utf8"));
+  assert.equal(jobsState.jobs.length, 1);
+  assert.equal(jobsState.jobs[0].codeksei_checkin_role, "wake");
+  assert.equal(jobsState.jobs[0].name, "ck-checkin-wake");
+});
+
+function createBridgeFixture(
+  prefix: string,
+  {
+    createJobBody = [],
+    createJobSignature = "def create_job(prompt, schedule, name=None, repeat=1, deliver='local', origin=None, skills=None, env=None):",
+    initialJobs = [],
+  }: {
+    createJobBody?: string[];
+    createJobSignature?: string;
+    initialJobs?: Array<Record<string, unknown>>;
+  },
+) {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), `codeksei-bridge-${prefix}-`));
+  const hermesHome = path.join(tempRoot, ".hermes");
+  const repoRoot = path.join(tempRoot, "hermes-agent");
+  const jobsFile = path.join(hermesHome, "cron", "jobs.json");
+  const sessionKey = "agent:main:weixin:dm:wxid_sender";
+
+  fs.mkdirSync(path.join(hermesHome, "cron"), { recursive: true });
+  fs.mkdirSync(path.join(hermesHome, "sessions"), { recursive: true });
+  fs.mkdirSync(path.join(repoRoot, "cron"), { recursive: true });
+
+  fs.writeFileSync(path.join(repoRoot, "cron", "__init__.py"), "", "utf8");
+  fs.writeFileSync(path.join(hermesHome, "sessions", "sessions.json"), JSON.stringify({
+    [sessionKey]: {
+      session_key: sessionKey,
+      session_id: "sess-123",
+      origin: {
+        platform: "weixin",
+        chat_id: "wxid_sender",
+        chat_name: "Test Chat",
+        thread_id: null,
+      },
+    },
+  }, null, 2), "utf8");
+  fs.writeFileSync(jobsFile, JSON.stringify({
+    jobs: initialJobs,
+    updated_at: new Date().toISOString(),
+  }, null, 2), "utf8");
+
+  fs.writeFileSync(path.join(repoRoot, "cron", "jobs.py"), buildFakeCronJobsModule({
+    createJobBody,
+    createJobSignature,
+  }), "utf8");
+
+  return {
+    hermesHome,
+    jobsFile,
+    repoRoot,
+    sessionKey,
+  };
+}
+
+function buildFakeCronJobsModule({
+  createJobBody,
+  createJobSignature,
+}: {
+  createJobBody: string[];
+  createJobSignature: string;
+}) {
+  const createBody = createJobBody.length
+    ? createJobBody.map((line) => `    ${line}`)
+    : [
+      "    state = _load_state()",
+      "    job = {",
+      "        'id': f'cron-created-{len(state.get(\"jobs\", [])) + 1}',",
+      "        'prompt': prompt,",
+      "        'schedule': schedule,",
+      "        'name': name or 'job',",
+      "        'repeat': repeat,",
+      "        'deliver': deliver,",
+      "        'origin': origin,",
+      "        'skills': list(skills or []),",
+      "        'skill': (list(skills or [])[:1] or [None])[0],",
+      "        'next_run_at': schedule,",
+      "        'enabled': True,",
+      "        'state': 'scheduled',",
+      "    }",
+      "    if 'env' in locals() and isinstance(env, dict):",
+      "        job['env'] = env",
+      "    state.setdefault('jobs', []).append(job)",
+      "    _save_state(state)",
+      "    return job",
+    ];
+
+  return [
+    "import json",
+    "import os",
+    "from pathlib import Path",
+    "",
+    "JOBS_FILE = Path(os.environ['HERMES_HOME']) / 'cron' / 'jobs.json'",
+    "",
+    "def _load_state():",
+    "    if not JOBS_FILE.exists():",
+    "        return {'jobs': [], 'updated_at': ''}",
+    "    return json.loads(JOBS_FILE.read_text(encoding='utf-8'))",
+    "",
+    "def _save_state(state):",
+    "    JOBS_FILE.parent.mkdir(parents=True, exist_ok=True)",
+    "    JOBS_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding='utf-8')",
+    "",
+    "def parse_schedule(value):",
+    "    return {'value': value, 'display': value}",
+    "",
+    "def list_jobs(include_disabled=False):",
+    "    state = _load_state()",
+    "    jobs = list(state.get('jobs', []))",
+    "    if include_disabled:",
+    "        return jobs",
+    "    return [job for job in jobs if job.get('enabled', True)]",
+    "",
+    "def remove_job(job_id):",
+    "    state = _load_state()",
+    "    jobs = [job for job in state.get('jobs', []) if job.get('id') != job_id]",
+    "    state['jobs'] = jobs",
+    "    _save_state(state)",
+    "    return True",
+    "",
+    "def update_job(job_id, updates):",
+    "    state = _load_state()",
+    "    for index, job in enumerate(state.get('jobs', [])):",
+    "        if job.get('id') != job_id:",
+    "            continue",
+    "        updated = dict(job)",
+    "        updated.update(dict(updates or {}))",
+    "        if isinstance(updated.get('schedule'), dict):",
+    "            updated['next_run_at'] = str(updated['schedule'].get('value') or '')",
+    "        state['jobs'][index] = updated",
+    "        _save_state(state)",
+    "        return updated",
+    "    return None",
+    "",
+    createJobSignature,
+    ...createBody,
+    "",
+  ].join("\n");
+}
+
+function invokeBridge(
+  fixture: {
+    hermesHome: string;
+    repoRoot: string;
+    sessionKey: string;
+  },
+  payload: Record<string, unknown>,
+) {
+  return spawnSync(pythonCommand, [bridgePath], {
+    cwd: fixture.repoRoot,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      HERMES_HOME: fixture.hermesHome,
+      HERMES_SESSION_KEY: fixture.sessionKey,
+    },
+    input: JSON.stringify({
+      action: "sync_checkin_cron",
+      hermes_home: fixture.hermesHome,
+      payload,
+      repo_root: fixture.repoRoot,
+      session_key: fixture.sessionKey,
+    }),
+    stdio: ["pipe", "pipe", "pipe"],
+    timeout: 60_000,
+    windowsHide: true,
+  });
+}

@@ -18,6 +18,7 @@ import { normalizeText } from "./text-normalization";
 export type HostedCheckinCronRole = "recovery" | "wake";
 
 export interface HostedCheckinCronSyncPlan {
+  env: Record<string, string>;
   name: string;
   plannedWakeAt: string;
   prompt: string;
@@ -62,8 +63,13 @@ export type HostedCheckinConfig = Pick<
   AppRuntimeConfig,
   | "channel"
   | "channelProvider"
+  | "checkinConfigFile"
   | "hermesHome"
+  | "hermesPythonCommand"
+  | "hermesRepoLocalShimPath"
+  | "hermesRepoRoot"
   | "runtime"
+  | "userName"
   | "workspaceRoot"
 >;
 
@@ -175,6 +181,7 @@ function createHostedCheckinCronPlan(
   // persists that schedule plus origin metadata so runtime delivery can use the
   // stored job.origin target without re-discovering a live session later.
   return {
+    env: buildHostedCheckinCronEnv(config, target),
     name: buildHostedCheckinJobName(targetKey, role),
     plannedWakeAt: normalizedWakeAt,
     prompt: buildHostedCheckinCronPrompt(config, target),
@@ -266,6 +273,44 @@ function buildHostedCheckinCronPrompt(
   ].join("\n");
 }
 
+function buildHostedCheckinCronEnv(
+  config: Partial<HostedCheckinConfig>,
+  target: CheckinResolvedTarget,
+): Record<string, string> {
+  const env: Record<string, string> = {
+    CODEKSEI_RUNTIME: "hermes",
+    CODEKSEI_CHANNEL_PROVIDER: "hermes",
+    CODEKSEI_CHANNEL: "weixin",
+    CODEKSEI_ALLOWED_USER_IDS: target.senderId,
+    CODEKSEI_WORKSPACE_ROOT: target.workspaceRoot,
+  };
+  const stateDir = deriveHostedCheckinStateDir(config);
+  if (stateDir) {
+    env.CODEKSEI_STATE_DIR = stateDir;
+  }
+  const userName = normalizeText(config.userName);
+  if (userName) {
+    env.CODEKSEI_USER_NAME = userName;
+  }
+  const hermesHome = normalizeText(config.hermesHome);
+  if (hermesHome) {
+    env.CODEKSEI_HERMES_HOME = hermesHome;
+  }
+  const hermesRepoRoot = normalizeText(config.hermesRepoRoot);
+  if (hermesRepoRoot) {
+    env.CODEKSEI_HERMES_REPO_ROOT = hermesRepoRoot;
+  }
+  const hermesRepoLocalShimPath = normalizeText(config.hermesRepoLocalShimPath);
+  if (hermesRepoLocalShimPath) {
+    env.CODEKSEI_HERMES_REPO_LOCAL_SHIM_PATH = hermesRepoLocalShimPath;
+  }
+  const hermesPythonCommand = normalizeText(config.hermesPythonCommand);
+  if (hermesPythonCommand) {
+    env.CODEKSEI_HERMES_PYTHON_COMMAND = hermesPythonCommand;
+  }
+  return env;
+}
+
 function buildHostedCheckinCliCommand(workspaceRoot: string, args: readonly string[]): string {
   const packageRoot = resolvePackageRoot(__dirname);
   const runtimeEntrypoint = resolveRuntimeEntrypointAbsolute(packageRoot, "cli");
@@ -282,6 +327,11 @@ function buildHostedCheckinCliCommand(workspaceRoot: string, args: readonly stri
 function buildHostedCheckinJobName(targetKey: string, role: HostedCheckinCronRole): string {
   const digest = crypto.createHash("sha256").update(targetKey).digest("hex").slice(0, 10);
   return `ck-checkin-${role}-${digest}`;
+}
+
+function deriveHostedCheckinStateDir(config: Partial<HostedCheckinConfig>): string {
+  const checkinConfigFile = normalizeText(config.checkinConfigFile);
+  return checkinConfigFile ? path.dirname(checkinConfigFile) : "";
 }
 
 function normalizeIsoTimestamp(value: unknown): string {

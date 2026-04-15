@@ -156,7 +156,6 @@ function createTestAppHarness({
     accountId: "",
     weixinBaseUrl: "http://127.0.0.1",
     weixinCdnBaseUrl: "https://cdn.example.com",
-    weixinAdapterVariant: "v2",
     weixinReplyMode: "stream",
     weixinDeliveryTrace: false,
     weixinQrBotType: "3",

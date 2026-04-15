@@ -153,6 +153,7 @@ function syncHostedWakeAfterCompletion(
     const plan = createHostedCheckinWakePlan(config, target, nextWakeAt);
     const sync = syncCheckinCronViaHermesRepoLocal(config, {
       due_at_iso: plan.plannedWakeAt,
+      env: plan.env,
       name: plan.name,
       prompt: plan.prompt,
       role: plan.role,

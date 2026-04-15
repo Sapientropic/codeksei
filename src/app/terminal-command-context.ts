@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { ensureCodekseiHomeEnv, ensureStateDirectory } from "../core/branding";
 import { loadEnvStack } from "../core/env-loader";
+import { applyHostConfigEnvFallback } from "../host/attach/config";
 import { readConfig } from "../core/config";
 import { createTerminalAppFacade, type TerminalAppFacade } from "../core/app-terminal-facade";
 import { renderInstructionTemplate } from "../core/instructions-template";
@@ -33,6 +34,16 @@ export function createTerminalCommandContext(
   cli: GlobalCliOptions,
   manifest: TerminalCommandManifestEntry | null = null,
 ): TerminalCommandContext {
+  const bootstrapCwd = cli.workspaceRoot || process.cwd();
+  loadEnvStack();
+  // Hosted proactive/check-in commands can be launched by Hermes cron from a
+  // clean environment. Rehydrate their CODEKSEI_* defaults from the canonical
+  // workspace config before the second env pass so state-dir .env and hosted
+  // runtime flags come back without leaking hosted user defaults into unrelated
+  // bridge commands like `system send`.
+  if (shouldApplyHostedConfigFallback(manifest)) {
+    applyHostConfigEnvFallback(process.env, bootstrapCwd);
+  }
   loadEnvStack();
   ensureStateDirectory();
   ensureCodekseiHomeEnv({ fallbackRoot: resolvePackageRoot(__dirname) });
@@ -98,3 +109,20 @@ function ensureInstructionsTemplate(config: TerminalRuntimeConfig): void {
 function hasArgFlag(argv: string[], flag: string): boolean {
   return Array.isArray(argv) && argv.some((item) => String(item || "").trim() === flag);
 }
+
+function shouldApplyHostedConfigFallback(manifest: TerminalCommandManifestEntry | null): boolean {
+  const action = manifest?.action || "";
+  return HOSTED_CONFIG_FALLBACK_ACTIONS.has(action);
+}
+
+const HOSTED_CONFIG_FALLBACK_ACTIONS = new Set<string>([
+  "host.seed_proactive",
+  "host.claim_checkin",
+  "host.settle_checkin",
+  "operator.hermes.sync_checkin",
+  "system.checkin_config",
+  "system.checkin_trigger",
+  "system.checkin_tick",
+  "system.checkin_complete",
+  "system.checkin_poller",
+]);
