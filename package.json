@@ -20,7 +20,10 @@
   "files": [
     "dist",
     "scripts",
+    "schemas",
     "templates",
+    "CODEKSEI_HOSTKIT.json",
+    "codeksei.config.json",
     "README.en.md"
   ],
   "keywords": [

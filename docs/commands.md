@@ -22,6 +22,7 @@
 - `Hermes Hosted Mode` 下，宿主控制命令交给 Hermes；Codeksei 主要暴露 timeline / diary / reminder / review / note / project radar / doctor / schema，并提供 Hermes operator 入口做 skill/status/smoke/sync-checkin
 - `channel send-file`、`timeline screenshot --send`、`reminder write` 已接上 Hermes repo-local 路径；`system send` 仍因缺少 backstage-only 宿主原语而保持 blocked
 - `Hermes Hosted Mode` 下，Hermes 只执行 one-shot wake/recovery job；Codeksei 继续持有 `tick -> ack -> complete` 的调度真相，并通过 `operator hermes sync-checkin` 把下一次 wake 重新 arm 给 Hermes
+- 外部宿主优先通过 `host attachment contract` 接入：`host manifest`、`host bootstrap`、`host doctor`、`host smoke`、`host seed-proactive`、`host claim-checkin`、`host settle-checkin`
 
 ## 命名
 
@@ -49,6 +50,14 @@ public CLI：
 - `codeksei doctor`
 - `codeksei help`
 - `codeksei schema`
+- `codeksei host manifest`
+- `codeksei host bootstrap`
+- `codeksei host doctor`
+- `codeksei host smoke`
+- `codeksei host seed-proactive`
+- `codeksei host claim-checkin`
+- `codeksei host settle-checkin`
+- `codeksei host render`
 
 operator / bootstrap：
 
@@ -77,6 +86,9 @@ operator / bootstrap：
 
 主动 check-in 控制：
 
+- `codeksei host seed-proactive --provider hermes --user <senderId> --workspace /absolute/workspace`
+- `codeksei host claim-checkin --provider hermes --user <senderId> --workspace /absolute/workspace`
+- `codeksei host settle-checkin --provider hermes --user <senderId> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for 6h`
 - `codeksei system checkin --show`
 - `codeksei system checkin --range 3-60`
 - `codeksei system checkin --reset`
@@ -103,6 +115,30 @@ operator / bootstrap：
 - `checkin-complete` 在 Hermes Hosted Mode 下会在写回 state 后自动 re-arm 下一条 wake one-shot job，并清理未来 recovery job
 - `sync-checkin` 创建/更新 job 时需要 origin context；真正 cron 投递时，Hermes 直接读取持久化的 `job.origin`，不会再按 target 反查 live session
 - `system checkin --range` 现在是 fallback window，不再代表 agent 的真实唤醒节奏
+
+## Host Attachment Contract
+
+这一组是面向外部宿主的机器入口，不是仓内 TypeScript seam。
+
+- `codeksei host manifest`
+  输出 host attachment manifest / hostkit 机器入口
+- `codeksei host bootstrap --provider hermes --ensure-daemon`
+  写入 canonical `codeksei.config.json`，并按 provider 做最小 bootstrap
+- `codeksei host doctor --provider hermes`
+  统一查看 daemon / attachment / provider recipe readiness
+- `codeksei host smoke --provider hermes`
+  执行 provider recipe 的最小 attach smoke
+- `codeksei host seed-proactive --provider hermes --user <senderId> --workspace /absolute/workspace`
+  种下或修复第一条 future wake
+- `codeksei host claim-checkin --provider hermes --user <senderId> --workspace /absolute/workspace`
+  原子 claim 一次 delegated proactive pass 的执行 lease
+- `codeksei host settle-checkin --provider hermes --user <senderId> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for 6h`
+  回写这轮 delegated proactive pass 的真实结果
+
+补充：
+
+- `bridge-full` 仍是 runtime invariant；外部宿主只是在 daemon-first 核心外面附着，不接管 poll loop、schedule truth 或 lease recovery。
+- `operator hermes *` 与 `system checkin-*` 继续保留为兼容 building blocks；新宿主默认优先走 `host seed / claim / settle`。
 
 ## 微信命令
 

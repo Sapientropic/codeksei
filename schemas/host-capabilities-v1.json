@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeksei.dev/schemas/host-capabilities-v1.json",
+  "type": "object",
+  "required": ["provider", "transport", "modeClassCandidates", "capabilities"],
+  "properties": {
+    "provider": { "type": "string" },
+    "transport": { "enum": ["cli_stdio"] },
+    "modeClassCandidates": {
+      "type": "array",
+      "items": {
+        "enum": ["bridge-full", "hosted-proactive", "hosted-skill-only", "cli-only"]
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": { "type": "boolean" }
+    }
+  }
+}

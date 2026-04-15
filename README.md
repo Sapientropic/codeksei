@@ -12,7 +12,7 @@
   <p><a href="https://zread.ai/Sapientropic/codeksei" target="_blank"><img src="https://img.shields.io/badge/Ask_Zread-_.svg?style=for-the-badge&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff" alt="zread"/></a></p>
   <h3>一个会主动照看时间感、帮你把日常和项目线程慢慢接回来的本地优先陪伴者助理</h3>
   <p><strong>以 WeChat 为入口，把 timeline、diary、reminders、reviews 和 project continuity 放进同一条共享线程。</strong></p>
-  <p>它不是一个只会等你开口的聊天框。Codeksei 会在合适的时候帮你补记录、接回线索、留提醒、带你重新进入项目，也让你的状态、日志和生活痕迹尽量继续留在本地。</p>
+  <p>它不是一个只会等你开口的聊天框，也不是另一套 agent runtime。Codeksei 会在合适的时候帮你补记录、接回线索、留提醒、带你重新进入项目，也让你的状态、日志和生活痕迹尽量继续留在本地。</p>
   <p>
     <a href="#try-codeksei">先试试看</a> ·
     <a href="#day-with-codeksei">一天会怎么相处</a> ·
@@ -24,18 +24,26 @@
   </p>
 </div>
 
-- **它是什么**：以 WeChat 为入口、把日常记录、提醒、复盘和项目连续性接在一起的本地优先 companion
-- **它适合谁**：容易时间感松开、项目线程常被打断、想让人替自己照看线头的人
+- **它是什么**：一个本地优先、承接连续性的 companion engine；对用户是陪伴型助理，对宿主是可附着的领域层
+- **它适合谁**：时间感容易松开、项目线程常被打断、愿意让系统替自己维护连续性的人
 - **你可以先这样试**：`npm install -g codeksei` 先体验基础 CLI；想体验完整形态，可选 `Bridge Mode` 或 `Hermes Hosted Mode`
 
 ## Host Modes
 
-Codeksei 现在把自己定义成 **companion/domain layer**，不再默认等于某一个固定 agent 宿主。
+Codeksei 现在把自己定义成 **daemon-first / bridge-first / companion engine**，不再默认等于某一个固定 agent 宿主。
 
 - `Bridge Mode`
   现有默认路径：`Codeksei Weixin bridge + Codex runtime`
 - `Hermes Hosted Mode`
   Hermes 负责 agent loop 和官方 Weixin；Codeksei 通过 CLI / skill surface 暴露 timeline、diary、reminder、review、note、project radar 等能力
+
+外部宿主默认通过更窄的 `host attachment contract` 接入，而不是直接读仓内 TypeScript seam：
+
+- `codeksei host manifest`
+- `codeksei host bootstrap`
+- `codeksei host doctor`
+- `codeksei host smoke --provider hermes`
+- `codeksei host seed-proactive / claim-checkin / settle-checkin`
 
 选择建议：
 
@@ -77,11 +85,11 @@ npm run shared:start
 git clone https://github.com/Sapientropic/codeksei.git
 cd codeksei
 npm install
-codeksei doctor
-codeksei operator hermes install-skill
-codeksei operator hermes status
-codeksei operator hermes smoke
-# 然后再由 Hermes gateway / Weixin 使用
+codeksei host manifest
+codeksei host bootstrap --provider hermes --ensure-daemon
+codeksei host doctor --provider hermes
+codeksei host smoke --provider hermes
+# 然后再由 Hermes gateway / Weixin 使用；operator hermes * 继续保留为兼容 alias
 ```
 
 - `先试基础 CLI`：看命令面、确认本机环境、感受产品边界
@@ -124,6 +132,8 @@ codeksei operator hermes smoke
 
 ## 这些人会喜欢它
 
+- 第一阶段更可信的用户是：时间感容易松开、项目线程经常被打断、愿意让系统替自己维护连续性的人。
+- `非技术家人` 仍是重要方向，但当前更适合作为第二阶段分发压力测试，而不是首页第一用户群。
 - 想有人替自己照看琐碎日常、提醒和未收口事项的人
 - 有 ADHD 或执行功能摩擦，希望得到持续陪伴和轻推的人
 - 希望对方会主动来问、主动跟进，也愿意替你分担一点琐碎的人
@@ -155,6 +165,10 @@ codeksei operator hermes smoke
   默认只展示 public finite CLI，不再把 shared / maintainer / background 入口混在一起
 - `codeksei schema`
   输出当前 public CLI 的结构化 contract，适合 agent / 自动化读取
+- `codeksei host manifest`
+  输出 host attachment manifest / hostkit 机器入口
+- `codeksei host doctor`
+  查看 daemon / attachment / provider recipe readiness
 - `codeksei operator help`
   查看 bootstrap、shared、background、maintainer 这类 operator surface
 - `codeksei operator schema`
@@ -272,6 +286,7 @@ Codeksei 自己负责 Weixin bridge 和共享线程。
 
 - 由 Hermes 负责 gateway / agent loop / Weixin
 - 由 Codeksei CLI + 官方受管的 Hermes skill 提供 companion workflows
+- 外部宿主优先通过 `host seed-proactive / claim-checkin / settle-checkin` 接入 delegated proactive contract，而不是自己手搓 `tick -> ack -> complete`
 - `channel send-file`、`timeline screenshot --send`、`reminder write` 现在会走 Hermes repo-local shim；`system send` 仍保持 blocked，因为还没有 source-backed backstage-only host primitive
 - 主动 checkin 由 Hermes 执行 one-shot wake/recovery job；Codeksei 提供 `system checkin-trigger` / `system checkin-tick` / `system checkin-complete` 维护 `tick -> ack -> complete` 的调度真相，并通过 `operator hermes sync-checkin` 把下一次 one-shot wake 重新 arm 回 Hermes
 - `sync-checkin` 创建/更新 job 时才需要 origin context；真正 cron 裸跑时，Hermes 直接按持久化的 `job.origin` 投递，不再反查 live session
@@ -336,6 +351,8 @@ codeksei login
 codeksei accounts
 codeksei doctor
 codeksei help
+codeksei host manifest
+codeksei host doctor
 ```
 
 终端（仓库 shared 脚本）：
@@ -374,6 +391,9 @@ npm run shared:status
 codeksei system checkin --show
 codeksei system checkin --range 3-60
 codeksei system checkin --reset
+codeksei host seed-proactive --provider hermes --user <wechat_user_id> --workspace /absolute/workspace
+codeksei host claim-checkin --provider hermes --user <wechat_user_id> --workspace /absolute/workspace
+codeksei host settle-checkin --provider hermes --user <wechat_user_id> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for 6h
 codeksei system checkin-trigger --user <wechat_user_id> --workspace /absolute/workspace
 codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace
 codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace --ack <triggerId>

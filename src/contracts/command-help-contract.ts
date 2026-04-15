@@ -51,6 +51,18 @@ const TOPIC_HELP = {
       `${buildExample("system.send", true)} / ${buildTerminalActionExample("system.checkin_config", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("system.checkin_trigger", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("system.checkin_tick", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("system.checkin_complete", { audience: "public", includeArgs: true })} / ${buildTerminalEntryUsage("system.checkin_poller", "public")}`,
     ],
   }),
+  host: () => ({
+    usage: [
+      `${buildTerminalEntryUsage("host.manifest", "public")} / ${buildTerminalActionExample("host.bootstrap", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("host.doctor", { audience: "public", includeArgs: true })}`,
+      `${buildTerminalActionExample("host.smoke", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("host.seed_proactive", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("host.claim_checkin", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("host.settle_checkin", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("host.render", { audience: "public", includeArgs: true })}`,
+    ],
+    bodyLabel: "补充：",
+    body: [
+      "  host 是面向外部宿主的机器入口，不是仓内 TypeScript seam。",
+      "  daemon-first / bridge-first 仍是 runtime invariant；host 只描述 attach、bootstrap、doctor 与 delegated proactive lease。",
+      "  对 Hermes 这类宿主，优先用 host seed/claim/settle；operator hermes / system checkin-* 继续只保留兼容 building blocks。",
+    ],
+  }),
   timeline: () => ({
     usage: [
       `${buildExample("timeline.event", true)} / ${buildTerminalEntryUsage("timeline.write", "public")} <args> / ${buildTerminalEntryUsage("timeline.read", "public")} <args> / ${buildTerminalEntryUsage("timeline.categories", "public")} / ${buildTerminalEntryUsage("timeline.proposals", "public")} <args> / ${buildTerminalEntryUsage("timeline.build", "public")} / ${buildTerminalEntryUsage("timeline.serve", "public")} / ${buildTerminalEntryUsage("timeline.dev", "public")} / ${buildTerminalActionExample("timeline.screenshot", { audience: "public", includeArgs: true })}`,
@@ -108,6 +120,78 @@ const TOPIC_HELP = {
 // help are marked topic_only in command-surface-definitions instead of silently
 // reusing a generic leaf renderer.
 const LEAF_HELP = {
+  "host.manifest": () => ({
+    usage: [buildTerminalActionExample("host.manifest", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  输出 host attachment manifest / hostkit 机器入口。",
+      "  这条命令描述 runtime invariant、recipes、entrypoints 与默认安装方式，不要求当前已经在受支持 profile 中。",
+    ],
+    includeFlagBlock: true,
+  }),
+  "host.bootstrap": () => ({
+    usage: [buildTerminalActionExample("host.bootstrap", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  写入 canonical codeksei.config.json，并按 provider 走最小 bootstrap。",
+      "  Hermes provider 当前会通过兼容路径同步 companion skill；--ensure-daemon 只声明并检查 v1 的 local CLI/state-owner readiness，不会偷开第二套常驻进程。",
+    ],
+    includeFlagBlock: true,
+  }),
+  "host.doctor": () => ({
+    usage: [buildTerminalActionExample("host.doctor", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  统一查看 daemon / attachment / provider recipe readiness。",
+      "  provider=hermes 时会收口 repo-local、skill、semantic review 与 smoke readiness，而不是只给一个 provider-specific 侧视图。",
+    ],
+    includeFlagBlock: true,
+  }),
+  "host.smoke": () => ({
+    usage: [buildTerminalActionExample("host.smoke", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  执行 provider recipe 的最小 attach smoke。",
+      "  当前重点 recipe 是 Hermes；generic-shell 暂时只返回无需额外 smoke 的薄壳结果。",
+    ],
+    includeFlagBlock: true,
+  }),
+  "host.seed_proactive": () => ({
+    usage: [buildTerminalActionExample("host.seed_proactive", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  安装后为 delegated proactive checkin 种下或修复第一条 future wake。",
+      "  这条命令不会改写 scheduler 真相，只会在当前 truth 上补第一条可执行 wake/recovery attach。",
+    ],
+    includeFlagBlock: true,
+  }),
+  "host.claim_checkin": () => ({
+    usage: [buildTerminalActionExample("host.claim_checkin", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  原子完成 tick + claim + ack + recovery re-arm。",
+      "  status=claimed 时返回 lease + payload；status=idle / in_progress 时不会伪造新 lease。",
+    ],
+    includeFlagBlock: true,
+  }),
+  "host.settle_checkin": () => ({
+    usage: [buildTerminalActionExample("host.settle_checkin", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  回写 delegated proactive checkin 的完成结果。",
+      "  result=failed 只会返回 partial 并保留 daemon recovery；不会偷偷扩写内部 completion enum。",
+    ],
+    includeFlagBlock: true,
+  }),
+  "host.render": () => ({
+    usage: [buildTerminalActionExample("host.render", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  从 command truth 渲染 provider-facing host asset。",
+      "  当前第一条 renderer 固定是 Hermes companion skill；--validate 会在渲染内容与仓内模板不一致时返回 partial。",
+    ],
+    includeFlagBlock: true,
+  }),
   "operator.hermes.install_skill": () => ({
     usage: [buildTerminalActionExample("operator.hermes.install_skill", { audience: "public", includeArgs: true })],
     bodyLabel: "说明：",

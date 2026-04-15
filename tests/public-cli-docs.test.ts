@@ -15,6 +15,11 @@ const timelineIntegrationDoc = fs.readFileSync(path.join(__dirname, "..", "docs"
 test("README public quickstart prefers codeksei CLI while shared mode keeps repo scripts", () => {
   assert.ok(readme.includes(buildTerminalEntryUsage("app.help", "public")));
   assert.ok(readme.includes("codeksei review weekly --help"));
+  assert.ok(readme.includes(buildTerminalEntryUsage("host.manifest", "public")));
+  assert.ok(readme.includes(buildTerminalEntryUsage("host.doctor", "public")));
+  assert.ok(readme.includes(buildTerminalEntryUsage("host.seed_proactive", "public")));
+  assert.ok(readme.includes(buildTerminalEntryUsage("host.claim_checkin", "public")));
+  assert.ok(readme.includes(buildTerminalEntryUsage("host.settle_checkin", "public")));
   assert.ok(readme.includes("codeksei system checkin-trigger"));
   assert.ok(readme.includes("codeksei system checkin-complete"));
   assert.ok(readme.includes("codeksei operator hermes sync-checkin"));
@@ -25,6 +30,11 @@ test("README public quickstart prefers codeksei CLI while shared mode keeps repo
 
 test("docs/commands keeps public CLI examples aligned with the terminal usage source", () => {
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("app.login", "public")));
+  assert.ok(commandsDoc.includes(buildTerminalEntryUsage("host.manifest", "public")));
+  assert.ok(commandsDoc.includes(buildTerminalEntryUsage("host.bootstrap", "public")));
+  assert.ok(commandsDoc.includes(buildTerminalEntryUsage("host.doctor", "public")));
+  assert.ok(commandsDoc.includes(buildTerminalEntryUsage("host.claim_checkin", "public")));
+  assert.ok(commandsDoc.includes(buildTerminalEntryUsage("host.settle_checkin", "public")));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("timeline.event", "public")));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("system.checkin_trigger", "public")));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("system.checkin_tick", "public")));

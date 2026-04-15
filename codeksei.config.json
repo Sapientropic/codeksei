@@ -1,0 +1,15 @@
+{
+  "$schema": "./schemas/codeksei-config-v1.json",
+  "modeClass": "hosted-proactive",
+  "workspaceRoot": "/absolute/path/to/workspace",
+  "stateDir": "/absolute/path/to/state",
+  "user": {
+    "id": "user_123",
+    "name": "Your Name",
+    "timezone": "Asia/Shanghai"
+  },
+  "host": {
+    "provider": "hermes",
+    "channel": "weixin"
+  }
+}

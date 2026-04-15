@@ -146,6 +146,84 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "显式绝对 workspace 路径；没传时尝试唯一稳定默认值" },
     ],
   }),
+  hostManifest: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "config", keys: ["--config"], type: "string", defaultValue: "", description: "显式 canonical config 文件路径" },
+    ],
+  }),
+  hostBootstrap: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      COMMON_DRY_RUN_FLAG,
+      COMMON_IDEMPOTENCY_FLAG,
+      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "", description: "目标 recipe provider，如 hermes" },
+      { name: "config", keys: ["--config"], type: "string", defaultValue: "", description: "显式 canonical config 文件路径" },
+      { name: "modeClass", keys: ["--mode-class"], type: "string", defaultValue: "", description: "bridge-full|hosted-proactive|hosted-skill-only|cli-only" },
+      { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "canonical config 里的 workspaceRoot" },
+      { name: "stateDir", keys: ["--state-dir"], type: "string", defaultValue: "", description: "canonical config 里的 stateDir" },
+      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "canonical config 里的 user.id" },
+      { name: "name", keys: ["--name"], type: "string", defaultValue: "", description: "canonical config 里的 user.name" },
+      { name: "timezone", keys: ["--timezone"], type: "string", defaultValue: "", description: "canonical config 里的 user.timezone" },
+      { name: "channel", keys: ["--channel"], type: "string", defaultValue: "", description: "canonical config 里的 host.channel" },
+      { name: "ensureDaemon", keys: ["--ensure-daemon"], type: "boolean", defaultValue: false, description: "把 daemon-first 前提写进 bootstrap 结果；当前 v1 为本地 CLI/state owner readiness" },
+    ],
+  }),
+  hostDoctor: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "", description: "显式 provider，如 hermes" },
+      { name: "config", keys: ["--config"], type: "string", defaultValue: "", description: "显式 canonical config 文件路径" },
+    ],
+  }),
+  hostSmoke: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "hermes", description: "显式 provider，如 hermes" },
+      { name: "config", keys: ["--config"], type: "string", defaultValue: "", description: "显式 canonical config 文件路径" },
+    ],
+  }),
+  hostSeedProactive: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "hermes", description: "显式 provider，如 hermes" },
+      { name: "config", keys: ["--config"], type: "string", defaultValue: "", description: "显式 canonical config 文件路径" },
+      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id" },
+      { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "显式绝对 workspace 路径" },
+      { name: "nextWakeAt", keys: ["--next-wake-at"], type: "string", defaultValue: "", description: "显式第一次 future wake 时间（ISO 8601）" },
+      { name: "sleepFor", keys: ["--sleep-for"], type: "string", defaultValue: "", description: "相对延迟，如 30m / 6h" },
+    ],
+  }),
+  hostClaimCheckin: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "hermes", description: "显式 provider，如 hermes" },
+      { name: "config", keys: ["--config"], type: "string", defaultValue: "", description: "显式 canonical config 文件路径" },
+      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id" },
+      { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "显式绝对 workspace 路径" },
+    ],
+  }),
+  hostSettleCheckin: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "hermes", description: "显式 provider，如 hermes" },
+      { name: "config", keys: ["--config"], type: "string", defaultValue: "", description: "显式 canonical config 文件路径" },
+      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id" },
+      { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "显式绝对 workspace 路径" },
+      { name: "lease", keys: ["--lease"], type: "string", defaultValue: "", required: true, description: "host claim-checkin 返回的 lease id" },
+      { name: "result", keys: ["--result"], type: "string", defaultValue: "", required: true, description: "sent_message|silent|backstage_only|failed" },
+      { name: "nextWakeAt", keys: ["--next-wake-at"], type: "string", defaultValue: "", description: "显式下次唤醒时间（ISO 8601）" },
+      { name: "sleepFor", keys: ["--sleep-for"], type: "string", defaultValue: "", description: "相对延迟，如 6h / 1d" },
+    ],
+  }),
+  hostRender: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "hermes", description: "显式 provider，如 hermes" },
+      { name: "target", keys: ["--target"], type: "string", defaultValue: "skill", description: "当前只支持 skill" },
+      { name: "validate", keys: ["--validate"], type: "boolean", defaultValue: false, description: "若与仓内模板不一致，返回 partial" },
+    ],
+  }),
   projectRadar: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,

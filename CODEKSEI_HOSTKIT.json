@@ -1,0 +1,70 @@
+{
+  "$schema": "./schemas/hostkit-v1.json",
+  "contractVersion": 1,
+  "runtimeInvariant": "bridge-full",
+  "package": {
+    "name": "codeksei",
+    "bin": "codeksei",
+    "node": ">=22"
+  },
+  "install": {
+    "preferred": ["npx", "-y", "codeksei@latest"],
+    "fallback": [["npm", "install", "-g", "codeksei"]]
+  },
+  "io": {
+    "defaultFormat": "json",
+    "stdout": "command-envelope",
+    "stderr": "diagnostic"
+  },
+  "daemon": {
+    "required": true,
+    "ownership": {
+      "pollLoop": "daemon",
+      "scheduleTruth": "daemon",
+      "leaseRecovery": "daemon"
+    }
+  },
+  "entrypoints": {
+    "manifest": ["codeksei", "host", "manifest", "--format", "json"],
+    "bootstrap": ["codeksei", "host", "bootstrap", "--ensure-daemon", "--format", "json"],
+    "doctor": ["codeksei", "host", "doctor", "--format", "json"],
+    "smoke": ["codeksei", "host", "smoke", "--provider", "hermes", "--format", "json"],
+    "seedProactive": ["codeksei", "host", "seed-proactive", "--provider", "hermes", "--format", "json"],
+    "claimCheckin": ["codeksei", "host", "claim-checkin", "--provider", "hermes", "--format", "json"],
+    "settleCheckin": ["codeksei", "host", "settle-checkin", "--provider", "hermes", "--format", "json"],
+    "render": ["codeksei", "host", "render", "--provider", "hermes", "--target", "skill", "--format", "json"]
+  },
+  "config": {
+    "canonicalFile": "codeksei.config.json",
+    "schema": "./schemas/codeksei-config-v1.json"
+  },
+  "contracts": {
+    "hostkit": "./schemas/hostkit-v1.json",
+    "attachmentCapabilities": "./schemas/host-capabilities-v1.json",
+    "commandEnvelope": "./schemas/command-envelope-v1.json",
+    "claimCheckin": "./schemas/host-claim-checkin-v1.json",
+    "settleCheckin": "./schemas/host-settle-checkin-v1.json"
+  },
+  "attachmentPolicy": {
+    "daemonOwnsPollLoop": true,
+    "daemonOwnsScheduleTruth": true,
+    "leaseExpiryFallback": "daemon_local_recovery"
+  },
+  "recipes": [
+    {
+      "id": "hermes",
+      "kind": "first_party",
+      "supportsDelegatedCheckin": true,
+      "supportsToolSurface": true
+    },
+    {
+      "id": "generic-shell",
+      "kind": "generic",
+      "supportsDelegatedCheckin": false,
+      "supportsToolSurface": true
+    }
+  ],
+  "discovery": {
+    "docs": ["README.md", "docs/architecture.md", "docs/commands.md"]
+  }
+}

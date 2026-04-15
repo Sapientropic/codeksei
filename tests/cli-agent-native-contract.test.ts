@@ -25,6 +25,8 @@ test("non-tty help defaults to JSON envelope and hides operator scripts from pub
   assert.equal(data.type, "command_collection");
   const actions = asCommandList(data.commands).map((entry) => entry.action);
   assert.ok(actions.includes("app.schema"));
+  assert.ok(actions.includes("host.manifest"));
+  assert.ok(actions.includes("host.doctor"));
   assert.ok(!actions.includes("app.shared_start"));
   assert.ok(!actions.includes("background.install"));
 });
@@ -35,6 +37,8 @@ test("schema splits public and operator surfaces", () => {
   const publicPayload = parseEnvelope(publicResult.stdout);
   const publicActions = asCommandList(asRecord(publicPayload.data).commands).map((entry) => entry.action);
   assert.ok(publicActions.includes("project.radar"));
+  assert.ok(publicActions.includes("host.bootstrap"));
+  assert.ok(publicActions.includes("host.claim_checkin"));
   assert.ok(!publicActions.includes("app.start"));
 
   const operatorResult = runCli(["operator", "schema"]);
