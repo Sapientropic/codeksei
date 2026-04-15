@@ -14,9 +14,10 @@
   <p><strong>以 WeChat 为入口，把 timeline、diary、reminders、reviews 和 project continuity 放进同一条共享线程。</strong></p>
   <p>它不是一个只会等你开口的聊天框，也不是另一套 agent runtime。Codeksei 会在合适的时候帮你补记录、接回线索、留提醒、带你重新进入项目，也让你的状态、日志和生活痕迹尽量继续留在本地。</p>
   <p>
-    <a href="#try-codeksei">先试试看</a> ·
+    <a href="#agent-quickstart">给 Agent</a> ·
+    <a href="#setup">SETUP</a> ·
+    <a href="#mode-specific-bring-up">模式化拉起</a> ·
     <a href="#day-with-codeksei">一天会怎么相处</a> ·
-    <a href="#快速开始">快速开始</a> ·
     <a href="#现在可以做什么">当前能力</a> ·
     <a href="#why-the-name">名字寓意</a> ·
     <a href="./docs/commands.md">命令</a> ·
@@ -24,9 +25,32 @@
   </p>
 </div>
 
-- **它是什么**：一个本地优先、承接连续性的 companion engine；对用户是陪伴型助理，对宿主是可附着的领域层
-- **它适合谁**：时间感容易松开、项目线程常被打断、愿意让系统替自己维护连续性的人
-- **你可以先这样试**：`npm install -g codeksei` 先体验基础 CLI；想体验完整形态，可选 `Bridge Mode` 或 `Hermes Hosted Mode`
+- **它是什么**：一个本地优先、`daemon-first / bridge-first` 的 companion engine；对用户是陪伴型助理，对宿主是可附着的领域层
+- **CLI contract**：`codeksei help`、`codeksei schema`、`codeksei host manifest` 是默认 discovery 面；非 TTY 默认 JSON，`stdout` 留给结果，`stderr` 留给诊断
+- **推荐开始方式**：先做通用 `SETUP`，再按 `Bridge Mode` 或 `Hermes Hosted Mode` 分流
+
+<a id="agent-quickstart"></a>
+
+## 给 Agent
+
+如果你是外部 agent，不要先读长 README prose 再猜内部 seam。当前推荐入口是：
+
+1. 先读 repo 根的 `CODEKSEI_HOSTKIT.json`
+2. 把 README 当成人类说明，把 `HOSTKIT + codeksei host manifest/bootstrap/doctor/smoke` 当机器入口
+3. 默认优先 `Hermes Hosted Mode`
+4. 把 `host bootstrap` 理解成“Codeksei attach/bootstrap 完成”，不要误读成 “Hermes gateway / Weixin live bring-up 已完成”
+
+推荐顺序：
+
+```bash
+npx -y codeksei@latest host manifest
+npx -y codeksei@latest host bootstrap --provider hermes --ensure-daemon
+npx -y codeksei@latest host doctor --provider hermes
+npx -y codeksei@latest host smoke --provider hermes
+```
+
+- `operator hermes *` 继续保留为兼容入口，不是新的主入口
+- `README` 负责人类 onboarding；真正的机器合同在 `CODEKSEI_HOSTKIT.json`、`codeksei host manifest` 和 public CLI schema
 
 ## Host Modes
 
@@ -36,38 +60,73 @@ Codeksei 现在把自己定义成 **daemon-first / bridge-first / companion engi
   现有默认路径：`Codeksei Weixin bridge + Codex runtime`
 - `Hermes Hosted Mode`
   Hermes 负责 agent loop 和官方 Weixin；Codeksei 通过 CLI / skill surface 暴露 timeline、diary、reminder、review、note、project radar 等能力
+- 外部宿主默认通过 `host attachment contract` 接入：
+  `codeksei host manifest`、`codeksei host bootstrap`、`codeksei host doctor`、`codeksei host smoke`、`codeksei host seed-proactive`、`codeksei host claim-checkin`、`codeksei host settle-checkin`
 
-外部宿主默认通过更窄的 `host attachment contract` 接入，而不是直接读仓内 TypeScript seam：
+<a id="setup"></a>
 
-- `codeksei host manifest`
-- `codeksei host bootstrap`
-- `codeksei host doctor`
-- `codeksei host smoke --provider hermes`
-- `codeksei host seed-proactive / claim-checkin / settle-checkin`
+## SETUP
 
-选择建议：
+这块只负责通用安装、发现 contract、验证 CLI 正常，不预设你必须先选 `Bridge Mode` 或 `Hermes Hosted Mode`。
 
-- 如果你想直接复用这个仓库现有的共享线程链路，用 `Bridge Mode`
-- 如果你已经在 Hermes 生态里，并且想直接吃 Hermes 官方维护的 Weixin，用 `Hermes Hosted Mode`
+### 通用前提
 
-<a id="try-codeksei"></a>
+- `Node.js >= 22`
+- repo 根默认机器入口：`CODEKSEI_HOSTKIT.json`
+- canonical host config 文件名：`codeksei.config.json`
 
-## 先试试看
+### 安装路径
 
-如果你想先判断 Codeksei 是不是你的路子，先走最短路径：
+1. 不落本地全局状态，直接临时运行：
+
+```bash
+npx -y codeksei@latest
+```
+
+2. 想先拿到全局 CLI：
 
 ```bash
 npm install -g codeksei
-codeksei help
-codeksei schema
-codeksei review weekly --help
 ```
 
-如果你想直接体验它更完整的样子，有两条官方路径：
+3. 想看源码、脚本、模板和完整仓库文档：
+
+```bash
+git clone https://github.com/Sapientropic/codeksei.git
+cd codeksei
+npm install
+```
+
+### 最小验证
+
+安装完成后，先确认 CLI 和机器合同都可发现：
+
+```bash
+codeksei help
+codeksei schema
+codeksei host manifest
+```
+
+如果你走的是 `npx` 路径，没有全局 `codeksei` 可执行名，就把同样的子命令挂到 `npx -y codeksei@latest` 后面执行。
+
+### SETUP 的边界
+
+- 这一步成功只代表 CLI、public schema、host attachment contract / hostkit 可发现
+- 这一步不代表 `Bridge Mode` 已扫码登录
+- 这一步也不代表 `Hermes Hosted Mode` 已 live attach 到 Hermes gateway / Weixin
+- 这一步更不代表提醒、check-in、repo-local shim 或 hosted send-back 已全部就绪
+
+<a id="mode-specific-bring-up"></a>
+
+## 模式化拉起
+
+`SETUP` 完成后，再按实际使用方式分流。
 
 ### Bridge Mode
 
-让 Codeksei 自己托管 WeChat bridge 和共享线程：
+适合你想直接复用这个仓库现有的共享线程链路时。
+
+拉起顺序：
 
 ```bash
 git clone https://github.com/Sapientropic/codeksei.git
@@ -77,26 +136,33 @@ npm run login
 npm run shared:start
 ```
 
-### Hermes Hosted Mode
-
-让 Hermes 托管 agent + Weixin，Codeksei 只作为 companion workflow surface：
+常见后续命令：
 
 ```bash
-git clone https://github.com/Sapientropic/codeksei.git
-cd codeksei
-npm install
+npm run shared:open
+npm run shared:status
+```
+
+### Hermes Hosted Mode
+
+适合你已经有 Hermes runtime / gateway / 官方 Weixin，希望 Codeksei 只作为 companion workflow surface 接入时。
+
+推荐顺序：
+
+```bash
 codeksei host manifest
 codeksei host bootstrap --provider hermes --ensure-daemon
 codeksei host doctor --provider hermes
 codeksei host smoke --provider hermes
-# 然后再由 Hermes gateway / Weixin 使用；operator hermes * 继续保留为兼容 alias
 ```
 
-- `先试基础 CLI`：看命令面、确认本机环境、感受产品边界
-- `需要 bootstrap / operator 命令时`：再用 `codeksei operator help` 或仓库里的 `npm run ...`
-- `再进共享模式`：体验它真正的连续性、主动分忧、提醒和项目接续
-- `若你已经用 Hermes`：优先直接接 Hermes Hosted Mode，不必再让 Codeksei 重复托管微信桥
-- `试完给反馈`：欢迎到 [GitHub Issues](https://github.com/Sapientropic/codeksei/issues) 告诉我们哪里最有用、哪里最别扭、哪里应该更主动或更克制
+边界说明：
+
+- `host manifest -> bootstrap -> doctor -> smoke` 是当前主入口
+- `operator hermes *` 是兼容入口，不是新的主入口
+- `host bootstrap` 只代表 Codeksei attach/bootstrap 完成，不等于 Hermes gateway / Weixin live bring-up 完成
+- live gateway、官方 Weixin、审批和 runtime loop 仍由 Hermes 自己托管
+- 外部 agent 不应从 README prose 猜内部 TypeScript seam，而应通过 host attachment contract 接入
 
 <a id="day-with-codeksei"></a>
 
@@ -118,9 +184,7 @@ codeksei host smoke --provider hermes
 
 - `Timeline`：把已经发生过的时间块、切换点和生活事实钉成时间感与记忆锚点，不让一天只剩模糊印象
 - `Diary`：Todo、碎片、补充记录、总结，以及和 timeline 紧密联动的时间线事实，帮你把零散日常慢慢收成可用痕迹
-- `Check-ins`：主动唤醒与主动分忧。发一句消息只是其中一种；它也会先回看上下文、整理后台、补一条 diary / timeline、留一个提醒，再决定是不是该主动露个面，并在每次 proactive pass 结束后自己写回下一次何时再醒
-- `Check-ins`
-  Codeksei 负责生成 proactive trigger、维护 `tick -> ack -> complete` 的调度真相，并在 `checkin-complete` 时写回下一次唤醒；Bridge Mode 下由本地 poller 包装 heartbeat 与入队，Hermes Hosted Mode 下由 Hermes 只持有 one-shot wake/recovery job，真正的下一次唤醒仍由 Codeksei 在 `checkin-complete` 里决定
+- `Check-ins`：主动唤醒与主动分忧。发一句消息只是其中一种；它也会先回看上下文、整理后台、补一条 diary / timeline、留一个提醒，再决定是不是该主动露个面。Codeksei 负责生成 proactive trigger、维护 `tick -> ack -> complete` 的调度真相，并在 `checkin-complete` 时写回下一次唤醒；Bridge Mode 下由本地 poller 包装 heartbeat 与入队，Hermes Hosted Mode 下由 Hermes 只持有 one-shot wake/recovery job，真正的下一次唤醒仍由 Codeksei 在 `checkin-complete` 里决定
 - `Reminders`：提醒写入与调度，给生活节奏和待办推进一个外部支点
 - `Review`：nightly / weekly / monthly，把日常记录压成更稳定的节奏校准与复盘材料
 - `Project support`：workspace bootstrap、project radar、按 workspace 恢复共享线程。项目切走再回来时，不用先把整条线在脑子里重建一遍；本地 git 仍是第一真相，只有 repo 缺失或不是 git repo 时才回退到 GitHub activity continuity signal
@@ -157,9 +221,7 @@ codeksei host smoke --provider hermes
   <p><em>线索有人照看，离开之后仍能顺着原来的温度回来。</em></p>
 </div>
 
-## 快速开始
-
-### CLI contract 速记
+## CLI contract 速记
 
 - `codeksei help`
   默认只展示 public finite CLI，不再把 shared / maintainer / background 入口混在一起
@@ -178,51 +240,15 @@ codeksei host smoke --provider hermes
 - 统一全局参数：
   `--format json|text`、`--verbose`、`--workspace-root /absolute/path`
 
-### 1. 先选安装方式
+## Bridge Mode 运行时配置
 
-如果你想按本文完整使用共享模式，先 clone 仓库，再跑 shared / background 脚本：
-
-```bash
-git clone https://github.com/Sapientropic/codeksei.git
-cd codeksei
-npm install
-```
-
-如果你只是想先拿到基础 CLI：
-
-```bash
-npm install -g codeksei
-codeksei help
-codeksei schema
-codeksei review weekly --help
-```
-
-说明：
-
-- 公共 CLI 示例默认写成 `codeksei ...`
-- 只有 shared / background / maintainer 脚本继续写成 `npm run ...`
-- 全局安装更适合先体验基础 CLI；共享模式相关脚本在仓库内运行最直接
-
-### 2. 配置最小环境变量
-
-运行时会按“两阶段”补全环境变量：
+Bridge Mode 仍按“两阶段”补全环境变量：
 
 1. 先保留当前进程里已经存在的环境变量
 2. 读取当前项目目录下的 `.env`
 3. 再根据这一步已经生效的 `CODEKSEI_STATE_DIR` 重新计算状态目录，并读取该状态目录下的 `.env`
 
 前面的值优先，后面的 `.env` 只补缺省，不会覆盖已经存在的 key。也就是说，如果 repo `.env` 里才定义了 `CODEKSEI_STATE_DIR`，运行时会在读完 repo `.env` 之后，重新定位 state-dir `.env`。
-
-最小可用配置：
-
-```dotenv
-CODEKSEI_RUNTIME=codex
-CODEKSEI_CHANNEL_PROVIDER=codeksei
-CODEKSEI_USER_NAME=你的名字
-CODEKSEI_USER_GENDER=female
-CODEKSEI_ALLOWED_USER_IDS=桥实际观测到的 sender id
-CODEKSEI_WORKSPACE_ROOT=/绝对路径/你的项目目录
-```
 
 <details>
 <summary>展开常用可选环境变量</summary>
@@ -274,61 +300,9 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - 运行时的 `.env` 读取是刻意设计成“两阶段”：先读 repo `.env`，再根据新得到的 `CODEKSEI_STATE_DIR` 重新定位并补读 state-dir `.env`；这也是 `dotenv` 目前仍保留在 runtime dependency 的原因
 - `.env` 只应放在你的本地工作目录或状态目录里，不要提交进仓库
 
-### 3. 选择运行模式
+## Windows 后台常驻
 
-#### Bridge Mode
-
-Codeksei 自己负责 Weixin bridge 和共享线程。
-
-#### Hermes Hosted Mode
-
-不要执行 `codeksei start` 或 `npm run shared:*`。
-
-- 由 Hermes 负责 gateway / agent loop / Weixin
-- 由 Codeksei CLI + 官方受管的 Hermes skill 提供 companion workflows
-- 外部宿主优先通过 `host seed-proactive / claim-checkin / settle-checkin` 接入 delegated proactive contract，而不是自己手搓 `tick -> ack -> complete`
-- `channel send-file`、`timeline screenshot --send`、`reminder write` 现在会走 Hermes repo-local shim；`system send` 仍保持 blocked，因为还没有 source-backed backstage-only host primitive
-- 主动 checkin 由 Hermes 执行 one-shot wake/recovery job；Codeksei 提供 `system checkin-trigger` / `system checkin-tick` / `system checkin-complete` 维护 `tick -> ack -> complete` 的调度真相，并通过 `operator hermes sync-checkin` 把下一次 one-shot wake 重新 arm 回 Hermes
-- `sync-checkin` 创建/更新 job 时才需要 origin context；真正 cron 裸跑时，Hermes 直接按持久化的 `job.origin` 投递，不再反查 live session
-- 若 sibling checkout 不在默认位置，可显式设置 `CODEKSEI_HERMES_REPO_ROOT`；`codeksei operator hermes status` / `smoke` 会把 repo-local readiness 和 commit 打出来
-- 可先用 `codeksei operator hermes --help` 或 `codeksei operator schema operator hermes` 看 4 个 leaf action
-- 推荐先执行：
-  `codeksei operator hermes install-skill`
-  `codeksei operator hermes sync-checkin --user <wechat_user_id> --workspace /absolute/workspace`
-  `codeksei operator hermes status`
-  `codeksei operator hermes smoke`
-
-### 4. Bridge Mode 扫码登录
-
-```bash
-npm run login
-```
-
-### 5. Bridge Mode 拉起共享模式
-
-共享模式更适合日常使用：微信和终端会接到同一条共享线程。
-
-```bash
-npm run shared:start
-```
-
-接入当前微信绑定的共享线程：
-
-```bash
-npm run shared:open
-```
-
-查看状态：
-
-```bash
-npm run shared:status
-```
-
-如果当前配置是 Hermes Hosted Mode，这几条 shared 命令会明确提示“改用 Hermes gateway”，不会偷偷回退到 Codex app-server。
-
-### 6. Windows 后台常驻
-
-如果你希望登录后自动拉起，并在解锁或恢复睡眠后快速自愈：
+如果你希望 Bridge Mode 登录后自动拉起，并在解锁或恢复睡眠后快速自愈：
 
 ```powershell
 npm run background:install
@@ -347,17 +321,21 @@ npm run background:uninstall
 终端：
 
 ```bash
-codeksei login
-codeksei accounts
 codeksei doctor
 codeksei help
+codeksei schema
 codeksei host manifest
+codeksei host bootstrap --provider hermes --ensure-daemon
 codeksei host doctor
+codeksei host smoke --provider hermes
+codeksei review weekly --help
 ```
 
 终端（仓库 shared 脚本）：
 
 ```bash
+npm run login
+npm run accounts
 npm run shared:start
 npm run shared:open
 npm run shared:status
