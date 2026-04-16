@@ -5,6 +5,7 @@ import {
   MAX_QR_REFRESH_COUNT,
   ensureTrailingSlash,
   finishWeixinLogin,
+  printLoginCompatibilityNotice,
   printQrCode,
 } from "./login-common";
 import type { WeixinAccountConfig } from "./account-store";
@@ -141,6 +142,7 @@ async function waitForLegacyWeixinLogin({
 
 async function runLegacyLoginFlow(config: LegacyLoginConfig): Promise<void> {
   writeStdoutLine("[codeksei] 正在启动微信扫码登录（legacy）...");
+  printLoginCompatibilityNotice();
   const result = await waitForLegacyWeixinLogin({
     apiBaseUrl: String(config.weixinBaseUrl || ""),
     botType: String(config.weixinQrBotType || ""),

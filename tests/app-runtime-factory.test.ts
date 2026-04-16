@@ -66,7 +66,7 @@ function createRuntimeConfig(): AppRuntimeConfig {
     weixinInstructionsOverlayFile: path.join(tempRoot, "weixin-instructions.local.md"),
     weixinOperationsFile: path.join(tempRoot, "weixin-operations.md"),
     weixinOperationsOverlayFile: path.join(tempRoot, "weixin-operations.local.md"),
-    weixinProtocolClientVersion: "2.1.1",
+    weixinProtocolClientVersion: "2.1.8",
     weixinQrBotType: "3",
     weixinReplyMode: "stream" as const,
     weixinRouteTag: "",

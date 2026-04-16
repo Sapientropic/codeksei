@@ -22,6 +22,17 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 
+def _force_stdio_utf8() -> None:
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if not callable(reconfigure):
+            continue
+        try:
+            reconfigure(encoding="utf-8")
+        except Exception:
+            continue
+
+
 def _emit(payload: Dict[str, Any], exit_code: int = 0) -> int:
     sys.stdout.write(json.dumps(payload, ensure_ascii=False))
     sys.stdout.flush()
@@ -603,6 +614,7 @@ def _handle_sync_checkin_cron(request: Dict[str, Any], origin_context: Dict[str,
 
 def main() -> int:
     try:
+        _force_stdio_utf8()
         request = _load_request()
         _ensure_repo_imports(str(request.get("repo_root") or ""))
         hermes_home = _resolve_hermes_home(request)

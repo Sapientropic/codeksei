@@ -160,7 +160,7 @@ function createTestAppHarness({
     weixinDeliveryTrace: false,
     weixinQrBotType: "3",
     weixinRouteTag: "",
-    weixinProtocolClientVersion: "2.1.1",
+    weixinProtocolClientVersion: "2.1.8",
     accountsDir: path.join(tempRoot, "accounts"),
     logDir: path.join(tempRoot, "logs"),
     reminderQueueFile: path.join(tempRoot, "reminder-queue.json"),

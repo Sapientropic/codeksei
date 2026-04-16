@@ -1,5 +1,9 @@
 import * as qrcodeTerminal from "qrcode-terminal";
 import { writeStdoutLine } from "../../../core/terminal-output";
+import {
+  TENCENT_OPENCLAW_WEIXIN_PACKAGE,
+  TENCENT_OPENCLAW_WEIXIN_VERSION,
+} from "../../../contracts/weixin-official";
 
 import {
   deleteWeixinAccount,
@@ -31,6 +35,15 @@ function printQrCode(url: string): void {
   } catch {
     writeStdoutLine(url);
   }
+}
+
+function printLoginCompatibilityNotice(): void {
+  writeStdoutLine(
+    `[codeksei] 默认协议版本对齐腾讯官方包 ${TENCENT_OPENCLAW_WEIXIN_PACKAGE}@${TENCENT_OPENCLAW_WEIXIN_VERSION}。`
+  );
+  writeStdoutLine(
+    "[codeksei] 海外/国际版 WeChat 当前可能受官方地域灰度限制；腾讯公开资料提到香港地域已支持，其他地域仍在逐步开放。若手机扫码直接报网络问题，优先核对账号与客户端资格。"
+  );
 }
 
 function cleanupStaleAccountsForUserId(
@@ -72,6 +85,7 @@ export {
   MAX_QR_REFRESH_COUNT,
   ensureTrailingSlash,
   finishWeixinLogin,
+  printLoginCompatibilityNotice,
   printQrCode,
   type WeixinLoginResult,
 };

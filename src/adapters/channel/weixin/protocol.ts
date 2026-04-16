@@ -1,6 +1,7 @@
 import * as crypto from "node:crypto";
+import { TENCENT_OPENCLAW_WEIXIN_VERSION } from "../../../contracts/weixin-official";
 
-const DEFAULT_PROTOCOL_CLIENT_VERSION = "2.1.1";
+const DEFAULT_PROTOCOL_CLIENT_VERSION = TENCENT_OPENCLAW_WEIXIN_VERSION;
 const BOT_API_USER_AGENT = "node";
 const ILINK_APP_ID = "bot";
 // Keep one stable sender identity per bridge process. Re-randomizing this on

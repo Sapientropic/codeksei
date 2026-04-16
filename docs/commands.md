@@ -68,6 +68,7 @@ operator / bootstrap：
 - `codeksei operator hermes status`
 - `codeksei operator hermes smoke`
 - `codeksei login` `Bridge Mode only`
+  默认协议版本对齐腾讯官方包 `@tencent-weixin/openclaw-weixin@2.1.8`；海外 / 国际版 WeChat 扫码仍可能受官方地域灰度限制
 - `codeksei accounts` `Bridge Mode only`
 - `codeksei start` `Bridge Mode only`
 - `codeksei system checkin-trigger`
