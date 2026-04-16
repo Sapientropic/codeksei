@@ -134,6 +134,11 @@ npm run login
 npm run shared:start
 ```
 
+Notes:
+
+- Bridge Mode keeps its default protocol version aligned with Tencent's official `@tencent-weixin/openclaw-weixin@2.1.8`
+- International / overseas WeChat login can still be region-gated; if the phone-side scan fails with a generic network error, verify account/client eligibility first
+
 Common follow-up commands:
 
 ```bash
@@ -254,7 +259,7 @@ CODEKSEI_REVIEW_SEMANTIC_HOST=auto
 CODEKSEI_CODEX_ENDPOINT=ws://127.0.0.1:8765
 CODEKSEI_WEIXIN_REPLY_MODE=stream
 CODEKSEI_WEIXIN_ROUTE_TAG=
-CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION=2.1.1
+CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION=2.1.8
 CODEKSEI_TIMEZONE=Asia/Shanghai
 CODEKSEI_TIMELINE_LOCALE=zh-CN
 CODEKSEI_DIARY_DIR=/absolute/path/to/your/vault/diary
@@ -275,6 +280,8 @@ Notes:
 - `CODEKSEI_WEIXIN_REPLY_MODE=stream` now behaves more like a hybrid stream: it prefers natural sentence boundaries or completed blocks so unfinished final sentences are not split into multiple WeChat bubbles
 - `CODEKSEI_WEIXIN_REPLY_MODE=settled` still means “wait until the whole turn settles”: only the latest visible final reply is sent
 - The Weixin bridge now exposes only one official `v2` adapter; the issue #4 media gap is handled as an internal legacy media fallback instead of a second public adapter
+- `CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION` now defaults to Tencent's official `@tencent-weixin/openclaw-weixin@2.1.8`; only override it when you have source-backed upstream evidence to do so
+- International / overseas WeChat login can still be gated by Tencent's regional rollout; Tencent's public docs say Hong Kong is supported while other regions are still rolling out
 - `CODEKSEI_RUNTIME` / `CODEKSEI_CHANNEL_PROVIDER` decide whether the current runtime is `Bridge Mode` or `Hermes Hosted Mode`
 - `CODEKSEI_RUNTIME_ENDPOINT` / `CODEKSEI_RUNTIME_COMMAND` are the new host-neutral runtime ingress; legacy `CODEKSEI_CODEX_*` variables still remain for compatibility
 - `CODEKSEI_REVIEW_SEMANTIC_HOST=auto|codex|hermes|deterministic` lets you pin the semantic review host explicitly; default is `auto`

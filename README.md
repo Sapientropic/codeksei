@@ -136,6 +136,11 @@ npm run login
 npm run shared:start
 ```
 
+补充：
+
+- Bridge Mode 的默认协议版本会跟随腾讯官方包 `@tencent-weixin/openclaw-weixin@2.1.8`
+- 海外 / 国际版 WeChat 当前仍可能受官方地域灰度限制；如果手机扫码直接报网络问题，优先核对账号与客户端资格
+
 常见后续命令：
 
 ```bash
@@ -262,7 +267,7 @@ CODEKSEI_REVIEW_SEMANTIC_HOST=auto
 CODEKSEI_CODEX_ENDPOINT=ws://127.0.0.1:8765
 CODEKSEI_WEIXIN_REPLY_MODE=stream
 CODEKSEI_WEIXIN_ROUTE_TAG=
-CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION=2.1.1
+CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION=2.1.8
 CODEKSEI_TIMEZONE=Asia/Shanghai
 CODEKSEI_TIMELINE_LOCALE=zh-CN
 CODEKSEI_DIARY_DIR=/绝对路径/你的 vault/日记
@@ -284,6 +289,8 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - `CODEKSEI_WEIXIN_REPLY_MODE=stream` 现在更接近 hybrid stream：优先在自然句边界或已完成块发送，避免把半句 final 提前裂成多个微信气泡
 - `CODEKSEI_WEIXIN_REPLY_MODE=settled` 仍表示“等整轮收口后再发”：只发送最新的可见最终回复
 - 微信桥的正式 adapter 现在只保留 `v2`；issue #4 对应的媒体上传缺口只作为内部 legacy media fallback 处理，不再通过第二个 public adapter 暴露
+- `CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION` 默认跟随腾讯官方包 `@tencent-weixin/openclaw-weixin@2.1.8`；只有在有 source-backed 上游变更或兼容性回退证据时才建议手动覆盖
+- 国际版 / 海外 WeChat 扫码登录当前仍可能受官方地域灰度限制；腾讯公开资料提到香港地域已支持，其它地域仍在逐步开放
 - `CODEKSEI_RUNTIME` / `CODEKSEI_CHANNEL_PROVIDER` 决定当前是 `Bridge Mode` 还是 `Hermes Hosted Mode`
 - `CODEKSEI_RUNTIME_ENDPOINT` / `CODEKSEI_RUNTIME_COMMAND` 是新的 host-neutral runtime 入口；旧的 `CODEKSEI_CODEX_*` 变量仍保留兼容
 - `CODEKSEI_REVIEW_SEMANTIC_HOST=auto|codex|hermes|deterministic` 可显式指定 review hybrid 语义宿主；默认 `auto`

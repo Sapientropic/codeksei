@@ -454,6 +454,15 @@ export function buildHermesRepoLocalEnv({
   // credentials. Do not let .env replace these two bridge-critical values.
   env.HERMES_HOME = hermesHome;
   env.PYTHONPATH = shellPythonPath ? `${repoRoot}${path.delimiter}${shellPythonPath}` : repoRoot;
+  // Codeksei sends UTF-8 JSON over stdin/stdout to the repo-local Python shim.
+  // Windows runners can otherwise decode Chinese reminder/checkin payloads with
+  // a legacy code page and fail before the bridge handles the request.
+  if (!normalizeText(env.PYTHONIOENCODING)) {
+    env.PYTHONIOENCODING = "utf-8";
+  }
+  if (!normalizeText(env.PYTHONUTF8)) {
+    env.PYTHONUTF8 = "1";
+  }
   return env;
 }
 

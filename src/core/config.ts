@@ -10,6 +10,7 @@ import {
   resolveHermesRepoLocalShimPath,
   resolveHermesRepoRoot,
 } from "./hermes-repo-local";
+import { TENCENT_OPENCLAW_WEIXIN_VERSION } from "../contracts/weixin-official";
 import {
   normalizeCodekseiChannel,
   normalizeCodekseiChannelProvider,
@@ -102,7 +103,7 @@ function parseEnvConfig(env: EnvSource, options: ReadConfigOptions = {}): AppRun
       weixinDeliveryTrace: readPrefixedBoolEnv(env, "WEIXIN_DELIVERY_TRACE"),
       weixinQrBotType: readPrefixedEnv(env, "WEIXIN_QR_BOT_TYPE") || "3",
       weixinRouteTag: readPrefixedEnv(env, "WEIXIN_ROUTE_TAG") || "",
-      weixinProtocolClientVersion: readPrefixedEnv(env, "WEIXIN_PROTOCOL_CLIENT_VERSION") || "2.1.1",
+      weixinProtocolClientVersion: readPrefixedEnv(env, "WEIXIN_PROTOCOL_CLIENT_VERSION") || TENCENT_OPENCLAW_WEIXIN_VERSION,
     },
     runtimeHost: {
       channel,

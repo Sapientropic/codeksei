@@ -42,7 +42,7 @@ test("config slices compose into the legacy-compatible app runtime surface", () 
       weixinDeliveryTrace: false,
       weixinQrBotType: "3",
       weixinRouteTag: "",
-      weixinProtocolClientVersion: "2.1.1",
+      weixinProtocolClientVersion: "2.1.8",
     },
     runtimeHost: {
       channel: "weixin",

@@ -10,6 +10,7 @@ import {
   MAX_QR_REFRESH_COUNT,
   ensureTrailingSlash,
   finishWeixinLogin,
+  printLoginCompatibilityNotice,
   printQrCode,
 } from "./login-common";
 import type { WeixinAccountConfig } from "./account-store";
@@ -237,6 +238,7 @@ async function runV2LoginFlow(config: V2LoginConfig): Promise<void> {
   const clientVersion = normalizeProtocolClientVersion(config.weixinProtocolClientVersion);
   const routeTagLabel = routeTag ? ` routeTag=${routeTag}` : "";
   writeStdoutLine(`[codeksei] 正在启动微信扫码登录（v2）...${routeTagLabel}`);
+  printLoginCompatibilityNotice();
   const result = await waitForV2WeixinLogin({
     apiBaseUrl: String(config.weixinBaseUrl || ""),
     botType: String(config.weixinQrBotType || ""),

@@ -20,11 +20,15 @@ test("buildHermesRepoLocalEnv mirrors Hermes home .env but preserves bridge-crit
 
   const originalEnv = { ...process.env };
   process.env.PYTHONPATH = "E:/shell-pythonpath";
+  delete process.env.PYTHONIOENCODING;
+  delete process.env.PYTHONUTF8;
   try {
     const env = buildHermesRepoLocalEnv({ hermesHome, repoRoot });
 
     assert.equal(env.HERMES_HOME, hermesHome);
     assert.equal(env.PYTHONPATH, `${repoRoot}${path.delimiter}E:/shell-pythonpath`);
+    assert.equal(env.PYTHONIOENCODING, "utf-8");
+    assert.equal(env.PYTHONUTF8, "1");
     assert.equal(env.WEIXIN_APP_ID, "from-hermes-home");
   } finally {
     for (const key of Object.keys(process.env)) {
