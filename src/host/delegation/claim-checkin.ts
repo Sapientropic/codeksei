@@ -58,7 +58,7 @@ export function claimDelegatedCheckin(
       lease: firstTick.activeWake ? buildDelegationLease(firstTick.activeWake.triggerId, firstTick.activeWake.startedAt) : null,
       payload: null,
       origin: buildOriginRef(target),
-      nextWakeAt: hostedSync?.plan.plannedWakeAt || "",
+      nextWakeAt: hostedSync?.plan.jobs[0]?.plannedWakeAt || "",
       hostedSync: hostedSync ? {
         plan: hostedSync.plan,
         sync: hostedSync.sync,
@@ -103,7 +103,7 @@ export function claimDelegatedCheckin(
       text: firstTick.payload.text,
     } : null,
     origin: buildOriginRef(target),
-    nextWakeAt: hostedSync?.plan.plannedWakeAt || "",
+    nextWakeAt: hostedSync?.plan.jobs[0]?.plannedWakeAt || "",
     hostedSync: hostedSync ? {
       plan: hostedSync.plan,
       sync: hostedSync.sync,

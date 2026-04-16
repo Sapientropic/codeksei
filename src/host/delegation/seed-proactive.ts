@@ -1,8 +1,11 @@
 import type { AppRuntimeConfig } from "../../core/app-service-contract";
-import { runCheckinTick, type CheckinResolvedTarget } from "../../checkin";
-import { createHostedCheckinWakePlan } from "../../core/hosted-checkin-cron";
-import { syncCheckinCronViaHermesRepoLocal } from "../recipes/hermes/repo-local";
-import { syncHostedCheckinPlanViaHermes } from "../recipes/hermes/wake-forwarder";
+import {
+  runCheckinScheduleNextWake,
+  runCheckinTick,
+  type CheckinResolvedTarget,
+} from "../../checkin";
+import { syncHostedCheckinPlanSetViaHermes, syncHostedCheckinPlanViaHermes } from "../recipes/hermes/wake-forwarder";
+import { createHostedCheckinWakePlanSet } from "../../core/hosted-checkin-cron";
 
 type SeedConfig = Pick<
   AppRuntimeConfig,
@@ -19,28 +22,29 @@ export function seedProactiveCheckin(
   config: SeedConfig,
   target: CheckinResolvedTarget,
   {
+    followupContext = "",
     provider,
     nextWakeAt,
   }: {
+    followupContext?: string;
     provider: string;
     nextWakeAt?: string;
   },
 ) {
   if (provider === "hermes" && nextWakeAt) {
-    const plan = createHostedCheckinWakePlan(config, target, nextWakeAt);
-    const sync = syncCheckinCronViaHermesRepoLocal(config, {
-      due_at_iso: plan.plannedWakeAt,
-      env: plan.env,
-      name: plan.name,
-      prompt: plan.prompt,
-      role: plan.role,
-      sender_id: plan.senderId,
-      target_key: plan.targetKey,
-      workspace_root: plan.workspaceRoot,
+    const scheduled = runCheckinScheduleNextWake({
+      config,
+      nextWakeAt,
+      target,
     });
+    const plan = createHostedCheckinWakePlanSet(config, target, {
+      followupContext,
+      plannedWakeAt: scheduled.nextWakeAt,
+    });
+    const sync = syncHostedCheckinPlanSetViaHermes(config, plan);
     return {
       status: "seeded",
-      nextWakeAt: plan.plannedWakeAt,
+      nextWakeAt: scheduled.nextWakeAt,
       sync,
       summary: null,
     };
@@ -51,10 +55,12 @@ export function seedProactiveCheckin(
     target,
   });
   if (provider === "hermes") {
-    const synced = syncHostedCheckinPlanViaHermes(config, target, tick);
+    const synced = syncHostedCheckinPlanViaHermes(config, target, tick, {
+      followupContext,
+    });
     return {
       status: tick.status === "scheduled" ? "seeded" : tick.status,
-      nextWakeAt: synced.plan.plannedWakeAt,
+      nextWakeAt: synced.plan.jobs[0]?.plannedWakeAt || "",
       sync: synced.sync,
       summary: synced.summary,
     };

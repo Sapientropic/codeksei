@@ -191,7 +191,7 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id" },
       { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "显式绝对 workspace 路径" },
       { name: "nextWakeAt", keys: ["--next-wake-at"], type: "string", defaultValue: "", description: "显式第一次 future wake 时间（ISO 8601）" },
-      { name: "sleepFor", keys: ["--sleep-for"], type: "string", defaultValue: "", description: "相对延迟，如 30m / 6h" },
+      { name: "sleepFor", keys: ["--sleep-for"], type: "string", defaultValue: "", description: "相对延迟，如 30m / 2h / 8h" },
     ],
   }),
   hostClaimCheckin: createCommandArgSchema({
@@ -213,7 +213,7 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "lease", keys: ["--lease"], type: "string", defaultValue: "", required: true, description: "host claim-checkin 返回的 lease id" },
       { name: "result", keys: ["--result"], type: "string", defaultValue: "", required: true, description: "sent_message|silent|backstage_only|failed" },
       { name: "nextWakeAt", keys: ["--next-wake-at"], type: "string", defaultValue: "", description: "显式下次唤醒时间（ISO 8601）" },
-      { name: "sleepFor", keys: ["--sleep-for"], type: "string", defaultValue: "", description: "相对延迟，如 6h / 1d" },
+      { name: "sleepFor", keys: ["--sleep-for"], type: "string", defaultValue: "", description: "相对延迟，如 90m / 4h / 1d" },
     ],
   }),
   hostRender: createCommandArgSchema({
@@ -242,6 +242,7 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "delay", keys: ["--delay"], type: "string", defaultValue: "", description: "相对延迟，如 30m / 2h / 1d" },
       { name: "at", keys: ["--at"], type: "string", defaultValue: "", description: "绝对时间，按当前 timezone 解释本地时间" },
       { name: "text", keys: ["--text"], type: "string", defaultValue: "", description: "提醒正文" },
+      { name: "delivery", keys: ["--delivery"], type: "string", defaultValue: "direct", description: "direct|proactive；Hermes Hosted Mode 下 proactive 会改成未来 proactive 唤醒" },
       { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id" },
       { name: "useStdin", keys: ["--stdin"], type: "boolean", defaultValue: false, description: "从标准输入读取正文" },
     ],
@@ -295,7 +296,7 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "trigger", keys: ["--trigger"], type: "string", defaultValue: "", required: true, description: "当前 active wake 的 trigger id" },
       { name: "result", keys: ["--result"], type: "string", defaultValue: "", required: true, description: "sent_message|silent|backstage_only" },
       { name: "nextWakeAt", keys: ["--next-wake-at"], type: "string", defaultValue: "", description: "显式下次唤醒时间（ISO 8601）" },
-      { name: "sleepFor", keys: ["--sleep-for"], type: "string", defaultValue: "", description: "相对延迟，如 6h / 1d4h" },
+      { name: "sleepFor", keys: ["--sleep-for"], type: "string", defaultValue: "", description: "相对延迟，如 90m / 4h / 1d4h" },
     ],
   }),
   systemCheckinTrigger: createCommandArgSchema({

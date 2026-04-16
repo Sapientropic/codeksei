@@ -14,16 +14,28 @@ import { resolveHostMode } from "./host-mode";
 import { resolveHermesHomePath } from "./hermes-repo-local";
 import { resolvePackageRoot } from "./path-utils";
 import { normalizeText } from "./text-normalization";
+import {
+  buildCheckinCompletionDurationGuidanceLines,
+  CHECKIN_COMPLETION_CONTEXT_GUIDANCE,
+  CHECKIN_COMPLETION_SLEEP_FOR_PLACEHOLDER,
+} from "../checkin/completion-guidance";
 
 export type HostedCheckinCronRole = "recovery" | "wake";
 
-export interface HostedCheckinCronSyncPlan {
+export interface HostedCheckinCronSyncJobPlan {
   env: Record<string, string>;
   name: string;
   plannedWakeAt: string;
   prompt: string;
   role: HostedCheckinCronRole;
   schedule: string;
+  senderId: string;
+  targetKey: string;
+  workspaceRoot: string;
+}
+
+export interface HostedCheckinCronSyncPlanSet {
+  jobs: HostedCheckinCronSyncJobPlan[];
   senderId: string;
   targetKey: string;
   workspaceRoot: string;
@@ -85,19 +97,20 @@ export function collectHostedCheckinCronSummary(
   const targetKey = buildCheckinTargetKey(target);
   const jobsFile = path.join(resolveHermesHomePath(config), "cron", "jobs.json");
   const allJobs = readManagedCronJobs(jobsFile);
+  const toleranceMs = 1_000;
   const futureJobs = allJobs.filter((job) => (
     job.targetKey === targetKey
     && job.nextRunAt
-    && Date.parse(job.nextRunAt) > nowMs
+    && Date.parse(job.nextRunAt) >= nowMs - toleranceMs
   ));
   const wakeJobs = futureJobs.filter((job) => job.role === "wake");
   const recoveryJobs = futureJobs.filter((job) => job.role === "recovery");
   const nextPlannedWakeAt = [...futureJobs]
     .sort((left, right) => Date.parse(left.nextRunAt) - Date.parse(right.nextRunAt))[0]?.nextRunAt || "";
-  const duplicateCount = Math.max(0, futureJobs.length - 1);
+  const duplicateCount = Math.max(0, wakeJobs.length - 1) + Math.max(0, recoveryJobs.length - 1);
   return {
     duplicateCount,
-    drifted: wakeJobs.length > 1 || recoveryJobs.length > 1 || (wakeJobs.length > 0 && recoveryJobs.length > 0),
+    drifted: duplicateCount > 0,
     futureJobs,
     nextPlannedWakeAt,
     recoveryJobs,
@@ -106,30 +119,36 @@ export function collectHostedCheckinCronSummary(
   };
 }
 
-export function createHostedCheckinCronPlanFromTick(
+export function createHostedCheckinCronPlanSetFromTick(
   config: Partial<HostedCheckinConfig>,
   target: CheckinResolvedTarget,
   tick: CheckinTickResult,
   {
+    followupContext = "",
     nowMs = Date.now(),
   }: {
+    followupContext?: string;
     nowMs?: number;
   } = {},
-): HostedCheckinCronSyncPlan {
+): HostedCheckinCronSyncPlanSet {
   switch (tick.status) {
     case "due":
-      return createHostedCheckinCronPlan(config, target, {
+      return createHostedCheckinWakePlanSet(config, target, {
+        followupContext,
         plannedWakeAt: new Date(nowMs).toISOString(),
-        role: "wake",
       });
     case "in_progress": {
       const startedAtMs = Date.parse(normalizeText(tick.activeWake?.startedAt));
       if (!Number.isFinite(startedAtMs) || startedAtMs <= 0) {
         throw new Error("当前 active wake 缺少 startedAt，无法创建 recovery one-shot job");
       }
-      return createHostedCheckinCronPlan(config, target, {
-        plannedWakeAt: new Date(startedAtMs + CHECKIN_ACTIVE_WAKE_TIMEOUT_MS).toISOString(),
-        role: "recovery",
+      return createHostedCheckinPlanSet(config, target, {
+        jobs: [
+          {
+            plannedWakeAt: new Date(startedAtMs + CHECKIN_ACTIVE_WAKE_TIMEOUT_MS).toISOString(),
+            role: "recovery",
+          },
+        ],
       });
     }
     case "scheduled":
@@ -138,53 +157,98 @@ export function createHostedCheckinCronPlanFromTick(
       if (!plannedWakeAt) {
         throw new Error("当前没有 nextWakeAt，无法同步 Hermes hosted checkin wake job");
       }
-      return createHostedCheckinCronPlan(config, target, {
+      return createHostedCheckinWakePlanSet(config, target, {
+        followupContext,
         plannedWakeAt,
-        role: "wake",
       });
     }
   }
 }
 
-export function createHostedCheckinWakePlan(
+export function createHostedCheckinWakePlanSet(
   config: Partial<HostedCheckinConfig>,
   target: CheckinResolvedTarget,
-  nextWakeAt: string,
-): HostedCheckinCronSyncPlan {
-  const plannedWakeAt = normalizeText(nextWakeAt);
-  if (!plannedWakeAt) {
+  {
+    followupContext = "",
+    plannedWakeAt,
+  }: {
+    followupContext?: string;
+    plannedWakeAt: string;
+  },
+): HostedCheckinCronSyncPlanSet {
+  const normalizedWakeAt = normalizeText(plannedWakeAt);
+  if (!normalizedWakeAt) {
     throw new Error("缺少 nextWakeAt，无法创建 hosted wake one-shot job");
   }
-  return createHostedCheckinCronPlan(config, target, {
-    plannedWakeAt,
-    role: "wake",
+  const recoveryWakeAt = buildRecoveryWakeAtIso(normalizedWakeAt);
+  return createHostedCheckinPlanSet(config, target, {
+    jobs: [
+      {
+        followupContext,
+        plannedWakeAt: normalizedWakeAt,
+        role: "wake",
+      },
+      {
+        followupContext,
+        plannedWakeAt: recoveryWakeAt,
+        role: "recovery",
+      },
+    ],
   });
+}
+
+function createHostedCheckinPlanSet(
+  config: Partial<HostedCheckinConfig>,
+  target: CheckinResolvedTarget,
+  {
+    jobs,
+  }: {
+    jobs: Array<{
+      followupContext?: string;
+      plannedWakeAt: string;
+      role: HostedCheckinCronRole;
+    }>;
+  },
+): HostedCheckinCronSyncPlanSet {
+  const targetKey = buildCheckinTargetKey(target);
+  return {
+    jobs: jobs.map((job) => createHostedCheckinCronPlan(config, target, targetKey, job)),
+    senderId: target.senderId,
+    targetKey,
+    workspaceRoot: target.workspaceRoot,
+  };
 }
 
 function createHostedCheckinCronPlan(
   config: Partial<HostedCheckinConfig>,
   target: CheckinResolvedTarget,
+  targetKey: string,
   {
+    followupContext = "",
     plannedWakeAt,
     role,
   }: {
+    followupContext?: string;
     plannedWakeAt: string;
     role: HostedCheckinCronRole;
   },
-): HostedCheckinCronSyncPlan {
-  const targetKey = buildCheckinTargetKey(target);
+): HostedCheckinCronSyncJobPlan {
   const normalizedWakeAt = normalizeIsoTimestamp(plannedWakeAt);
+  if (!plannedWakeAt) {
+    throw new Error("缺少 nextWakeAt，无法创建 hosted wake one-shot job");
+  }
   if (!normalizedWakeAt) {
     throw new Error(`非法的 hosted checkin wake 时间：${plannedWakeAt}`);
   }
-  // Codeksei decides which single future one-shot job should exist. Hermes only
-  // persists that schedule plus origin metadata so runtime delivery can use the
-  // stored job.origin target without re-discovering a live session later.
+  // Codeksei decides which hosted wake/recovery job set should exist. Hermes
+  // only persists that schedule plus origin metadata so runtime delivery can
+  // use the stored job.origin target without re-discovering a live session
+  // later.
   return {
     env: buildHostedCheckinCronEnv(config, target),
     name: buildHostedCheckinJobName(targetKey, role),
     plannedWakeAt: normalizedWakeAt,
-    prompt: buildHostedCheckinCronPrompt(config, target),
+    prompt: buildHostedCheckinCronPrompt(config, target, { followupContext }),
     role,
     schedule: normalizedWakeAt,
     senderId: target.senderId,
@@ -196,6 +260,11 @@ function createHostedCheckinCronPlan(
 function buildHostedCheckinCronPrompt(
   config: Partial<HostedCheckinConfig>,
   target: CheckinResolvedTarget,
+  {
+    followupContext = "",
+  }: {
+    followupContext?: string;
+  } = {},
 ): string {
   // The prompt teaches Hermes when to tick/ack/complete, while actual delivery
   // routing comes from the persisted cron job origin metadata written by sync-checkin.
@@ -238,7 +307,7 @@ function buildHostedCheckinCronPrompt(
     "--result",
     "silent",
     "--sleep-for",
-    "6h",
+    CHECKIN_COMPLETION_SLEEP_FOR_PLACEHOLDER,
   ]);
   const completeSent = buildHostedCheckinCliCommand(target.workspaceRoot, [
     "system",
@@ -252,11 +321,19 @@ function buildHostedCheckinCronPrompt(
     "--result",
     "sent_message",
     "--sleep-for",
-    "6h",
+    CHECKIN_COMPLETION_SLEEP_FOR_PLACEHOLDER,
   ]);
   return [
-    "[SYSTEM: You are running one Codeksei hosted proactive checkin on Hermes. Hermes only executes this one-shot wake/recovery job; Codeksei remains the schedule source of truth.]",
+    "[SYSTEM: You are running one Codeksei hosted proactive checkin on Hermes. Hermes only executes the managed wake/recovery job set; Codeksei remains the schedule source of truth.]",
     "[SYSTEM: Do not create cron jobs yourself. Do not call codeksei start/shared:start/shared:watchdog. The attached codeksei-companion skill is the only companion workflow surface you should rely on.]",
+    ...(followupContext
+      ? [
+        "[SYSTEM: Additional internal follow-up context is provided below. Use it only as internal context for this proactive pass. Do not quote it verbatim to the user or expose internal planning.]",
+        "",
+        "Internal follow-up context:",
+        followupContext,
+      ]
+      : []),
     "",
     `1. Run this command first and inspect its JSON result: ${tickCommand}`,
     "2. Branch by tick status:",
@@ -266,11 +343,21 @@ function buildHostedCheckinCronPrompt(
     `3. Right after ack, run ${syncCommand}. This re-arms the 30 minute recovery fallback while the current proactive pass is executing.`,
     "4. Execute exactly one proactive pass using payload.text as the task instruction. Keep it stateful and lightweight. You may stay silent, produce one short final message, or only do backstage work.",
     "5. Before ending the run, you must execute exactly one completion command.",
+    `   - ${CHECKIN_COMPLETION_CONTEXT_GUIDANCE}`,
+    ...buildCheckinCompletionDurationGuidanceLines().map((line) => `   - ${line}`),
     `   - If your final response is the actual user-visible message, use a command like: ${completeSent}`,
     `   - If you intentionally stay silent, use a command like: ${completeSilent} and make your final response exactly [SILENT].`,
     "   - Use result=backstage_only only when you only did backstage work; in that case your final response must also be exactly [SILENT].",
     "6. Never skip checkin-complete after ack. Never execute more than one completion command in the same run.",
   ].join("\n");
+}
+
+function buildRecoveryWakeAtIso(plannedWakeAt: string): string {
+  const plannedWakeAtMs = Date.parse(plannedWakeAt);
+  if (!Number.isFinite(plannedWakeAtMs)) {
+    throw new Error(`非法的 hosted checkin wake 时间：${plannedWakeAt}`);
+  }
+  return new Date(plannedWakeAtMs + CHECKIN_ACTIVE_WAKE_TIMEOUT_MS).toISOString();
 }
 
 function buildHostedCheckinCronEnv(

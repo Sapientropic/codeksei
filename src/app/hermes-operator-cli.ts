@@ -21,7 +21,7 @@ import {
 } from "../core/host-mode";
 import {
   collectHostedCheckinCronSummary,
-  createHostedCheckinCronPlanFromTick,
+  createHostedCheckinCronPlanSetFromTick,
   type HostedCheckinCronSummary,
 } from "../core/hosted-checkin-cron";
 import {
@@ -31,9 +31,9 @@ import {
 } from "../checkin";
 import {
   resolveHermesHomePath,
-  syncCheckinCronViaHermesRepoLocal,
 } from "../core/hermes-repo-local";
 import { normalizeText } from "../core/text-normalization";
+import { syncHostedCheckinPlanSetViaHermes } from "../host/recipes/hermes/wake-forwarder";
 
 interface HermesInstallSkillOptions {
   dryRun?: boolean;
@@ -75,22 +75,28 @@ type HermesInstallSkillSideEffect = {
 
 type HermesSyncCheckinMutationData = {
   planned: {
-    name: string;
-    nextRunAt: string;
-    role: "recovery" | "wake";
+    jobs: Array<{
+      name: string;
+      nextRunAt: string;
+      role: "recovery" | "wake";
+      targetKey: string;
+    }>;
     targetKey: string;
   };
   summary: HostedCheckinCronSummary;
   sync: {
     chatId: string;
-    created: boolean;
     deliver: string;
-    jobId: string;
-    name: string;
-    nextRunAt: string;
+    jobs: Array<{
+      created: boolean;
+      deliver: string;
+      jobId: string;
+      name: string;
+      nextRunAt: string;
+      role: "recovery" | "wake";
+    }>;
     platform: string;
     removedJobIds: string[];
-    role: "recovery" | "wake";
     threadId: string;
   };
   target: {
@@ -305,7 +311,7 @@ export async function runHermesSyncCheckinCommand(
     config,
     target,
   });
-  const plan = createHostedCheckinCronPlanFromTick(config, target, tick);
+  const planSet = createHostedCheckinCronPlanSetFromTick(config, target, tick);
   const jobsFile = path.join(resolveHermesHomePath(config), "cron", "jobs.json");
 
   return runCliMutation<HermesSyncCheckinMutationData>({
@@ -319,22 +325,28 @@ export async function runHermesSyncCheckinCommand(
     dryRunResult: {
       data: {
         planned: {
-          name: plan.name,
-          nextRunAt: plan.plannedWakeAt,
-          role: plan.role,
-          targetKey: plan.targetKey,
+          jobs: planSet.jobs.map((job) => ({
+            name: job.name,
+            nextRunAt: job.plannedWakeAt,
+            role: job.role,
+            targetKey: job.targetKey,
+          })),
+          targetKey: planSet.targetKey,
         },
         summary: collectHostedCheckinCronSummary(config, target),
         sync: {
           chatId: "",
-          created: false,
           deliver: "origin",
-          jobId: "",
-          name: plan.name,
-          nextRunAt: plan.plannedWakeAt,
+          jobs: planSet.jobs.map((job) => ({
+            created: false,
+            deliver: "origin",
+            jobId: "",
+            name: job.name,
+            nextRunAt: job.plannedWakeAt,
+            role: job.role,
+          })),
           platform: "weixin",
           removedJobIds: [],
-          role: plan.role,
           threadId: "",
         },
         target,
@@ -348,43 +360,33 @@ export async function runHermesSyncCheckinCommand(
       text: [
         "hosted checkin sync dry-run",
         `status: ${tick.status}`,
-        `target: ${plan.targetKey}`,
-        `role: ${plan.role}`,
-        `nextRunAt: ${plan.plannedWakeAt}`,
+        `target: ${planSet.targetKey}`,
+        `roles: ${planSet.jobs.map((job) => job.role).join(", ")}`,
+        `nextRunAt: ${planSet.jobs.map((job) => `${job.role}:${job.plannedWakeAt}`).join(", ")}`,
         `jobsFile: ${jobsFile}`,
       ].join("\n"),
     },
     execute: async () => {
-      const sync = syncCheckinCronViaHermesRepoLocal(config, {
-        due_at_iso: plan.plannedWakeAt,
-        env: plan.env,
-        name: plan.name,
-        prompt: plan.prompt,
-        role: plan.role,
-        sender_id: plan.senderId,
-        target_key: plan.targetKey,
-        workspace_root: plan.workspaceRoot,
-      });
+      const sync = syncHostedCheckinPlanSetViaHermes(config, planSet);
       const summary = collectHostedCheckinCronSummary(config, target);
       return {
         data: {
           planned: {
-            name: plan.name,
-            nextRunAt: plan.plannedWakeAt,
-            role: plan.role,
-            targetKey: plan.targetKey,
+            jobs: planSet.jobs.map((job) => ({
+              name: job.name,
+              nextRunAt: job.plannedWakeAt,
+              role: job.role,
+              targetKey: job.targetKey,
+            })),
+            targetKey: planSet.targetKey,
           },
           summary,
           sync: {
             chatId: sync.chatId,
-            created: sync.created,
             deliver: sync.deliver,
-            jobId: sync.jobId,
-            name: sync.name,
-            nextRunAt: sync.nextRunAt,
+            jobs: sync.jobs,
             platform: sync.platform,
             removedJobIds: sync.removedJobIds,
-            role: sync.role,
             threadId: sync.threadId,
           },
           target,
@@ -396,29 +398,29 @@ export async function runHermesSyncCheckinCommand(
           },
         },
         text: [
-          `hosted checkin synced: ${sync.jobId}`,
+          `hosted checkin synced: ${sync.jobs.map((job) => `${job.role}:${job.jobId}`).join(", ")}`,
           `status: ${tick.status}`,
-          `role: ${plan.role}`,
-          `nextRunAt: ${sync.nextRunAt}`,
+          `roles: ${planSet.jobs.map((job) => job.role).join(", ")}`,
+          `nextRunAt: ${sync.jobs.map((job) => `${job.role}:${job.nextRunAt}`).join(", ")}`,
           `removedFutureJobs: ${sync.removedJobIds.length}`,
         ].join("\n"),
       };
     },
     idempotencyKey: normalizeText(options.idempotencyKey),
     request: {
-      role: plan.role,
-      senderId: plan.senderId,
+      roles: planSet.jobs.map((job) => job.role),
+      senderId: planSet.senderId,
       status: tick.status,
-      targetKey: plan.targetKey,
-      workspaceRoot: plan.workspaceRoot,
-      nextRunAt: plan.plannedWakeAt,
+      targetKey: planSet.targetKey,
+      workspaceRoot: planSet.workspaceRoot,
+      nextRunAt: planSet.jobs.map((job) => job.plannedWakeAt),
     },
     resolvedTargets: {
       jobsFile,
-      role: plan.role,
-      senderId: plan.senderId,
-      targetKey: plan.targetKey,
-      workspaceRoot: plan.workspaceRoot,
+      roles: planSet.jobs.map((job) => job.role),
+      senderId: planSet.senderId,
+      targetKey: planSet.targetKey,
+      workspaceRoot: planSet.workspaceRoot,
     },
     sideEffects: [
       {

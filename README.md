@@ -184,8 +184,8 @@ codeksei host smoke --provider hermes
 
 - `Timeline`：把已经发生过的时间块、切换点和生活事实钉成时间感与记忆锚点，不让一天只剩模糊印象
 - `Diary`：Todo、碎片、补充记录、总结，以及和 timeline 紧密联动的时间线事实，帮你把零散日常慢慢收成可用痕迹
-- `Check-ins`：主动唤醒与主动分忧。发一句消息只是其中一种；它也会先回看上下文、整理后台、补一条 diary / timeline、留一个提醒，再决定是不是该主动露个面。Codeksei 负责生成 proactive trigger、维护 `tick -> ack -> complete` 的调度真相，并在 `checkin-complete` 时写回下一次唤醒；Bridge Mode 下由本地 poller 包装 heartbeat 与入队，Hermes Hosted Mode 下由 Hermes 只持有 one-shot wake/recovery job，真正的下一次唤醒仍由 Codeksei 在 `checkin-complete` 里决定
-- `Reminders`：提醒写入与调度，给生活节奏和待办推进一个外部支点
+- `Check-ins`：主动唤醒与主动分忧。发一句消息只是其中一种；它也会先回看上下文、整理后台、补一条 diary / timeline、留一个提醒，再决定是不是该主动露个面。Codeksei 负责生成 proactive trigger、维护 `tick -> ack -> complete` 的调度真相，并在 `checkin-complete` 时写回下一次唤醒；Bridge Mode 下由本地 poller 包装 heartbeat 与入队，Hermes Hosted Mode 下由 Hermes 只执行受控 wake/recovery job set，真正的下一次唤醒仍由 Codeksei 在 `checkin-complete` 里决定
+- `Reminders`：提醒写入与调度，给生活节奏和待办推进一个外部支点。Hermes Hosted Mode 下默认是用户可见提醒；若要把内部后续跟进改成未来 proactive 唤醒，用 `reminder write --delivery proactive`
 - `Review`：nightly / weekly / monthly，把日常记录压成更稳定的节奏校准与复盘材料
 - `Project support`：workspace bootstrap、project radar、按 workspace 恢复共享线程。项目切走再回来时，不用先把整条线在脑子里重建一遍；本地 git 仍是第一真相，只有 repo 缺失或不是 git repo 时才回退到 GitHub activity continuity signal
 - `WeChat bridge`
@@ -372,11 +372,11 @@ codeksei system checkin --range 3-60
 codeksei system checkin --reset
 codeksei host seed-proactive --provider hermes --user <wechat_user_id> --workspace /absolute/workspace
 codeksei host claim-checkin --provider hermes --user <wechat_user_id> --workspace /absolute/workspace
-codeksei host settle-checkin --provider hermes --user <wechat_user_id> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for 6h
+codeksei host settle-checkin --provider hermes --user <wechat_user_id> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for <duration>
 codeksei system checkin-trigger --user <wechat_user_id> --workspace /absolute/workspace
 codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace
 codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace --ack <triggerId>
-codeksei system checkin-complete --user <wechat_user_id> --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for 6h
+codeksei system checkin-complete --user <wechat_user_id> --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for <duration>
 codeksei operator hermes sync-checkin --user <wechat_user_id> --workspace /absolute/workspace
 ```
 

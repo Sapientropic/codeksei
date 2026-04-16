@@ -236,8 +236,10 @@ def _build_reminder_name(origin: Dict[str, str], text: str, due_at_iso: str, wor
 def _build_reminder_prompt(text: str) -> str:
     return (
         "[SYSTEM: This reminder was scheduled by Codeksei. "
-        "When this cron job runs, respond with exactly the reminder body below. "
-        "Do not add greeting, explanation, markdown, quote marks, or any extra text.]\n\n"
+        "Use the reminder context below to send one short, natural, user-visible reminder right now. "
+        "Rephrase it for the user instead of quoting it verbatim. "
+        "Do not expose internal planning, scheduling machinery, or analysis. "
+        "Respond with plain text only.]\n\n"
         f"{text.strip()}"
     )
 
@@ -328,6 +330,46 @@ def _normalize_job_env(value: Any) -> Dict[str, str]:
             continue
         normalized[key] = str(raw_value if raw_value is not None else "")
     return normalized
+
+
+def _normalize_sync_checkin_plan(value: Any) -> Dict[str, Any]:
+    if not isinstance(value, dict):
+        raise RuntimeError("sync_checkin_cron plan must be an object")
+
+    due_at_iso = _normalize_iso_timestamp(value.get("due_at_iso"))
+    env = _normalize_job_env(value.get("env"))
+    prompt = str(value.get("prompt") or "").strip()
+    role = _normalize_checkin_role(value.get("role"))
+    target_key = str(value.get("target_key") or "").strip()
+    workspace_root = str(value.get("workspace_root") or "").strip()
+    sender_id = str(value.get("sender_id") or "").strip()
+    name = str(value.get("name") or "").strip()
+
+    if not due_at_iso:
+        raise RuntimeError("sync_checkin_cron plan is missing due_at_iso")
+    if not prompt:
+        raise RuntimeError("sync_checkin_cron plan is missing prompt")
+    if not role:
+        raise RuntimeError("sync_checkin_cron plan role must be wake or recovery")
+    if not target_key:
+        raise RuntimeError("sync_checkin_cron plan is missing target_key")
+    if not workspace_root:
+        raise RuntimeError("sync_checkin_cron plan is missing workspace_root")
+    if not sender_id:
+        raise RuntimeError("sync_checkin_cron plan is missing sender_id")
+    if not name:
+        raise RuntimeError("sync_checkin_cron plan is missing name")
+
+    return {
+        "due_at_iso": due_at_iso,
+        "env": env,
+        "name": name,
+        "prompt": prompt,
+        "role": role,
+        "sender_id": sender_id,
+        "target_key": target_key,
+        "workspace_root": workspace_root,
+    }
 
 
 def _build_checkin_job_updates(
@@ -431,30 +473,20 @@ def _handle_sync_checkin_cron(request: Dict[str, Any], origin_context: Dict[str,
     payload = request.get("payload") or {}
     if not isinstance(payload, dict):
         raise RuntimeError("sync_checkin_cron payload must be an object")
+    raw_plans = payload.get("plans")
+    if raw_plans is None:
+        plans = [_normalize_sync_checkin_plan(payload)]
+    else:
+        if not isinstance(raw_plans, list) or not raw_plans:
+            raise RuntimeError("sync_checkin_cron payload plans must be a non-empty array")
+        plans = [_normalize_sync_checkin_plan(plan) for plan in raw_plans]
 
-    due_at_iso = _normalize_iso_timestamp(payload.get("due_at_iso"))
-    env = _normalize_job_env(payload.get("env"))
-    prompt = str(payload.get("prompt") or "").strip()
-    role = _normalize_checkin_role(payload.get("role"))
-    target_key = str(payload.get("target_key") or "").strip()
-    workspace_root = str(payload.get("workspace_root") or "").strip()
-    sender_id = str(payload.get("sender_id") or "").strip()
-    name = str(payload.get("name") or "").strip()
-
-    if not due_at_iso:
-        raise RuntimeError("sync_checkin_cron payload is missing due_at_iso")
-    if not prompt:
-        raise RuntimeError("sync_checkin_cron payload is missing prompt")
-    if not role:
-        raise RuntimeError("sync_checkin_cron payload role must be wake or recovery")
-    if not target_key:
-        raise RuntimeError("sync_checkin_cron payload is missing target_key")
-    if not workspace_root:
-        raise RuntimeError("sync_checkin_cron payload is missing workspace_root")
-    if not sender_id:
-        raise RuntimeError("sync_checkin_cron payload is missing sender_id")
-    if not name:
-        raise RuntimeError("sync_checkin_cron payload is missing name")
+    target_key = plans[0]["target_key"]
+    workspace_root = plans[0]["workspace_root"]
+    sender_id = plans[0]["sender_id"]
+    for plan in plans[1:]:
+        if plan["target_key"] != target_key or plan["workspace_root"] != workspace_root or plan["sender_id"] != sender_id:
+            raise RuntimeError("sync_checkin_cron payload plans must share the same target")
 
     origin = origin_context["origin"]
     if not origin["platform"] or not origin["chat_id"]:
@@ -471,64 +503,87 @@ def _handle_sync_checkin_cron(request: Dict[str, Any], origin_context: Dict[str,
             continue
         managed_jobs.append(job)
 
-    desired_job = None
-    stale_jobs = []
+    desired_roles = {plan["role"] for plan in plans}
+    desired_jobs_by_role: Dict[str, Dict[str, Any]] = {}
+    duplicate_jobs = []
     for job in managed_jobs:
         job_role = _normalize_checkin_role(job.get("codeksei_checkin_role"))
-        if job_role == role and desired_job is None:
-            desired_job = job
+        if job_role and job_role not in desired_jobs_by_role:
+            desired_jobs_by_role[job_role] = job
             continue
-        stale_jobs.append(job)
+        duplicate_jobs.append(job)
 
-    updates = _build_checkin_job_updates(
-        due_at_iso=due_at_iso,
-        env=env,
-        name=name,
-        origin=origin,
-        prompt=prompt,
-        role=role,
-        sender_id=sender_id,
-        target_key=target_key,
-        workspace_root=workspace_root,
-    )
-    created = False
-    if desired_job:
-        job = _update_checkin_job(
-            job_id=str(desired_job.get("id") or "").strip(),
-            updates=updates,
-            update_job=update_job,
+    synced_jobs = []
+    kept_job_ids = set()
+    for plan in plans:
+        updates = _build_checkin_job_updates(
+            due_at_iso=plan["due_at_iso"],
+            env=plan["env"],
+            name=plan["name"],
+            origin=origin,
+            prompt=plan["prompt"],
+            role=plan["role"],
+            sender_id=plan["sender_id"],
+            target_key=plan["target_key"],
+            workspace_root=plan["workspace_root"],
         )
-    else:
-        created = True
-        created_job = _create_checkin_job(
-            create_job=create_job,
-            deliver="origin",
-            env=env,
-            name=name,
-            origin={
-                "platform": origin["platform"],
-                "chat_id": origin["chat_id"],
-                "chat_name": origin.get("chat_name") or None,
-                "thread_id": origin.get("thread_id") or None,
-            },
-            prompt=prompt,
-            skills=["codeksei-companion"],
-            due_at_iso=due_at_iso,
-        )
-        job = _update_checkin_job(
-            job_id=str(created_job.get("id") or "").strip(),
-            updates=updates,
-            update_job=update_job,
-        )
+        desired_job = desired_jobs_by_role.get(plan["role"])
+        created = False
+        if desired_job:
+            job = _update_checkin_job(
+                job_id=str(desired_job.get("id") or "").strip(),
+                updates=updates,
+                update_job=update_job,
+            )
+        else:
+            created = True
+            created_job = _create_checkin_job(
+                create_job=create_job,
+                deliver="origin",
+                env=plan["env"],
+                name=plan["name"],
+                origin={
+                    "platform": origin["platform"],
+                    "chat_id": origin["chat_id"],
+                    "chat_name": origin.get("chat_name") or None,
+                    "thread_id": origin.get("thread_id") or None,
+                },
+                prompt=plan["prompt"],
+                skills=["codeksei-companion"],
+                due_at_iso=plan["due_at_iso"],
+            )
+            job = _update_checkin_job(
+                job_id=str(created_job.get("id") or "").strip(),
+                updates=updates,
+                update_job=update_job,
+            )
+        if not job:
+            raise RuntimeError("failed to create or update Hermes hosted checkin cron job")
+        job_id = str(job.get("id") or "").strip()
+        if job_id:
+            kept_job_ids.add(job_id)
+        synced_jobs.append({
+            "created": created,
+            "deliver": str(job.get("deliver") or ""),
+            "job_id": job_id,
+            "name": str(job.get("name") or ""),
+            "next_run_at": str(job.get("next_run_at") or ""),
+            "role": plan["role"],
+        })
+
+    stale_jobs = list(duplicate_jobs)
+    for role, job in desired_jobs_by_role.items():
+        if role not in desired_roles:
+            stale_jobs.append(job)
 
     removed_job_ids = []
-    # Only prune stale future jobs after the desired wake/recovery job already
-    # exists. Duplicates are acceptable for one sync cycle; removing the old
-    # recovery wake first can strand hosted check-in with zero future jobs if
+    # Only prune stale future jobs after every desired wake/recovery job already
+    # exists. Duplicates are acceptable for one sync cycle; removing old jobs
+    # first can strand hosted check-in with zero future jobs if a later
     # create/update fails midway.
     for stale_job in stale_jobs:
         job_id = str(stale_job.get("id") or "").strip()
-        if not job_id:
+        if not job_id or job_id in kept_job_ids:
             continue
         try:
             remove_job(job_id)
@@ -536,15 +591,9 @@ def _handle_sync_checkin_cron(request: Dict[str, Any], origin_context: Dict[str,
         except Exception:
             continue
 
-    if not job:
-        raise RuntimeError("failed to create or update Hermes hosted checkin cron job")
-
     return {
-        "created": created,
-        "deliver": str(job.get("deliver") or ""),
-        "job_id": str(job.get("id") or ""),
-        "name": str(job.get("name") or ""),
-        "next_run_at": str(job.get("next_run_at") or ""),
+        "deliver": "origin",
+        "jobs": synced_jobs,
         "removed_job_ids": removed_job_ids,
         "session_key": str(origin_context.get("session_key") or request.get("session_key") or ""),
         "session_id": str(origin_context.get("session_id") or ""),

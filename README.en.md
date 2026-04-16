@@ -180,8 +180,8 @@ Boundaries:
 
 - `Timeline`: time blocks, switches, and lived facts become anchors for memory and time sense instead of fading into a blur
 - `Diary`: todos, fragments, supplements, summaries, and timeline-linked facts for daily traces that want to stay
-- `Check-ins`: proactive wake-ups and background care. Messaging is only one output path; Codeksei can also reread context, clean up backstage state, update diary/timeline, or leave a reminder before deciding whether it should surface. It owns proactive trigger generation, the `tick -> ack -> complete` schedule truth, and the next wake decision written in `checkin-complete`; Bridge Mode wraps that truth with a local poller, while Hermes Hosted Mode only holds a one-shot wake/recovery job and still defers the true next wake to Codeksei
-- `Reminders`: reminder write and scheduling support for rhythm and follow-through
+- `Check-ins`: proactive wake-ups and background care. Messaging is only one output path; Codeksei can also reread context, clean up backstage state, update diary/timeline, or leave a reminder before deciding whether it should surface. It owns proactive trigger generation, the `tick -> ack -> complete` schedule truth, and the next wake decision written in `checkin-complete`; Bridge Mode wraps that truth with a local poller, while Hermes Hosted Mode only executes a managed wake/recovery job set and still defers the true next wake to Codeksei
+- `Reminders`: reminder write and scheduling support for rhythm and follow-through. In Hermes Hosted Mode the default is a user-visible reminder; use `reminder write --delivery proactive` when the text should become a future proactive wake instead of a direct message
 - `Review`: nightly / weekly / monthly review, with hybrid semantic extraction by default
 - `Project support`: workspace bootstrap, project radar, and shared-thread recovery by workspace so re-entry does not always start from scratch; local git remains the first truth and GitHub activity is only a fallback continuity signal
 - `WeChat bridge`: owned by Codeksei in Bridge Mode; Hermes Hosted Mode should use Hermes official Weixin
@@ -363,11 +363,11 @@ codeksei system checkin --range 3-60
 codeksei system checkin --reset
 codeksei host seed-proactive --provider hermes --user <wechat_user_id> --workspace /absolute/workspace
 codeksei host claim-checkin --provider hermes --user <wechat_user_id> --workspace /absolute/workspace
-codeksei host settle-checkin --provider hermes --user <wechat_user_id> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for 6h
+codeksei host settle-checkin --provider hermes --user <wechat_user_id> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for <duration>
 codeksei system checkin-trigger --user <wechat_user_id> --workspace /absolute/workspace
 codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace
 codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace --ack <triggerId>
-codeksei system checkin-complete --user <wechat_user_id> --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for 6h
+codeksei system checkin-complete --user <wechat_user_id> --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for <duration>
 codeksei operator hermes sync-checkin --user <wechat_user_id> --workspace /absolute/workspace
 ```
 

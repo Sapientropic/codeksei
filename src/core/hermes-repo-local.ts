@@ -60,17 +60,22 @@ export interface HermesRepoLocalReminderResult {
 
 export interface HermesRepoLocalSyncCheckinCronResult {
   chatId: string;
+  deliver: string;
+  jobs: HermesRepoLocalSyncCheckinCronJobResult[];
+  platform: string;
+  removedJobIds: string[];
+  sessionId: string;
+  sessionKey: string;
+  threadId: string;
+}
+
+export interface HermesRepoLocalSyncCheckinCronJobResult {
   created: boolean;
   deliver: string;
   jobId: string;
   name: string;
   nextRunAt: string;
-  platform: string;
-  removedJobIds: string[];
   role: "recovery" | "wake";
-  sessionId: string;
-  sessionKey: string;
-  threadId: string;
 }
 
 interface HermesRepoLocalEnvelope<TData> {
@@ -94,12 +99,24 @@ interface HermesRepoLocalReminderPayload {
   sender_id?: string;
 }
 
-interface HermesRepoLocalSyncCheckinCronPayload {
+interface HermesRepoLocalSyncCheckinCronPlanPayload {
   due_at_iso: string;
   env?: Record<string, string>;
   name: string;
   prompt: string;
   role: "recovery" | "wake";
+  sender_id: string;
+  target_key: string;
+  workspace_root: string;
+}
+
+interface HermesRepoLocalSyncCheckinCronPayload {
+  plans?: HermesRepoLocalSyncCheckinCronPlanPayload[];
+  due_at_iso?: string;
+  env?: Record<string, string>;
+  name?: string;
+  prompt?: string;
+  role?: "recovery" | "wake";
   sender_id: string;
   target_key: string;
   workspace_root: string;
@@ -132,11 +149,8 @@ interface HermesRepoLocalReminderShimResult {
 }
 
 interface HermesRepoLocalSyncCheckinCronShimResult {
-  created?: unknown;
   deliver?: string;
-  job_id?: string;
-  name?: string;
-  next_run_at?: string;
+  jobs?: unknown;
   removed_job_ids?: unknown;
   session_id?: string;
   session_key?: string;
@@ -145,6 +159,10 @@ interface HermesRepoLocalSyncCheckinCronShimResult {
     chat_id?: string;
     thread_id?: string;
   };
+  created?: unknown;
+  job_id?: string;
+  name?: string;
+  next_run_at?: string;
 }
 
 interface HermesRepoLocalInvocation {
@@ -301,14 +319,10 @@ export function syncCheckinCronViaHermesRepoLocal(
   });
   return {
     chatId: normalizeText(data.origin?.chat_id),
-    created: Boolean(data.created),
     deliver: normalizeText(data.deliver) || "origin",
-    jobId: normalizeText(data.job_id),
-    name: normalizeText(data.name) || normalizeText(payload.name),
-    nextRunAt: normalizeText(data.next_run_at) || normalizeText(payload.due_at_iso),
+    jobs: normalizeSyncCheckinCronJobs(data, payload),
     platform: normalizeText(data.origin?.platform) || "weixin",
     removedJobIds: normalizeStringList(data.removed_job_ids),
-    role: payload.role,
     sessionId: normalizeText(data.session_id),
     sessionKey: normalizeText(data.session_key),
     threadId: normalizeText(data.origin?.thread_id),
@@ -456,4 +470,59 @@ function normalizeStringList(value: unknown): string[] {
   return value
     .map((entry) => normalizeText(entry))
     .filter(Boolean);
+}
+
+function normalizeSyncCheckinCronJobs(
+  data: HermesRepoLocalSyncCheckinCronShimResult,
+  payload: HermesRepoLocalSyncCheckinCronPayload,
+): HermesRepoLocalSyncCheckinCronJobResult[] {
+  const normalizedFromJobs = Array.isArray(data.jobs)
+    ? data.jobs
+      .map((job) => normalizeSyncCheckinCronJob(job))
+      .filter((job): job is HermesRepoLocalSyncCheckinCronJobResult => Boolean(job))
+    : [];
+  if (normalizedFromJobs.length > 0) {
+    return normalizedFromJobs;
+  }
+
+  const legacyPlan = payload.plans?.[0] || payload;
+  const legacyJob = normalizeSyncCheckinCronJob({
+    created: data.created,
+    deliver: data.deliver,
+    job_id: data.job_id,
+    name: data.name || legacyPlan.name,
+    next_run_at: data.next_run_at || legacyPlan.due_at_iso,
+    role: "role" in legacyPlan ? legacyPlan.role : payload.role,
+  });
+  return legacyJob ? [legacyJob] : [];
+}
+
+function normalizeSyncCheckinCronJob(value: unknown): HermesRepoLocalSyncCheckinCronJobResult | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const source = value as Record<string, unknown>;
+  const role = normalizeSyncCheckinCronRole(source.role);
+  const jobId = normalizeText(source.job_id);
+  const name = normalizeText(source.name);
+  const nextRunAt = normalizeText(source.next_run_at);
+  if (!role || !jobId || !name || !nextRunAt) {
+    return null;
+  }
+  return {
+    created: Boolean(source.created),
+    deliver: normalizeText(source.deliver) || "origin",
+    jobId,
+    name,
+    nextRunAt,
+    role,
+  };
+}
+
+function normalizeSyncCheckinCronRole(value: unknown): "recovery" | "wake" | "" {
+  const normalized = normalizeText(value).toLowerCase();
+  if (normalized === "wake" || normalized === "recovery") {
+    return normalized;
+  }
+  return "";
 }
