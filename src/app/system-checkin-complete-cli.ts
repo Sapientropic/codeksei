@@ -15,6 +15,7 @@ import {
 } from "../checkin";
 import { buildTerminalLeafHelp } from "../core/command-registry";
 import type { AppRuntimeConfig } from "../core/app-service-contract";
+import { tryRefreshContextBoard, type ContextBoardConfig } from "../context/board";
 import { resolveHostMode } from "../core/host-mode";
 import { createHostedCheckinWakePlanSet } from "../core/hosted-checkin-cron";
 import { formatCheckinRange } from "../state/checkin-config";
@@ -31,7 +32,7 @@ interface SystemCheckinCompleteOptions {
   workspace: string;
 }
 
-type RuntimeConfig = Pick<AppRuntimeConfig, "checkinConfigFile" | "checkinScheduleStateFile"> & Partial<Pick<
+type RuntimeConfig = ContextBoardConfig & Pick<AppRuntimeConfig, "checkinConfigFile" | "checkinScheduleStateFile"> & Partial<Pick<
   AppRuntimeConfig,
   | "accountId"
   | "allowedUserIds"
@@ -103,6 +104,10 @@ export async function runSystemCheckinCompleteCommand(
       sleepFor: options.sleepFor,
       target: resolution.value,
       triggerId: options.trigger,
+    });
+    tryRefreshContextBoard(config, resolution.value, {
+      clearFollowupContext: true,
+      mode: "proactive",
     });
     const hostMode = resolveHostMode(config);
     const hostedWakeSync = hostMode.profile === "hosted-hermes-weixin"

@@ -33,6 +33,7 @@ function assertSharedReadmeCliContract(doc: string, name: string) {
   assert.ok(doc.includes(buildTerminalEntryUsage("host.bootstrap", "public")), `${name} should mention host bootstrap`);
   assert.ok(doc.includes(buildTerminalEntryUsage("host.doctor", "public")), `${name} should mention host doctor`);
   assert.ok(doc.includes(buildTerminalEntryUsage("host.smoke", "public")), `${name} should mention host smoke`);
+  assert.ok(doc.includes(buildTerminalEntryUsage("context.briefing", "public")), `${name} should mention context briefing`);
   assert.ok(doc.includes(buildTerminalEntryUsage("host.seed_proactive", "public")), `${name} should mention host seed-proactive`);
   assert.ok(doc.includes(buildTerminalEntryUsage("host.claim_checkin", "public")), `${name} should mention host claim-checkin`);
   assert.ok(doc.includes(buildTerminalEntryUsage("host.settle_checkin", "public")), `${name} should mention host settle-checkin`);
@@ -70,6 +71,7 @@ test("docs/commands keeps public CLI examples aligned with the terminal usage so
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("host.manifest", "public")));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("host.bootstrap", "public")));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("host.doctor", "public")));
+  assert.ok(commandsDoc.includes(buildTerminalEntryUsage("context.briefing", "public")));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("host.claim_checkin", "public")));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("host.settle_checkin", "public")));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("timeline.event", "public")));

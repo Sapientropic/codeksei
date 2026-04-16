@@ -1,13 +1,15 @@
 import type { AppRuntimeConfig } from "../../core/app-service-contract";
+import { tryRefreshContextBoard, type ContextBoardConfig } from "../../context/board";
 import {
   runCheckinScheduleNextWake,
   runCheckinTick,
   type CheckinResolvedTarget,
 } from "../../checkin";
+import type { HostedCheckinConfig } from "../recipes/hermes/wake-forwarder";
 import { syncHostedCheckinPlanSetViaHermes, syncHostedCheckinPlanViaHermes } from "../recipes/hermes/wake-forwarder";
 import { createHostedCheckinWakePlanSet } from "../../core/hosted-checkin-cron";
 
-type SeedConfig = Pick<
+type SeedConfig = ContextBoardConfig & Pick<
   AppRuntimeConfig,
   "checkinConfigFile" | "checkinScheduleStateFile"
 > & Partial<Pick<
@@ -31,17 +33,21 @@ export function seedProactiveCheckin(
     nextWakeAt?: string;
   },
 ) {
+  tryRefreshContextBoard(config, target, {
+    followupContext,
+    mode: "proactive",
+  });
   if (provider === "hermes" && nextWakeAt) {
     const scheduled = runCheckinScheduleNextWake({
       config,
       nextWakeAt,
       target,
     });
-    const plan = createHostedCheckinWakePlanSet(config, target, {
+    const plan = createHostedCheckinWakePlanSet(config as Partial<HostedCheckinConfig>, target, {
       followupContext,
       plannedWakeAt: scheduled.nextWakeAt,
     });
-    const sync = syncHostedCheckinPlanSetViaHermes(config, plan);
+    const sync = syncHostedCheckinPlanSetViaHermes(config as Partial<HostedCheckinConfig>, plan);
     return {
       status: "seeded",
       nextWakeAt: scheduled.nextWakeAt,
@@ -55,7 +61,7 @@ export function seedProactiveCheckin(
     target,
   });
   if (provider === "hermes") {
-    const synced = syncHostedCheckinPlanViaHermes(config, target, tick, {
+    const synced = syncHostedCheckinPlanViaHermes(config as Partial<HostedCheckinConfig>, target, tick, {
       followupContext,
     });
     return {

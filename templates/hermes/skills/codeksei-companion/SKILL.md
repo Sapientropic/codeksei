@@ -49,6 +49,7 @@ codeksei review nightly
 codeksei review weekly
 codeksei review monthly
 codeksei project radar --project <slug> --json
+codeksei context briefing --user <wechatUserId> --workspace /absolute/workspace --mode proactive
 codeksei host seed-proactive --provider hermes --user <wechatUserId> --workspace /absolute/workspace
 codeksei host claim-checkin --provider hermes --user <wechatUserId> --workspace /absolute/workspace
 codeksei host settle-checkin --provider hermes --user <wechatUserId> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for <duration>
@@ -65,6 +66,7 @@ codeksei host settle-checkin --provider hermes --user <wechatUserId> --workspace
    - `note` for durable memory
    - `review` for structured reflection
    - `project radar` for repo continuity
+   - `context briefing` for inspecting the current proactive/review handoff board
    - `host seed-proactive / claim-checkin / settle-checkin` for hosted proactive checkin
 3. When a command returns JSON, use the returned facts directly instead of paraphrasing from memory.
 4. If a command fails because local state or dependencies are missing, explain the missing prerequisite exactly and stop instead of guessing.
@@ -82,6 +84,7 @@ codeksei host settle-checkin --provider hermes --user <wechatUserId> --workspace
 
 Flow:
 
+0. Hermes hosted proactive wakes now receive a fresh Codeksei context board via the cron job's pre-run script. Treat that Script Output block as the current-state handoff, not as raw vault data.
 1. `host seed-proactive` creates or repairs the first future wake when Hermes needs a one-shot job to exist.
 2. `host claim-checkin` asks Codeksei whether a proactive pass is due.
 3. If status is `claimed`, Hermes must use `payload.text` as the task instruction and keep `lease.id` for completion.
@@ -94,6 +97,7 @@ Reminder note:
 
 - Default `reminder write` is for user-visible reminders.
 - Use `codeksei reminder write --delivery proactive ...` when the text is internal follow-up context that should re-enter the proactive checkin chain later instead of being sent directly to the user.
+- If the user says something that should affect future proactive judgement, do not leave it only in chat memory: write it into Codeksei state via diary supplement, companion note, or proactive follow-up context.
 
 Compatibility note:
 

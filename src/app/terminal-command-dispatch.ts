@@ -1,4 +1,5 @@
 import { runChannelSendFileCommand } from "./channel-send-file-cli";
+import { runContextBriefingCommand } from "./context-briefing-cli";
 import { runDiaryWriteCommand } from "./diary-write-cli";
 import {
   runHostBootstrapCommand,
@@ -174,6 +175,9 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
   },
   "channel.send-file": async (_manifest, context) => {
     return runChannelSendFileCommand(context.getApp() as ChannelSendFileApp, context.leafArgs, context.config);
+  },
+  "context.briefing": async (_manifest, context) => {
+    return runContextBriefingCommand(context.config, context.leafArgs);
   },
   "note.sync": async (_manifest, context) => {
     return runNoteSyncCommand(context.config, context.leafArgs);

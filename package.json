@@ -64,6 +64,7 @@
     "note:auto": "node ./dist/src/index.js note auto",
     "note:maybe": "node ./dist/src/index.js note maybe",
     "note:sync": "node ./dist/src/index.js note sync",
+    "context:briefing": "node ./dist/src/index.js context briefing",
     "project:radar": "node ./dist/src/index.js project radar",
     "review:nightly": "node ./dist/src/index.js review nightly",
     "review:weekly": "node ./dist/src/index.js review weekly",

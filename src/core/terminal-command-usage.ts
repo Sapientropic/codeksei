@@ -17,6 +17,7 @@ type CommandActionLike = Pick<
 
 const ACTION_USAGE_ARGS: Readonly<Partial<Record<CommandActionId, string>>> = Object.freeze({
   "channel.send_file": "--path /绝对路径",
+  "context.briefing": "--user <wechat_user_id> --workspace /绝对路径 [--mode proactive|review]",
   "diary.append": "--section todo --state open --text \"内容\"",
   "note.auto": "(--project <slug> | --scope <name>) --kind <kind> [--text \"内容\" | --stdin]",
   "note.maybe": "[--project <slug> | --scope <name>] [--kind <kind>] [--json]",

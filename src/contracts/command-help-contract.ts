@@ -28,6 +28,15 @@ type CommandHelpContext = Record<string, unknown>;
 type CommandHelpBuilder<TContext extends CommandHelpContext = CommandHelpContext> = (context: TContext) => CommandHelpDocument;
 
 const TOPIC_HELP = {
+  context: () => ({
+    usage: [buildExample("context.briefing", true)],
+    bodyLabel: "补充：",
+    body: [
+      "  这条命令会先刷新本地 context board，再输出一份 prompt-ready handoff。",
+      "  board 默认落在 CODEKSEI_STATE_DIR/context/boards/ 下，按 sender + workspace 分目标维护。",
+      "  proactive 更偏主动判断；review 更偏复盘 framing 与重入提示。",
+    ],
+  }),
   reminder: () => ({
     usage: [buildExample("reminder.create", true)],
     bodyLabel: "补充：",
@@ -300,6 +309,20 @@ const LEAF_HELP = {
       "  codeksei note maybe --project <slug>",
       "  codeksei note maybe --scope companion --kind preference",
       "  codeksei note maybe --scope inspiration --json",
+    ],
+    includeFlagBlock: true,
+  }),
+  "context.briefing": () => ({
+    usage: [buildExample("context.briefing", true)],
+    bodyLabel: "说明：",
+    body: [
+      "  读取并刷新当前 sender/workspace 对应的 context board，再输出一份 prompt-ready handoff。",
+      "  board 只读受控输入集：today diary、companion note、checkin state、project radar、workspace bootstrap 入口。",
+      "  若看到 [⚠️ 需确认]，表示这块上下文偏薄或偏旧，不应被当作确定事实。",
+    ],
+    examples: [
+      "  codeksei context briefing --user <wechatUserId> --workspace /absolute/workspace",
+      "  codeksei context briefing --user <wechatUserId> --workspace /absolute/workspace --mode review",
     ],
     includeFlagBlock: true,
   }),

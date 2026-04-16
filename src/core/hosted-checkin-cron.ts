@@ -4,6 +4,7 @@ import * as path from "node:path";
 
 import { resolveRuntimeEntrypointAbsolute } from "../contracts/runtime-entrypoints";
 import type { AppRuntimeConfig } from "./app-service-contract";
+import { buildContextBriefingJobEnv, resolveHermesContextBriefingScriptPath } from "../context/briefing-script";
 import {
   CHECKIN_ACTIVE_WAKE_TIMEOUT_MS,
   buildCheckinTargetKey,
@@ -29,6 +30,7 @@ export interface HostedCheckinCronSyncJobPlan {
   prompt: string;
   role: HostedCheckinCronRole;
   schedule: string;
+  script: string;
   senderId: string;
   targetKey: string;
   workspaceRoot: string;
@@ -251,6 +253,7 @@ function createHostedCheckinCronPlan(
     prompt: buildHostedCheckinCronPrompt(config, target, { followupContext }),
     role,
     schedule: normalizedWakeAt,
+    script: resolveHermesContextBriefingScriptPath(config),
     senderId: target.senderId,
     targetKey,
     workspaceRoot: target.workspaceRoot,
@@ -326,6 +329,7 @@ function buildHostedCheckinCronPrompt(
   return [
     "[SYSTEM: You are running one Codeksei hosted proactive checkin on Hermes. Hermes only executes the managed wake/recovery job set; Codeksei remains the schedule source of truth.]",
     "[SYSTEM: Do not create cron jobs yourself. Do not call codeksei start/shared:start/shared:watchdog. The attached codeksei-companion skill is the only companion workflow surface you should rely on.]",
+    "[SYSTEM: Hermes injects a fresh Codeksei context board via the job script right before this run. Treat that Script Output block as your current-state handoff, and use followupContext only as one-shot internal carry-forward.]",
     ...(followupContext
       ? [
         "[SYSTEM: Additional internal follow-up context is provided below. Use it only as internal context for this proactive pass. Do not quote it verbatim to the user or expose internal planning.]",
@@ -369,8 +373,12 @@ function buildHostedCheckinCronEnv(
     CODEKSEI_CHANNEL_PROVIDER: "hermes",
     CODEKSEI_CHANNEL: "weixin",
     CODEKSEI_ALLOWED_USER_IDS: target.senderId,
+    CODEKSEI_CONTEXT_BRIEFING_MODE: "proactive",
+    CODEKSEI_CONTEXT_BRIEFING_USER: target.senderId,
+    CODEKSEI_CONTEXT_BRIEFING_WORKSPACE: target.workspaceRoot,
     CODEKSEI_WORKSPACE_ROOT: target.workspaceRoot,
   };
+  Object.assign(env, buildContextBriefingJobEnv());
   const stateDir = deriveHostedCheckinStateDir(config);
   if (stateDir) {
     env.CODEKSEI_STATE_DIR = stateDir;

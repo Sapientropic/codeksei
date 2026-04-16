@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { PACKAGE_NAME } from "../../contracts/app-env";
+import { bestEffortRefreshContextBoard, type ContextBoardConfig } from "../../context/board";
 import { LEGACY_TIMELINE_TIMEZONE } from "../../core/timezone";
 import { logWarn } from "../../core/logging";
 import { writeForeignTextDocument } from "../../state/json-state";
@@ -17,7 +18,7 @@ import {
   normalizeSection,
 } from "./shared";
 
-interface DiaryWriteConfig {
+interface DiaryWriteConfig extends ContextBoardConfig {
   cliIdempotencyLedgerFile?: string;
   diaryDir?: string;
   timezone?: unknown;
@@ -98,6 +99,9 @@ export async function runDiaryWriteCommand(config: DiaryWriteConfig, args: strin
         current,
       );
       writeForeignTextDocument(filePath, next, { encoding: "utf8" });
+      bestEffortRefreshContextBoard(config, {
+        mode: "proactive",
+      });
       return {
         data: {
           date: dateString,

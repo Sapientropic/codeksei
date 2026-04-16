@@ -35,6 +35,7 @@ test("repo-local sync_checkin_cron keeps the existing recovery job when wake cre
         name: "ck-checkin-wake",
         prompt: "run hosted checkin",
         role: "wake",
+        script: "/tmp/.hermes/scripts/codeksei_context_briefing.py",
         sender_id: "wx-user",
         target_key: "wx-user::/tmp/workspace",
         workspace_root: "/tmp/workspace",
@@ -47,6 +48,7 @@ test("repo-local sync_checkin_cron keeps the existing recovery job when wake cre
         name: "ck-checkin-recovery",
         prompt: "run hosted checkin recovery",
         role: "recovery",
+        script: "/tmp/.hermes/scripts/codeksei_context_briefing.py",
         sender_id: "wx-user",
         target_key: "wx-user::/tmp/workspace",
         workspace_root: "/tmp/workspace",
@@ -68,7 +70,7 @@ test("repo-local sync_checkin_cron keeps the existing recovery job when wake cre
 
 test("repo-local sync_checkin_cron degrades gracefully when Hermes create_job has no env kwarg", () => {
   const fixture = createBridgeFixture("no_env_kwarg", {
-    createJobSignature: "def create_job(prompt, schedule, name=None, repeat=1, deliver='local', origin=None, skills=None):",
+    createJobSignature: "def create_job(prompt, schedule, name=None, repeat=1, deliver='local', origin=None, skills=None, script=None):",
     initialJobs: [{
       id: "cron-recovery-1",
       name: "ck-checkin-recovery",
@@ -92,6 +94,7 @@ test("repo-local sync_checkin_cron degrades gracefully when Hermes create_job ha
         name: "ck-checkin-wake",
         prompt: "run hosted checkin",
         role: "wake",
+        script: "/tmp/.hermes/scripts/codeksei_context_briefing.py",
         sender_id: "wx-user",
         target_key: "wx-user::/tmp/workspace",
         workspace_root: "/tmp/workspace",
@@ -105,6 +108,7 @@ test("repo-local sync_checkin_cron degrades gracefully when Hermes create_job ha
         name: "ck-checkin-recovery",
         prompt: "run hosted checkin recovery",
         role: "recovery",
+        script: "/tmp/.hermes/scripts/codeksei_context_briefing.py",
         sender_id: "wx-user",
         target_key: "wx-user::/tmp/workspace",
         workspace_root: "/tmp/workspace",
@@ -148,7 +152,7 @@ function createBridgeFixture(
   prefix: string,
   {
     createJobBody = [],
-    createJobSignature = "def create_job(prompt, schedule, name=None, repeat=1, deliver='local', origin=None, skills=None, env=None):",
+    createJobSignature = "def create_job(prompt, schedule, name=None, repeat=1, deliver='local', origin=None, skills=None, env=None, script=None):",
     initialJobs = [],
   }: {
     createJobBody?: string[];
@@ -218,6 +222,7 @@ function buildFakeCronJobsModule({
       "        'origin': origin,",
       "        'skills': list(skills or []),",
       "        'skill': (list(skills or [])[:1] or [None])[0],",
+      "        'script': script,",
       "        'next_run_at': schedule,",
       "        'enabled': True,",
       "        'state': 'scheduled',",
