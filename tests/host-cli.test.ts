@@ -8,6 +8,7 @@ const { CheckinConfigStore } = require("../src/state/checkin-config-store");
 const { CheckinScheduleStateStore } = require("../src/state/checkin-schedule-state-store");
 const { runHostBootstrapCommand } = require("../src/app/host-bootstrap-cli");
 const { runHostClaimCheckinCommand } = require("../src/app/host-claim-checkin-cli");
+const { runHostSeedProactiveCommand } = require("../src/app/host-seed-proactive-cli");
 const { runHostSettleCheckinCommand } = require("../src/app/host-settle-checkin-cli");
 const { runHostManifestCommand } = require("../src/app/host-manifest-cli");
 const { runHostRenderCommand } = require("../src/app/host-render-cli");
@@ -206,6 +207,7 @@ test("host claim-checkin and settle-checkin cover delegated proactive lease flow
   assert.equal(claim.data.status, "claimed");
   assert.equal(typeof claim.data.lease.id, "string");
   assert.equal(claim.data.payload.kind, "proactive_checkin");
+  assert.deepEqual(claim.data.hostedSync.plan.jobs.map((job: { role: string }) => job.role), ["recovery"]);
 
   const settle = await runHostSettleCheckinCommand(runtimeConfig, [
     "--provider", "hermes",
@@ -217,6 +219,39 @@ test("host claim-checkin and settle-checkin cover delegated proactive lease flow
   ]);
   assert.equal(settle.ok, true);
   assert.match(String(settle.data.nextWakeAt || ""), /^\d{4}-\d{2}-\d{2}T/u);
+  assert.deepEqual(settle.data.hostedWakeSync.jobs.map((job: { role: string }) => job.role), ["wake", "recovery"]);
+});
+
+test("host seed-proactive with explicit sleep-for repairs state and hosted job set together", async () => {
+  const fixture = createHostFixture("codeksei-host-seed-explicit-");
+  const repoLocal = createFakeHermesRepoLocalFixture(
+    fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-host-seed-explicit-repo-local-"))
+  );
+  const runtimeConfig = {
+    ...fixture.config,
+    ...repoLocal.env,
+    runtime: "hermes",
+    channelProvider: "hermes",
+    hermesHome: repoLocal.hermesHome,
+    hermesRepoRoot: repoLocal.repoRoot,
+    hermesRepoLocalShimPath: repoLocal.shimPath,
+  };
+
+  const result = await runHostSeedProactiveCommand(runtimeConfig, [
+    "--provider", "hermes",
+    "--user", "wx-user",
+    "--workspace", fixture.workspaceRoot,
+    "--sleep-for", "2h",
+  ]);
+
+  assert.equal(result.data.status, "seeded");
+  assert.match(String(result.data.nextWakeAt || ""), /^\d{4}-\d{2}-\d{2}T/u);
+  assert.equal(result.data.sync.jobs.length, 2);
+  assert.deepEqual(result.data.sync.jobs.map((job: { role: string }) => job.role), ["wake", "recovery"]);
+  const state = new CheckinScheduleStateStore({ filePath: fixture.config.checkinScheduleStateFile }).getState();
+  assert.equal(state?.nextWakeAt, result.data.nextWakeAt);
+  const jobsState = JSON.parse(fs.readFileSync(repoLocal.jobsFile, "utf8"));
+  assert.deepEqual(jobsState.jobs.map((job: { codeksei_checkin_role: string }) => job.codeksei_checkin_role).sort(), ["recovery", "wake"]);
 });
 
 test("host settle-checkin returns partial on failed delegated pass and keeps recovery ownership", async () => {

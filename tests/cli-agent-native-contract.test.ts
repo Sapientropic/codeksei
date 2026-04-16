@@ -83,6 +83,17 @@ test("channel send-file schema exposes warned mutation flags", () => {
   assert.match(String(asRecord(payload.data).helpText || ""), /--dry-run/u);
 });
 
+test("reminder write schema exposes delivery mode for hosted proactive follow-up", () => {
+  const result = runCli(["schema", "reminder", "write"]);
+  assert.equal(result.status, 0, result.stderr || "expected reminder write schema to succeed");
+
+  const payload = parseEnvelope(result.stdout);
+  const args = asCommandArgs(asRecord(asRecord(payload.data).args).command);
+  const argNames = args.map((entry) => entry.name);
+  assert.ok(argNames.includes("delivery"));
+  assert.match(String(asRecord(payload.data).helpText || ""), /proactive/u);
+});
+
 test("hosted mode channel send-file routes through Hermes repo-local shim", () => {
   const tempRoot = createCliFixture();
   const repoLocal = createFakeHermesRepoLocalFixture(
@@ -205,25 +216,30 @@ test("operator hermes sync-checkin routes through Hermes repo-local shim and upd
   assert.equal(result.status, 0, result.stderr || "expected operator hermes sync-checkin to succeed");
   const payload = parseEnvelope(result.stdout);
   assert.equal(payload.ok, true);
-  assert.equal(asRecord(asRecord(payload.data).planned).role, "wake");
-  assert.equal(asRecord(asRecord(payload.data).sync).jobId ? true : false, true);
+  assert.deepEqual((asRecord(asRecord(payload.data).planned).jobs as Array<Record<string, unknown>>).map((job) => job.role), ["wake", "recovery"]);
+  assert.equal(Array.isArray(asRecord(asRecord(payload.data).sync).jobs), true);
   assert.equal(asRecord(asRecord(payload.data).summary).wakeJobs ? true : false, true);
 
   const requests = readFakeHermesRepoLocalLog(repoLocal.logFile);
   assert.equal(requests.length, 1);
   assert.equal(requests[0].action, "sync_checkin_cron");
   assert.equal(asRecord(requests[0].payload).sender_id, "wx-user");
-  assert.equal(asRecord(asRecord(requests[0].payload).env).CODEKSEI_RUNTIME, "hermes");
+  const plans = asRecord(requests[0].payload).plans as Array<Record<string, unknown>>;
+  assert.equal(Array.isArray(plans), true);
+  assert.equal(plans.length, 2);
+  assert.equal(asRecord(plans[0] || {}).env ? asRecord(asRecord(plans[0] || {}).env).CODEKSEI_RUNTIME : "", "hermes");
   const jobsState = JSON.parse(fs.readFileSync(repoLocal.jobsFile, "utf8"));
-  assert.equal(jobsState.jobs.length, 1);
-  assert.equal(jobsState.jobs[0].deliver, "origin");
-  assert.equal(jobsState.jobs[0].env.CODEKSEI_STATE_DIR, tempRoot.stateDir);
-  assert.deepEqual(jobsState.jobs[0].origin, {
-    platform: "weixin",
-    chat_id: "wxid_sender",
-    chat_name: "Test Chat",
-    thread_id: "",
-  });
+  assert.equal(jobsState.jobs.length, 2);
+  for (const job of jobsState.jobs) {
+    assert.equal(job.deliver, "origin");
+    assert.equal(job.env.CODEKSEI_STATE_DIR, tempRoot.stateDir);
+    assert.deepEqual(job.origin, {
+      platform: "weixin",
+      chat_id: "wxid_sender",
+      chat_name: "Test Chat",
+      thread_id: "",
+    });
+  }
 });
 
 test("operator hermes invalid leaf returns validation_error instead of unknown_command", () => {
@@ -391,6 +407,7 @@ test("hosted mode reminder write routes through Hermes repo-local shim and skips
   assert.equal(result.status, 0, result.stderr || "expected hosted reminder write to succeed");
   const payload = parseEnvelope(result.stdout);
   assert.equal(payload.ok, true);
+  assert.equal(asRecord(payload.data).deliveryMode, "hermes_repo_local_origin");
   assert.equal(asRecord(payload.data).jobId, "cron-123");
   assert.equal(fs.existsSync(path.join(tempRoot.stateDir, "reminder-queue.json")), false);
 
@@ -398,6 +415,44 @@ test("hosted mode reminder write routes through Hermes repo-local shim and skips
   assert.equal(requests.length, 1);
   assert.equal(requests[0].action, "create_reminder");
   assert.equal(asRecord(requests[0].payload).text, "hello");
+});
+
+test("hosted mode reminder write with delivery proactive seeds hosted checkin instead of creating a direct reminder cron", () => {
+  const tempRoot = createCliFixture();
+  const repoLocal = createFakeHermesRepoLocalFixture(
+    fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-cli-hermes-repo-local-reminder-proactive-"))
+  );
+  const result = runCli([
+    "reminder",
+    "write",
+    "--delay",
+    "2h",
+    "--delivery",
+    "proactive",
+    "--text",
+    "白天再主动接回这条线",
+    "--user",
+    "wx-user",
+  ], {
+    ...tempRoot.env,
+    ...repoLocal.env,
+    CODEKSEI_RUNTIME: "hermes",
+    CODEKSEI_CHANNEL_PROVIDER: "hermes",
+    CODEKSEI_ALLOWED_USER_IDS: "wx-user",
+  });
+
+  assert.equal(result.status, 0, result.stderr || "expected hosted proactive reminder write to succeed");
+  const payload = parseEnvelope(result.stdout);
+  assert.equal(payload.ok, true);
+  assert.equal(asRecord(payload.data).deliveryMode, "hermes_proactive_checkin");
+  assert.equal(Array.isArray(asRecord(payload.data).syncJobs), true);
+  const requests = readFakeHermesRepoLocalLog(repoLocal.logFile);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].action, "sync_checkin_cron");
+  assert.equal(fs.existsSync(path.join(tempRoot.stateDir, "reminder-queue.json")), false);
+  const jobsState = JSON.parse(fs.readFileSync(repoLocal.jobsFile, "utf8"));
+  assert.equal(jobsState.jobs.length, 2);
+  assert.deepEqual(jobsState.jobs.map((job: { codeksei_checkin_role: string }) => job.codeksei_checkin_role).sort(), ["recovery", "wake"]);
 });
 
 test("hosted mode system send still fails fast with unsupported_host_capability", () => {

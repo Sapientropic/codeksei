@@ -1,11 +1,12 @@
 import {
   collectHostedCheckinCronSummary,
-  createHostedCheckinCronPlanFromTick,
-  createHostedCheckinWakePlan,
+  createHostedCheckinCronPlanSetFromTick,
+  createHostedCheckinWakePlanSet,
   isHostedHermesCheckinEnabled,
   type HostedCheckinConfig,
   type HostedCheckinCronSummary,
-  type HostedCheckinCronSyncPlan,
+  type HostedCheckinCronSyncJobPlan,
+  type HostedCheckinCronSyncPlanSet,
 } from "../../../core/hosted-checkin-cron";
 import type { CheckinResolvedTarget, CheckinTickResult } from "../../../checkin";
 import { syncCheckinCronViaHermesRepoLocal } from "./repo-local";
@@ -13,13 +14,14 @@ import { syncCheckinCronViaHermesRepoLocal } from "./repo-local";
 export type {
   HostedCheckinConfig,
   HostedCheckinCronSummary,
-  HostedCheckinCronSyncPlan,
+  HostedCheckinCronSyncJobPlan,
+  HostedCheckinCronSyncPlanSet,
 };
 
 export {
   collectHostedCheckinCronSummary,
-  createHostedCheckinCronPlanFromTick,
-  createHostedCheckinWakePlan,
+  createHostedCheckinCronPlanSetFromTick,
+  createHostedCheckinWakePlanSet,
   isHostedHermesCheckinEnabled,
 };
 
@@ -27,21 +29,40 @@ export function syncHostedCheckinPlanViaHermes(
   config: Partial<HostedCheckinConfig>,
   target: CheckinResolvedTarget,
   tick: CheckinTickResult,
+  {
+    followupContext = "",
+  }: {
+    followupContext?: string;
+  } = {},
 ) {
-  const plan = createHostedCheckinCronPlanFromTick(config, target, tick);
-  const sync = syncCheckinCronViaHermesRepoLocal(config, {
-    due_at_iso: plan.plannedWakeAt,
-    env: plan.env,
-    name: plan.name,
-    prompt: plan.prompt,
-    role: plan.role,
-    sender_id: plan.senderId,
-    target_key: plan.targetKey,
-    workspace_root: plan.workspaceRoot,
+  const planSet = createHostedCheckinCronPlanSetFromTick(config, target, tick, {
+    followupContext,
   });
+  const sync = syncHostedCheckinPlanSetViaHermes(config, planSet);
   return {
-    plan,
+    plan: planSet,
     sync,
     summary: collectHostedCheckinCronSummary(config, target),
   };
+}
+
+export function syncHostedCheckinPlanSetViaHermes(
+  config: Partial<HostedCheckinConfig>,
+  planSet: HostedCheckinCronSyncPlanSet,
+) {
+  return syncCheckinCronViaHermesRepoLocal(config, {
+    plans: planSet.jobs.map((job) => ({
+      due_at_iso: job.plannedWakeAt,
+      env: job.env,
+      name: job.name,
+      prompt: job.prompt,
+      role: job.role,
+      sender_id: job.senderId,
+      target_key: job.targetKey,
+      workspace_root: job.workspaceRoot,
+    })),
+    sender_id: planSet.senderId,
+    target_key: planSet.targetKey,
+    workspace_root: planSet.workspaceRoot,
+  });
 }

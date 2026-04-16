@@ -11,6 +11,10 @@ import {
   buildTerminalEntryUsage,
 } from "../core/terminal-command-usage";
 import { listGlobalCliFlags } from "../core/cli-contract";
+import {
+  CHECKIN_COMPLETION_CONTEXT_GUIDANCE,
+  CHECKIN_COMPLETION_SLEEP_FOR_PLACEHOLDER,
+} from "../checkin/completion-guidance";
 
 export interface CommandHelpDocument {
   usage: readonly string[];
@@ -30,6 +34,7 @@ const TOPIC_HELP = {
     body: [
       `  先用 ${buildTerminalEntryUsage("app.accounts", "public")} 看可用 sender id；不要填昵称或自己猜的微信号`,
       "  当前选中的 sender id 必须已经有可用的 context_token；否则命令会直接失败",
+      "  默认 --delivery direct 会创建用户可见提醒；Hermes Hosted Mode 下可用 --delivery proactive，把这条提醒改成未来 proactive 唤醒。",
       "  不带 offset 的本地时间按当前 runtime timezone 解释；显式偏移时间戳按原值保留",
     ],
   }),
@@ -224,7 +229,7 @@ const LEAF_HELP = {
     usage: [buildTerminalActionExample("operator.hermes.sync_checkin", { audience: "public", includeArgs: true })],
     bodyLabel: "说明：",
     body: [
-      "  按 Codeksei 当前 checkin state 为 Hermes 同步唯一需要存在的 one-shot wake/recovery job。",
+      "  按 Codeksei 当前 checkin state 为 Hermes 同步当前需要存在的受控 wake/recovery job set。",
       "  scheduled -> wake；due -> 立即执行的 wake；in_progress -> 30 分钟 recovery fallback。",
       "  这是宿主 re-arm 入口，不会改写 Codeksei 自己的 nextWakeAt 真相源。",
     ],
@@ -341,11 +346,13 @@ const LEAF_HELP = {
     body: [
       "  Bridge Mode 下会创建提醒并放入本地 reminder queue。",
       "  Bridge Mode 仍会解析唯一稳定 sender，并检查对应 context_token；缺失时直接报 auth_required。",
-      "  Hermes Hosted Mode 下会改走 repo-local Hermes cron，并把 deliver 绑定到当前 origin chat。",
+      "  Hermes Hosted Mode 下默认 --delivery direct，会改走 repo-local Hermes cron，并把 deliver 绑定到当前 origin chat。",
+      "  Hermes Hosted Mode 下传 --delivery proactive，会把提醒改成未来 proactive 唤醒，而不是直接发一条用户可见消息。",
     ],
     examples: [
       "  codeksei reminder write --delay 30m --text \"起身喝水\"",
       "  codeksei reminder write --at 2026-04-07 21:30 --text \"收今晚的日记\"",
+      "  codeksei reminder write --delay 2h --delivery proactive --text \"白天再主动关心一下这条线\"",
     ],
     includeFlagBlock: true,
   }),
@@ -422,11 +429,12 @@ const LEAF_HELP = {
     body: [
       "  记录这轮 proactive check-in 的完成结果，并由 agent 显式写回下一次唤醒时间。",
       "  --trigger / --result 必填；--next-wake-at 与 --sleep-for 二选一。",
+      `  ${CHECKIN_COMPLETION_CONTEXT_GUIDANCE}`,
       "  agent 给出过长时间会被 clamp 到 24h guardrail；缺失或无效时间会回退 fallback window。",
-      "  Hermes Hosted Mode 下，写回 state 后还会自动把下一条 wake one-shot job 重新 arm 给 Hermes，并清理未来 recovery job。",
+      "  Hermes Hosted Mode 下，写回 state 后还会自动把下一组 wake/recovery jobs 重新 arm 给 Hermes，并清理多余的未来 job。",
     ],
     examples: [
-      "  codeksei system checkin-complete --user wxid_xxx --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for 6h",
+      `  codeksei system checkin-complete --user wxid_xxx --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for ${CHECKIN_COMPLETION_SLEEP_FOR_PLACEHOLDER}`,
       "  codeksei system checkin-complete --user wxid_xxx --workspace /absolute/workspace --trigger <triggerId> --result sent_message --next-wake-at 2026-04-15T09:00:00+08:00",
     ],
     includeFlagBlock: true,

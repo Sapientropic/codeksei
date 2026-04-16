@@ -43,7 +43,7 @@ codeksei channel send-file --path /绝对路径
 codeksei timeline event --date YYYY-MM-DD --start HH:mm --end HH:mm --title "标题" (--event-node <id> | --subcategory <id>) [其他参数]
 codeksei timeline screenshot --send [--user <wechatUserId>] [--output /绝对路径] [其他 timeline screenshot 参数]
 codeksei diary write --section todo --state open --text "内容"
-codeksei reminder write --delay 30m --text "提醒内容"
+codeksei reminder write --delay 30m --text "提醒内容" [--delivery direct|proactive]
 codeksei note auto (--project <slug> | --scope <name>) --kind <kind> [--text "内容" | --stdin]
 codeksei review nightly
 codeksei review weekly
@@ -51,7 +51,7 @@ codeksei review monthly
 codeksei project radar --project <slug> --json
 codeksei host seed-proactive --provider hermes --user <wechatUserId> --workspace /absolute/workspace
 codeksei host claim-checkin --provider hermes --user <wechatUserId> --workspace /absolute/workspace
-codeksei host settle-checkin --provider hermes --user <wechatUserId> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for 6h
+codeksei host settle-checkin --provider hermes --user <wechatUserId> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for <duration>
 ```
 
 ## Procedure
@@ -61,7 +61,7 @@ codeksei host settle-checkin --provider hermes --user <wechatUserId> --workspace
    - `channel send-file` for explicit local artifact send-back
    - `timeline` for concrete time blocks and dashboard screenshots
    - `diary` for lived notes / supplements / todo transitions
-   - `reminder` for future nudges
+   - `reminder` for user-visible nudges or future proactive wakes
    - `note` for durable memory
    - `review` for structured reflection
    - `project radar` for repo continuity
@@ -77,7 +77,7 @@ Preferred host contract:
 ```bash
 codeksei host seed-proactive --provider hermes --user <wechatUserId> --workspace /absolute/workspace
 codeksei host claim-checkin --provider hermes --user <wechatUserId> --workspace /absolute/workspace
-codeksei host settle-checkin --provider hermes --user <wechatUserId> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for 6h
+codeksei host settle-checkin --provider hermes --user <wechatUserId> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for <duration>
 ```
 
 Flow:
@@ -88,6 +88,12 @@ Flow:
 4. If status is `in_progress`, another proactive pass already owns the lease; Hermes should stay silent and let the recovery wake remain armed.
 5. After the proactive pass finishes, Hermes must call `host settle-checkin` with `sent_message|silent|backstage_only`.
 6. Use `result=failed` only when Hermes could not finish the delegated pass truthfully; Codeksei will keep recovery ownership and surface a partial result instead of faking completion.
+7. Choose --sleep-for based on the user's current state and time of day: shorter during active daytime, longer during sleep or late-night quiet hours.
+
+Reminder note:
+
+- Default `reminder write` is for user-visible reminders.
+- Use `codeksei reminder write --delivery proactive ...` when the text is internal follow-up context that should re-enter the proactive checkin chain later instead of being sent directly to the user.
 
 Compatibility note:
 

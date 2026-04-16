@@ -15,6 +15,11 @@ import {
 } from "../contracts/checkin-schedule-state";
 import { resolvePromptPersonEn } from "../contracts/person-reference";
 import { normalizeText } from "../contracts/text-normalization";
+import {
+  buildCheckinCompletionDurationGuidanceLines,
+  CHECKIN_COMPLETION_CONTEXT_GUIDANCE,
+  CHECKIN_COMPLETION_SLEEP_FOR_PLACEHOLDER,
+} from "./completion-guidance";
 import type { ResolvedCheckinConfig } from "../state/checkin-config";
 import {
   DEFAULT_CHECKIN_MAX_INTERVAL_MS,
@@ -79,6 +84,15 @@ export interface CheckinCompleteResult {
   intervalConfig: ResolvedCheckinConfig;
   nextDueAt: string;
   nextWakeAt: string;
+  state: CheckinScheduleState;
+  target: CheckinResolvedTarget;
+}
+
+export interface CheckinScheduledWakeResult {
+  intervalConfig: ResolvedCheckinConfig;
+  nextDueAt: string;
+  nextWakeAt: string;
+  scheduleSource: CheckinScheduleSource;
   state: CheckinScheduleState;
   target: CheckinResolvedTarget;
 }
@@ -282,6 +296,67 @@ export function runCheckinComplete({
     intervalConfig,
     nextDueAt: completion.nextWakeAt,
     nextWakeAt: completion.nextWakeAt,
+    state: nextState,
+    target,
+  };
+}
+
+export function runCheckinScheduleNextWake({
+  config,
+  nextWakeAt,
+  nowMs = Date.now(),
+  target,
+}: {
+  config: CheckinTickConfig;
+  nextWakeAt: string;
+  nowMs?: number;
+  target: CheckinResolvedTarget;
+}): CheckinScheduledWakeResult {
+  const intervalConfig = resolveCheckinIntervalConfig(config);
+  const stateStore = new CheckinScheduleStateStore({
+    filePath: resolveCheckinScheduleStateFile(config),
+  });
+  const currentState = resolveOperationalCheckinStateForTarget({
+    intervalConfig,
+    nowMs,
+    stateStore,
+    target,
+  });
+  const normalizedNextWakeAt = normalizeText(nextWakeAt);
+  const requestedNextWakeAt = resolveRequestedNextWakeAt({
+    nextWakeAt: normalizedNextWakeAt,
+    nowMs,
+    sleepFor: "",
+  });
+  const requestedNextWakeAtMs = Date.parse(requestedNextWakeAt);
+  if (!requestedNextWakeAt || !Number.isFinite(requestedNextWakeAtMs)) {
+    throw new Error(`非法的 nextWakeAt：${normalizedNextWakeAt || "(empty)"}`);
+  }
+  if (requestedNextWakeAtMs <= nowMs) {
+    throw new Error("nextWakeAt 必须晚于当前时间");
+  }
+  const scheduleSource: CheckinScheduleSource = requestedNextWakeAtMs > nowMs + CHECKIN_MAX_SILENCE_MS
+    ? "guardrail_clamped"
+    : "agent";
+  const recordedNextWakeAt = scheduleSource === "guardrail_clamped"
+    ? new Date(nowMs + CHECKIN_MAX_SILENCE_MS).toISOString()
+    : requestedNextWakeAt;
+  const nextState = stateStore.setState({
+    activeWake: null,
+    lastCompletion: currentState.lastCompletion,
+    nextWakeAt: recordedNextWakeAt,
+    pendingTrigger: null,
+    scheduleSource,
+    senderId: target.senderId,
+    targetKey: buildCheckinTargetKey(target),
+    updatedAt: new Date(nowMs).toISOString(),
+    workspaceRoot: target.workspaceRoot,
+  });
+  return {
+    intervalConfig,
+    nextDueAt: recordedNextWakeAt,
+    nextWakeAt: recordedNextWakeAt,
+    scheduleSource,
     state: nextState,
     target,
   };
@@ -621,12 +696,14 @@ function buildScheduledCheckinPrompt(
     "",
     `Trigger id: ${triggerId}`,
     "After this proactive pass, you must decide when Codeksei should wake next and record it with exactly one completion command.",
+    CHECKIN_COMPLETION_CONTEXT_GUIDANCE,
+    ...buildCheckinCompletionDurationGuidanceLines(),
     "Use result=sent_message only if you actually sent a user-visible message.",
     "Use result=silent when you intentionally stayed silent.",
     "Use result=backstage_only when you only did backstage work such as diary/timeline/reminder or other internal housekeeping.",
     "",
     "Completion command example:",
-    `codeksei --workspace-root ${quotedWorkspace} system checkin-complete --user ${quotedSender} --workspace ${quotedWorkspace} --trigger ${triggerId} --result silent --sleep-for 6h`,
+    `codeksei --workspace-root ${quotedWorkspace} system checkin-complete --user ${quotedSender} --workspace ${quotedWorkspace} --trigger ${triggerId} --result silent --sleep-for ${CHECKIN_COMPLETION_SLEEP_FOR_PLACEHOLDER}`,
     "You may replace --sleep-for with --next-wake-at 2026-04-15T09:00:00+08:00 if you want an exact wake time.",
   ].join("\n");
 }

@@ -21,7 +21,7 @@
 - `Bridge Mode` 下，Codeksei 自己托管 bridge / shared 线程
 - `Hermes Hosted Mode` 下，宿主控制命令交给 Hermes；Codeksei 主要暴露 timeline / diary / reminder / review / note / project radar / doctor / schema，并提供 Hermes operator 入口做 skill/status/smoke/sync-checkin
 - `channel send-file`、`timeline screenshot --send`、`reminder write` 已接上 Hermes repo-local 路径；`system send` 仍因缺少 backstage-only 宿主原语而保持 blocked
-- `Hermes Hosted Mode` 下，Hermes 只执行 one-shot wake/recovery job；Codeksei 继续持有 `tick -> ack -> complete` 的调度真相，并通过 `operator hermes sync-checkin` 把下一次 wake 重新 arm 给 Hermes
+- `Hermes Hosted Mode` 下，Hermes 只执行受控 wake/recovery job set；Codeksei 继续持有 `tick -> ack -> complete` 的调度真相，并通过 `operator hermes sync-checkin` 把下一次 wake/recovery 重新 arm 给 Hermes
 - 外部宿主优先通过 `host attachment contract` 接入：`host manifest`、`host bootstrap`、`host doctor`、`host smoke`、`host seed-proactive`、`host claim-checkin`、`host settle-checkin`
 
 ## 命名
@@ -88,14 +88,14 @@ operator / bootstrap：
 
 - `codeksei host seed-proactive --provider hermes --user <senderId> --workspace /absolute/workspace`
 - `codeksei host claim-checkin --provider hermes --user <senderId> --workspace /absolute/workspace`
-- `codeksei host settle-checkin --provider hermes --user <senderId> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for 6h`
+- `codeksei host settle-checkin --provider hermes --user <senderId> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for <duration>`
 - `codeksei system checkin --show`
 - `codeksei system checkin --range 3-60`
 - `codeksei system checkin --reset`
 - `codeksei system checkin-trigger --user <senderId> --workspace /absolute/workspace`
 - `codeksei system checkin-tick --user <senderId> --workspace /absolute/workspace`
 - `codeksei system checkin-tick --user <senderId> --workspace /absolute/workspace --ack <triggerId>`
-- `codeksei system checkin-complete --user <senderId> --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for 6h`
+- `codeksei system checkin-complete --user <senderId> --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for <duration>`
 - `codeksei operator hermes sync-checkin --user <senderId> --workspace /absolute/workspace`
 
 说明：
@@ -104,7 +104,7 @@ operator / bootstrap：
 - `codeksei operator help` / `codeksei operator schema` 才会显示 bootstrap、shared、background、maintainer 入口
 - `codeksei operator hermes --help` / `codeksei operator schema operator hermes` 会列出 Hermes Hosted Mode 的 4 个 leaf action
 - `codeksei operator hermes install-skill` 是唯一会改本机 Hermes skill 状态的 leaf action；支持 `--dry-run`
-- `codeksei operator hermes sync-checkin` 会按当前 target 的 checkin state 为 Hermes 创建/更新唯一需要存在的 one-shot wake/recovery job；支持 `--dry-run`
+- `codeksei operator hermes sync-checkin` 会按当前 target 的 checkin state 为 Hermes 创建/更新当前需要存在的受控 wake/recovery job set；支持 `--dry-run`
 - `Codeksei` 当前 hosted check-in 主链不再要求 Hermes upstream 先支持 cron `env`；若想把 Hermes 原生 cron `env` 能力也补上，可选补丁统一看 [`docs/hermes-cron-env-patch.md`](./hermes-cron-env-patch.md)
 - 非 TTY 默认返回 JSON envelope；TTY 默认返回 text
 - `stdout` 留给结果数据，`stderr` 留给诊断与 debug 信息
@@ -113,7 +113,7 @@ operator / bootstrap：
 - `codeksei start` / `npm run start:checkin` 更适合 operator 调试，不再视作默认 public discovery 面
 - 如果当前配置是 `Hermes Hosted Mode`，`codeksei start` 与 `shared:start` 会明确提示“改由 Hermes gateway 托管”，不会隐式回退到 Codex app-server
 - `codeksei system checkin-poller` 现在只保留 bridge 宿主包装；host-neutral 真相层是 `checkin-trigger`、`checkin-tick` 与 `checkin-complete`
-- `checkin-complete` 在 Hermes Hosted Mode 下会在写回 state 后自动 re-arm 下一条 wake one-shot job，并清理未来 recovery job
+- `checkin-complete` 在 Hermes Hosted Mode 下会在写回 state 后自动 re-arm 下一组 wake/recovery jobs，并清理多余的未来 job
 - `sync-checkin` 创建/更新 job 时需要 origin context；真正 cron 投递时，Hermes 直接读取持久化的 `job.origin`，不会再按 target 反查 live session
 - `sync-checkin` 现在会先确保目标 wake/recovery job 已成功存在，再 best-effort 清理旧 job；中途失败时不会先把最后一条 recovery wake 删掉
 - `system checkin --range` 现在是 fallback window，不再代表 agent 的真实唤醒节奏
@@ -134,7 +134,7 @@ operator / bootstrap：
   种下或修复第一条 future wake
 - `codeksei host claim-checkin --provider hermes --user <senderId> --workspace /absolute/workspace`
   原子 claim 一次 delegated proactive pass 的执行 lease
-- `codeksei host settle-checkin --provider hermes --user <senderId> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for 6h`
+- `codeksei host settle-checkin --provider hermes --user <senderId> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for <duration>`
   回写这轮 delegated proactive pass 的真实结果
 
 补充：
@@ -227,12 +227,14 @@ Diary 用来接那些更琐碎、更生活化、也最容易散掉的东西。
 - `codeksei reminder write --delay 30m --text "起身喝水"`
 - `codeksei reminder write --at 2026-04-07 21:30 --text "收今晚的日记"`
 - `codeksei reminder write --delay 2h --text "继续推进这个任务" --user <senderId>`
+- `codeksei reminder write --delay 2h --delivery proactive --text "白天再主动接回这条线"`
 
 建议：
 
 - 适合写那些不想只靠脑子记住的事
 - 提醒最好短、明确、可执行
-- Bridge Mode 下写本地 reminder queue；Hosted Mode 下会创建 Hermes cron 并 deliver 回当前 origin chat
+- Bridge Mode 下写本地 reminder queue；Hosted Mode 下默认 `--delivery direct`，会创建 Hermes cron 并 deliver 回当前 origin chat
+- Hosted Mode 下若正文是内部后续跟进而不是用户可见文案，改用 `--delivery proactive`，让它回到未来 proactive wake，而不是直接发给用户
 - 如果一条事同时需要后续回看，可以配合 `diary:write` 或 `timeline:event`
 
 ## Durable Notes

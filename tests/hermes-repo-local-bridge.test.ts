@@ -26,13 +26,32 @@ test("repo-local sync_checkin_cron keeps the existing recovery job when wake cre
   });
 
   const result = invokeBridge(fixture, {
-    due_at_iso: new Date(Date.now() + 10 * 60_000).toISOString(),
-    env: {
-      CODEKSEI_RUNTIME: "hermes",
-    },
-    name: "ck-checkin-wake",
-    prompt: "run hosted checkin",
-    role: "wake",
+    plans: [
+      {
+        due_at_iso: new Date(Date.now() + 10 * 60_000).toISOString(),
+        env: {
+          CODEKSEI_RUNTIME: "hermes",
+        },
+        name: "ck-checkin-wake",
+        prompt: "run hosted checkin",
+        role: "wake",
+        sender_id: "wx-user",
+        target_key: "wx-user::/tmp/workspace",
+        workspace_root: "/tmp/workspace",
+      },
+      {
+        due_at_iso: new Date(Date.now() + 40 * 60_000).toISOString(),
+        env: {
+          CODEKSEI_RUNTIME: "hermes",
+        },
+        name: "ck-checkin-recovery",
+        prompt: "run hosted checkin recovery",
+        role: "recovery",
+        sender_id: "wx-user",
+        target_key: "wx-user::/tmp/workspace",
+        workspace_root: "/tmp/workspace",
+      },
+    ],
     sender_id: "wx-user",
     target_key: "wx-user::/tmp/workspace",
     workspace_root: "/tmp/workspace",
@@ -63,14 +82,34 @@ test("repo-local sync_checkin_cron degrades gracefully when Hermes create_job ha
   });
 
   const result = invokeBridge(fixture, {
-    due_at_iso: new Date(Date.now() + 10 * 60_000).toISOString(),
-    env: {
-      CODEKSEI_RUNTIME: "hermes",
-      CODEKSEI_STATE_DIR: "/tmp/codeksei-state",
-    },
-    name: "ck-checkin-wake",
-    prompt: "run hosted checkin",
-    role: "wake",
+    plans: [
+      {
+        due_at_iso: new Date(Date.now() + 10 * 60_000).toISOString(),
+        env: {
+          CODEKSEI_RUNTIME: "hermes",
+          CODEKSEI_STATE_DIR: "/tmp/codeksei-state",
+        },
+        name: "ck-checkin-wake",
+        prompt: "run hosted checkin",
+        role: "wake",
+        sender_id: "wx-user",
+        target_key: "wx-user::/tmp/workspace",
+        workspace_root: "/tmp/workspace",
+      },
+      {
+        due_at_iso: new Date(Date.now() + 40 * 60_000).toISOString(),
+        env: {
+          CODEKSEI_RUNTIME: "hermes",
+          CODEKSEI_STATE_DIR: "/tmp/codeksei-state",
+        },
+        name: "ck-checkin-recovery",
+        prompt: "run hosted checkin recovery",
+        role: "recovery",
+        sender_id: "wx-user",
+        target_key: "wx-user::/tmp/workspace",
+        workspace_root: "/tmp/workspace",
+      },
+    ],
     sender_id: "wx-user",
     target_key: "wx-user::/tmp/workspace",
     workspace_root: "/tmp/workspace",
@@ -79,13 +118,30 @@ test("repo-local sync_checkin_cron degrades gracefully when Hermes create_job ha
   assert.equal(result.status, 0, result.stderr || "expected bridge to succeed");
   const payload = JSON.parse(result.stdout || "{}");
   assert.equal(payload.ok, true);
-  assert.equal(payload.data.job_id.startsWith("cron-created-"), true);
-  assert.deepEqual(payload.data.removed_job_ids, ["cron-recovery-1"]);
+  assert.equal(Array.isArray(payload.data.jobs), true);
+  assert.deepEqual(payload.data.jobs.map((job: { role: string }) => job.role), ["wake", "recovery"]);
+  assert.equal(payload.data.jobs.find((job: { role: string }) => job.role === "wake").job_id.startsWith("cron-created-"), true);
+  assert.equal(payload.data.jobs.find((job: { role: string }) => job.role === "recovery").job_id, "cron-recovery-1");
+  assert.deepEqual(payload.data.removed_job_ids, []);
 
   const jobsState = JSON.parse(fs.readFileSync(fixture.jobsFile, "utf8"));
+  assert.equal(jobsState.jobs.length, 2);
+  assert.deepEqual(jobsState.jobs.map((job: { codeksei_checkin_role: string }) => job.codeksei_checkin_role).sort(), ["recovery", "wake"]);
+});
+
+test("repo-local create_reminder stores a rephrasing prompt instead of verbatim echo instructions", () => {
+  const fixture = createBridgeFixture("create_reminder_prompt");
+  const result = invokeBridge(fixture, {
+    due_at_iso: new Date(Date.now() + 30 * 60_000).toISOString(),
+    text: "白天再主动关心一下这条线",
+    workspace_root: "/tmp/workspace",
+  }, "create_reminder");
+
+  assert.equal(result.status, 0, result.stderr || "expected reminder bridge to succeed");
+  const jobsState = JSON.parse(fs.readFileSync(fixture.jobsFile, "utf8"));
   assert.equal(jobsState.jobs.length, 1);
-  assert.equal(jobsState.jobs[0].codeksei_checkin_role, "wake");
-  assert.equal(jobsState.jobs[0].name, "ck-checkin-wake");
+  assert.match(jobsState.jobs[0].prompt, /Rephrase it for the user/u);
+  assert.doesNotMatch(jobsState.jobs[0].prompt, /respond with exactly the reminder body below/u);
 });
 
 function createBridgeFixture(
@@ -98,7 +154,7 @@ function createBridgeFixture(
     createJobBody?: string[];
     createJobSignature?: string;
     initialJobs?: Array<Record<string, unknown>>;
-  },
+  } = {},
 ) {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), `codeksei-bridge-${prefix}-`));
   const hermesHome = path.join(tempRoot, ".hermes");
@@ -233,6 +289,7 @@ function invokeBridge(
     sessionKey: string;
   },
   payload: Record<string, unknown>,
+  action: "create_reminder" | "sync_checkin_cron" = "sync_checkin_cron",
 ) {
   return spawnSync(pythonCommand, [bridgePath], {
     cwd: fixture.repoRoot,
@@ -243,7 +300,7 @@ function invokeBridge(
       HERMES_SESSION_KEY: fixture.sessionKey,
     },
     input: JSON.stringify({
-      action: "sync_checkin_cron",
+      action,
       hermes_home: fixture.hermesHome,
       payload,
       repo_root: fixture.repoRoot,

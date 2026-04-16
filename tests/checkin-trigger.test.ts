@@ -271,21 +271,26 @@ test("hosted checkin-complete re-arms the next wake and clears future recovery j
 
   assert.equal(result.ok, true);
   const data = result.data as {
-    hostedWakeSync: { jobId: string; removedJobIds: string[]; role: string };
+    hostedWakeSync: {
+      jobs: Array<{ jobId: string; role: string }>;
+      removedJobIds: string[];
+    };
   };
-  assert.equal(data.hostedWakeSync.role, "wake");
-  assert.equal(data.hostedWakeSync.jobId.startsWith("cron-"), true);
-  assert.deepEqual(data.hostedWakeSync.removedJobIds, ["cron-old-recovery"]);
+  assert.deepEqual(data.hostedWakeSync.jobs.map((job) => job.role), ["wake", "recovery"]);
+  assert.equal(data.hostedWakeSync.jobs.every((job) => job.jobId.startsWith("cron-")), true);
+  assert.deepEqual(data.hostedWakeSync.removedJobIds, []);
   const jobsState = JSON.parse(fs.readFileSync(repoLocal.jobsFile, "utf8"));
-  assert.equal(jobsState.jobs.length, 1);
-  assert.equal(jobsState.jobs[0].codeksei_checkin_role, "wake");
-  assert.equal(jobsState.jobs[0].deliver, "origin");
-  assert.equal(jobsState.jobs[0].env.CODEKSEI_RUNTIME, "hermes");
-  assert.equal(jobsState.jobs[0].env.CODEKSEI_STATE_DIR, fixture.tempRoot);
-  assert.deepEqual(jobsState.jobs[0].origin, {
-    platform: "weixin",
-    chat_id: "wxid_sender",
-    chat_name: "Test Chat",
-    thread_id: "",
-  });
+  assert.equal(jobsState.jobs.length, 2);
+  assert.deepEqual(jobsState.jobs.map((job: { codeksei_checkin_role: string }) => job.codeksei_checkin_role).sort(), ["recovery", "wake"]);
+  for (const job of jobsState.jobs) {
+    assert.equal(job.deliver, "origin");
+    assert.equal(job.env.CODEKSEI_RUNTIME, "hermes");
+    assert.equal(job.env.CODEKSEI_STATE_DIR, fixture.tempRoot);
+    assert.deepEqual(job.origin, {
+      platform: "weixin",
+      chat_id: "wxid_sender",
+      chat_name: "Test Chat",
+      thread_id: "",
+    });
+  }
 });

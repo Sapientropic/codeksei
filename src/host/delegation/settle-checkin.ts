@@ -6,9 +6,11 @@ import {
   runCheckinTick,
   type CheckinResolvedTarget,
 } from "../../checkin";
-import { syncHostedCheckinPlanViaHermes } from "../recipes/hermes/wake-forwarder";
-import { createHostedCheckinWakePlan } from "../../core/hosted-checkin-cron";
-import { syncCheckinCronViaHermesRepoLocal } from "../recipes/hermes/repo-local";
+import { createHostedCheckinWakePlanSet } from "../../core/hosted-checkin-cron";
+import {
+  syncHostedCheckinPlanSetViaHermes,
+  syncHostedCheckinPlanViaHermes,
+} from "../recipes/hermes/wake-forwarder";
 import type { HostSettleResult } from "../contracts/settle-result";
 
 type SettleConfig = Pick<
@@ -72,7 +74,7 @@ export function settleDelegatedCheckin(
         plan: hostedSync.plan,
         sync: hostedSync.sync,
       } : null,
-      nextWakeAt: hostedSync?.plan.plannedWakeAt || "",
+      nextWakeAt: hostedSync?.plan.jobs[0]?.plannedWakeAt || "",
       target,
     };
   }
@@ -113,27 +115,17 @@ function syncNextWakeViaHermes(
   nextWakeAt: string,
 ) {
   try {
-    const plan = createHostedCheckinWakePlan(config, target, nextWakeAt);
-    const sync = syncCheckinCronViaHermesRepoLocal(config, {
-      due_at_iso: plan.plannedWakeAt,
-      env: plan.env,
-      name: plan.name,
-      prompt: plan.prompt,
-      role: plan.role,
-      sender_id: plan.senderId,
-      target_key: plan.targetKey,
-      workspace_root: plan.workspaceRoot,
+    const planSet = createHostedCheckinWakePlanSet(config, target, {
+      plannedWakeAt: nextWakeAt,
     });
+    const sync = syncHostedCheckinPlanSetViaHermes(config, planSet);
     return {
       ok: true as const,
       data: {
-        created: sync.created,
         deliver: sync.deliver,
-        jobId: sync.jobId,
-        name: sync.name,
-        nextRunAt: sync.nextRunAt,
+        jobs: sync.jobs,
+        nextRunAt: sync.jobs[0]?.nextRunAt || nextWakeAt,
         removedJobIds: sync.removedJobIds,
-        role: sync.role,
       },
     };
   } catch (error) {

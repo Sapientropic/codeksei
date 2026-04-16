@@ -80,6 +80,15 @@ test("docs/commands keeps public CLI examples aligned with the terminal usage so
   assert.ok(commandsDoc.includes(buildTerminalActionExample("review.weekly", { audience: "public", includeArgs: false })));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("app.shared_status", "repo")));
   assert.ok(commandsDoc.includes("./timeline-integration.md"));
+  assert.match(commandsDoc, /--delivery proactive/u);
+  assert.doesNotMatch(commandsDoc, /--sleep-for 6h/u);
+});
+
+test("public docs remove fixed 6h checkin anchors and mention proactive reminder delivery", () => {
+  for (const { name, content } of readmeDocs) {
+    assert.doesNotMatch(content, /--sleep-for 6h/u, `${name} should not anchor hosted checkins to 6h`);
+    assert.match(content, /delivery proactive/u, `${name} should mention proactive reminder delivery`);
+  }
 });
 
 test("timeline integration doc is the canonical deep-dive for timeline support and agent routing", () => {

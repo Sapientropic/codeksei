@@ -16,10 +16,10 @@ import {
 import { buildTerminalLeafHelp } from "../core/command-registry";
 import type { AppRuntimeConfig } from "../core/app-service-contract";
 import { resolveHostMode } from "../core/host-mode";
-import { createHostedCheckinWakePlan } from "../core/hosted-checkin-cron";
-import { syncCheckinCronViaHermesRepoLocal } from "../core/hermes-repo-local";
+import { createHostedCheckinWakePlanSet } from "../core/hosted-checkin-cron";
 import { formatCheckinRange } from "../state/checkin-config";
 import { normalizeText } from "../core/text-normalization";
+import { syncHostedCheckinPlanSetViaHermes } from "../host/recipes/hermes/wake-forwarder";
 
 interface SystemCheckinCompleteOptions {
   help: boolean;
@@ -150,28 +150,18 @@ function syncHostedWakeAfterCompletion(
   nextWakeAt: string,
 ): CommandExecutionResult<Record<string, unknown>> | null {
   try {
-    const plan = createHostedCheckinWakePlan(config, target, nextWakeAt);
-    const sync = syncCheckinCronViaHermesRepoLocal(config, {
-      due_at_iso: plan.plannedWakeAt,
-      env: plan.env,
-      name: plan.name,
-      prompt: plan.prompt,
-      role: plan.role,
-      sender_id: plan.senderId,
-      target_key: plan.targetKey,
-      workspace_root: plan.workspaceRoot,
+    const planSet = createHostedCheckinWakePlanSet(config, target, {
+      plannedWakeAt: nextWakeAt,
     });
+    const sync = syncHostedCheckinPlanSetViaHermes(config, planSet);
     return {
       data: {
-        created: sync.created,
         deliver: sync.deliver,
-        jobId: sync.jobId,
-        name: sync.name,
-        nextRunAt: sync.nextRunAt,
+        jobs: sync.jobs,
+        nextRunAt: sync.jobs[0]?.nextRunAt || nextWakeAt,
         removedJobIds: sync.removedJobIds,
-        role: sync.role,
       },
-      text: `hosted_next_wake: ${sync.nextRunAt} [${sync.role}] job=${sync.jobId}`,
+      text: `hosted_next_wake_jobs: ${sync.jobs.map((job) => `${job.role}:${job.jobId}`).join(", ")}`,
     };
   } catch (error) {
     return {

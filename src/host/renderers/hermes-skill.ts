@@ -1,4 +1,8 @@
 import { buildTerminalActionExample, buildTerminalEntryUsage } from "../../core/terminal-command-usage";
+import {
+  CHECKIN_COMPLETION_CONTEXT_GUIDANCE,
+  CHECKIN_COMPLETION_SLEEP_FOR_PLACEHOLDER,
+} from "../../checkin/completion-guidance";
 
 export function renderHermesCompanionSkill(): string {
   const lines = [
@@ -55,7 +59,7 @@ export function renderHermesCompanionSkill(): string {
     `${buildTerminalEntryUsage("project.radar", "public")} --project <slug> --json`,
     `${buildTerminalEntryUsage("host.seed_proactive", "public")} --provider hermes --user <wechatUserId> --workspace /absolute/workspace`,
     `${buildTerminalEntryUsage("host.claim_checkin", "public")} --provider hermes --user <wechatUserId> --workspace /absolute/workspace`,
-    `${buildTerminalEntryUsage("host.settle_checkin", "public")} --provider hermes --user <wechatUserId> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for 6h`,
+    `${buildTerminalEntryUsage("host.settle_checkin", "public")} --provider hermes --user <wechatUserId> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for ${CHECKIN_COMPLETION_SLEEP_FOR_PLACEHOLDER}`,
     "```",
     "",
     "## Procedure",
@@ -65,7 +69,7 @@ export function renderHermesCompanionSkill(): string {
     "   - `channel send-file` for explicit local artifact send-back",
     "   - `timeline` for concrete time blocks and dashboard screenshots",
     "   - `diary` for lived notes / supplements / todo transitions",
-    "   - `reminder` for future nudges",
+    "   - `reminder` for user-visible nudges or future proactive wakes",
     "   - `note` for durable memory",
     "   - `review` for structured reflection",
     "   - `project radar` for repo continuity",
@@ -81,7 +85,7 @@ export function renderHermesCompanionSkill(): string {
     "```bash",
     `${buildTerminalEntryUsage("host.seed_proactive", "public")} --provider hermes --user <wechatUserId> --workspace /absolute/workspace`,
     `${buildTerminalEntryUsage("host.claim_checkin", "public")} --provider hermes --user <wechatUserId> --workspace /absolute/workspace`,
-    `${buildTerminalEntryUsage("host.settle_checkin", "public")} --provider hermes --user <wechatUserId> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for 6h`,
+    `${buildTerminalEntryUsage("host.settle_checkin", "public")} --provider hermes --user <wechatUserId> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for ${CHECKIN_COMPLETION_SLEEP_FOR_PLACEHOLDER}`,
     "```",
     "",
     "Flow:",
@@ -92,6 +96,12 @@ export function renderHermesCompanionSkill(): string {
     "4. If status is `in_progress`, another proactive pass already owns the lease; Hermes should stay silent and let the recovery wake remain armed.",
     "5. After the proactive pass finishes, Hermes must call `host settle-checkin` with `sent_message|silent|backstage_only`.",
     "6. Use `result=failed` only when Hermes could not finish the delegated pass truthfully; Codeksei will keep recovery ownership and surface a partial result instead of faking completion.",
+    `7. ${CHECKIN_COMPLETION_CONTEXT_GUIDANCE}`,
+    "",
+    "Reminder note:",
+    "",
+    "- Default `reminder write` is for user-visible reminders.",
+    "- Use `codeksei reminder write --delivery proactive ...` when the text is internal follow-up context that should re-enter the proactive checkin chain later instead of being sent directly to the user.",
     "",
     "Compatibility note:",
     "",

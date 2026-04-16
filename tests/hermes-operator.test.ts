@@ -136,11 +136,12 @@ test("operator hermes sync-checkin creates a wake job for scheduled hosted check
   ]);
 
   assert.equal(result.data.tick.status, "scheduled");
-  assert.equal(result.data.planned.role, "wake");
+  assert.deepEqual(result.data.planned.jobs.map((job: { role: string }) => job.role), ["wake", "recovery"]);
   assert.equal(result.data.summary.wakeJobs.length, 1);
-  assert.equal(result.data.summary.recoveryJobs.length, 0);
+  assert.equal(result.data.summary.recoveryJobs.length, 1);
+  assert.equal(result.data.summary.drifted, false);
   const jobsState = JSON.parse(fs.readFileSync(repoLocal.jobsFile, "utf8"));
-  assert.equal(jobsState.jobs.length, 1);
+  assert.equal(jobsState.jobs.length, 2);
   assert.equal(jobsState.jobs[0].deliver, "origin");
   assert.deepEqual(jobsState.jobs[0].origin, {
     platform: "weixin",
@@ -184,8 +185,9 @@ test("operator hermes sync-checkin creates an immediate wake job when checkin is
   ]);
 
   assert.equal(result.data.tick.status, "due");
-  assert.equal(result.data.planned.role, "wake");
-  assert.equal(result.data.sync.jobId.startsWith("cron-"), true);
+  assert.deepEqual(result.data.planned.jobs.map((job: { role: string }) => job.role), ["wake", "recovery"]);
+  assert.equal(result.data.sync.jobs.length, 2);
+  assert.equal(result.data.sync.jobs.every((job: { jobId: string }) => job.jobId.startsWith("cron-")), true);
   assert.equal(result.data.tick.triggerId.length > 0, true);
 });
 
@@ -234,7 +236,7 @@ test("operator hermes sync-checkin creates a recovery job while active wake is i
   ]);
 
   assert.equal(result.data.tick.status, "in_progress");
-  assert.equal(result.data.planned.role, "recovery");
+  assert.deepEqual(result.data.planned.jobs.map((job: { role: string }) => job.role), ["recovery"]);
   assert.equal(result.data.summary.wakeJobs.length, 0);
   assert.equal(result.data.summary.recoveryJobs.length, 1);
 });

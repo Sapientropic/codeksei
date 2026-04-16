@@ -13,7 +13,7 @@
   Hermes 托管 agent + 官方 Weixin；Codeksei 通过 CLI / operator / skill surface 暴露领域能力
 
 这次不会把 Hermes 的 Python Weixin adapter 硬塞进 Node/TS。Hermes Weixin 仍由 Hermes 官方维护，Codeksei 负责 timeline / diary / reminder / review / note / project radar 这些领域能力，并通过 `host attachment contract` 与兼容 `operator hermes` 入口暴露 recipe surface。
-主动 checkin 也按同一条边界收口：Codeksei 负责 trigger generation、`tick -> ack -> complete` 调度真相与下一次唤醒决策；Bridge 继续持有本地 poller，Hermes Hosted Mode 则只执行由 Codeksei 重新 arm 的 one-shot wake/recovery job。对外公开 attach 时，推荐使用 `host seed-proactive / claim-checkin / settle-checkin`，而不是把内部 tick/ack/complete 状态机直接泄露给宿主。
+主动 checkin 也按同一条边界收口：Codeksei 负责 trigger generation、`tick -> ack -> complete` 调度真相与下一次唤醒决策；Bridge 继续持有本地 poller，Hermes Hosted Mode 则只执行由 Codeksei 重新 arm 的受控 wake/recovery job set。对外公开 attach 时，推荐使用 `host seed-proactive / claim-checkin / settle-checkin`，而不是把内部 tick/ack/complete 状态机直接泄露给宿主。
 运行配置入口也已经收口成 `src/core/config.ts` 的 `parseEnvConfig()`：env/CLI override 先规范化成显式字段的 `AppRuntimeConfig`，下游 factory / host policy / CLI 命令不再各自做一轮局部 `typeof config.xxx === "string"` 补丁式收口。
 
 当前质量基线也已经同步到结构层：
