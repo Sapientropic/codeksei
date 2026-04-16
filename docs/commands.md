@@ -50,6 +50,7 @@ public CLI：
 - `codeksei doctor`
 - `codeksei help`
 - `codeksei schema`
+- `codeksei context briefing`
 - `codeksei host manifest`
 - `codeksei host bootstrap`
 - `codeksei host doctor`
@@ -98,6 +99,8 @@ operator / bootstrap：
 - `codeksei system checkin-tick --user <senderId> --workspace /absolute/workspace --ack <triggerId>`
 - `codeksei system checkin-complete --user <senderId> --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for <duration>`
 - `codeksei operator hermes sync-checkin --user <senderId> --workspace /absolute/workspace`
+- `codeksei context briefing --user <senderId> --workspace /absolute/workspace --mode proactive`
+- `codeksei context briefing --user <senderId> --workspace /absolute/workspace --mode review`
 
 说明：
 
@@ -116,8 +119,25 @@ operator / bootstrap：
 - `codeksei system checkin-poller` 现在只保留 bridge 宿主包装；host-neutral 真相层是 `checkin-trigger`、`checkin-tick` 与 `checkin-complete`
 - `checkin-complete` 在 Hermes Hosted Mode 下会在写回 state 后自动 re-arm 下一组 wake/recovery jobs，并清理多余的未来 job
 - `sync-checkin` 创建/更新 job 时需要 origin context；真正 cron 投递时，Hermes 直接读取持久化的 `job.origin`，不会再按 target 反查 live session
+- `sync-checkin` 现在会同时写入 Hermes cron `script`；每次 wake 前先调用 `codeksei context briefing` 读取最新 context board，再让 Hermes 用这份 handoff context 执行主动判断
 - `sync-checkin` 现在会先确保目标 wake/recovery job 已成功存在，再 best-effort 清理旧 job；中途失败时不会先把最后一条 recovery wake 删掉
 - `system checkin --range` 现在是 fallback window，不再代表 agent 的真实唤醒节奏
+
+## Context Board
+
+这一组入口把 Codeksei 的“主动性判断上下文层”暴露成稳定 CLI，而不是要求宿主或 agent 去盲扫原始 vault / repo。
+
+- `codeksei context briefing --user <senderId> --workspace /absolute/workspace`
+- `codeksei context briefing --user <senderId> --workspace /absolute/workspace --mode proactive`
+- `codeksei context briefing --user <senderId> --workspace /absolute/workspace --mode review`
+
+说明：
+
+- 默认输出当前 target 的 prompt-ready briefing；`--mode proactive|review` 用来调整 framing
+- board 落在 `CODEKSEI_STATE_DIR/context/boards/<targetKey>.md`
+- 来源固定为受控输入集：checkin state、当日日记、最近 companion note、proactive follow-up context、project radar、workspace continuity 入口
+- 缺源时显式标 `[⚠️ 需确认]`，不会编造
+- Hermes Hosted Mode 下的 proactive wake 会在 cron 运行前现读这份 board；原始 `AGENTS.md / Home.md / diary` 是输入源，不再是 cron prompt 的直接 surface
 
 ## Host Attachment Contract
 

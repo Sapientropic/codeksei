@@ -75,6 +75,14 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "user", keys: ["--user"], type: "string", defaultValue: "", placeholder: "<wechatUserId>", description: "可选；覆盖默认接收用户" },
     ],
   }),
+  contextBriefing: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id" },
+      { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "显式绝对 workspace 路径" },
+      { name: "mode", keys: ["--mode"], type: "string", defaultValue: "proactive", description: "proactive|review" },
+    ],
+  }),
   diaryWrite: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,

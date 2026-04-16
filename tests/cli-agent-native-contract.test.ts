@@ -230,8 +230,10 @@ test("operator hermes sync-checkin routes through Hermes repo-local shim and upd
   assert.equal(asRecord(plans[0] || {}).env ? asRecord(asRecord(plans[0] || {}).env).CODEKSEI_RUNTIME : "", "hermes");
   const jobsState = JSON.parse(fs.readFileSync(repoLocal.jobsFile, "utf8"));
   assert.equal(jobsState.jobs.length, 2);
+  assert.equal(fs.existsSync(path.join(repoLocal.hermesHome, "scripts", "codeksei_context_briefing.py")), true);
   for (const job of jobsState.jobs) {
     assert.equal(job.deliver, "origin");
+    assert.match(String(job.script || ""), /codeksei_context_briefing\.py$/u);
     assert.equal(job.env.CODEKSEI_STATE_DIR, tempRoot.stateDir);
     assert.deepEqual(job.origin, {
       platform: "weixin",
@@ -453,6 +455,7 @@ test("hosted mode reminder write with delivery proactive seeds hosted checkin in
   const jobsState = JSON.parse(fs.readFileSync(repoLocal.jobsFile, "utf8"));
   assert.equal(jobsState.jobs.length, 2);
   assert.deepEqual(jobsState.jobs.map((job: { codeksei_checkin_role: string }) => job.codeksei_checkin_role).sort(), ["recovery", "wake"]);
+  assert.equal(jobsState.jobs.every((job: { script: string }) => /codeksei_context_briefing\.py$/u.test(job.script)), true);
 });
 
 test("hosted mode system send still fails fast with unsupported_host_capability", () => {

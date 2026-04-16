@@ -1,5 +1,6 @@
 import { CliError } from "../../core/cli-contract";
 import type { AppRuntimeConfig } from "../../core/app-service-contract";
+import { tryRefreshContextBoard, type ContextBoardConfig } from "../../context/board";
 import {
   normalizeCheckinCompleteResult,
   runCheckinComplete,
@@ -7,13 +8,14 @@ import {
   type CheckinResolvedTarget,
 } from "../../checkin";
 import { createHostedCheckinWakePlanSet } from "../../core/hosted-checkin-cron";
+import type { HostedCheckinConfig } from "../recipes/hermes/wake-forwarder";
 import {
   syncHostedCheckinPlanSetViaHermes,
   syncHostedCheckinPlanViaHermes,
 } from "../recipes/hermes/wake-forwarder";
 import type { HostSettleResult } from "../contracts/settle-result";
 
-type SettleConfig = Pick<
+type SettleConfig = ContextBoardConfig & Pick<
   AppRuntimeConfig,
   "checkinConfigFile" | "checkinScheduleStateFile"
 > & Partial<Pick<
@@ -65,7 +67,7 @@ export function settleDelegatedCheckin(
 
   if (result === "failed") {
     const hostedSync = provider === "hermes"
-      ? syncHostedCheckinPlanViaHermes(config, target, current)
+      ? syncHostedCheckinPlanViaHermes(config as Partial<HostedCheckinConfig>, target, current)
       : null;
     return {
       ok: "partial" as const,
@@ -97,6 +99,10 @@ export function settleDelegatedCheckin(
     target,
     triggerId: leaseId,
   });
+  tryRefreshContextBoard(config, target, {
+    clearFollowupContext: true,
+    mode: "proactive",
+  });
   const hostedWakeSync = provider === "hermes"
     ? syncNextWakeViaHermes(config, target, completion.nextWakeAt)
     : null;
@@ -115,10 +121,10 @@ function syncNextWakeViaHermes(
   nextWakeAt: string,
 ) {
   try {
-    const planSet = createHostedCheckinWakePlanSet(config, target, {
+    const planSet = createHostedCheckinWakePlanSet(config as Partial<HostedCheckinConfig>, target, {
       plannedWakeAt: nextWakeAt,
     });
-    const sync = syncHostedCheckinPlanSetViaHermes(config, planSet);
+    const sync = syncHostedCheckinPlanSetViaHermes(config as Partial<HostedCheckinConfig>, planSet);
     return {
       ok: true as const,
       data: {

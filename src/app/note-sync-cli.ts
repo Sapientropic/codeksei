@@ -1,5 +1,6 @@
 import { getCommandArgsSchema } from "../contracts/command-args";
 import type { CommandExecutionResult } from "../contracts/cli-contract";
+import { bestEffortRefreshContextBoard, type ContextBoardConfig } from "../context/board";
 import { parseCliArgs } from "../core/cli-args";
 import { buildTerminalLeafHelp } from "../core/command-registry";
 import { runCliMutation } from "../core/cli-mutation";
@@ -31,7 +32,11 @@ interface NoteSyncResult {
 }
 
 
-async function runNoteSyncCommand(config: unknown, args: string[] = []) {
+type NoteSyncRuntimeConfig = ContextBoardConfig & {
+  cliIdempotencyLedgerFile?: string;
+};
+
+async function runNoteSyncCommand(config: NoteSyncRuntimeConfig, args: string[] = []) {
   const options = parseNoteSyncArgs(args);
   if (options.help) {
     return {
@@ -81,6 +86,9 @@ async function runNoteSyncCommand(config: unknown, args: string[] = []) {
       });
 
       const action = result.changed ? "updated" : "noop";
+      bestEffortRefreshContextBoard(normalizeConfig(config), {
+        mode: "proactive",
+      });
       return {
         data: {
           action,
@@ -146,6 +154,6 @@ export {
   runNoteSyncCommand,
 };
 
-function normalizeConfig(config: unknown): Record<string, unknown> {
+function normalizeConfig(config: unknown): NoteSyncRuntimeConfig {
   return config && typeof config === "object" ? { ...config } : {};
 }

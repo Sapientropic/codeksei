@@ -252,6 +252,8 @@ test("host seed-proactive with explicit sleep-for repairs state and hosted job s
   assert.equal(state?.nextWakeAt, result.data.nextWakeAt);
   const jobsState = JSON.parse(fs.readFileSync(repoLocal.jobsFile, "utf8"));
   assert.deepEqual(jobsState.jobs.map((job: { codeksei_checkin_role: string }) => job.codeksei_checkin_role).sort(), ["recovery", "wake"]);
+  assert.equal(jobsState.jobs.every((job: { script: string }) => /codeksei_context_briefing\.py$/u.test(job.script)), true);
+  assert.equal(fs.existsSync(path.join(repoLocal.hermesHome, "scripts", "codeksei_context_briefing.py")), true);
 });
 
 test("host settle-checkin returns partial on failed delegated pass and keeps recovery ownership", async () => {

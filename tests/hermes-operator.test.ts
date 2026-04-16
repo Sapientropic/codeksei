@@ -142,7 +142,9 @@ test("operator hermes sync-checkin creates a wake job for scheduled hosted check
   assert.equal(result.data.summary.drifted, false);
   const jobsState = JSON.parse(fs.readFileSync(repoLocal.jobsFile, "utf8"));
   assert.equal(jobsState.jobs.length, 2);
+  assert.equal(fs.existsSync(path.join(repoLocal.hermesHome, "scripts", "codeksei_context_briefing.py")), true);
   assert.equal(jobsState.jobs[0].deliver, "origin");
+  assert.equal(jobsState.jobs.every((job: { script: string }) => /codeksei_context_briefing\.py$/u.test(job.script)), true);
   assert.deepEqual(jobsState.jobs[0].origin, {
     platform: "weixin",
     chat_id: "wxid_sender",

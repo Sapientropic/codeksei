@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import * as dotenv from "dotenv";
 
 import { resolvePackageRoot } from "../contracts/path-utils";
+import { ensureHermesContextBriefingScript } from "../context/briefing-script";
 import { captureSubprocess, resolveCommandOnPath } from "./subprocess-capture";
 import { normalizeText } from "./text-normalization";
 
@@ -105,6 +106,7 @@ interface HermesRepoLocalSyncCheckinCronPlanPayload {
   name: string;
   prompt: string;
   role: "recovery" | "wake";
+  script?: string;
   sender_id: string;
   target_key: string;
   workspace_root: string;
@@ -117,6 +119,7 @@ interface HermesRepoLocalSyncCheckinCronPayload {
   name?: string;
   prompt?: string;
   role?: "recovery" | "wake";
+  script?: string;
   sender_id: string;
   target_key: string;
   workspace_root: string;
@@ -310,10 +313,11 @@ export function syncCheckinCronViaHermesRepoLocal(
   config: HermesRepoLocalConfigInput,
   payload: HermesRepoLocalSyncCheckinCronPayload,
 ): HermesRepoLocalSyncCheckinCronResult {
+  const normalizedPayload = ensureContextScriptForSyncPayload(config, payload);
   const data = invokeHermesRepoLocalBridge<HermesRepoLocalSyncCheckinCronShimResult>(config, {
     action: "sync_checkin_cron",
     hermes_home: resolveHermesHomePath(config),
-    payload,
+    payload: normalizedPayload,
     repo_root: resolveHermesRepoRoot(config),
     session_key: normalizeText(process.env.HERMES_SESSION_KEY),
   });
@@ -326,6 +330,26 @@ export function syncCheckinCronViaHermesRepoLocal(
     sessionId: normalizeText(data.session_id),
     sessionKey: normalizeText(data.session_key),
     threadId: normalizeText(data.origin?.thread_id),
+  };
+}
+
+function ensureContextScriptForSyncPayload(
+  config: HermesRepoLocalConfigInput,
+  payload: HermesRepoLocalSyncCheckinCronPayload,
+): HermesRepoLocalSyncCheckinCronPayload {
+  const scriptPath = ensureHermesContextBriefingScript(config);
+  if (Array.isArray(payload.plans) && payload.plans.length > 0) {
+    return {
+      ...payload,
+      plans: payload.plans.map((plan) => ({
+        ...plan,
+        script: normalizeText(plan.script) || scriptPath,
+      })),
+    };
+  }
+  return {
+    ...payload,
+    script: normalizeText(payload.script) || scriptPath,
   };
 }
 

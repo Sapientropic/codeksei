@@ -48,6 +48,7 @@ test("terminal manifest declares unique command keys", () => {
 
 test("command surface can resolve routed terminal commands from a single manifest", () => {
   assert.equal(findTerminalCommandManifest("note", "auto")?.action, "note.auto");
+  assert.equal(findTerminalCommandManifest("context", "briefing")?.action, "context.briefing");
   assert.equal(findTerminalCommandManifest("timeline", "screenshot")?.runner, "timeline.screenshot");
   assert.equal(findTerminalCommandManifest("review", "weekly")?.argsSchemaKey, "review");
   assert.equal(findTerminalCommandManifest("operator", "hermes install-skill")?.action, "operator.hermes.install_skill");
@@ -110,6 +111,7 @@ test("package scripts keep runtime entrypoints aligned with the published-runtim
     "shared:supervisor": buildNodeRuntimeInvocation("sharedSupervisor"),
     "shared:watchdog": buildNodeRuntimeInvocation("sharedWatchdog"),
     "channel:send-file": buildNodeRuntimeInvocation("cli", ["channel", "send-file"]),
+    "context:briefing": buildNodeRuntimeInvocation("cli", ["context", "briefing"]),
     "note:auto": buildNodeRuntimeInvocation("cli", ["note", "auto"]),
     "note:maybe": buildNodeRuntimeInvocation("cli", ["note", "maybe"]),
     "note:sync": buildNodeRuntimeInvocation("cli", ["note", "sync"]),

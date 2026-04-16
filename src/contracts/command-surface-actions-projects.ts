@@ -2,6 +2,22 @@ import type { CommandActionDefinition } from "./command-surface-definition-types
 
 export const PROJECTS_COMMAND_ACTION_DEFINITIONS = [
   {
+    action: "context.briefing",
+    groupId: "projects",
+    summary: "生成一份主动判断可复用的 context board handoff",
+    terminal: ["context briefing"],
+    weixin: [],
+    status: "active",
+    entrypointType: "cli",
+    scriptName: "context:briefing",
+    command: "context",
+    subcommand: "briefing",
+    runner: "context.briefing",
+    argsSchemaKey: "contextBriefing",
+    help: { topic: "context", leafKey: "context.briefing", detail: "leaf" },
+    approval: { autoApprove: true },
+  },
+  {
     action: "project.radar",
     groupId: "projects",
     summary: "读取已跟踪代码项目的稳定入口与轻量 git 近况",

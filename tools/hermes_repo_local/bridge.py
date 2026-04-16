@@ -351,6 +351,7 @@ def _normalize_sync_checkin_plan(value: Any) -> Dict[str, Any]:
     env = _normalize_job_env(value.get("env"))
     prompt = str(value.get("prompt") or "").strip()
     role = _normalize_checkin_role(value.get("role"))
+    script = str(value.get("script") or "").strip()
     target_key = str(value.get("target_key") or "").strip()
     workspace_root = str(value.get("workspace_root") or "").strip()
     sender_id = str(value.get("sender_id") or "").strip()
@@ -360,6 +361,8 @@ def _normalize_sync_checkin_plan(value: Any) -> Dict[str, Any]:
         raise RuntimeError("sync_checkin_cron plan is missing due_at_iso")
     if not prompt:
         raise RuntimeError("sync_checkin_cron plan is missing prompt")
+    if not script:
+        raise RuntimeError("sync_checkin_cron plan is missing script")
     if not role:
         raise RuntimeError("sync_checkin_cron plan role must be wake or recovery")
     if not target_key:
@@ -377,6 +380,7 @@ def _normalize_sync_checkin_plan(value: Any) -> Dict[str, Any]:
         "name": name,
         "prompt": prompt,
         "role": role,
+        "script": script,
         "sender_id": sender_id,
         "target_key": target_key,
         "workspace_root": workspace_root,
@@ -391,6 +395,7 @@ def _build_checkin_job_updates(
     origin: Dict[str, str],
     prompt: str,
     role: str,
+    script: str,
     sender_id: str,
     target_key: str,
     workspace_root: str,
@@ -418,6 +423,7 @@ def _build_checkin_job_updates(
         "paused_at": None,
         "paused_reason": None,
         "prompt": prompt,
+        "script": script,
         "schedule": schedule,
         "schedule_display": schedule.get("display", due_at_iso),
         "skill": "codeksei-companion",
@@ -441,6 +447,7 @@ def _create_checkin_job(
     name: str,
     origin: Dict[str, str],
     prompt: str,
+    script: str,
     skills: list[str],
     due_at_iso: str,
 ) -> Dict[str, Any]:
@@ -452,6 +459,7 @@ def _create_checkin_job(
         "deliver": deliver,
         "origin": origin,
         "skills": skills,
+        "script": script,
     }
     # Hermes upstream releases before the cron-env patch do not accept an
     # `env` kwarg on create_job. Hosted check-in commands now self-bootstrap
@@ -534,6 +542,7 @@ def _handle_sync_checkin_cron(request: Dict[str, Any], origin_context: Dict[str,
             origin=origin,
             prompt=plan["prompt"],
             role=plan["role"],
+            script=plan["script"],
             sender_id=plan["sender_id"],
             target_key=plan["target_key"],
             workspace_root=plan["workspace_root"],
@@ -560,6 +569,7 @@ def _handle_sync_checkin_cron(request: Dict[str, Any], origin_context: Dict[str,
                     "thread_id": origin.get("thread_id") or None,
                 },
                 prompt=plan["prompt"],
+                script=plan["script"],
                 skills=["codeksei-companion"],
                 due_at_iso=plan["due_at_iso"],
             )

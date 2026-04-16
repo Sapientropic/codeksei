@@ -1,5 +1,6 @@
 import { getCommandArgsSchema } from "../contracts/command-args";
 import type { CommandExecutionResult } from "../contracts/cli-contract";
+import { bestEffortRefreshContextBoard, type ContextBoardConfig } from "../context/board";
 import { parseCliArgs } from "../core/cli-args";
 import { buildTerminalLeafHelp } from "../core/command-registry";
 import {
@@ -35,7 +36,11 @@ interface NoteSyncResult {
   filePath: string;
 }
 
-async function runNoteAutoCommand(config: unknown, args: string[] = []) {
+type NoteAutoRuntimeConfig = ContextBoardConfig & {
+  cliIdempotencyLedgerFile?: string;
+};
+
+async function runNoteAutoCommand(config: NoteAutoRuntimeConfig, args: string[] = []) {
   const options = parseNoteAutoArgs(args);
   if (options.help) {
     return {
@@ -91,6 +96,9 @@ async function runNoteAutoCommand(config: unknown, args: string[] = []) {
       if (schemaResult.changed) {
         lines.push(`schema ensured: ${schemaResult.filePath} (${schemaResult.createdSections.join(", ")})`);
       }
+      bestEffortRefreshContextBoard(normalizeConfig(config), {
+        mode: "proactive",
+      });
 
       return {
         data: {
@@ -125,7 +133,7 @@ async function runNoteAutoCommand(config: unknown, args: string[] = []) {
   });
 }
 
-function runNoteMaybeCommand(config: unknown, args: string[] = []) {
+function runNoteMaybeCommand(config: NoteAutoRuntimeConfig, args: string[] = []) {
   const options = parseNoteAutoArgs(args);
   if (options.help) {
     return {
@@ -209,7 +217,7 @@ function formatInspection(inspection: DurableNoteRoutingInspection): string {
   ].join("\n");
 }
 
-function normalizeConfig(config: unknown): Record<string, unknown> {
+function normalizeConfig(config: unknown): NoteAutoRuntimeConfig {
   return config && typeof config === "object" ? { ...config } : {};
 }
 

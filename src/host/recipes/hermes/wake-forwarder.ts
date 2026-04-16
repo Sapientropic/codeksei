@@ -57,6 +57,7 @@ export function syncHostedCheckinPlanSetViaHermes(
       name: job.name,
       prompt: job.prompt,
       role: job.role,
+      script: job.script,
       sender_id: job.senderId,
       target_key: job.targetKey,
       workspace_root: job.workspaceRoot,

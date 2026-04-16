@@ -60,6 +60,8 @@ Codeksei is now positioned as a **daemon-first / bridge-first / companion engine
   Current default path: `Codeksei Weixin bridge + Codex runtime`
 - `Hermes Hosted Mode`
   Hermes owns the agent loop and official Weixin; Codeksei exposes timeline, diary, reminder, review, note, and project radar through its CLI / skill surface
+- `Proactive context layer`
+  Hosted proactive wakes read a Codeksei-managed context board by default. It is aggregated from checkin state, today's diary, companion notes, project radar, and workspace continuity, then injected by a Hermes cron `script` right before runtime instead of requiring raw vault scans
 - External hosts should attach through the `host attachment contract`:
   `codeksei host manifest`, `codeksei host bootstrap`, `codeksei host doctor`, `codeksei host smoke`, `codeksei host seed-proactive`, `codeksei host claim-checkin`, `codeksei host settle-checkin`
 
@@ -186,6 +188,7 @@ Boundaries:
 - `Timeline`: time blocks, switches, and lived facts become anchors for memory and time sense instead of fading into a blur
 - `Diary`: todos, fragments, supplements, summaries, and timeline-linked facts for daily traces that want to stay
 - `Check-ins`: proactive wake-ups and background care. Messaging is only one output path; Codeksei can also reread context, clean up backstage state, update diary/timeline, or leave a reminder before deciding whether it should surface. It owns proactive trigger generation, the `tick -> ack -> complete` schedule truth, and the next wake decision written in `checkin-complete`; Bridge Mode wraps that truth with a local poller, while Hermes Hosted Mode only executes a managed wake/recovery job set and still defers the true next wake to Codeksei
+- `Context board`: the controlled context layer for proactive judgement. It turns checkin state, today's facts, active threads, cautions, and re-entry handles into a prompt-ready briefing; Hermes Hosted Mode refreshes and injects that board at cron runtime instead of scanning raw vault files
 - `Reminders`: reminder write and scheduling support for rhythm and follow-through. In Hermes Hosted Mode the default is a user-visible reminder; use `reminder write --delivery proactive` when the text should become a future proactive wake instead of a direct message
 - `Review`: nightly / weekly / monthly review, with hybrid semantic extraction by default
 - `Project support`: workspace bootstrap, project radar, and shared-thread recovery by workspace so re-entry does not always start from scratch; local git remains the first truth and GitHub activity is only a fallback continuity signal
@@ -327,6 +330,7 @@ codeksei host manifest
 codeksei host bootstrap --provider hermes --ensure-daemon
 codeksei host doctor
 codeksei host smoke --provider hermes
+codeksei context briefing --user <wechat_user_id> --workspace /absolute/workspace --mode proactive
 codeksei review weekly --help
 ```
 
@@ -376,6 +380,7 @@ codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/works
 codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace --ack <triggerId>
 codeksei system checkin-complete --user <wechat_user_id> --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for <duration>
 codeksei operator hermes sync-checkin --user <wechat_user_id> --workspace /absolute/workspace
+codeksei context briefing --user <wechat_user_id> --workspace /absolute/workspace --mode review
 ```
 
 More detailed references:

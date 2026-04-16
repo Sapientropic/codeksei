@@ -13,7 +13,7 @@
   Hermes 托管 agent + 官方 Weixin；Codeksei 通过 CLI / operator / skill surface 暴露领域能力
 
 这次不会把 Hermes 的 Python Weixin adapter 硬塞进 Node/TS。Hermes Weixin 仍由 Hermes 官方维护，Codeksei 负责 timeline / diary / reminder / review / note / project radar 这些领域能力，并通过 `host attachment contract` 与兼容 `operator hermes` 入口暴露 recipe surface。
-主动 checkin 也按同一条边界收口：Codeksei 负责 trigger generation、`tick -> ack -> complete` 调度真相与下一次唤醒决策；Bridge 继续持有本地 poller，Hermes Hosted Mode 则只执行由 Codeksei 重新 arm 的受控 wake/recovery job set。对外公开 attach 时，推荐使用 `host seed-proactive / claim-checkin / settle-checkin`，而不是把内部 tick/ack/complete 状态机直接泄露给宿主。
+主动 checkin 也按同一条边界收口：Codeksei 负责 trigger generation、`tick -> ack -> complete` 调度真相与下一次唤醒决策；Bridge 继续持有本地 poller，Hermes Hosted Mode 则只执行由 Codeksei 重新 arm 的受控 wake/recovery job set。主动判断依赖 Codeksei 自己维护的 context board：由受控输入集做 deterministic 聚合，再通过 Hermes cron `script` 在运行前注入，而不是把 raw vault/filesystem 扫描直接暴露给 cron prompt。对外公开 attach 时，推荐使用 `host seed-proactive / claim-checkin / settle-checkin`，而不是把内部 tick/ack/complete 状态机直接泄露给宿主。
 运行配置入口也已经收口成 `src/core/config.ts` 的 `parseEnvConfig()`：env/CLI override 先规范化成显式字段的 `AppRuntimeConfig`，下游 factory / host policy / CLI 命令不再各自做一轮局部 `typeof config.xxx === "string"` 补丁式收口。
 
 当前质量基线也已经同步到结构层：
@@ -266,7 +266,7 @@
 
 ## 8. Integrations And Operational Layer
 
-`src/integrations/*`、`src/checkin/*`、`src/review/*`、`src/notes/*`、`src/app/*`
+`src/integrations/*`、`src/checkin/*`、`src/context/*`、`src/review/*`、`src/notes/*`、`src/app/*`
 
 这几层共同构成更接近“陪伴感”和“节奏感”的工作流表面。
 
@@ -274,6 +274,7 @@
 
 - `src/integrations/*` 负责接上游能力，例如 timeline
 - `src/checkin/*` 负责 proactive checkin 的 target resolution、wake schedule truth 与 bridge poller scheduling
+- `src/context/*` 负责主动性判断上下文层：context board 的聚合、managed markdown 落盘、briefing CLI 与 Hermes script 注入合同
 - `src/review/*` 负责 nightly / weekly / monthly review
 - `src/notes/*` 负责 durable note routing 与写入
 - `src/app/*` 负责公开 CLI 入口命令
@@ -287,6 +288,7 @@
 - `src/core` / `src/runtime` 不再依赖 style/type allowlist 才能维持这些边界
 - Hermes 集成当前优先走 skill / CLI / operator contract，而不是把 Hermes gateway 逻辑重新 vendoring 进来
 - Hermes Hosted Mode 的 repo-local send-back / cron 现在通过 Codeksei 自己的薄 Python shim 对接 sibling `hermes-agent` checkout，不在 TS 里重写 Weixin/CDN/context_token/cron 细节
+- Hosted proactive cron 的 handoff context 现在由 `context briefing` + Hermes pre-run `script` 提供；稳定状态、今天事实和重入入口先在 Codeksei 内部收口成 board，再交给宿主消费
 - review hybrid 现在由宿主策略层选择 semantic host：Bridge Mode 默认走 Codex，Hermes Hosted Mode 默认走 Hermes，文件路由与落盘逻辑仍保留在 Codeksei 自己手里
 - checkin 现在按 host-neutral core 收口：`system checkin-trigger` 提供 one-shot payload，`system checkin-tick` / `system checkin-complete` 维护调度真相；Hermes Hosted Mode 通过 `operator hermes sync-checkin` + repo-local shim 只保留一个未来 wake 或 recovery one-shot job，运行时 delivery 直接读持久化的 `job.origin`，`system checkin-poller` 退回 bridge-only wrapper
 - 对外公开给宿主时，`host seed-proactive / claim-checkin / settle-checkin` 只是在现有 scheduler 真相外面包一层 delegated execution lease；不要把它误读成第二套 scheduler
@@ -312,6 +314,7 @@
 - sessions
 - sync buffers
 - reminder / system / timeline screenshot queues
+- context boards
 - workspace bootstrap config
 - logs
 

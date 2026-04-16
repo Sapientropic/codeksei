@@ -38,6 +38,14 @@ interface CollectedFile {
   when: string;
 }
 
+export interface WorkspaceContinuityFile extends CollectedFile {}
+
+export interface WorkspaceContinuitySnapshot {
+  primaryFiles: WorkspaceContinuityFile[];
+  recentFiles: WorkspaceContinuityFile[];
+  conditionalFiles: WorkspaceContinuityFile[];
+}
+
 const DEFAULT_BOOTSTRAP_PROFILE: WorkspaceBootstrapProfile = Object.freeze({
   primaryFiles: [
     {
@@ -90,14 +98,11 @@ export function buildWorkspaceContinuityInstructions(
     return "";
   }
 
-  const profile = resolveWorkspaceBootstrapProfile(normalizedWorkspaceRoot, config);
-  // Keep the bootstrap read set intentionally narrow and curated. This path is
-  // supposed to rehydrate durable context for a thread, not silently turn a
-  // workspace switch into a broad vault scan.
-  const primaryFiles = collectExistingFiles(normalizedWorkspaceRoot, profile.primaryFiles);
-  const recentFiles = collectRecentFiles(normalizedWorkspaceRoot, profile.recentFiles);
-  const conditionalFiles = collectExistingFiles(normalizedWorkspaceRoot, profile.conditionalFiles);
-
+  const {
+    conditionalFiles,
+    primaryFiles,
+    recentFiles,
+  } = collectWorkspaceContinuitySnapshot(normalizedWorkspaceRoot, config);
   const primarySequence = [...primaryFiles, ...recentFiles];
   if (!primarySequence.length && !conditionalFiles.length) {
     return "";
@@ -132,6 +137,30 @@ export function buildWorkspaceContinuityInstructions(
   }
   lines.push("Do not paste these file paths or summarize them back unless the user explicitly asks.");
   return lines.join("\n").trim();
+}
+
+export function collectWorkspaceContinuitySnapshot(
+  workspaceRoot: unknown,
+  config: WorkspaceBootstrapOptions = {},
+): WorkspaceContinuitySnapshot {
+  const normalizedWorkspaceRoot = normalizeWorkspaceRoot(workspaceRoot);
+  if (!normalizedWorkspaceRoot) {
+    return {
+      conditionalFiles: [],
+      primaryFiles: [],
+      recentFiles: [],
+    };
+  }
+
+  const profile = resolveWorkspaceBootstrapProfile(normalizedWorkspaceRoot, config);
+  // Keep the bootstrap read set intentionally narrow and curated. This path is
+  // supposed to rehydrate durable context for a thread, not silently turn a
+  // workspace switch into a broad vault scan.
+  return {
+    conditionalFiles: collectExistingFiles(normalizedWorkspaceRoot, profile.conditionalFiles),
+    primaryFiles: collectExistingFiles(normalizedWorkspaceRoot, profile.primaryFiles),
+    recentFiles: collectRecentFiles(normalizedWorkspaceRoot, profile.recentFiles),
+  };
 }
 
 function resolveWorkspaceBootstrapProfile(
