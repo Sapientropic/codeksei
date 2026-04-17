@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = ROOT / "docs" / "assets" / "readme"
 WIDTH = 960
 HEIGHT = 640
-FPS = 10
+FPS = 14
 
 BACKGROUND = "#f3ede2"
 BACKGROUND_WASH = "#e9dcc9"
@@ -285,18 +285,21 @@ def draw_bubble(
 
     draw.rounded_rectangle(box, radius=radius, fill=fill_rgba, outline=border_rgba, width=2)
     if tail_side == "left":
+        base_oval = (box[0] + 16, box[3] - 16, box[0] + 32, box[3] - 2)
         tail = [
-            (box[0] + 34, box[3] - 20),
-            (box[0] + 8, box[3] - 10),
-            (box[0] - 8, box[3] + 8),
+            (box[0] + 22, box[3] - 4),
+            (box[0] + 8, box[3] + 10),
+            (box[0] + 18, box[3] + 2),
         ]
     else:
+        base_oval = (box[2] - 32, box[3] - 16, box[2] - 16, box[3] - 2)
         tail = [
-            (box[2] - 34, box[3] - 20),
-            (box[2] - 8, box[3] - 10),
-            (box[2] + 8, box[3] + 8),
+            (box[2] - 22, box[3] - 4),
+            (box[2] - 8, box[3] + 10),
+            (box[2] - 18, box[3] + 2),
         ]
     draw.polygon(tail, fill=fill_rgba, outline=border_rgba)
+    draw.ellipse(base_oval, fill=fill_rgba, outline=border_rgba, width=2)
     lines, _, _ = measure_lines(text, font, width - padding_x * 2, line_gap)
     line_height = font.getbbox("Ag")[3] - font.getbbox("Ag")[1]
     text_y = box[1] + padding_y
@@ -317,28 +320,31 @@ def draw_bubble(
     return Image.alpha_composite(base, overlay)
 
 
-def transform_states(initial: str, final: str, keep_prefix: str) -> list[str]:
-    states: list[str] = []
-    current = initial
-    states.append(current)
+def tail_backspace_states(text: str, target: str, *, max_steps: int | None = None) -> list[str]:
+    if len(target) > len(text):
+        raise ValueError("target must not be longer than source text")
+    if target and not text.startswith(target):
+        raise ValueError("target must stay on the same prefix path")
+    diff = len(text) - len(target)
+    if diff <= 0:
+        return []
+    steps = diff if max_steps is None else min(max_steps, diff)
+    removals = sorted(set(max(1, round(index * diff / steps)) for index in range(1, steps + 1)))
+    states = [text[: len(text) - remove_count] for remove_count in removals]
+    if states[-1] != target:
+        states.append(target)
+    return states
 
-    while current and not current.startswith(keep_prefix):
-        current = current[1:]
-        states.append(current)
 
-    suffix_len = max(0, len(current) - len(keep_prefix))
-    if suffix_len:
-        steps = min(8, suffix_len)
-        for step in range(1, steps + 1):
-            remaining = suffix_len - round(step * suffix_len / steps)
-            next_state = keep_prefix + current[len(current) - remaining :] if remaining > 0 else keep_prefix
-            if states[-1] != next_state:
-                states.append(next_state)
-        current = keep_prefix
-
-    suffix = final[len(keep_prefix) :]
-    for index in range(1, len(suffix) + 1):
-        states.append(keep_prefix + suffix[:index])
+def type_in_states(text: str, *, max_steps: int | None = None) -> list[str]:
+    if not text:
+        return [""]
+    total = len(text)
+    steps = total if max_steps is None else min(max_steps, total)
+    indices = sorted(set(max(1, round(index * total / steps)) for index in range(1, steps + 1)))
+    states = [text[:index] for index in indices]
+    if states[-1] != text:
+        states.append(text)
     return states
 
 
@@ -362,7 +368,6 @@ def render_language(language: str) -> None:
     bubble_one_box = bubble_box(spec_one.text, body_font, spec_one.max_width, padding_x, padding_y, line_gap)
     bubble_two_box = bubble_box(spec_two.text, body_font, spec_two.max_width, padding_x, padding_y, line_gap)
     bubble_three_initial = spec_three.text
-    bubble_three_keep = spec_three.keep_prefix or ""
     bubble_three_width, bubble_three_height = bubble_box(
         max([bubble_three_initial, final_text], key=len),
         body_font,
@@ -375,7 +380,14 @@ def render_language(language: str) -> None:
     base = build_static_base(language, label_font, detail_font)
     frames: list[Image.Image] = []
 
-    def push(progress_one: float = 1.0, progress_two: float = 1.0, bubble_three_text: str | None = None, cursor: bool = False) -> None:
+    def push(
+        progress_one: float = 1.0,
+        progress_two: float = 1.0,
+        bubble_three_text: str | None = None,
+        cursor: bool = False,
+        bubble_three_alpha: float = 1.0,
+        bubble_three_offset_y: int = 0,
+    ) -> None:
         frame = base.copy()
         if progress_one > 0:
             eased = ease_out(progress_one)
@@ -431,9 +443,9 @@ def render_language(language: str) -> None:
                 bubble_three_text,
                 body_font,
                 TEXT,
-                alpha=1.0,
+                alpha=bubble_three_alpha,
                 offset_x=0,
-                offset_y=0,
+                offset_y=bubble_three_offset_y,
                 padding_x=padding_x,
                 padding_y=padding_y,
                 line_gap=line_gap,
@@ -442,19 +454,92 @@ def render_language(language: str) -> None:
             )
         frames.append(frame.convert("P", palette=Image.ADAPTIVE, colors=80))
 
-    for _ in range(8):
+    def hold(count: int, **kwargs: object) -> None:
+        for _ in range(count):
+            push(**kwargs)
+
+    def blink(text: str, count: int, *, alpha: float = 1.0) -> None:
+        for index in range(count):
+            push(
+                progress_one=1.0,
+                progress_two=1.0,
+                bubble_three_text=text,
+                cursor=index % 2 == 0,
+                bubble_three_alpha=alpha,
+            )
+
+    for _ in range(6):
         push(progress_one=1.0, progress_two=1.0)
 
-    states = transform_states(bubble_three_initial, final_text, bubble_three_keep)
-    for index, state in enumerate(states):
+    for step in range(1, 5):
+        eased = ease_out(step / 4.0)
         push(
             progress_one=1.0,
             progress_two=1.0,
-            bubble_three_text=state,
-            cursor=index < len(states) - 1,
+            bubble_three_text="",
+            cursor=False,
+            bubble_three_alpha=eased,
+            bubble_three_offset_y=round((1.0 - eased) * 18),
         )
-    for _ in range(8):
-        push(progress_one=1.0, progress_two=1.0, bubble_three_text=final_text, cursor=False)
+
+    blink("", 2)
+
+    if language == "zh":
+        initial_type_steps = 10
+        final_type_steps = 9
+        first_delete_steps = 5
+        second_delete_steps = 4
+    else:
+        initial_type_steps = 16
+        final_type_steps = 14
+        first_delete_steps = 7
+        second_delete_steps = 5
+
+    initial_states = type_in_states(bubble_three_initial, max_steps=initial_type_steps)
+    for state in initial_states:
+        push(progress_one=1.0, progress_two=1.0, bubble_three_text=state, cursor=True)
+        if state[-1:] in {"?", "？"}:
+            push(progress_one=1.0, progress_two=1.0, bubble_three_text=state, cursor=False)
+
+    blink(bubble_three_initial, 3)
+
+    if language == "zh":
+        rethink_anchor = "现在要不要"
+    else:
+        rethink_anchor = "Want to "
+
+    for state in tail_backspace_states(bubble_three_initial, rethink_anchor, max_steps=first_delete_steps):
+        push(progress_one=1.0, progress_two=1.0, bubble_three_text=state, cursor=True)
+
+    blink(rethink_anchor, 2)
+
+    for state in tail_backspace_states(rethink_anchor, "", max_steps=second_delete_steps):
+        push(progress_one=1.0, progress_two=1.0, bubble_three_text=state, cursor=True)
+
+    blink("", 1)
+
+    final_states = type_in_states(final_text, max_steps=final_type_steps)
+    for state in final_states:
+        push(progress_one=1.0, progress_two=1.0, bubble_three_text=state, cursor=True)
+        if state[-1:] in {"?", "？"}:
+            push(progress_one=1.0, progress_two=1.0, bubble_three_text=state, cursor=False)
+
+    blink(final_text, 2)
+    hold(4, progress_one=1.0, progress_two=1.0, bubble_three_text=final_text, cursor=False)
+
+    for step in range(2, -1, -1):
+        alpha = step / 3.0
+        if alpha <= 0:
+            push(progress_one=1.0, progress_two=1.0)
+        else:
+            push(
+                progress_one=1.0,
+                progress_two=1.0,
+                bubble_three_text=final_text,
+                cursor=False,
+                bubble_three_alpha=alpha,
+                bubble_three_offset_y=round((1.0 - alpha) * 14),
+            )
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     direct_output = CONFIGS[language]["output"]
