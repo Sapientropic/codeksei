@@ -63,10 +63,45 @@ test("SystemMessageDispatcher builds backstage prepared messages with fallback w
   assert.equal(prepared.contextToken, "ctx-1");
   assert.equal(prepared.systemMessageKind, "manual");
   assert.equal(prepared.checkinTriggerId, "");
+  assert.match(prepared.text, /^系统触发。/u);
+  assert.match(prepared.text, /只留在后台/u);
+  assert.match(prepared.text, /Follow up quietly\./u);
+  assert.equal(prepared.receivedAt, "2026-04-12T22:00:00.000Z");
+});
+
+test("SystemMessageDispatcher honors explicit English language for backstage prepared messages", () => {
+  const dispatcher = new SystemMessageDispatcher({
+    accountId: "acct-1",
+    config: {
+      workspaceId: "workspace-1",
+      workspaceRoot: "E:/repo/default",
+      userLanguage: "en",
+      userName: "Dao",
+    },
+    queueStore: {
+      hasPendingForAccount() {
+        return false;
+      },
+      takeReadyForAccount() {
+        return [];
+      },
+      defer() {
+        return { status: "deferred", message: null };
+      },
+      deadLetter() {
+        return { status: "dead_letter", message: null };
+      },
+      complete() {
+        return { status: "sent", message: null };
+      },
+    },
+  });
+
+  const prepared = dispatcher.buildPreparedMessage(createSystemMessage(), "ctx-1");
+
   assert.match(prepared.text, /^System trigger\./u);
   assert.match(prepared.text, /stays backstage/u);
   assert.match(prepared.text, /Follow up quietly\./u);
-  assert.equal(prepared.receivedAt, "2026-04-12T22:00:00.000Z");
 });
 
 test("SystemMessageDispatcher forwards ready checks through the account-scoped queue owner", () => {
