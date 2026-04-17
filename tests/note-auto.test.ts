@@ -152,3 +152,37 @@ test("note:maybe can inspect inspiration scope and list kinds without writing", 
   assert.deepEqual(inspection.kinds, ["idea", "status"]);
   assert.equal(inspection.filePath.replace(/\\/g, "/"), fixture.inspirationNotePath.replace(/\\/g, "/"));
 });
+
+test("note:auto fallback can create and populate a companion profile without workspace schema", () => {
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-note-auto-fallback-"));
+  const stateDir = path.join(workspaceRoot, ".codeksei-state");
+  const route = resolveDurableNoteRoute({
+    allowedUserIds: ["wx-fallback"],
+    stateDir,
+    workspaceRoot,
+  }, {
+    scope: "companion",
+    kind: "preference",
+  });
+
+  const schemaResult = ensureDurableNoteSections(route.filePath, route.sections, {
+    createIfMissing: route.createIfMissing,
+    fileTitle: route.fileTitle,
+  });
+  assert.equal(schemaResult.changed, true);
+
+  const writeResult = syncNoteFile({
+    filePath: route.filePath,
+    section: route.section,
+    text: "提醒要短一点，不要太像任务系统。",
+    style: route.style,
+    slot: route.slot,
+    maxItems: route.maxItems,
+  });
+
+  assert.equal(writeResult.changed, true);
+  const content = fs.readFileSync(route.filePath, "utf8");
+  assert.match(content, /^# Codeksei Companion Profile/mu);
+  assert.match(content, /## 支持偏好/u);
+  assert.match(content, /提醒要短一点，不要太像任务系统/u);
+});

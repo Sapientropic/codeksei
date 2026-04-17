@@ -74,6 +74,10 @@ export interface SchemaAndTemplateConfig {
   reviewSemanticHost: ReviewSemanticHost;
   reviewSemanticModel: string;
   reviewSemanticTimeoutMs: number;
+  onboardingSemanticMode: string;
+  onboardingSemanticHost: ReviewSemanticHost | "";
+  onboardingSemanticModel: string;
+  onboardingSemanticTimeoutMs: number;
 }
 
 export interface CheckinRuntimeConfig extends Pick<WorkspacePathsConfig, "workspaceId" | "workspaceRoot">, Pick<IdentityAndTimeConfig, "allowedUserIds" | "userName"> {

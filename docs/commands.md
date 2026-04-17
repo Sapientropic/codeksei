@@ -50,6 +50,8 @@ public CLI：
 - `codeksei doctor`
 - `codeksei help`
 - `codeksei schema`
+- `codeksei onboarding start`
+- `codeksei onboarding status`
 - `codeksei context briefing`
 - `codeksei host manifest`
 - `codeksei host bootstrap`
@@ -138,6 +140,23 @@ operator / bootstrap：
 - 来源固定为受控输入集：checkin state、当日日记、最近 companion note、proactive follow-up context、project radar、workspace continuity 入口
 - 缺源时显式标 `[⚠️ 需确认]`，不会编造
 - Hermes Hosted Mode 下的 proactive wake 会在 cron 运行前现读这份 board；原始 `AGENTS.md / Home.md / diary` 是输入源，不再是 cron prompt 的直接 surface
+
+## Onboarding
+
+这一组入口负责“激活即访谈”的轻量本地流程：先自然聊出最小画像，再把长期事实写进 companion note，由 context board 投影给宿主消费。
+
+- `codeksei onboarding start --user <senderId>`
+- `codeksei onboarding step --user <senderId> --session <sessionId> --stdin`
+- `codeksei onboarding status --user <senderId>`
+- `codeksei onboarding reset --user <senderId>`
+
+说明：
+
+- `start` 返回第一句适合直接对用户说的话，不会吐出问卷模板
+- `step` 负责吸收用户最新一轮回复、回写 companion note，并给出下一句更自然的追问
+- `step` 现在会优先走小模型语义抽取，再回退到 deterministic 规则兜底；六域 persona taxonomy 只作为 backstage schema
+- `status` 只看流程状态、session 和缺口
+- `reset` 只重置流程状态，不清空已经形成的长期 companion note
 
 ## Host Attachment Contract
 
@@ -275,6 +294,7 @@ Durable note 负责把值得长期记住的判断、偏好和项目脉络，放�
 - 先判断路由时用 `note:maybe`
 - 需要定制 section / slot 时再用 `note:sync`
 - 公开示例默认用 `companion`；旧的 `assistant` scope 仍兼容
+- 当没有 workspace schema / vault 时，`companion` scope 会自动回退到 `CODEKSEI_STATE_DIR/companions/<userKey>/profile.md`
 
 这一层让值得长期保留的判断、偏好和项目脉络有稳定落点，也让后续照看更连贯。
 
@@ -293,6 +313,9 @@ Durable note 负责把值得长期记住的判断、偏好和项目脉络，放�
 
 - 默认走 hybrid review：脚本保骨架，runtime 语义生成器做结构化提炼
 - `CODEKSEI_REVIEW_SEMANTIC_HOST=auto|codex|hermes|deterministic` 可显式指定语义宿主；默认 `auto`
+- `CODEKSEI_ONBOARDING_SEMANTIC_HOST=auto|codex|hermes|deterministic` 可为 onboarding 隐藏抽取单独指定宿主；留空时沿用默认 host 决策
+- `CODEKSEI_ONBOARDING_SEMANTIC_MODEL` 可给 onboarding 六域 persona 抽取单独指定模型
+- `CODEKSEI_ONBOARDING_SEMANTIC_TIMEOUT_MS` 默认 `15000`，超时自动退回 deterministic 抽取
 - 不传 `--date/--week/--month` 时，当前日期按统一 timezone contract 推断
 - 失败或超时会回退 deterministic
 - nightly 是周/月复盘的前置压缩层

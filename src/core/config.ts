@@ -16,6 +16,7 @@ import {
   normalizeCodekseiChannelProvider,
   normalizeCodekseiRuntimeAccessMode,
   normalizeCodekseiRuntimeProvider,
+  normalizeOptionalReviewSemanticHost,
   normalizeReviewSemanticHost,
   normalizeWeixinReplyMode,
 } from "./config-value-types";
@@ -145,6 +146,10 @@ function parseEnvConfig(env: EnvSource, options: ReadConfigOptions = {}): AppRun
       reviewSemanticHost: normalizeReviewSemanticHost(readPrefixedEnv(env, "REVIEW_SEMANTIC_HOST")),
       reviewSemanticModel: readPrefixedEnv(env, "REVIEW_SEMANTIC_MODEL") || "",
       reviewSemanticTimeoutMs: readPrefixedIntEnv(env, "REVIEW_SEMANTIC_TIMEOUT_MS") || 120000,
+      onboardingSemanticMode: readPrefixedEnv(env, "ONBOARDING_SEMANTIC_MODE") || "",
+      onboardingSemanticHost: normalizeOptionalReviewSemanticHost(readPrefixedEnv(env, "ONBOARDING_SEMANTIC_HOST")),
+      onboardingSemanticModel: readPrefixedEnv(env, "ONBOARDING_SEMANTIC_MODEL") || "",
+      onboardingSemanticTimeoutMs: readPrefixedIntEnv(env, "ONBOARDING_SEMANTIC_TIMEOUT_MS") || 15000,
     },
     checkinRuntime: {
       workspaceId: readPrefixedEnv(env, "WORKSPACE_ID") || "default",

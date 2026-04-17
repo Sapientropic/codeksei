@@ -1,5 +1,9 @@
-import { normalizeText } from "../core/text-normalization";
-export type JsonObject = Record<string, unknown>;
+import {
+  asRecord,
+  normalizeText,
+  parseSemanticJson,
+  type JsonObject,
+} from "../core/semantic-json";
 
 export function compactDiaryDays(entries: unknown): Array<JsonObject> {
   return (Array.isArray(entries) ? entries : []).map((entry) => ({
@@ -32,29 +36,6 @@ export function compactNightlyDays(entries: unknown): Array<JsonObject> {
     closeout: normalizeStringList(entry?.closeout, 4, 160),
     signals: normalizeStringList(entry?.signals, 4, 160),
   }));
-}
-
-export function parseSemanticJson(text: unknown): JsonObject {
-  const direct = tryParseJson(text);
-  if (direct) {
-    return direct;
-  }
-
-  const fenced = /```(?:json)?\s*([\s\S]*?)```/iu.exec(String(text || ""));
-  if (fenced?.[1]) {
-    const parsed = tryParseJson(fenced[1]);
-    if (parsed) {
-      return parsed;
-    }
-  }
-
-  const objectCandidate = extractFirstJsonObject(text);
-  const parsed = tryParseJson(objectCandidate);
-  if (parsed) {
-    return parsed;
-  }
-
-  throw new Error("semantic review did not return valid JSON");
 }
 
 export function normalizeSemanticResult(kind: string, raw: unknown): JsonObject | null {
@@ -201,29 +182,10 @@ export function truncateSentence(value: unknown, maxLength: number): string {
   return `${normalized.slice(0, Math.max(0, maxLength - 1)).replace(/[，。；,;:\s]+$/u, "")}…`;
 }
 
-export function tryParseJson(text: unknown): JsonObject | null {
-  try {
-    const parsed = JSON.parse(String(text || "").trim());
-    return parsed && typeof parsed === "object" ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-export function extractFirstJsonObject(text: unknown): string {
-  const input = String(text || "");
-  const start = input.indexOf("{");
-  const end = input.lastIndexOf("}");
-  if (start < 0 || end <= start) {
-    return "";
-  }
-  return input.slice(start, end + 1);
-}
-export { normalizeText };
-
-export function asRecord(value: unknown): JsonObject {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? value as JsonObject
-    : {};
-}
+export {
+  asRecord,
+  normalizeText,
+  parseSemanticJson,
+  type JsonObject,
+};
 

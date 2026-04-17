@@ -54,3 +54,8 @@ export function normalizeReviewSemanticHost(value: unknown): ReviewSemanticHost 
   }
   return "auto";
 }
+
+export function normalizeOptionalReviewSemanticHost(value: unknown): ReviewSemanticHost | "" {
+  const normalized = normalizeText(value);
+  return normalized ? normalizeReviewSemanticHost(normalized) : "";
+}

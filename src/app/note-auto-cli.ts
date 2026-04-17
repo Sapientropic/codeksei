@@ -81,7 +81,17 @@ async function runNoteAutoCommand(config: NoteAutoRuntimeConfig, args: string[] 
       ].join("\n"),
     },
     execute: async () => {
-      const schemaResult = ensureDurableNoteSections(route.filePath, route.sections);
+      const ensureOptions: {
+        createIfMissing?: boolean;
+        fileTitle?: unknown;
+      } = {};
+      if (route.createIfMissing) {
+        ensureOptions.createIfMissing = true;
+      }
+      if (route.fileTitle) {
+        ensureOptions.fileTitle = route.fileTitle;
+      }
+      const schemaResult = ensureDurableNoteSections(route.filePath, route.sections, ensureOptions);
       const result = syncNoteFile({
         filePath: route.filePath,
         section: route.section,

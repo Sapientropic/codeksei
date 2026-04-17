@@ -95,6 +95,7 @@ function buildBriefingData(briefing: ContextBoardBriefing): Record<string, unkno
     sources: {
       checkin: briefing.checkin,
       companionNote: briefing.companionNote,
+      onboarding: briefing.onboarding,
       projectRadar: briefing.projectRadar,
       todayDiary: briefing.todayDiary,
       workspaceBootstrap: briefing.workspaceBootstrap,
@@ -110,4 +111,3 @@ function normalizeBriefingMode(value: unknown): ContextBriefingMode {
   const normalized = normalizeText(value).toLowerCase();
   return normalized === "review" ? "review" : "proactive";
 }
-
