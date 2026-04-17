@@ -61,6 +61,13 @@ test("README docs keep bilingual public discovery aligned while shared mode stay
   }
 });
 
+test("README docs keep the bilingual warm hero assets aligned", () => {
+  assert.ok(readme.includes("./docs/assets/readme/hero-chat-zh.gif"));
+  assert.ok(readme.includes("会主动来问一句，也会替你把停下来的地方轻轻接回来。"));
+  assert.ok(readmeEn.includes("./docs/assets/readme/hero-chat-en.gif"));
+  assert.ok(readmeEn.includes("Checks in gently, remembers where you paused, and helps you ease back in."));
+});
+
 test("README docs keep bilingual agent-native setup anchors aligned", () => {
   for (const { name, content, modeHeading } of readmeDocs) {
     assertAgentNativeAnchors(content, name, modeHeading);
