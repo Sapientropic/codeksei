@@ -176,3 +176,62 @@ test("runtime turn completion treats snapshot resend as authoritative replacemen
     text: '{"progress":["done"]}',
   });
 });
+
+test("runtime turn completion keeps split English content readable", async () => {
+  const client = createFakeClient();
+  const completion = __testing.waitForTurnCompletion(client as WaitForTurnCompletionClient, "thread-1");
+
+  client.emit({
+    method: "turn/started",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-3",
+    },
+  });
+  client.emit({
+    method: "item/completed",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-3",
+      item: {
+        id: "item-english",
+        type: "agentmessage",
+        content: [
+          { type: "text", text: "I" },
+          { type: "text", text: "'m" },
+          { type: "text", text: "switching" },
+          { type: "text", text: "to" },
+          { type: "text", text: "English" },
+          { type: "text", text: "now," },
+          { type: "text", text: "and" },
+          { type: "text", text: "I" },
+          { type: "text", text: "'m" },
+          { type: "text", text: "keeping" },
+          { type: "text", text: "state" },
+          { type: "text", text: "-" },
+          { type: "text", text: "of" },
+          { type: "text", text: "-" },
+          { type: "text", text: "the" },
+          { type: "text", text: "-" },
+          { type: "text", text: "art" },
+          { type: "text", text: "formatting." },
+        ],
+        metadata: {
+          phase: "final_answer",
+        },
+      },
+    },
+  });
+  client.emit({
+    method: "turn/completed",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-3",
+    },
+  });
+
+  assert.deepEqual(await completion, {
+    turnId: "turn-3",
+    text: "I'm switching to English now, and I'm keeping state-of-the-art formatting.",
+  });
+});

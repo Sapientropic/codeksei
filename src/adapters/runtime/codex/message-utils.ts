@@ -161,6 +161,13 @@ export function normalizeAssistantPhase(value: unknown): string {
   return "";
 }
 
+const LATIN_OR_DIGIT_CHAR = /[\p{Script=Latin}\p{Nd}]/u;
+const CJK_CHAR = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+const OPENING_PUNCTUATION_CHARS = "([{<“‘「『【（《〈";
+const CLOSING_PUNCTUATION_CHARS = ".,;:!?)]}>\"”’」』】）》〉、。，；：！？";
+const SEGMENT_JOINER_CHARS = "-/";
+const APOSTROPHE_CHARS = "'’";
+
 function extractRawTextFromContent(content: unknown): string {
   if (typeof content === "string" && content.length > 0) {
     return normalizeLineEndings(content);
@@ -194,7 +201,7 @@ function extractRawTextFromContent(content: unknown): string {
         parts.push(normalizeLineEndings(record.value));
       }
     }
-    return parts.join("");
+    return joinCodexTextContentSegments(parts);
   }
 
   if (typeof content !== "object") {
@@ -207,4 +214,66 @@ function extractRawTextFromContent(content: unknown): string {
   }
 
   return "";
+}
+
+function joinCodexTextContentSegments(parts: string[]): string {
+  let joined = "";
+  for (const part of parts) {
+    if (!part) {
+      continue;
+    }
+    // Codex can split one human-readable sentence across multiple text spans.
+    // Rejoining with `join("")` silently eats English word boundaries, but this
+    // logic is runtime-specific and should not become a generic normalizer.
+    if (!joined) {
+      joined = part;
+      continue;
+    }
+    joined += shouldInsertCodexSegmentSpace(joined, part) ? ` ${part}` : part;
+  }
+  return joined;
+}
+
+function shouldInsertCodexSegmentSpace(previousText: string, nextText: string): boolean {
+  const previousChar = getLastCodePoint(previousText);
+  const nextChar = getFirstCodePoint(nextText);
+  if (!previousChar || !nextChar) {
+    return false;
+  }
+  if (/\s/u.test(previousChar) || /\s/u.test(nextChar)) {
+    return false;
+  }
+  if (OPENING_PUNCTUATION_CHARS.includes(previousChar)) {
+    return false;
+  }
+  if (SEGMENT_JOINER_CHARS.includes(previousChar) || SEGMENT_JOINER_CHARS.includes(nextChar)) {
+    return false;
+  }
+  if (APOSTROPHE_CHARS.includes(nextChar) || CLOSING_PUNCTUATION_CHARS.includes(nextChar)) {
+    return false;
+  }
+  if (isCjkChar(previousChar) || isCjkChar(nextChar)) {
+    return false;
+  }
+  if (!isLatinOrDigitChar(nextChar)) {
+    return false;
+  }
+  return isLatinOrDigitChar(previousChar) || CLOSING_PUNCTUATION_CHARS.includes(previousChar);
+}
+
+function getFirstCodePoint(text: string): string {
+  return Array.from(String(text || ""))[0] || "";
+}
+
+function getLastCodePoint(text: string): string {
+  const characters = Array.from(String(text || ""));
+  return characters[characters.length - 1] || "";
+}
+
+function isLatinOrDigitChar(value: string): boolean {
+  return Boolean(value) && LATIN_OR_DIGIT_CHAR.test(value);
+}
+
+function isCjkChar(value: string): boolean {
+  return Boolean(value) && CJK_CHAR.test(value);
 }
