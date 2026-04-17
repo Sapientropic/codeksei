@@ -9,6 +9,9 @@ const {
   RUNTIME_EVENT_TYPE_LIST: string[];
 } = require("../src/contracts/runtime-events");
 const { mapCodexMessageToRuntimeEvent } = require("../src/adapters/runtime/codex/events");
+const {
+  extractAssistantSnapshotText,
+}: typeof import("../src/adapters/runtime/codex/message-utils") = require("../src/adapters/runtime/codex/message-utils");
 
 test("codex runtime delta events keep commentary phase", () => {
   const event = mapCodexMessageToRuntimeEvent({
@@ -92,6 +95,111 @@ test("codex runtime completed assistant items normalize final_answer phase", () 
       turnId: "turn-1",
       itemId: "item-1",
       text: "已经修好了。",
+      phase: "final",
+    },
+  });
+});
+
+test("codex runtime snapshot extraction preserves English word boundaries without forcing CJK spacing", () => {
+  const text = extractAssistantSnapshotText({
+    item: {
+      content: [
+        { type: "text", text: "I" },
+        { type: "text", text: "'m" },
+        { type: "text", text: "switching" },
+        { type: "text", text: "to" },
+        { type: "text", text: "English" },
+        { type: "text", text: "now," },
+        { type: "text", text: "and" },
+        { type: "text", text: "I" },
+        { type: "text", text: "'m" },
+        { type: "text", text: "keeping" },
+        { type: "text", text: "state" },
+        { type: "text", text: "-" },
+        { type: "text", text: "of" },
+        { type: "text", text: "-" },
+        { type: "text", text: "the" },
+        { type: "text", text: "-" },
+        { type: "text", text: "art" },
+        { type: "text", text: "中文" },
+        { type: "text", text: "English" },
+      ],
+    },
+  });
+
+  assert.equal(
+    text,
+    "I'm switching to English now, and I'm keeping state-of-the-art中文English",
+  );
+});
+
+test("codex runtime delta snapshot content preserves closing bracket and word boundaries", () => {
+  const event = mapCodexMessageToRuntimeEvent({
+    method: "item/agentMessage/delta",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-english-snapshot",
+      itemId: "item-3",
+      item: {
+        id: "item-3",
+        content: [
+          { type: "text", text: "already" },
+          { type: "text", text: "fixed" },
+          { type: "text", text: ")" },
+          { type: "text", text: "Next" },
+          { type: "text", text: "step" },
+        ],
+      },
+      phase: "final_answer",
+    },
+  });
+
+  assert.deepEqual(event, {
+    type: "runtime.reply.delta",
+    payload: {
+      threadId: "thread-1",
+      turnId: "turn-english-snapshot",
+      itemId: "item-3",
+      text: "already fixed) Next step",
+      fragmentKind: "snapshot",
+      phase: "final",
+    },
+  });
+});
+
+test("codex runtime completed assistant items preserve split English spacing", () => {
+  const event = mapCodexMessageToRuntimeEvent({
+    method: "item/completed",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-english-completed",
+      item: {
+        id: "item-4",
+        type: "agentmessage",
+        content: [
+          { type: "text", text: "I" },
+          { type: "text", text: "'m" },
+          { type: "text", text: "switching" },
+          { type: "text", text: "now," },
+          { type: "text", text: "and" },
+          { type: "text", text: "I" },
+          { type: "text", text: "'m" },
+          { type: "text", text: "back." },
+        ],
+        metadata: {
+          phase: "final_answer",
+        },
+      },
+    },
+  });
+
+  assert.deepEqual(event, {
+    type: "runtime.reply.completed",
+    payload: {
+      threadId: "thread-1",
+      turnId: "turn-english-completed",
+      itemId: "item-4",
+      text: "I'm switching now, and I'm back.",
       phase: "final",
     },
   });
