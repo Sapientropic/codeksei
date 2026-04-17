@@ -2,6 +2,7 @@ import * as path from "node:path";
 import { z } from "zod";
 
 import { COMPANION_MEMORY_SLOT_IDS, type CompanionMemorySlotId } from "../companion-memory/contracts";
+import { normalizeCompanionProfileLanguage } from "../companion-memory/profile-signal-contracts";
 import { normalizeText } from "../core/text-normalization";
 import {
   ensureParentDirectory,
@@ -209,28 +210,56 @@ export function sanitizeUserKey(userId: unknown): string {
 
 export function buildOnboardingCheckinPrompt(
   state: OnboardingState,
+  language: unknown = "",
 ): string {
-  const preferredGap = resolvePromptGapLabel(resolveNextPromptSlot(state, state.status === "followup_needed"));
+  const resolvedLanguage = normalizeCompanionProfileLanguage(language) || "zh-CN";
+  const preferredGap = resolvePromptGapLabel(
+    resolveNextPromptSlot(state, state.status === "followup_needed"),
+    resolvedLanguage,
+  );
   switch (state.status) {
     case "not_started":
+      if (resolvedLanguage === "en") {
+        return [
+          "This is the first real activation. Do not sound like a survey or a checklist.",
+          "Stay in your own voice and persona, but make the opening feel gentle, human, and easy to answer.",
+          "Start with one warm line that gets to know what life feels like lately and what they most want help with right now.",
+          "If this is obviously a bad moment to start that conversation, output exactly SILENT.",
+        ].join("\n");
+      }
       return [
-        "This is the first real activation. Do not sound like a survey or a checklist.",
-        "Stay in your own voice and persona, but make the opening feel gentle, human, and easy to answer.",
-        "Start with one warm line that gets to know what life feels like lately and what they most want help with right now.",
-        "If this is obviously a bad moment to start that conversation, output exactly SILENT.",
+        "这是第一次真实激活。不要像问卷或清单。",
+        "保持你本来的语气和人格，但开场要温和、自然、容易回答。",
+        "先用一句暖一点的话，了解对方最近的日子像什么、眼下最想被帮到的是什么。",
+        "如果现在明显不是合适时机，直接输出 SILENT。",
       ].join("\n");
     case "in_progress":
+      if (resolvedLanguage === "en") {
+        return [
+          "The onboarding conversation is already underway.",
+          "Do not restart it, do not dump a questionnaire, and do not mention onboarding explicitly.",
+          `If you speak, gently learn only one thing that is still missing, preferably ${preferredGap}.`,
+          "A brief empathic line without a question is allowed. If now is not a good moment, output exactly SILENT.",
+        ].join("\n");
+      }
       return [
-        "The onboarding conversation is already underway.",
-        "Do not restart it, do not dump a questionnaire, and do not mention onboarding explicitly.",
-        `If you speak, gently learn only one thing that is still missing, preferably ${preferredGap}.`,
-        "A brief empathic line without a question is allowed. If now is not a good moment, output exactly SILENT.",
+        "首次访谈已经在进行中。",
+        "不要重新开一轮，不要甩问卷，也不要显式提 onboarding。",
+        `如果你要开口，只自然地补一个还缺的点，最好先补 ${preferredGap}。`,
+        "允许先给一句简短共情而不提问；如果现在不适合打扰，直接输出 SILENT。",
       ].join("\n");
     case "followup_needed":
+      if (resolvedLanguage === "en") {
+        return [
+          "Do not turn this into a long intake.",
+          `There are still a few missing details, and the highest-value one is ${preferredGap}.`,
+          "At most ask for one missing detail, naturally and lightly. If there is no good opening, output exactly SILENT.",
+        ].join("\n");
+      }
       return [
-        "Do not turn this into a long intake.",
-        `There are still a few missing details, and the highest-value one is ${preferredGap}.`,
-        "At most ask for one missing detail, naturally and lightly. If there is no good opening, output exactly SILENT.",
+        "不要把这变成长表单。",
+        `目前还缺几个点，但最高价值的是 ${preferredGap}。`,
+        "最多自然地补问一个点；如果没有合适入口，直接输出 SILENT。",
       ].join("\n");
     case "ready":
     default:
@@ -260,7 +289,25 @@ function resolveNextPromptSlot(state: OnboardingState, followupPriority: boolean
     || "current_status";
 }
 
-function resolvePromptGapLabel(slotId: OnboardingSlotId): string {
+function resolvePromptGapLabel(
+  slotId: OnboardingSlotId,
+  language: "zh-CN" | "en" = "en",
+): string {
+  if (language === "zh-CN") {
+    switch (slotId) {
+      case "boundary":
+        return "什么会让这段协作显得冒犯或越界";
+      case "preference":
+        return "她更喜欢你怎样说话、怎样支持她";
+      case "rhythm":
+        return "她通常什么时候有精力、什么时候最好别打扰";
+      case "next":
+        return "接下来几天最可能先发生的那件真实小事";
+      case "current_status":
+      default:
+        return "最近的日子大概是什么样、眼下最想被帮到什么";
+    }
+  }
   switch (slotId) {
     case "boundary":
       return "what would make the interaction feel intrusive or cross a line";

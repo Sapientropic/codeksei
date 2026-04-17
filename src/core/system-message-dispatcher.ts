@@ -2,8 +2,14 @@ import { normalizeText } from "./text-normalization";
 import type { SystemMessage } from "../contracts/queue-items";
 import type { NormalizedIncomingMessage } from "./runtime-types";
 import { resolvePromptPersonEn } from "../contracts/person-reference";
+import { resolveInstructionLanguage } from "./instructions-template";
 
 interface SystemMessageDispatcherConfig {
+  allowedUserIds?: unknown;
+  durableNoteSchemaConfigFile?: unknown;
+  stateDir?: unknown;
+  userGender?: unknown;
+  userLanguage?: unknown;
   workspaceId: string;
   workspaceRoot: string;
   userName?: unknown;
@@ -90,7 +96,7 @@ class SystemMessageDispatcher {
       threadKey: `system:${message.senderId}`,
       senderId: message.senderId,
       messageId: message.id,
-      text: buildSystemInboundText(message.text, this.config),
+      text: buildSystemInboundText(message.text, this.config, message.senderId),
       attachments: [],
       command: "message",
       contextToken,
@@ -102,9 +108,23 @@ class SystemMessageDispatcher {
   }
 }
 
-function buildSystemInboundText(text: unknown, config: SystemMessageDispatcherConfig): string {
+function buildSystemInboundText(
+  text: unknown,
+  config: SystemMessageDispatcherConfig,
+  senderId: unknown = "",
+): string {
   const body = normalizeText(text);
   const person = resolvePromptPersonEn(config);
+  const language = resolveInstructionLanguage({
+    ...config,
+    senderId,
+  });
+  if (language === "zh-CN") {
+    if (!body) {
+      return `系统触发。\n这条消息只留在后台，不会直接对 ${person} 可见。`;
+    }
+    return `系统触发。\n这条消息只留在后台，不会直接对 ${person} 可见。\n${body}`;
+  }
   if (!body) {
     return `System trigger.\nThis message stays backstage and is not visible to ${person}.`;
   }

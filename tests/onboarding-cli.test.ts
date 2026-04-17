@@ -304,9 +304,12 @@ test("onboarding status and reset keep long-term companion note intact", async (
 });
 
 test("checkin payload uses onboarding-specific proactive copy before the profile is ready", () => {
-  const fixture = createOnboardingFixture();
+  const fixture = createOnboardingFixture({
+    userLanguage: "en",
+  });
   const payload = buildCheckinTriggerPayload({
     stateDir: fixture.stateDir,
+    userLanguage: "en",
     userName: "单道杨",
   }, {
     senderId: fixture.userId,
@@ -317,4 +320,17 @@ test("checkin payload uses onboarding-specific proactive copy before the profile
 
   assert.match(payload.text, /first real activation/u);
   assert.match(payload.text, /Do not sound like a survey/u);
+});
+
+test("onboarding follow-up switches to english after an explicit language preference", async () => {
+  const fixture = createOnboardingFixture();
+  const started = await runOnboardingStartCommand(fixture.config, ["--user", fixture.userId]);
+
+  const firstStep = await runOnboardingStepCommand(fixture.config, [
+    "--user", fixture.userId,
+    "--session", started.data.state.sessionId,
+    "--text", "Please use English with me. I'm usually more functional after 2pm. Keep it short and direct.",
+  ]);
+
+  assert.match(String(firstStep.text || ""), /I've got a clearer sense of how you want me to sound|Let's skip the form|What has life felt like lately/u);
 });

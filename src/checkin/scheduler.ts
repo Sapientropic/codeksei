@@ -35,6 +35,8 @@ import {
   buildOnboardingCheckinPrompt,
   createOnboardingStateStore,
 } from "../onboarding/state";
+import { resolveCompanionProfileSignals } from "../companion-memory/profile-signals";
+import { normalizeCompanionProfileLanguage } from "../companion-memory/profile-signal-contracts";
 
 const INTERNAL_CHECKIN_TRIGGER_TEMPLATE = "Take a quiet look at whether now is a good moment to reach out to %PERSON%. You may stay silent, send one short WeChat message, update diary/timeline, or take another useful backstage action. If no user-visible message should be sent, output exactly SILENT. If you do send a message, output only the message text.";
 const CHECKIN_MAX_SILENCE_MS = 24 * 60 * 60_000;
@@ -102,7 +104,10 @@ export interface CheckinScheduledWakeResult {
 }
 
 export function buildCheckinTriggerPayload(
-  config: Partial<Pick<AppRuntimeConfig, "stateDir" | "userName">>,
+  config: Partial<Pick<
+    AppRuntimeConfig,
+    "allowedUserIds" | "durableNoteSchemaConfigFile" | "stateDir" | "userGender" | "userLanguage" | "userName" | "workspaceRoot"
+  >>,
   target: CheckinResolvedTarget,
   {
     nowMs = Date.now(),
@@ -715,7 +720,7 @@ function buildScheduledCheckinPrompt(
 }
 
 function resolveOnboardingPrompt(
-  config: Partial<Pick<AppRuntimeConfig, "stateDir">>,
+  config: Partial<Pick<AppRuntimeConfig, "allowedUserIds" | "durableNoteSchemaConfigFile" | "stateDir" | "userGender" | "userLanguage" | "workspaceRoot">>,
   senderId: string,
 ): string {
   try {
@@ -723,7 +728,11 @@ function resolveOnboardingPrompt(
       return "";
     }
     const state = createOnboardingStateStore(config, senderId).getState();
-    return buildOnboardingCheckinPrompt(state);
+    const signals = resolveCompanionProfileSignals(config, senderId);
+    return buildOnboardingCheckinPrompt(
+      state,
+      normalizeCompanionProfileLanguage(signals.preferredLanguage || config.userLanguage) || "zh-CN",
+    );
   } catch {
     return "";
   }

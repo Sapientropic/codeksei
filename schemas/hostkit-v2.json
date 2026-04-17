@@ -141,6 +141,28 @@
         }
       }
     },
+    "recommendedWorkflows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "trigger", "steps"],
+        "properties": {
+          "id": { "type": "string" },
+          "trigger": { "type": "string" },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["commandRef", "reason"],
+              "properties": {
+                "commandRef": { "type": "string" },
+                "reason": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
     "discovery": {
       "type": "object",
       "properties": {

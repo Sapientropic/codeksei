@@ -41,6 +41,8 @@ If you are an external agent, do not infer internal seams from long README prose
 3. Prefer `Hosted Mode` by default
 4. Treat `host bootstrap` as “Codeksei attachment/bootstrap completed”, not as proof that Hermes gateway or live Weixin bring-up is already complete
 
+- `CODEKSEI_HOSTKIT.json` now also carries minimal entrypoint/workflow hints, enough for a new host to discover the default onboarding / companion-memory / context-briefing route; `codeksei host manifest` remains the richer dynamic source of truth
+
 Recommended order:
 
 ```bash

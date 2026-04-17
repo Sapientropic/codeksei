@@ -1,26 +1,36 @@
 import { normalizeText } from "../../../core/text-normalization";
 import * as fs from "node:fs";
+import * as path from "node:path";
 import { renderInstructionTemplate } from "../../../core/instructions-template";
 import { buildWorkspaceContinuityInstructions } from "../../../workspace/workspace-bootstrap";
+import { normalizeCompanionProfileLanguage } from "../../../companion-memory/profile-signal-contracts";
+import { resolveCompanionProfileSignals } from "../../../companion-memory/profile-signals";
 
 
 interface CodexInstructionConfig {
+  allowedUserIds?: unknown;
   codekseiHome?: unknown;
+  durableNoteSchemaConfigFile?: unknown;
+  senderId?: unknown;
+  stateDir?: unknown;
   userGender?: unknown;
+  userLanguage?: unknown;
   userName?: unknown;
   weixinInstructionsFile?: string;
   weixinOperationsFile?: string;
   weixinInstructionsOverlayFile?: string;
   weixinOperationsOverlayFile?: string;
   workspaceBootstrapConfigFile?: unknown;
+  workspaceRoot?: unknown;
 }
 
 export function buildOpeningTurnText(
   config: CodexInstructionConfig,
   workspaceRoot: string,
   userText: unknown,
+  senderId: unknown = "",
 ): string {
-  const instructionBlocks = buildInstructionBlocks(config, workspaceRoot);
+  const instructionBlocks = buildInstructionBlocks({ ...config, senderId }, workspaceRoot);
   const normalizedText = String(userText || "").trim();
   if (!instructionBlocks.length) {
     return normalizedText;
@@ -37,8 +47,9 @@ export function buildWorkspaceBootstrapTurnText(
   config: CodexInstructionConfig,
   workspaceRoot: string,
   userText: unknown,
+  senderId: unknown = "",
 ): string {
-  const instructionBlocks = buildInstructionBlocks(config, workspaceRoot);
+  const instructionBlocks = buildInstructionBlocks({ ...config, senderId }, workspaceRoot);
   const normalizedText = String(userText || "").trim();
   if (!instructionBlocks.length) {
     return normalizedText;
@@ -59,27 +70,33 @@ export function buildWorkspaceBootstrapTurnText(
 export function buildInstructionRefreshText(
   config: CodexInstructionConfig,
   workspaceRoot: string,
+  senderId: unknown = "",
 ): string {
-  const instructionBlocks = buildInstructionBlocks(config, workspaceRoot);
+  const instructionBlocks = buildInstructionBlocks({ ...config, senderId }, workspaceRoot);
+  const language = resolvePreferredInstructionLanguage(config, senderId);
+  const confirmationLine = language === "en"
+    ? "Reply in one short English sentence confirming that you have updated your behavior for this thread."
+    : "Reply in one short Chinese sentence confirming that you have updated your behavior for this thread.";
   if (!instructionBlocks.length) {
-    return "Refresh your WeChat behavior for this existing thread. Reply in one short Chinese sentence confirming that you have updated your behavior for this thread.";
+    return `Refresh your WeChat behavior for this existing thread. ${confirmationLine}`;
   }
   return [
     "WECHAT SESSION INSTRUCTIONS REFRESH",
     "Re-read and adopt the updated WeChat and workspace continuity instructions below for the rest of this existing thread.",
     "This is an internal refresh command, not a user-facing task.",
     "Do not summarize the instructions back in detail.",
-    "Reply in one short Chinese sentence confirming that you have updated your behavior for this thread.",
+    confirmationLine,
     "",
     ...instructionBlocks,
   ].join("\n").trim();
 }
 
 export function loadWechatInstructions(config: CodexInstructionConfig): string {
-  const persona = loadInstructionFile(config.weixinInstructionsFile, config);
-  const operations = loadInstructionFile(config.weixinOperationsFile, config);
-  const personaOverlay = loadInstructionFile(config.weixinInstructionsOverlayFile, config);
-  const operationsOverlay = loadInstructionFile(config.weixinOperationsOverlayFile, config);
+  const language = resolvePreferredInstructionLanguage(config, config.senderId);
+  const persona = loadInstructionFile(config.weixinInstructionsFile, config, language);
+  const operations = loadInstructionFile(config.weixinOperationsFile, config, language);
+  const personaOverlay = loadInstructionFile(config.weixinInstructionsOverlayFile, config, language);
+  const operationsOverlay = loadInstructionFile(config.weixinOperationsOverlayFile, config, language);
   return [persona, operations, personaOverlay, operationsOverlay].filter(Boolean).join("\n\n").trim();
 }
 
@@ -105,8 +122,12 @@ function buildInstructionBlocks(config: CodexInstructionConfig, workspaceRoot: s
   return sections;
 }
 
-function loadInstructionFile(filePath: unknown, config: CodexInstructionConfig): string {
-  const normalizedPath = normalizeText(filePath);
+function loadInstructionFile(
+  filePath: unknown,
+  config: CodexInstructionConfig,
+  language: "zh-CN" | "en",
+): string {
+  const normalizedPath = resolveLanguageAwareInstructionPath(filePath, language);
   if (!normalizedPath) {
     return "";
   }
@@ -116,5 +137,35 @@ function loadInstructionFile(filePath: unknown, config: CodexInstructionConfig):
   } catch {
     return "";
   }
+}
+
+function resolvePreferredInstructionLanguage(
+  config: CodexInstructionConfig,
+  senderId: unknown = "",
+): "zh-CN" | "en" {
+  const normalizedSenderId = normalizeText(senderId);
+  const signals = resolveCompanionProfileSignals({
+    ...config,
+    senderId: normalizedSenderId || config.senderId,
+  }, normalizedSenderId);
+  return normalizeCompanionProfileLanguage(
+    signals.preferredLanguage || config.userLanguage,
+  ) || "zh-CN";
+}
+
+function resolveLanguageAwareInstructionPath(
+  filePath: unknown,
+  language: "zh-CN" | "en",
+): string {
+  const normalizedPath = normalizeText(filePath);
+  if (!normalizedPath || language !== "en" || /\.en\.md$/iu.test(normalizedPath)) {
+    return normalizedPath;
+  }
+  const extension = path.extname(normalizedPath);
+  if (extension.toLowerCase() !== ".md") {
+    return normalizedPath;
+  }
+  const englishVariant = normalizedPath.replace(/\.md$/iu, ".en.md");
+  return fs.existsSync(englishVariant) ? englishVariant : normalizedPath;
 }
 
