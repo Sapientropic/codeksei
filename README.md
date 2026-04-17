@@ -20,6 +20,7 @@
     <a href="#day-with-codeksei">一天会怎么相处</a> ·
     <a href="#现在可以做什么">当前能力</a> ·
     <a href="#why-the-name">名字寓意</a> ·
+    <a href="./CHANGELOG.md">更新日志</a> ·
     <a href="./docs/commands.md">命令</a> ·
     <a href="./docs/architecture.md">架构</a>
   </p>

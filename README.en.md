@@ -20,6 +20,7 @@
     <a href="#a-day-with-codeksei">A Day With Codeksei</a> ·
     <a href="#what-it-can-do">Capabilities</a> ·
     <a href="#why-the-name">Why the Name</a> ·
+    <a href="./CHANGELOG.md">Changelog</a> ·
     <a href="./docs/commands.md">Commands</a> ·
     <a href="./docs/architecture.md">Architecture</a>
   </p>
