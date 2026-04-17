@@ -1,6 +1,8 @@
 export {
   buildHostAttachmentManifest,
+  buildHostedFirstHostAttachmentResolution,
   buildHostEntrypointManifest,
+  DEFAULT_HOST_DISCOVERY_PROVIDER,
 } from "./attach/manifest";
 export {
   HOST_ATTACHMENT_CONTRACT_VERSION,
@@ -42,6 +44,11 @@ export {
   type HostRecipeDescriptor,
   type HostRecipeId,
 } from "./contracts/host-recipe";
+export {
+  buildRepoHostkitDocument,
+  renderRepoHostkitDocument,
+  resolveRepoHostkitAssetPath,
+} from "./renderers/hostkit";
 export type {
   AttachedDaemonState,
 } from "./contracts/daemon-attach";

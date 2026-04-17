@@ -36,6 +36,7 @@ export async function runHostSmokeCommand(
   const resolvedProvider = resolveHostProviderWithConfig(config, {
     provider: options.provider,
     configFile: options.config,
+    defaultProvider: "hermes",
   });
   if (resolvedProvider.provider !== "hermes") {
     return {

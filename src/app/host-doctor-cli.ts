@@ -38,6 +38,7 @@ export async function runHostDoctorCommand(
   const resolvedProvider = resolveHostProviderWithConfig(config, {
     provider: options.provider,
     configFile: options.config,
+    defaultProvider: "hermes",
   });
   const effectiveConfig = resolvedProvider.provider === "hermes"
     ? { ...config, runtime: "hermes", channelProvider: "hermes" }

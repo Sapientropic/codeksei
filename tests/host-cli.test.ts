@@ -48,25 +48,63 @@ function normalizePathSeparators(value: string) {
   return value.replace(/\\/gu, "/");
 }
 
-test("host manifest returns host-neutral v2 identity plus compatibility invariant", async () => {
+test("host manifest returns the hosted-first discovery contract plus compatibility invariant", async () => {
   const fixture = createHostFixture("codeksei-host-manifest-");
   const result = await runHostManifestCommand(fixture.config);
 
   assert.equal(result.data.contractVersion, 2);
   assert.equal(result.data.coreInvariant, "codeksei-core-owned");
   assert.equal(result.data.scheduleTruthOwner, "codeksei");
-  assert.equal(result.data.hostIdentity.profile, "codex-mode");
+  assert.equal(result.data.hostIdentity.profile, "hosted-mode");
+  assert.equal(result.data.hostIdentity.runtimeProvider, "hermes");
+  assert.equal(result.data.hostIdentity.runtimeOwner, "host");
+  assert.equal(result.data.hostIdentity.channelProvider, "hermes");
+  assert.equal(result.data.hostIdentity.deliveryRecipe, "hermes-origin");
   assert.equal(result.data.runtimeInvariant, "bridge-full");
+  assert.equal(result.data.provider, "hermes");
   assert.equal(Array.isArray(result.data.recipes), true);
   assert.equal(result.data.recipes.some((entry: { id: string }) => entry.id === "hermes"), true);
   assert.equal(Array.isArray(result.data.recommendedWorkflows), true);
   assert.equal(result.data.recommendedWorkflows.some((entry: { id: string }) => entry.id === "first_activation_onboarding"), true);
   assert.equal(result.data.recommendedWorkflows.some((entry: { id: string }) => entry.id === "ongoing_companion_memory"), true);
   assert.equal(result.data.recommendedWorkflows.some((entry: { id: string }) => entry.id === "proactive_checkin"), true);
+  assert.deepEqual(result.data.entrypoints.bootstrap, ["codeksei", "host", "bootstrap", "--provider", "hermes", "--ensure-daemon", "--format", "json"]);
+  assert.deepEqual(result.data.entrypoints.doctor, ["codeksei", "host", "doctor", "--provider", "hermes", "--format", "json"]);
+  assert.deepEqual(result.data.entrypoints.seedProactive, ["codeksei", "host", "seed-proactive", "--provider", "hermes", "--format", "json"]);
+  assert.deepEqual(result.data.entrypoints.claimCheckin, ["codeksei", "host", "claim-checkin", "--provider", "hermes", "--format", "json"]);
+  assert.deepEqual(result.data.entrypoints.settleCheckin, ["codeksei", "host", "settle-checkin", "--provider", "hermes", "--format", "json"]);
   assert.equal(Array.isArray(result.data.entrypoints.companionRemember), true);
   assert.equal(Array.isArray(result.data.entrypoints.onboardingStart), true);
   assert.equal(Array.isArray(result.data.entrypoints.contextBriefing), true);
   assert.equal(result.data.upgrade.startupDoctorRequired, true);
+});
+
+test("host bootstrap defaults to hermes on clean install when provider is omitted", async () => {
+  const fixture = createHostFixture("codeksei-host-bootstrap-default-hermes-");
+  const targetWorkspace = path.join(fixture.tempRoot, "target-workspace");
+  fs.mkdirSync(targetWorkspace, { recursive: true });
+
+  const result = await runHostBootstrapCommand(fixture.config, [
+    "--workspace", targetWorkspace,
+    "--ensure-daemon",
+    "--dry-run",
+  ]);
+
+  assert.equal(result.meta.dryRun, true);
+  assert.equal(result.data.provider, "hermes");
+  assert.equal(result.meta.resolvedTargets.provider, "hermes");
+  assert.equal(result.data.config.workspaceRoot, targetWorkspace);
+  assert.equal(result.data.config.host.provider, "hermes");
+  assert.equal(result.data.config.host.runtimeProvider, "hermes");
+  assert.equal(result.data.config.host.runtimeOwner, "host");
+  assert.equal(result.data.config.host.channelProvider, "hermes");
+  assert.equal(result.data.config.host.channelKind, "weixin");
+  assert.equal(result.data.config.host.deliveryRecipe, "hermes-origin");
+  assert.equal(typeof result.data.skillInstall, "object");
+  assert.deepEqual(result.meta.sideEffects, [
+    { kind: "write_canonical_config", target: path.join(targetWorkspace, "codeksei.config.json") },
+    { kind: "install_companion_skill", target: "~/.hermes/skills/codeksei-companion/SKILL.md" },
+  ]);
 });
 
 test("host bootstrap writes canonical config and previews Hermes bootstrap", async () => {

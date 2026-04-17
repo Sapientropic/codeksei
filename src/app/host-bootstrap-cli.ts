@@ -58,6 +58,7 @@ export async function runHostBootstrapCommand(
   const resolvedProvider = resolveHostProviderWithConfig(config, {
     provider: options.provider,
     configFile: options.config,
+    defaultProvider: "hermes",
   });
   const bootstrapTarget = resolveHostBootstrapTarget(config, resolvedProvider, options);
   const nextConfig = buildCanonicalHostConfig(config, bootstrapTarget, options);
@@ -88,7 +89,9 @@ export async function runHostBootstrapCommand(
         provider: bootstrapTarget.provider,
         ensureDaemon: Boolean(options.ensureDaemon),
       }, null, 2),
-      next: ["codeksei host doctor --provider hermes"],
+      next: bootstrapTarget.provider === "hermes"
+        ? ["codeksei host doctor --provider hermes", "codeksei host smoke --provider hermes"]
+        : [`codeksei host doctor --provider ${bootstrapTarget.provider}`],
     },
     execute: async () => {
       const written = writeCodekseiHostConfig(bootstrapTarget.configFilePath, nextConfig);

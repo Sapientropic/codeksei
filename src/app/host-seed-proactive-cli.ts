@@ -54,6 +54,7 @@ export async function runHostSeedProactiveCommand(
   const resolvedProvider = resolveHostProviderWithConfig(config, {
     provider: options.provider,
     configFile: options.config,
+    defaultProvider: "hermes",
   });
   const seeded = seedProactiveCheckin(config as Parameters<typeof seedProactiveCheckin>[0], target, {
     provider: resolvedProvider.provider,

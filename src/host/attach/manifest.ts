@@ -11,20 +11,35 @@ import {
   HOST_SCHEDULE_TRUTH_OWNER,
 } from "../contracts/attach-manifest";
 import { resolveHostAttachment, type HostAttachmentConfigInput } from "./model";
-import { listHostRecipes } from "../contracts/host-recipe";
+import { listHostRecipes, type HostRecipeId } from "../contracts/host-recipe";
 import { previewHermesCompanionSkillInstall } from "../recipes/hermes/skill";
 import type { HermesHostedSkillConfigInput } from "../recipes/hermes/skill";
 
-export function buildHostEntrypointManifest(): HostEntrypointManifest {
+export const DEFAULT_HOST_DISCOVERY_PROVIDER = "hermes" as const;
+
+export function buildHostedFirstHostAttachmentResolution(): ReturnType<typeof resolveHostAttachment> {
+  return resolveHostAttachment({
+    runtime: "hermes",
+    channelProvider: "hermes",
+    channel: "weixin",
+  });
+}
+
+export function buildHostEntrypointManifest({
+  defaultProvider = DEFAULT_HOST_DISCOVERY_PROVIDER,
+}: {
+  defaultProvider?: HostRecipeId;
+} = {}): HostEntrypointManifest {
+  const providerArgs = ["--provider", defaultProvider];
   return {
     manifest: ["codeksei", "host", "manifest", "--format", "json"],
-    bootstrap: ["codeksei", "host", "bootstrap", "--ensure-daemon", "--format", "json"],
-    doctor: ["codeksei", "host", "doctor", "--format", "json"],
-    smoke: ["codeksei", "host", "smoke", "--provider", "hermes", "--format", "json"],
-    seedProactive: ["codeksei", "host", "seed-proactive", "--format", "json"],
-    claimCheckin: ["codeksei", "host", "claim-checkin", "--format", "json"],
-    settleCheckin: ["codeksei", "host", "settle-checkin", "--format", "json"],
-    render: ["codeksei", "host", "render", "--provider", "hermes", "--target", "skill", "--format", "json"],
+    bootstrap: ["codeksei", "host", "bootstrap", ...providerArgs, "--ensure-daemon", "--format", "json"],
+    doctor: ["codeksei", "host", "doctor", ...providerArgs, "--format", "json"],
+    smoke: ["codeksei", "host", "smoke", ...providerArgs, "--format", "json"],
+    seedProactive: ["codeksei", "host", "seed-proactive", ...providerArgs, "--format", "json"],
+    claimCheckin: ["codeksei", "host", "claim-checkin", ...providerArgs, "--format", "json"],
+    settleCheckin: ["codeksei", "host", "settle-checkin", ...providerArgs, "--format", "json"],
+    render: ["codeksei", "host", "render", ...providerArgs, "--target", "skill", "--format", "json"],
     companionRemember: ["codeksei", "companion", "remember", "--format", "json"],
     onboardingStart: ["codeksei", "onboarding", "start", "--format", "json"],
     onboardingStep: ["codeksei", "onboarding", "step", "--format", "json"],
@@ -36,7 +51,7 @@ export function buildHostEntrypointManifest(): HostEntrypointManifest {
 export function buildHostAttachmentManifest(
   config: HostAttachmentConfigInput & HermesHostedSkillConfigInput = {},
 ): HostAttachmentManifest {
-  const attachment = resolveHostAttachment(config);
+  const attachment = buildHostedFirstHostAttachmentResolution();
   const entrypoints = buildHostEntrypointManifest();
   const skillPreview = previewHermesCompanionSkillInstall(config);
   return {
@@ -47,7 +62,7 @@ export function buildHostAttachmentManifest(
     runtimeInvariant: "bridge-full",
     transport: attachment.transport,
     modeClass: attachment.modeClass,
-    provider: attachment.provider,
+    provider: DEFAULT_HOST_DISCOVERY_PROVIDER,
     supported: attachment.supported,
     reason: attachment.reason,
     install: {

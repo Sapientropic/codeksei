@@ -10,6 +10,11 @@ const {
 const {
   resolveRepoHermesSkillAssetPath,
 }: typeof import("../src/host/recipes/hermes/skill") = require("../src/host/recipes/hermes/skill");
+const {
+  buildRepoHostkitDocument,
+  renderRepoHostkitDocument,
+  resolveRepoHostkitAssetPath,
+}: typeof import("../src/host/renderers/hostkit") = require("../src/host/renderers/hostkit");
 
 test("Hermes companion skill template stays generated from the renderer truth", () => {
   const rendered = renderHermesCompanionSkill();
@@ -36,13 +41,20 @@ test("hostkit static assets stay shipped at the repo root", () => {
   assert.equal(fs.existsSync(path.join(repoRoot, "schemas", "codeksei-config-v1.json")), true);
 });
 
-test("hostkit static asset carries onboarding and ongoing companion workflow hints", () => {
-  const repoRoot = path.join(__dirname, "..");
-  const hostkit = JSON.parse(fs.readFileSync(path.join(repoRoot, "CODEKSEI_HOSTKIT.json"), "utf8"));
+test("hostkit static asset stays round-tripped from the hosted-first renderer truth", () => {
+  const hostkitPath = resolveRepoHostkitAssetPath();
+  const tracked = fs.readFileSync(hostkitPath, "utf8");
+  const rendered = renderRepoHostkitDocument();
+  const hostkit = buildRepoHostkitDocument();
 
-  assert.deepEqual(hostkit.entrypoints.onboardingStart, ["codeksei", "onboarding", "start", "--format", "json"]);
-  assert.deepEqual(hostkit.entrypoints.companionRemember, ["codeksei", "companion", "remember", "--format", "json"]);
-  assert.deepEqual(hostkit.entrypoints.contextBriefing, ["codeksei", "context", "briefing", "--format", "json"]);
+  assert.equal(normalizeLineEndings(tracked), normalizeLineEndings(rendered));
+  assert.equal(hostkit.hostIdentity.profile, "hosted-mode");
+  assert.equal(hostkit.hostIdentity.runtimeProvider, "hermes");
+  assert.equal(hostkit.hostIdentity.deliveryRecipe, "hermes-origin");
+  assert.deepEqual(hostkit.entrypoints.bootstrap, ["codeksei", "host", "bootstrap", "--provider", "hermes", "--ensure-daemon", "--format", "json"]);
+  assert.deepEqual(hostkit.entrypoints.claimCheckin, ["codeksei", "host", "claim-checkin", "--provider", "hermes", "--format", "json"]);
+  assert.deepEqual(hostkit.entrypoints.settleCheckin, ["codeksei", "host", "settle-checkin", "--provider", "hermes", "--format", "json"]);
   assert.equal(hostkit.recommendedWorkflows.some((entry: { id: string }) => entry.id === "first_activation_onboarding"), true);
   assert.equal(hostkit.recommendedWorkflows.some((entry: { id: string }) => entry.id === "ongoing_companion_memory"), true);
+  assert.equal(hostkit.recommendedWorkflows.some((entry: { id: string }) => entry.id === "proactive_checkin"), true);
 });

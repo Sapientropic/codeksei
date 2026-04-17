@@ -178,11 +178,11 @@ operator / bootstrap：
 这一组是面向外部宿主的机器入口，不是仓内 TypeScript seam。
 
 - `codeksei host manifest`
-  输出 host attachment manifest / hostkit 机器入口
+  输出默认 Hosted Mode / Hermes 的 host attachment manifest / hostkit 机器入口
 - `codeksei host bootstrap --provider hermes --ensure-daemon`
   写入 canonical `codeksei.config.json`，并按 provider 做最小 bootstrap
 - `codeksei host doctor --provider hermes`
-  统一查看 daemon / attachment / provider recipe readiness
+  统一查看当前环境 / 当前 canonical config 下的 daemon / attachment / provider recipe readiness
 - `codeksei host smoke --provider hermes`
   执行 provider recipe 的最小 attach smoke
 - `codeksei host seed-proactive --provider hermes --user <senderId> --workspace /absolute/workspace`
@@ -195,6 +195,7 @@ operator / bootstrap：
 补充：
 
 - canonical 真相层现在是 `coreInvariant=codeksei-core-owned` 与 `scheduleTruthOwner=codeksei`；`runtimeInvariant=bridge-full` 只保留给旧 hostkit / config consumer 做兼容读取，不再是公开主命名。
+- `host manifest` 现在表达默认机器合同，不再伪装成当前环境探测；当前机器/当前 workspace 的实际 provider、profile 与 readiness 统一看 `host doctor`。
 - `operator hermes *` 与 `system checkin-*` 继续保留为兼容 building blocks；新宿主默认优先走 `host seed / claim / settle`。
 
 ## 微信命令
