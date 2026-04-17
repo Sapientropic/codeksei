@@ -26,6 +26,7 @@ import {
 } from "../workspace/workspace-bootstrap";
 import { SessionStore } from "../adapters/runtime/codex/session-store";
 import { normalizeDisplayPath } from "../core/path-utils";
+import { createCompanionMemoryRuntimeStateStore } from "../companion-memory/runtime-state";
 import { createOnboardingStateStore } from "../onboarding/state";
 
 export type ContextBriefingMode = "proactive" | "review";
@@ -84,6 +85,13 @@ interface OnboardingSnapshot {
   updatedAt: string;
 }
 
+interface CompanionMemorySnapshot {
+  lastSource: string;
+  lastUpdatedAt: string;
+  recentWriteCount: number;
+  slotFreshness: Record<string, string>;
+}
+
 interface ContextBoardState {
   followupContext: string;
 }
@@ -119,6 +127,7 @@ export interface ContextBoardBriefing {
   freshness: ContextBoardFreshness;
   mode: ContextBriefingMode;
   onboarding: OnboardingSnapshot;
+  companionMemory: CompanionMemorySnapshot;
   projectRadar: ProjectRadarSnapshot;
   stale: boolean;
   staleReasons: string[];
@@ -224,6 +233,7 @@ export function buildContextBoardBriefing(
   const companionNote = collectCompanionNoteSnapshot(config, target.senderId);
   const checkin = collectCheckinSnapshot(config, target);
   const onboarding = collectOnboardingSnapshot(config, target.senderId);
+  const companionMemory = collectCompanionMemorySnapshot(config, target.senderId);
   const projectRadar = collectCurrentProjectRadar(config, target.workspaceRoot);
   const workspaceBootstrap = collectWorkspaceContinuitySnapshot(target.workspaceRoot, {
     workspaceBootstrapConfigFile: config.workspaceBootstrapConfigFile,
@@ -251,6 +261,7 @@ export function buildContextBoardBriefing(
     }),
     sourceStatus: buildSourceStatusSection({
       checkin,
+      companionMemory,
       companionNote,
       freshness,
       onboarding,
@@ -281,6 +292,7 @@ export function buildContextBoardBriefing(
     freshness,
     mode,
     onboarding,
+    companionMemory,
     projectRadar,
     sections,
     stale,
@@ -502,6 +514,7 @@ function buildSourceStatusSection({
   checkin,
   companionNote,
   freshness,
+  companionMemory,
   onboarding,
   projectRadar,
   staleReasons,
@@ -512,6 +525,7 @@ function buildSourceStatusSection({
 }: {
   checkin: CheckinSnapshot;
   companionNote: CompanionNoteSnapshot;
+  companionMemory: CompanionMemorySnapshot;
   freshness: ContextBoardFreshness;
   onboarding: OnboardingSnapshot;
   projectRadar: ProjectRadarSnapshot;
@@ -525,6 +539,7 @@ function buildSourceStatusSection({
     `board 更新时间：${updatedAt}`,
     `today diary：${freshness.diaryCurrent ? "present" : "missing"}${normalizeText(todayDiaryEntry?.filePath) ? ` | ${normalizeText(todayDiaryEntry?.filePath)}` : ` | ${todayDate}`}`,
     `companion note：${companionNote.exists ? "present" : "missing"}${companionNote.updatedAt ? ` | updated ${companionNote.updatedAt}` : ""}`,
+    `companion memory：${companionMemory.lastUpdatedAt ? `${companionMemory.lastUpdatedAt}` : "missing"}${companionMemory.lastSource ? ` | source ${companionMemory.lastSource}` : ""}${companionMemory.recentWriteCount ? ` | recent writes ${companionMemory.recentWriteCount}` : ""}`,
     `onboarding：${onboarding.status}${onboarding.updatedAt ? ` | updated ${onboarding.updatedAt}` : ""}${onboarding.missingSlots.length ? ` | missing ${onboarding.missingSlots.join(", ")}` : ""}`,
     `checkin completion：${checkin.lastCompletionAt ? checkin.lastCompletionAt : "missing"}`,
     `project radar：${projectRadar.available ? "available" : `unavailable${projectRadar.reason ? ` (${projectRadar.reason})` : ""}`}`,
@@ -599,6 +614,23 @@ function collectOnboardingSnapshot(config: ContextBoardConfig, senderId: string)
       status: "not_started",
       updatedAt: "",
     };
+  }
+}
+
+function collectCompanionMemorySnapshot(config: ContextBoardConfig, senderId: string): CompanionMemorySnapshot {
+  try {
+    if (!normalizeText(config.stateDir)) {
+      return emptyCompanionMemorySnapshot();
+    }
+    const state = createCompanionMemoryRuntimeStateStore(config, senderId).getState();
+    return {
+      lastSource: normalizeText(state.lastSource),
+      lastUpdatedAt: normalizeText(state.lastUpdatedAt),
+      recentWriteCount: state.recentWrites.length,
+      slotFreshness: { ...state.slotFreshness },
+    };
+  } catch {
+    return emptyCompanionMemorySnapshot();
   }
 }
 
@@ -859,6 +891,15 @@ function emptyCheckinSnapshot(): CheckinSnapshot {
     pendingTriggerCreatedAt: "",
     scheduleSource: "",
     stateFound: false,
+  };
+}
+
+function emptyCompanionMemorySnapshot(): CompanionMemorySnapshot {
+  return {
+    lastSource: "",
+    lastUpdatedAt: "",
+    recentWriteCount: 0,
+    slotFreshness: {},
   };
 }
 

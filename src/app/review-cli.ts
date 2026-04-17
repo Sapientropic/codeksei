@@ -1,5 +1,6 @@
 import { getCommandArgsSchema } from "../contracts/command-args";
 import type { CommandExecutionResult } from "../contracts/cli-contract";
+import { bestEffortRememberCompanionMemory } from "../companion-memory/remember";
 import { parseCliArgs } from "../core/cli-args";
 import { runCliMutation } from "../core/cli-mutation";
 import { buildTerminalLeafHelp } from "../core/command-registry";
@@ -10,6 +11,7 @@ import type {
   WorkspacePathsConfig,
 } from "../core/config-slices";
 import { buildReview, writeReview } from "../review/review";
+import type { ReviewDraft } from "../review/review-types";
 
 type ReviewKind = "nightly" | "weekly" | "monthly";
 
@@ -85,6 +87,17 @@ async function runReviewCommand(config: ReviewConfig, kind: ReviewKind, args: st
     },
     execute: async () => {
       const result = await writeReview(config, kind, options);
+      const memorySummary = buildReviewMemorySummary(preview.draft);
+      if (memorySummary) {
+        await bestEffortRememberCompanionMemory(config, {
+          options: {
+            periodLabel: preview.draft.periodLabel,
+            reviewKind: kind,
+          },
+          source: "review_summary",
+          text: memorySummary,
+        });
+      }
       const action = result.changed ? "updated" : "noop";
       const semantic = result.semanticUsed ? " semantic=hybrid" : "";
       return {
@@ -141,3 +154,13 @@ export {
   parseReviewArgs,
   runReviewCommand,
 };
+
+function buildReviewMemorySummary(draft: ReviewDraft): string {
+  const lines = [
+    ...(draft.insights.progress?.length ? [`当前更稳定的推进：${draft.insights.progress.slice(0, 3).join("；")}`] : []),
+    ...(draft.insights.friction?.length ? [`反复出现的摩擦：${draft.insights.friction.slice(0, 3).join("；")}`] : []),
+    ...(draft.insights.signals?.length ? [`值得带走的信号：${draft.insights.signals.slice(0, 3).join("；")}`] : []),
+    ...(draft.insights.carryForward?.length ? [`下一步：${draft.insights.carryForward.slice(0, 3).join("；")}`] : []),
+  ];
+  return lines.join("\n").trim();
+}

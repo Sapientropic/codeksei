@@ -94,6 +94,7 @@ function buildBriefingData(briefing: ContextBoardBriefing): Record<string, unkno
     mode: briefing.mode,
     sources: {
       checkin: briefing.checkin,
+      companionMemory: briefing.companionMemory,
       companionNote: briefing.companionNote,
       onboarding: briefing.onboarding,
       projectRadar: briefing.projectRadar,

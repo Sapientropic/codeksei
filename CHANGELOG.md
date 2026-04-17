@@ -16,12 +16,17 @@
 - 语义化 onboarding persona 提取主链，支持“小模型优先、规则兜底”的六域 backstage 抽取，并继续把长期真相只写回 companion note，而不是新建第二套 profile store。`adb6b90`
 - `codeksei onboarding start|step|status|reset` 公共 CLI 面，以及无 workspace schema / 无 Obsidian 时自动回退到 `CODEKSEI_STATE_DIR/companions/<userKey>/profile.md` 的 companion profile。`adb6b90`
 - 统一的 semantic JSON runtime 抽取基础件，供 onboarding 和 review semantic host 复用，减少重复的 Codex/Hermes JSON 提取逻辑。`adb6b90`
+- 通用的 `codeksei companion remember` 公共 CLI 和 `src/companion-memory/*` shared owner：所有宿主都可以把会影响未来陪伴判断的新事实或纠正送进同一条 ongoing companion memory 主链，而不是只把记忆更新绑在 onboarding 会话里。
+- `CODEKSEI_STATE_DIR/companion-memory/<userKey>.json` 运行态记忆状态：只存 dedupe、freshness、recent writes 和 pending pattern candidates，不引入第二套长期 profile store。
 - host 升级感知合同：`host manifest` 现在带 machine-readable 的推荐工作流与升级要求；`host bootstrap` 会写入 bootstrap 快照；`host doctor` 会显式判断是否需要重新 bootstrap 或重装 companion skill。`c650278`
 
 ### Changed
 
 - 主上下文策略切到 `context board first / raw vault injection second`。宿主默认应先读受控的 context board handoff，而不是把原始 vault/note 直接塞进 prompt。`9b8012f`
 - Hermes companion skill 与 host manifest 不再只是命令清单，而是带默认 routing/workflow 提示，明确何时先看 onboarding、何时先看 context briefing、以及 hosted proactive 必须走 `seed-proactive / claim-checkin / settle-checkin`。`678b3eb`
+- onboarding 的 durable memory 写入逻辑已退回 shared companion-memory 内核；`onboarding step` 继续负责首访状态机和自然追问，但长期真相更新、去重、纠错和 runtime freshness 现在与后续 ongoing memory 共用同一条 host-neutral 管线。
+- `host manifest` / Hermes companion skill 的默认工作流新增 `ongoing_companion_memory`，并把 `user_correction_persistence` 明确成“onboarding 未完成走 onboarding step，ready 后统一走 companion remember”，不再暗示不同宿主要维护各自专用的长期记忆语义。
+- `context briefing` 现在会暴露 companion memory freshness / source status，帮助宿主判断当前 handoff 只是在消费旧 onboarding 画像，还是已经接上了持续更新的 companion memory。
 - Hosted proactive wake、reminder delivery 和 Hermes wake-forwarder 进一步收口，修正了一次性 wake job、delivery origin 和 recovery ownership 的行为。`f5aaeec`
 - Weixin 默认值与腾讯官方插件对齐，包括协议 client version、登录相关默认行为，以及 repo-local bridge 对应的兼容更新。`35c784a`
 - Weixin 路由和 Hermes hosted checkin 路径先做了一轮收口式简化，并补上 Hermes cron `env` passthrough patch 文档与资产。`f67f383`
@@ -30,6 +35,7 @@
 
 - 这条发布线的核心变化不是“多了几个命令”，而是宿主默认接法已经从“拿命令列表自己拼”升级为“由 `host manifest`、skill 和 `host doctor` 共同驱动默认工作流”。
 - onboarding 现在是正式的一等入口，新用户或薄画像用户不应再假设已有 durable profile；长期真相也不应旁路写入，而应继续回到 companion note。
+- onboarding 之上的记忆更新能力已经进一步泛化成 host-neutral 的 ongoing companion memory。对已完成 onboarding 的用户，后续纠正、支持偏好变化、节奏变化和近线任务更新，默认应走 `codeksei companion remember`，不要继续把 `onboarding step` 当作长期记忆的总入口。
 - 主动判断上下文现在应优先依赖 `context briefing` / context board，而不是直接注入 raw vault。
 - 没有数据库迁移，也没有新的公开 profile store；升级影响主要集中在 host routing、bootstrap 快照和 skill 安装物。
 
@@ -40,6 +46,7 @@
 - [ ] 如果 `host doctor` 返回 `skill_reinstall_required: yes`，执行 `codeksei operator hermes install-skill`。
 - [ ] 如果宿主之前只缓存了命令清单，改为读取 `codeksei host manifest --format json`，并消费其中的 `recommendedWorkflows` 与 `entrypoints`。
 - [ ] 把“新用户 / 薄画像”默认链路改成 `onboarding status -> onboarding start|step`，不要再假设已有 companion profile。
+- [ ] 把“onboarding 已完成后的持续记忆更新”默认链路改成 `codeksei companion remember --user <id> --workspace <path> --source host_user_turn --stdin`，不要再复用 `onboarding step` 承担全部长期纠正。
 - [ ] 把“主动判断 / 当前状态 handoff”默认链路改成 `codeksei context briefing --user <id> --workspace <path> --mode proactive`，不要再直接注入原始 vault。
 
 ### Commit Trace

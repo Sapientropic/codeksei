@@ -28,6 +28,15 @@ type CommandHelpContext = Record<string, unknown>;
 type CommandHelpBuilder<TContext extends CommandHelpContext = CommandHelpContext> = (context: TContext) => CommandHelpDocument;
 
 const TOPIC_HELP = {
+  companion: () => ({
+    usage: [buildExample("companion.remember", true)],
+    bodyLabel: "补充：",
+    body: [
+      "  这是 ongoing companion memory 的统一写入口，不是另一套 profile store。",
+      "  它只把高价值、会影响未来陪伴判断的事实写进 companion note，再由 context board 投影给宿主消费。",
+      "  安全 over-call 是允许的：如果这一轮没有足够稳定的新事实，命令会返回 noop 或 deferred，而不是强行落盘。",
+    ],
+  }),
   context: () => ({
     usage: [buildExample("context.briefing", true)],
     bodyLabel: "补充：",
@@ -387,6 +396,20 @@ const LEAF_HELP = {
     ],
     examples: [
       "  codeksei onboarding reset --user <wechatUserId>",
+    ],
+    includeFlagBlock: true,
+  }),
+  "companion.remember": () => ({
+    usage: [buildExample("companion.remember", true)],
+    bodyLabel: "说明：",
+    body: [
+      "  把会影响未来支持方式、边界、节奏、当前定位或近期重入点的新事实提炼进 companion memory。",
+      "  这条命令不负责生成对用户的回复，只负责 backstage 提炼、写回 companion note，并在需要时刷新 context board。",
+      "  宿主可以安全 over-call：普通寒暄或低信号输入会得到 noop / deferred，而不是强行写成长期真相。",
+    ],
+    examples: [
+      "  @'\n我下午两点后更能动，晚上别催太紧。\n'@ | codeksei companion remember --user <wechatUserId> --workspace /absolute/workspace --source host_user_turn --stdin",
+      "  codeksei companion remember --user <wechatUserId> --workspace /absolute/workspace --source review_summary --text \"这周反复卡在切换成本太高，下一步先把重入入口做得更轻。\"",
     ],
     includeFlagBlock: true,
   }),

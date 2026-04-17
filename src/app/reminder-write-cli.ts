@@ -3,6 +3,7 @@ import * as crypto from "node:crypto";
 import * as path from "node:path";
 
 import { SessionStore } from "../adapters/runtime/codex/session-store";
+import { rememberCompanionMemory } from "../companion-memory/remember";
 import {
   resolveSelectedAccount,
   type WeixinAccountConfig,
@@ -221,6 +222,17 @@ async function runReminderWriteCommand(
             followupContext: body,
             nextWakeAt: dueAtIso,
             provider: "hermes",
+          });
+          await rememberCompanionMemory(config, {
+            options: {
+              delivery: "proactive",
+              dueAtIso,
+            },
+            refreshBoard: false,
+            source: "reminder_proactive",
+            text: body,
+            userId: target.senderId,
+            workspaceRoot: target.workspaceRoot,
           });
           return {
             data: {

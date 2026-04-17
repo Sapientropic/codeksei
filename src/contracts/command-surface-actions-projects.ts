@@ -2,6 +2,22 @@ import type { CommandActionDefinition } from "./command-surface-definition-types
 
 export const PROJECTS_COMMAND_ACTION_DEFINITIONS = [
   {
+    action: "companion.remember",
+    groupId: "projects",
+    summary: "把会影响未来陪伴判断的新事实提炼进 companion memory",
+    terminal: ["companion remember"],
+    weixin: [],
+    status: "active",
+    entrypointType: "cli",
+    scriptName: "companion:remember",
+    command: "companion",
+    subcommand: "remember",
+    runner: "companion.remember",
+    argsSchemaKey: "companionRemember",
+    help: { topic: "companion", leafKey: "companion.remember", detail: "leaf" },
+    approval: { autoApprove: true },
+  },
+  {
     action: "onboarding.start",
     groupId: "projects",
     summary: "开始一轮聊天式激活访谈，建立最小 companion 画像",

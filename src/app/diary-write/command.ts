@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { PACKAGE_NAME } from "../../contracts/app-env";
+import { bestEffortRememberCompanionMemory } from "../../companion-memory/remember";
 import { bestEffortRefreshContextBoard, type ContextBoardConfig } from "../../context/board";
 import { LEGACY_TIMELINE_TIMEZONE } from "../../core/timezone";
 import { logWarn } from "../../core/logging";
@@ -99,6 +100,18 @@ export async function runDiaryWriteCommand(config: DiaryWriteConfig, args: strin
         current,
       );
       writeForeignTextDocument(filePath, next, { encoding: "utf8" });
+      if (section === "supplement" || section === "summary") {
+        await bestEffortRememberCompanionMemory(config, {
+          options: {
+            diary_date: dateString,
+            diary_section: section,
+            title: options.title,
+          },
+          refreshBoard: false,
+          source: "diary_supplement",
+          text: [options.title, body].filter(Boolean).join("\n"),
+        });
+      }
       bestEffortRefreshContextBoard(config, {
         mode: "proactive",
       });

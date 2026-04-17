@@ -1,6 +1,7 @@
 import * as path from "node:path";
 import { z } from "zod";
 
+import { COMPANION_MEMORY_SLOT_IDS, type CompanionMemorySlotId } from "../companion-memory/contracts";
 import { normalizeText } from "../core/text-normalization";
 import {
   ensureParentDirectory,
@@ -9,13 +10,7 @@ import {
 } from "../state/json-state";
 import { type OnboardingPersonaDomain } from "./onboarding-contracts";
 
-export const ONBOARDING_SLOT_IDS = [
-  "current_status",
-  "rhythm",
-  "preference",
-  "boundary",
-  "next",
-] as const;
+export const ONBOARDING_SLOT_IDS = COMPANION_MEMORY_SLOT_IDS;
 
 export const ONBOARDING_STATUS_VALUES = [
   "not_started",
@@ -24,7 +19,7 @@ export const ONBOARDING_STATUS_VALUES = [
   "followup_needed",
 ] as const;
 
-export type OnboardingSlotId = typeof ONBOARDING_SLOT_IDS[number];
+export type OnboardingSlotId = CompanionMemorySlotId;
 export type OnboardingStatus = typeof ONBOARDING_STATUS_VALUES[number];
 
 export interface OnboardingSlotCoverage {
