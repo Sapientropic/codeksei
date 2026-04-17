@@ -81,9 +81,11 @@ export function resolveHostProviderWithConfig(
   {
     provider,
     configFile,
+    defaultProvider,
   }: {
     provider?: string;
     configFile?: string;
+    defaultProvider?: string;
   } = {},
 ): {
   provider: string;
@@ -94,6 +96,7 @@ export function resolveHostProviderWithConfig(
   const resolved = loadResolvedHostConfig(configFile, cwd);
   const resolvedProvider = normalizeText(provider)
     || normalizeText(resolved.config?.host.provider)
+    || normalizeText(defaultProvider)
     || (normalizeText(config.runtime) === "hermes" && normalizeText(config.channelProvider) === "hermes" ? "hermes" : "generic-shell");
   return {
     provider: resolvedProvider,

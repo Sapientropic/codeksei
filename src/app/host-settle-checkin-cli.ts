@@ -54,6 +54,7 @@ export async function runHostSettleCheckinCommand(
   const resolvedProvider = resolveHostProviderWithConfig(config, {
     provider: options.provider,
     configFile: options.config,
+    defaultProvider: "hermes",
   });
   const settled = settleDelegatedCheckin(config as Parameters<typeof settleDelegatedCheckin>[0], target, {
     provider: resolvedProvider.provider,

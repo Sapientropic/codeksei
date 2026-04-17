@@ -96,7 +96,8 @@ const TOPIC_HELP = {
     bodyLabel: "补充：",
     body: [
       "  host 是面向外部宿主的机器入口，不是仓内 TypeScript seam。",
-      "  daemon-first / host-attachable 仍是 runtime invariant；host 只描述 attach、bootstrap、doctor 与 delegated proactive lease。",
+      "  host manifest 输出默认 Hosted Mode / Hermes 机器合同；当前环境与当前 canonical config 的真实状态统一看 host doctor。",
+      "  daemon-first / host-attachable 仍是 runtime invariant；public host 命令默认走 Hermes recipe，generic-shell 继续支持但需要显式指定。",
       "  对 Hermes 这类宿主，优先用 host seed/claim/settle；operator hermes / system checkin-* 继续只保留兼容 building blocks。",
     ],
   }),
@@ -161,8 +162,9 @@ const LEAF_HELP = {
     usage: [buildTerminalActionExample("host.manifest", { audience: "public", includeArgs: true })],
     bodyLabel: "说明：",
     body: [
-      "  输出 host attachment manifest / hostkit 机器入口。",
-      "  这条命令描述 runtime invariant、recipes、entrypoints 与默认安装方式，不要求当前已经在受支持 profile 中。",
+      "  输出默认 Hosted Mode / Hermes 的 host attachment manifest / hostkit 机器入口。",
+      "  这条命令描述推荐给新宿主的默认 attach contract、recipes、entrypoints 与安装方式，不再负责表达当前机器的 live 环境真相。",
+      "  若要看当前 workspace / 当前 config 实际解析到了什么 provider/profile，统一改用 host doctor。",
     ],
     includeFlagBlock: true,
   }),
@@ -171,6 +173,7 @@ const LEAF_HELP = {
     bodyLabel: "说明：",
     body: [
       "  写入 canonical codeksei.config.json，并按 provider 走最小 bootstrap。",
+      "  public host bootstrap 默认 provider=hermes；只有显式传 --provider generic-shell，或已有 canonical config 已锁定 provider 时，才会走 generic-shell。",
       "  Hermes provider 当前会通过兼容路径同步 companion skill；--ensure-daemon 只声明并检查 v1 的 local CLI/state-owner readiness，不会偷开第二套常驻进程。",
     ],
     includeFlagBlock: true,
@@ -179,8 +182,8 @@ const LEAF_HELP = {
     usage: [buildTerminalActionExample("host.doctor", { audience: "public", includeArgs: true })],
     bodyLabel: "说明：",
     body: [
-      "  统一查看 daemon / attachment / provider recipe readiness。",
-      "  provider=hermes 时会收口 repo-local、skill、semantic review 与 smoke readiness，而不是只给一个 provider-specific 侧视图。",
+      "  统一查看当前环境 / 当前 canonical config 下的 daemon、attachment 与 provider recipe readiness。",
+      "  这条命令才是 host 当前环境真相层；provider=hermes 时会收口 repo-local、skill、semantic review 与 smoke readiness，而不是只给一个 provider-specific 侧视图。",
     ],
     includeFlagBlock: true,
   }),
@@ -198,6 +201,7 @@ const LEAF_HELP = {
     bodyLabel: "说明：",
     body: [
       "  安装后为 delegated proactive checkin 种下或修复第一条 future wake。",
+      "  public host 命令默认 provider=hermes；只有显式传 --provider generic-shell，或已有 canonical config 已锁定 provider 时，才会改走 generic-shell。",
       "  这条命令不会改写 scheduler 真相，只会在当前 truth 上补第一条可执行 wake/recovery attach。",
     ],
     includeFlagBlock: true,
@@ -207,6 +211,7 @@ const LEAF_HELP = {
     bodyLabel: "说明：",
     body: [
       "  原子完成 tick + claim + ack + recovery re-arm。",
+      "  public host 命令默认 provider=hermes；generic-shell 只保留给显式 opt-in 的 attach 方案。",
       "  status=claimed 时返回 lease + payload；status=idle / in_progress 时不会伪造新 lease。",
     ],
     includeFlagBlock: true,
@@ -216,6 +221,7 @@ const LEAF_HELP = {
     bodyLabel: "说明：",
     body: [
       "  回写 delegated proactive checkin 的完成结果。",
+      "  public host 命令默认 provider=hermes；generic-shell 只保留给显式 opt-in 的 attach 方案。",
       "  result=failed 只会返回 partial 并保留 daemon recovery；不会偷偷扩写内部 completion enum。",
     ],
     includeFlagBlock: true,

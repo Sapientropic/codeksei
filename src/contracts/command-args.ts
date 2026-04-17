@@ -211,7 +211,7 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       COMMON_HELP_FLAG,
       COMMON_DRY_RUN_FLAG,
       COMMON_IDEMPOTENCY_FLAG,
-      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "", description: "目标 recipe provider，如 hermes" },
+      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "hermes", description: "目标 recipe provider，如 hermes；generic-shell 需显式指定" },
       { name: "config", keys: ["--config"], type: "string", defaultValue: "", description: "显式 canonical config 文件路径" },
       { name: "modeClass", keys: ["--mode-class"], type: "string", defaultValue: "", description: "codex-managed|hosted-proactive|hosted-skill-only|cli-only（兼容 legacy: bridge-full）" },
       { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "canonical config 里的 workspaceRoot" },
@@ -226,7 +226,7 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
   hostDoctor: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,
-      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "", description: "显式 provider，如 hermes" },
+      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "hermes", description: "显式 provider，如 hermes；generic-shell 需显式指定" },
       { name: "config", keys: ["--config"], type: "string", defaultValue: "", description: "显式 canonical config 文件路径" },
     ],
   }),

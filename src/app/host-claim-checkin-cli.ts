@@ -50,6 +50,7 @@ export async function runHostClaimCheckinCommand(
   const resolvedProvider = resolveHostProviderWithConfig(config, {
     provider: options.provider,
     configFile: options.config,
+    defaultProvider: "hermes",
   });
   const claimed = claimDelegatedCheckin(
     config as Parameters<typeof claimDelegatedCheckin>[0],
