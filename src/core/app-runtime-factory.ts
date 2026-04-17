@@ -86,10 +86,10 @@ function createAppInfrastructure({
   config: AppFactoryConfig;
 }): AppInfrastructure {
   const hostMode = resolveHostMode(config);
-  const channelAdapter = hostMode.mode === "bridge"
+  const channelAdapter = hostMode.mode === "codex"
     ? createWeixinChannelAdapter(config)
     : createHostedChannelAdapter(config);
-  const runtimeAdapter = hostMode.mode === "bridge"
+  const runtimeAdapter = hostMode.mode === "codex"
     ? createCodexRuntimeAdapter(config)
     : createHostedRuntimeAdapter(config);
   const sessionWriter = runtimeAdapter.getSessionWriter();

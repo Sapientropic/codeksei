@@ -98,14 +98,14 @@ export function createHostedChannelAdapter(config: HostedModeConfig): ChannelAda
   return {
     describe() {
       return {
-        id: "hermes-weixin",
+        id: `${resolved.channelProvider}-${resolved.channelKind}`,
         kind: "channel",
-        provider: "hermes",
+        provider: resolved.channelProvider,
         operations: { ...matrixEntry.channelOperations },
         profile: resolved.profile,
         mode: resolved.mode,
         supported: resolved.supported,
-        channel: resolved.channel,
+        channel: resolved.channelKind,
         capabilities: resolved.capabilities,
       };
     },
@@ -153,9 +153,9 @@ export function createHostedRuntimeAdapter(config: HostedModeConfig): HostedRunt
   return {
     describe() {
       return {
-        id: resolved.runtime === "hermes" ? "hermes" : "unsupported-runtime",
+        id: resolved.runtimeProvider === "hermes" ? "hermes" : "unsupported-runtime",
         kind: "runtime",
-        provider: resolved.runtime,
+        provider: resolved.runtimeProvider,
         operations: { ...matrixEntry.runtimeOperations },
         profile: resolved.profile,
         mode: resolved.mode,

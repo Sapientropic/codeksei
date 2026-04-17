@@ -7,15 +7,20 @@ const {
   resolveHostMode,
 } = require("../src/core/host-mode");
 
-test("resolveHostMode defaults to bridge codex+weixin when no host override is configured", () => {
+test("resolveHostMode defaults to codex-mode with the first-party weixin adapter when no host override is configured", () => {
   const resolved = resolveHostMode({});
 
   assert.deepEqual(resolved, {
-    profile: "bridge-codex-weixin",
+    profile: "codex-mode",
+    legacyProfileIds: ["bridge-codex-weixin"],
     runtime: "codex",
+    runtimeProvider: "codex",
+    runtimeOwner: "codeksei",
     channelProvider: "codeksei",
     channel: "weixin",
-    mode: "bridge",
+    channelKind: "weixin",
+    deliveryRecipe: "codeksei-weixin-bridge",
+    mode: "codex",
     supported: true,
     reason: "",
     capabilities: {
@@ -35,10 +40,40 @@ test("resolveHostMode recognizes Hermes hosted mode as a first-class supported p
     channelProvider: "hermes",
   });
 
-  assert.equal(resolved.profile, "hosted-hermes-weixin");
+  assert.equal(resolved.profile, "hosted-mode");
   assert.equal(resolved.mode, "hosted");
   assert.equal(resolved.supported, true);
   assert.equal(resolved.capabilities.supportsHostedSkillInstall, true);
+});
+
+test("resolveHostMode keeps codex-mode open to host-managed non-weixin channels", () => {
+  const resolved = resolveHostMode({
+    runtime: "codex",
+    channelProvider: "host",
+    channel: "telegram",
+  });
+
+  assert.equal(resolved.profile, "codex-mode");
+  assert.equal(resolved.mode, "codex");
+  assert.equal(resolved.supported, true);
+  assert.equal(resolved.channelKind, "telegram");
+  assert.equal(resolved.deliveryRecipe, "generic-shell");
+  assert.deepEqual(resolved.legacyProfileIds, []);
+});
+
+test("resolveHostMode keeps hosted-mode open to host-managed non-weixin channels", () => {
+  const resolved = resolveHostMode({
+    runtime: "hermes",
+    channelProvider: "host",
+    channel: "discord",
+  });
+
+  assert.equal(resolved.profile, "hosted-mode");
+  assert.equal(resolved.mode, "hosted");
+  assert.equal(resolved.supported, true);
+  assert.equal(resolved.channelKind, "discord");
+  assert.equal(resolved.deliveryRecipe, "generic-shell");
+  assert.deepEqual(resolved.legacyProfileIds, []);
 });
 
 test("resolveHostMode keeps mixed host combinations explicit instead of silently coercing them", () => {
@@ -61,8 +96,8 @@ test("assertBridgeMode preserves the hosted guidance message for bridge-only com
 
   assert.throws(
     () => assertBridgeMode({ runtime: "hermes", channelProvider: "hermes" }, "codeksei start"),
-    /Hermes Hosted Mode/u,
+    /Hosted Mode/u,
   );
-  assert.match(formatBridgeOnlyCommandMessage(hosted, "codeksei start"), /Hermes Hosted Mode/u);
-  assert.match(formatBridgeOnlyCommandMessage(hosted, "codeksei start"), /operator \/ skill 入口/u);
+  assert.match(formatBridgeOnlyCommandMessage(hosted, "codeksei start"), /Hosted Mode/u);
+  assert.match(formatBridgeOnlyCommandMessage(hosted, "codeksei start"), /host\/operator\/skill/u);
 });

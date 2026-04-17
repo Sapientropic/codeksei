@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeksei.dev/schemas/codeksei-config-v2.json",
+  "type": "object",
+  "required": ["$schema", "modeClass", "workspaceRoot", "stateDir", "user", "host"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "modeClass": {
+      "enum": ["codex-managed", "hosted-proactive", "hosted-skill-only", "cli-only", "bridge-full"]
+    },
+    "workspaceRoot": { "type": "string", "minLength": 1 },
+    "stateDir": { "type": "string", "minLength": 1 },
+    "user": {
+      "type": "object",
+      "required": ["id", "name", "timezone"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string" },
+        "timezone": { "type": "string", "minLength": 1 }
+      }
+    },
+    "host": {
+      "type": "object",
+      "required": [
+        "provider",
+        "runtimeProvider",
+        "runtimeOwner",
+        "channelProvider",
+        "channelKind",
+        "deliveryRecipe"
+      ],
+      "properties": {
+        "provider": { "enum": ["hermes", "generic-shell"] },
+        "runtimeProvider": { "enum": ["codex", "hermes", "openclaw-reserved"] },
+        "runtimeOwner": { "enum": ["codeksei", "host"] },
+        "channelProvider": { "enum": ["codeksei", "hermes", "host"] },
+        "channelKind": { "type": "string", "minLength": 1 },
+        "deliveryRecipe": { "type": "string", "minLength": 1 },
+        "channel": { "type": "string", "minLength": 1 }
+      }
+    },
+    "bootstrap": {
+      "type": "object",
+      "properties": {
+        "snapshotVersion": { "type": "integer", "minimum": 1 },
+        "manifestContractVersion": { "type": "integer", "minimum": 1 },
+        "companionSkillVersion": { "type": "string" },
+        "companionSkillHash": { "type": "string" },
+        "completedAt": { "type": "string" }
+      }
+    }
+  }
+}

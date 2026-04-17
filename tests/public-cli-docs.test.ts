@@ -51,8 +51,8 @@ function assertAgentNativeAnchors(doc: string, name: string, modeHeading: string
   assert.ok(doc.includes("Node.js >= 22"), `${name} should mention Node.js >= 22`);
   assert.ok(doc.includes("## SETUP"), `${name} should contain a dedicated SETUP section`);
   assert.ok(doc.includes(modeHeading), `${name} should contain a mode-specific bring-up section`);
-  assert.ok(doc.includes("### Bridge Mode"), `${name} should contain Bridge Mode bring-up`);
-  assert.ok(doc.includes("### Hermes Hosted Mode"), `${name} should contain Hermes Hosted Mode bring-up`);
+  assert.ok(doc.includes("### Codex Mode"), `${name} should contain Codex Mode bring-up`);
+  assert.ok(doc.includes("### Hosted Mode"), `${name} should contain Hosted Mode bring-up`);
 }
 
 test("README docs keep bilingual public discovery aligned while shared mode stays on repo scripts", () => {

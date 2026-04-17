@@ -183,10 +183,8 @@ function buildCanonicalHostConfig(
     ? previewHermesCompanionSkillInstall(config)
     : null;
   return {
-    $schema: "./schemas/codeksei-config-v1.json",
-    modeClass: (normalizeText(options.modeClass)
-      || normalizeText(existing?.modeClass)
-      || (provider === "hermes" ? "hosted-proactive" : "hosted-skill-only")) as CodekseiHostConfig["modeClass"],
+    $schema: "./schemas/codeksei-config-v2.json",
+    modeClass: resolveModeClass(existing, options, provider, config) as CodekseiHostConfig["modeClass"],
     workspaceRoot,
     stateDir,
     user: {
@@ -205,9 +203,14 @@ function buildCanonicalHostConfig(
     },
     host: {
       provider: provider as CodekseiHostConfig["host"]["provider"],
+      runtimeProvider: resolveRuntimeProvider(existing, provider, config),
+      runtimeOwner: resolveRuntimeOwner(existing, provider, config),
+      channelProvider: resolveChannelProvider(existing, provider, options, config),
+      channelKind: resolveChannelKind(existing, provider, options),
+      deliveryRecipe: resolveDeliveryRecipe(existing, provider, options, config),
       channel: normalizeText(options.channel)
         || normalizeText(existing?.host.channel)
-        || "weixin",
+        || resolveChannelKind(existing, provider, options),
     },
     bootstrap: {
       snapshotVersion: HOST_BOOTSTRAP_SNAPSHOT_VERSION,
@@ -217,4 +220,103 @@ function buildCanonicalHostConfig(
       completedAt: new Date().toISOString(),
     },
   };
+}
+
+function resolveModeClass(
+  existing: CodekseiHostConfig | null,
+  options: HostBootstrapOptions,
+  provider: string,
+  config: BootstrapConfig,
+): CodekseiHostConfig["modeClass"] {
+  const explicit = normalizeText(options.modeClass) as CodekseiHostConfig["modeClass"] | "";
+  if (explicit) {
+    return explicit;
+  }
+  if (normalizeText(existing?.modeClass) === "codex-managed") {
+    return "codex-managed";
+  }
+  if (provider === "hermes") {
+    return "hosted-proactive";
+  }
+  const runtimeProvider = resolveRuntimeProvider(existing, provider, config);
+  const channelProvider = resolveChannelProvider(existing, provider, options, config);
+  return runtimeProvider === "codex" && channelProvider === "codeksei"
+    ? "codex-managed"
+    : (normalizeText(existing?.modeClass) as CodekseiHostConfig["modeClass"] | "") || "hosted-skill-only";
+}
+
+function resolveRuntimeProvider(
+  existing: CodekseiHostConfig | null,
+  provider: string,
+  config: BootstrapConfig,
+): CodekseiHostConfig["host"]["runtimeProvider"] {
+  const current = normalizeText(existing?.host.runtimeProvider) as CodekseiHostConfig["host"]["runtimeProvider"] | "";
+  if (current) {
+    return current;
+  }
+  if (provider === "hermes") {
+    return "hermes";
+  }
+  return normalizeText(config.runtime) === "hermes" ? "hermes" : "codex";
+}
+
+function resolveRuntimeOwner(
+  existing: CodekseiHostConfig | null,
+  provider: string,
+  config: BootstrapConfig,
+): CodekseiHostConfig["host"]["runtimeOwner"] {
+  const current = normalizeText(existing?.host.runtimeOwner) as CodekseiHostConfig["host"]["runtimeOwner"] | "";
+  if (current) {
+    return current;
+  }
+  const runtimeProvider = resolveRuntimeProvider(existing, provider, config);
+  return runtimeProvider === "codex" ? "codeksei" : "host";
+}
+
+function resolveChannelKind(
+  existing: CodekseiHostConfig | null,
+  provider: string,
+  options: HostBootstrapOptions,
+): string {
+  return normalizeText(options.channel)
+    || normalizeText(existing?.host.channelKind)
+    || normalizeText(existing?.host.channel)
+    || (provider === "hermes" ? "weixin" : "none");
+}
+
+function resolveChannelProvider(
+  existing: CodekseiHostConfig | null,
+  provider: string,
+  options: HostBootstrapOptions,
+  config: BootstrapConfig,
+): CodekseiHostConfig["host"]["channelProvider"] {
+  const current = normalizeText(existing?.host.channelProvider) as CodekseiHostConfig["host"]["channelProvider"] | "";
+  if (current) {
+    return current;
+  }
+  const channelKind = resolveChannelKind(existing, provider, options);
+  if (provider === "hermes") {
+    return channelKind === "weixin" ? "hermes" : "host";
+  }
+  return normalizeText(config.runtime) === "codex" && channelKind === "weixin" ? "codeksei" : "host";
+}
+
+function resolveDeliveryRecipe(
+  existing: CodekseiHostConfig | null,
+  provider: string,
+  options: HostBootstrapOptions,
+  config: BootstrapConfig,
+): string {
+  const current = normalizeText(existing?.host.deliveryRecipe);
+  if (current) {
+    return current;
+  }
+  const channelProvider = resolveChannelProvider(existing, provider, options, config);
+  if (provider === "hermes" && channelProvider === "hermes") {
+    return "hermes-origin";
+  }
+  if (channelProvider === "codeksei") {
+    return "codeksei-weixin-bridge";
+  }
+  return "generic-shell";
 }

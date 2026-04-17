@@ -1,6 +1,6 @@
 # Hermes Cron Env Patch
 
-这份文档是 `Hermes Hosted Mode` 下 cron `env` 兼容补丁的唯一详细入口。
+这份文档是 `Hosted Mode` 下 cron `env` 兼容补丁的唯一详细入口。
 
 补丁资产在：
 

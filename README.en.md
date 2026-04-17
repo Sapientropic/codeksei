@@ -11,8 +11,8 @@
   </p>
   <p><a href="https://zread.ai/Sapientropic/codeksei" target="_blank"><img src="https://img.shields.io/badge/Ask_Zread-_.svg?style=for-the-badge&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff" alt="zread"/></a></p>
   <h3>A local-first companion that helps time hold shape and brings daily life and project threads back within reach</h3>
-  <p><strong>It uses WeChat as the main entry and keeps timeline, diary, reminders, reviews, and project continuity on one shared thread.</strong></p>
-  <p>Codeksei is not just a chat box waiting for prompts, and it is not a second agent runtime. It helps capture what happened, reconnect loose threads, leave reminders, and make project re-entry gentler while keeping state, logs, and life traces local by default.</p>
+  <p><strong>It keeps timeline, diary, reminders, reviews, and project continuity inside one local-first companion core, then attaches that core to whichever host bridge you want.</strong></p>
+  <p>Codeksei is not just a chat box waiting for prompts, and it is not a second agent runtime. It helps capture what happened, reconnect loose threads, leave reminders, and make project re-entry gentler while keeping state, logs, and life traces local by default. WeChat is now only a first-party adapter, not the whole product identity.</p>
   <p>
     <a href="#agent-quickstart">Agent Quickstart</a> ·
     <a href="#setup">SETUP</a> ·
@@ -26,9 +26,9 @@
   </p>
 </div>
 
-- **What it is**: a local-first, `daemon-first / bridge-first` companion engine; for humans it is a companion assistant, and for hosts it is an attachable domain layer
+- **What it is**: a local-first, `daemon-first / host-attachable` companion engine; for humans it is a companion assistant, and for hosts it is an attachable domain layer
 - **CLI contract**: `codeksei help`, `codeksei schema`, and `codeksei host manifest` are the public discovery surface; non-TTY runs default to JSON, `stdout` carries results, and `stderr` carries diagnostics
-- **Recommended start**: complete shared `SETUP` first, then choose `Bridge Mode` or `Hermes Hosted Mode`
+- **Recommended start**: complete shared `SETUP` first, then choose `Codex Mode` or `Hosted Mode`
 
 <a id="agent-quickstart"></a>
 
@@ -38,7 +38,7 @@ If you are an external agent, do not infer internal seams from long README prose
 
 1. Read `CODEKSEI_HOSTKIT.json` in the repo root first
 2. Treat the README as human-facing guidance, and treat `HOSTKIT + codeksei host manifest/bootstrap/doctor/smoke` as the machine entrypoint
-3. Prefer `Hermes Hosted Mode` by default
+3. Prefer `Hosted Mode` by default
 4. Treat `host bootstrap` as “Codeksei attachment/bootstrap completed”, not as proof that Hermes gateway or live Weixin bring-up is already complete
 
 Recommended order:
@@ -55,12 +55,12 @@ npx -y codeksei@latest host smoke --provider hermes
 
 ## Host Modes
 
-Codeksei is now positioned as a **daemon-first / bridge-first / companion engine**, not a CLI tied to one fixed host.
+Codeksei is now positioned as a **daemon-first / host-attachable / companion engine**, not a CLI tied to one fixed host.
 
-- `Bridge Mode`
-  Current default path: `Codeksei Weixin bridge + Codex runtime`
-- `Hermes Hosted Mode`
-  Hermes owns the agent loop and official Weixin; Codeksei exposes timeline, diary, reminder, review, note, and project radar through its CLI / skill surface
+- `Codex Mode`
+  Current default path: `Codeksei first-party Weixin adapter + Codex runtime`
+- `Hosted Mode`
+  Hermes owns the agent loop and host-side messaging surface; Codeksei exposes timeline, diary, reminder, review, note, and project radar through its CLI / skill surface
 - `Proactive context layer`
   Hosted proactive wakes read a Codeksei-managed context board by default. It is aggregated from checkin state, today's diary, companion notes, project radar, and workspace continuity, then injected by a Hermes cron `script` right before runtime instead of requiring raw vault scans
 - External hosts should attach through the `host attachment contract`:
@@ -70,7 +70,7 @@ Codeksei is now positioned as a **daemon-first / bridge-first / companion engine
 
 ## SETUP
 
-This section only covers shared installation, contract discovery, and basic CLI verification. It does not force you to choose `Bridge Mode` or `Hermes Hosted Mode` first.
+This section only covers shared installation, contract discovery, and basic CLI verification. It does not force you to choose `Codex Mode` or `Hosted Mode` first.
 
 ### Common prerequisites
 
@@ -115,8 +115,8 @@ If you are using the `npx` path and do not have a global `codeksei` binary on `P
 ### SETUP boundaries
 
 - A successful setup only means the CLI, public schema, and host attachment contract / hostkit are discoverable
-- It does not mean `Bridge Mode` has already logged in
-- It also does not mean `Hermes Hosted Mode` is already live-attached to Hermes gateway / Weixin
+- It does not mean `Codex Mode` has already logged in
+- It also does not mean `Hosted Mode` is already live-attached to Hermes gateway / host bridge
 - It definitely does not mean reminders, check-ins, repo-local shims, or hosted send-back are all ready yet
 
 <a id="mode-specific-bring-up"></a>
@@ -125,7 +125,7 @@ If you are using the `npx` path and do not have a global `codeksei` binary on `P
 
 After `SETUP`, choose the bring-up path that matches how you want to run Codeksei.
 
-### Bridge Mode
+### Codex Mode
 
 Use this when you want Codeksei to own the repo's existing shared-thread path.
 
@@ -139,7 +139,7 @@ npm run shared:start
 
 Notes:
 
-- Bridge Mode keeps its default protocol version aligned with Tencent's official `@tencent-weixin/openclaw-weixin@2.1.8`
+- Codex Mode keeps its first-party Weixin adapter protocol version aligned with Tencent's official `@tencent-weixin/openclaw-weixin@2.1.8`
 - International / overseas WeChat login can still be region-gated; if the phone-side scan fails with a generic network error, verify account/client eligibility first
 
 Common follow-up commands:
@@ -149,7 +149,7 @@ npm run shared:open
 npm run shared:status
 ```
 
-### Hermes Hosted Mode
+### Hosted Mode
 
 Use this when you already have Hermes runtime / gateway / official Weixin and want Codeksei to attach as a companion workflow surface.
 
@@ -188,15 +188,15 @@ Boundaries:
 
 - `Timeline`: time blocks, switches, and lived facts become anchors for memory and time sense instead of fading into a blur
 - `Diary`: todos, fragments, supplements, summaries, and timeline-linked facts for daily traces that want to stay
-- `Check-ins`: proactive wake-ups and background care. Messaging is only one output path; Codeksei can also reread context, clean up backstage state, update diary/timeline, or leave a reminder before deciding whether it should surface. It owns proactive trigger generation, the `tick -> ack -> complete` schedule truth, and the next wake decision written in `checkin-complete`; Bridge Mode wraps that truth with a local poller, while Hermes Hosted Mode only executes a managed wake/recovery job set and still defers the true next wake to Codeksei
+- `Check-ins`: proactive wake-ups and background care. Messaging is only one output path; Codeksei can also reread context, clean up backstage state, update diary/timeline, or leave a reminder before deciding whether it should surface. It owns proactive trigger generation, the `tick -> ack -> complete` schedule truth, and the next wake decision written in `checkin-complete`; Codex Mode wraps that truth with a local poller, while Hosted Mode only executes a managed wake/recovery job set and still defers the true next wake to Codeksei
 - `Onboarding`: first activation can happen as a conversational interview instead of a form. Long-term truth lands in the companion note and is then projected through the context board; when there is no Obsidian/workspace schema, Codeksei can fall back to a local companion profile under the state dir
 - `Companion memory`: the system keeps updating after first activation. When a user's new self-description, correction, support preference, boundary, or near-term task should change future companionship judgement, route it through `companion remember` instead of leaving it only in host chat memory
-- `Context board`: the controlled context layer for proactive judgement. It turns checkin state, today's facts, active threads, cautions, and re-entry handles into a prompt-ready briefing; Hermes Hosted Mode refreshes and injects that board at cron runtime instead of scanning raw vault files
-- `Reminders`: reminder write and scheduling support for rhythm and follow-through. In Hermes Hosted Mode the default is a user-visible reminder; use `reminder write --delivery proactive` when the text should become a future proactive wake instead of a direct message
+- `Context board`: the controlled context layer for proactive judgement. It turns checkin state, today's facts, active threads, cautions, and re-entry handles into a prompt-ready briefing; Hosted Mode refreshes and injects that board at cron runtime instead of scanning raw vault files
+- `Reminders`: reminder write and scheduling support for rhythm and follow-through. In Hosted Mode the default is a user-visible reminder; use `reminder write --delivery proactive` when the text should become a future proactive wake instead of a direct message
 - `Review`: nightly / weekly / monthly review, with hybrid semantic extraction by default
 - `Project support`: workspace bootstrap, project radar, and shared-thread recovery by workspace so re-entry does not always start from scratch; local git remains the first truth and GitHub activity is only a fallback continuity signal
-- `WeChat bridge`: owned by Codeksei in Bridge Mode; Hermes Hosted Mode should use Hermes official Weixin
-- `Runtime host`: Bridge Mode currently defaults to Codex; Hermes Hosted Mode lets Hermes own agent/runtime/approval/model switching
+- `WeChat bridge`: owned by Codeksei in Codex Mode; Hosted Mode should use the host's own bridge
+- `Runtime host`: Codex Mode currently defaults to Codex; Hosted Mode lets the host own agent/runtime/approval/model switching
 - `Durable notes`: `note:auto`, `note:maybe`, `note:sync`
 
 ## Who It Fits
@@ -243,9 +243,9 @@ Boundaries:
 - Shared global flags:
   `--format json|text`, `--verbose`, `--workspace-root /absolute/path`
 
-## Bridge Mode Runtime Config
+## Codex Mode Runtime Config
 
-Bridge Mode still uses a deliberate two-stage environment-loading contract:
+Codex Mode still uses a deliberate two-stage environment-loading contract:
 
 1. Keep any environment variables already present in the current process
 2. Load `.env` from the current project directory
@@ -294,7 +294,7 @@ Notes:
 - The Weixin bridge now exposes only one official `v2` adapter; the issue #4 media gap is handled as an internal legacy media fallback instead of a second public adapter
 - `CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION` now defaults to Tencent's official `@tencent-weixin/openclaw-weixin@2.1.8`; only override it when you have source-backed upstream evidence to do so
 - International / overseas WeChat login can still be gated by Tencent's regional rollout; Tencent's public docs say Hong Kong is supported while other regions are still rolling out
-- `CODEKSEI_RUNTIME` / `CODEKSEI_CHANNEL_PROVIDER` decide whether the current runtime is `Bridge Mode` or `Hermes Hosted Mode`
+- `CODEKSEI_RUNTIME` / `CODEKSEI_CHANNEL_PROVIDER` decide whether the current runtime is `Codex Mode` or `Hosted Mode`
 - `CODEKSEI_RUNTIME_ENDPOINT` / `CODEKSEI_RUNTIME_COMMAND` are the new host-neutral runtime ingress; legacy `CODEKSEI_CODEX_*` variables still remain for compatibility
 - `CODEKSEI_REVIEW_SEMANTIC_HOST=auto|codex|hermes|deterministic` lets you pin the semantic review host explicitly; default is `auto`
 - `CODEKSEI_COMPANION_SEMANTIC_HOST=auto|codex|hermes|deterministic` lets ongoing companion-memory extraction pick a dedicated semantic host; when left blank it follows the default host decision
@@ -309,7 +309,7 @@ Notes:
 - If you use multiple workspaces in shared mode, set `CODEKSEI_WORKSPACE_ROOT` before startup
 - `CODEKSEI_TIMEZONE` is optional; when set, it becomes the single local-time contract for reminder / diary / review / timeline flows
 - `CODEKSEI_TIMELINE_LOCALE` is optional; it currently switches timeline dashboard copy, date formatting, and demo data between `zh-CN` and `en`
-- `CODEKSEI_HERMES_REPO_ROOT` is optional; if the default sibling checkout `../hermes-agent` is not available in Hermes Hosted Mode, point it at the repo-local upstream checkout explicitly
+- `CODEKSEI_HERMES_REPO_ROOT` is optional; if the default sibling checkout `../hermes-agent` is not available in Hosted Mode, point it at the repo-local upstream checkout explicitly
 - The Hermes native cron-env passthrough patch now ships as an optional Codeksei asset; see [docs/hermes-cron-env-patch.md](./docs/hermes-cron-env-patch.md) for applicability and `git apply` usage
 - If `CODEKSEI_TIMEZONE` is unset, Codeksei first reuses any non-legacy timezone already declared by the timeline state; otherwise it falls back to the system timezone
 - Legacy `Asia/Shanghai` timeline state can auto-migrate to the unified timezone the next time you run a timeline command
@@ -319,7 +319,7 @@ Notes:
 
 ## Windows Background Tasks
 
-If you want Bridge Mode to auto-start after login and heal quickly after unlock or sleep recovery:
+If you want Codex Mode to auto-start after login and heal quickly after unlock or sleep recovery:
 
 ```powershell
 npm run background:install
@@ -406,7 +406,7 @@ More detailed references:
 - [docs/commands.md](./docs/commands.md)
 - [docs/timeline-integration.md](./docs/timeline-integration.md)
 - [docs/architecture.md](./docs/architecture.md)
-- [docs/hermes-cron-env-patch.md](./docs/hermes-cron-env-patch.md) `Optional Hermes Hosted Mode patch`
+- [docs/hermes-cron-env-patch.md](./docs/hermes-cron-env-patch.md) `Optional Hosted Mode patch`
 
 If you maintain this repository, the current quality-gate split is:
 
@@ -465,7 +465,7 @@ Codeksei grew from that starting point, and the project is grateful for it.
 
 ### Can I install it with `npm install -g codeksei`?
 
-You can. Use that path when you want the base CLI quickly; clone the repository when you want the full Bridge Mode flow from this README, source-level customization, or shared-script debugging.
+You can. Use that path when you want the base CLI quickly; clone the repository when you want the full Codex Mode flow from this README, source-level customization, or shared-script debugging.
 
 ### How is shared mode different from `npm run start`?
 

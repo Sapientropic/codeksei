@@ -10,6 +10,7 @@ WECHAT_PID_FILE="${LOG_DIR}/shared-wechat.pid"
 WECHAT_LOG_FILE="${LOG_DIR}/shared-wechat.log"
 RUNTIME="${CODEKSEI_RUNTIME:-codex}"
 CHANNEL_PROVIDER="${CODEKSEI_CHANNEL_PROVIDER:-}"
+CHANNEL_KIND="${CODEKSEI_CHANNEL:-weixin}"
 
 if [[ -z "${CHANNEL_PROVIDER}" ]]; then
   if [[ "${RUNTIME}" == "hermes" ]]; then
@@ -19,22 +20,30 @@ if [[ -z "${CHANNEL_PROVIDER}" ]]; then
   fi
 fi
 
-if [[ "${RUNTIME}" == "hermes" && "${CHANNEL_PROVIDER}" == "hermes" ]]; then
-  echo "profile=hosted-hermes-weixin"
+if [[ "${RUNTIME}" == "hermes" && "${CHANNEL_PROVIDER}" != "codeksei" ]]; then
+  legacy_profile=""
+  if [[ "${CHANNEL_PROVIDER}" == "hermes" && "${CHANNEL_KIND}" == "weixin" ]]; then
+    legacy_profile="hosted-hermes-weixin"
+  fi
+
+  echo "profile=hosted-mode"
+  if [[ -n "${legacy_profile}" ]]; then
+    echo "legacy_profile=${legacy_profile}"
+  fi
   echo "mode=hosted"
   echo "runtime=hermes"
-  echo "channel_provider=hermes"
-  echo "channel=weixin"
+  echo "channel_provider=${CHANNEL_PROVIDER}"
+  echo "channel=${CHANNEL_KIND}"
   echo "shared_bridge=managed_by_host"
   exit 0
 fi
 
-if [[ "${RUNTIME}" == "hermes" || "${CHANNEL_PROVIDER}" == "hermes" ]]; then
+if [[ "${RUNTIME}" != "codex" || "${CHANNEL_PROVIDER}" != "codeksei" || "${CHANNEL_KIND}" != "weixin" ]]; then
   echo "profile=unsupported"
   echo "mode=unsupported"
   echo "runtime=${RUNTIME}"
   echo "channel_provider=${CHANNEL_PROVIDER}"
-  echo "channel=weixin"
+  echo "channel=${CHANNEL_KIND}"
   echo "supported=no"
   echo "shared_bridge=unsupported"
   exit 0

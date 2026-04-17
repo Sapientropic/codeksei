@@ -144,7 +144,7 @@ export function resolveCommandHostDependenciesDefinition(actionId: CommandAction
 
 export function resolveCommandHostProfileIdsDefinition(actionId: CommandActionId): readonly CommandHostProfileIdDefinition[] {
   return HOST_PROFILE_OVERRIDES[actionId]
-    || Object.freeze(["bridge-codex-weixin", "hosted-hermes-weixin"]);
+    || Object.freeze(["codex-mode", "hosted-mode"]);
 }
 
 export function resolveCommandHostSupportTierDefinition(actionId: CommandActionId): CommandHostSupportTierDefinition {

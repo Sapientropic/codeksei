@@ -1,5 +1,5 @@
 {
-  "$schema": "./schemas/codeksei-config-v1.json",
+  "$schema": "./schemas/codeksei-config-v2.json",
   "modeClass": "hosted-proactive",
   "workspaceRoot": "/absolute/path/to/workspace",
   "stateDir": "/absolute/path/to/state",
@@ -10,6 +10,11 @@
   },
   "host": {
     "provider": "hermes",
+    "runtimeProvider": "hermes",
+    "runtimeOwner": "host",
+    "channelProvider": "hermes",
+    "channelKind": "weixin",
+    "deliveryRecipe": "hermes-origin",
     "channel": "weixin"
   }
 }

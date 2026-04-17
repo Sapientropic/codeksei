@@ -25,8 +25,10 @@ export interface ClaimedPayload {
 }
 
 export interface HostCommandMeta {
-  contract: "codeksei-host-v1";
+  contract: "codeksei-host-v2";
   command: "host.claim-checkin" | "host.settle-checkin";
+  coreInvariant: "codeksei-core-owned";
+  scheduleTruthOwner: "codeksei";
   runtimeInvariant: "bridge-full";
   recipeId: HostRecipeId | "";
   workspaceRoot: string;

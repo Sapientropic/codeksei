@@ -10,6 +10,7 @@ ACCOUNT_DIR="${STATE_DIR}/accounts"
 ACCOUNT_ID="${CODEKSEI_ACCOUNT_ID:-}"
 RUNTIME="${CODEKSEI_RUNTIME:-codex}"
 CHANNEL_PROVIDER="${CODEKSEI_CHANNEL_PROVIDER:-}"
+CHANNEL_KIND="${CODEKSEI_CHANNEL:-weixin}"
 
 if [[ -z "${CHANNEL_PROVIDER}" ]]; then
   if [[ "${RUNTIME}" == "hermes" ]]; then
@@ -19,13 +20,13 @@ if [[ -z "${CHANNEL_PROVIDER}" ]]; then
   fi
 fi
 
-if [[ "${RUNTIME}" == "hermes" && "${CHANNEL_PROVIDER}" == "hermes" ]]; then
-  echo "Hermes Hosted Mode 下共享线程由 Hermes 宿主管理；不要再执行 open_wechat_thread.sh。" >&2
+if [[ "${RUNTIME}" == "hermes" && "${CHANNEL_PROVIDER}" != "codeksei" ]]; then
+  echo "Hosted Mode 下共享线程由宿主管理；不要再执行 open_wechat_thread.sh。" >&2
   exit 1
 fi
 
-if [[ "${RUNTIME}" == "hermes" || "${CHANNEL_PROVIDER}" == "hermes" ]]; then
-  echo "当前 host 组合不受支持：runtime=${RUNTIME} channelProvider=${CHANNEL_PROVIDER} channel=weixin" >&2
+if [[ "${RUNTIME}" != "codex" || "${CHANNEL_PROVIDER}" != "codeksei" || "${CHANNEL_KIND}" != "weixin" ]]; then
+  echo "open_wechat_thread.sh 只支持 Codex Mode + codeksei/weixin first-party adapter：runtime=${RUNTIME} channelProvider=${CHANNEL_PROVIDER} channel=${CHANNEL_KIND}" >&2
   exit 1
 fi
 

@@ -52,7 +52,7 @@ export function resolveActiveCompanionMemorySemanticHost(
   if (requested === "deterministic" || requested === "codex" || requested === "hermes") {
     return requested;
   }
-  return resolveHostMode(config).profile === "hosted-hermes-weixin" ? "hermes" : "codex";
+  return resolveHostMode(config).mode === "hosted" ? "hermes" : "codex";
 }
 
 export async function runCodexCompanionMemorySemantic(

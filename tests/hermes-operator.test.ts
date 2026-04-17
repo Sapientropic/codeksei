@@ -93,7 +93,7 @@ test("operator hermes status reports catalog and semantic availability", async (
     workspaceRoot: tempRoot,
   });
 
-  assert.equal(result.data.hostProfile.profile, "hosted-hermes-weixin");
+  assert.equal(result.data.hostProfile.profile, "hosted-mode");
   assert.equal(result.data.hermes.installedSkill.inSync, true);
   assert.equal(result.data.hermes.repoLocal.ready, true);
   assert.equal(result.data.skillCatalog.listed, true);

@@ -107,7 +107,7 @@ async function runTimelineScreenshotCommand(
     } satisfies CommandExecutionResult;
   }
   const hostMode = resolveHostMode(config);
-  if (hostMode.profile === "hosted-hermes-weixin") {
+  if (hostMode.mode === "hosted") {
     const timelineConfig = resolveTimelineRuntimeConfig(config);
     const runtimeArgs = buildHostedRuntimeArgs(options);
     const runtimeOptions = parseTimelineScreenshotRuntimeArgs(runtimeArgs, timelineConfig);

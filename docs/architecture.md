@@ -5,15 +5,15 @@
 
 ## Host-Neutral Core
 
-这一版开始把 `Codeksei` 明确收口成 `daemon-first / bridge-first / companion engine`，而不是默认绑死某一个固定 agent 宿主。
+这一版开始把 `Codeksei` 明确收口成 `daemon-first / host-attachable / companion engine`，而不是默认绑死某一个固定 agent 宿主。
 
-- `Bridge Mode`
+- `Codex Mode`
   `Codeksei Weixin bridge + Codex runtime`
-- `Hermes Hosted Mode`
+- `Hosted Mode`
   Hermes 托管 agent + 官方 Weixin；Codeksei 通过 CLI / operator / skill surface 暴露领域能力
 
 这次不会把 Hermes 的 Python Weixin adapter 硬塞进 Node/TS。Hermes Weixin 仍由 Hermes 官方维护，Codeksei 负责 timeline / diary / reminder / review / note / project radar 这些领域能力，并通过 `host attachment contract` 与兼容 `operator hermes` 入口暴露 recipe surface。
-主动 checkin 也按同一条边界收口：Codeksei 负责 trigger generation、`tick -> ack -> complete` 调度真相与下一次唤醒决策；Bridge 继续持有本地 poller，Hermes Hosted Mode 则只执行由 Codeksei 重新 arm 的受控 wake/recovery job set。主动判断依赖 Codeksei 自己维护的 context board：由受控输入集做 deterministic 聚合，再通过 Hermes cron `script` 在运行前注入，而不是把 raw vault/filesystem 扫描直接暴露给 cron prompt。对外公开 attach 时，推荐使用 `host seed-proactive / claim-checkin / settle-checkin`，而不是把内部 tick/ack/complete 状态机直接泄露给宿主。
+主动 checkin 也按同一条边界收口：Codeksei 负责 trigger generation、`tick -> ack -> complete` 调度真相与下一次唤醒决策；Codex Mode 继续持有本地 poller，Hosted Mode 则只执行由 Codeksei 重新 arm 的受控 wake/recovery job set。主动判断依赖 Codeksei 自己维护的 context board：由受控输入集做 deterministic 聚合，再通过 Hermes cron `script` 在运行前注入，而不是把 raw vault/filesystem 扫描直接暴露给 cron prompt。对外公开 attach 时，推荐使用 `host seed-proactive / claim-checkin / settle-checkin`，而不是把内部 tick/ack/complete 状态机直接泄露给宿主。
 运行配置入口也已经收口成 `src/core/config.ts` 的 `parseEnvConfig()`：env/CLI override 先规范化成显式字段的 `AppRuntimeConfig`，下游 factory / host policy / CLI 命令不再各自做一轮局部 `typeof config.xxx === "string"` 补丁式收口。
 
 当前质量基线也已经同步到结构层：
@@ -177,7 +177,7 @@
 
 `src/adapters/channel/*`
 
-当前主要是 `Bridge Mode` 下的 WeChat bridge。
+当前主要是 `Codex Mode` 下的 first-party WeChat adapter。
 
 负责：
 
@@ -220,7 +220,7 @@
 - 管理 thread / session / approval / stop / resume
 - 对共享 `app-server` 与本地 client attach 做边界适配
 
-`Hermes Hosted Mode` 当前不在仓内重复实现一份 Hermes runtime adapter；它的主路径是 Hermes 自己做宿主，Codeksei 通过 CLI / operator / skill asset 暴露能力。
+`Hosted Mode` 当前不在仓内重复实现一份 Hermes runtime adapter；它的主路径是 Hermes 自己做宿主，Codeksei 通过 CLI / operator / skill asset 暴露能力。
 
 当前收口方式：
 
@@ -238,7 +238,7 @@
 
 公开入口脚本在 `scripts/*.sh` / `scripts/*.ps1`，shared lifecycle 逻辑收口在 `src/shared/*`。
 
-这是当前 `Bridge Mode` 的默认运行方式。
+这是当前 `Codex Mode` 的默认运行方式。
 
 负责：
 
@@ -247,7 +247,7 @@
 - watchdog / supervisor / status / open
 - shared heartbeat ownership
 
-在 `Hermes Hosted Mode` 下，`shared:start` / `shared:open` / `shared:watchdog` 不会再偷偷起 Codeksei 自己的 bridge，而是明确提示“由 Hermes 宿主管理”。
+在 `Hosted Mode` 下，`shared:start` / `shared:open` / `shared:watchdog` 不会再偷偷起 Codeksei 自己的 bridge，而是明确提示“由 Hermes 宿主管理”。
 
 `src/shared/shared-bridge-heartbeat.ts` 现在是 heartbeat ingress 与 owner，不再挂在 `src/core`。
 
@@ -289,10 +289,10 @@
 - `src/app/*` 继续只做公开入口，不重新吸回领域实现
 - `src/core` / `src/runtime` 不再依赖 style/type allowlist 才能维持这些边界
 - Hermes 集成当前优先走 skill / CLI / operator contract，而不是把 Hermes gateway 逻辑重新 vendoring 进来
-- Hermes Hosted Mode 的 repo-local send-back / cron 现在通过 Codeksei 自己的薄 Python shim 对接 sibling `hermes-agent` checkout，不在 TS 里重写 Weixin/CDN/context_token/cron 细节
+- Hosted Mode 的 repo-local send-back / cron 现在通过 Codeksei 自己的薄 Python shim 对接 sibling `hermes-agent` checkout，不在 TS 里重写 Weixin/CDN/context_token/cron 细节
 - Hosted proactive cron 的 handoff context 现在由 `context briefing` + Hermes pre-run `script` 提供；稳定状态、今天事实和重入入口先在 Codeksei 内部收口成 board，再交给宿主消费
-- review hybrid 现在由宿主策略层选择 semantic host：Bridge Mode 默认走 Codex，Hermes Hosted Mode 默认走 Hermes，文件路由与落盘逻辑仍保留在 Codeksei 自己手里
-- checkin 现在按 host-neutral core 收口：`system checkin-trigger` 提供 one-shot payload，`system checkin-tick` / `system checkin-complete` 维护调度真相；Hermes Hosted Mode 通过 `operator hermes sync-checkin` + repo-local shim 只保留一个未来 wake 或 recovery one-shot job，运行时 delivery 直接读持久化的 `job.origin`，`system checkin-poller` 退回 bridge-only wrapper
+- review hybrid 现在由宿主策略层选择 semantic host：Codex Mode 默认走 Codex，Hosted Mode 默认走 Hermes，文件路由与落盘逻辑仍保留在 Codeksei 自己手里
+- checkin 现在按 host-neutral core 收口：`system checkin-trigger` 提供 one-shot payload，`system checkin-tick` / `system checkin-complete` 维护调度真相；Hosted Mode 通过 `operator hermes sync-checkin` + repo-local shim 只保留一个未来 wake 或 recovery one-shot job，运行时 delivery 直接读持久化的 `job.origin`，`system checkin-poller` 退回 codex-mode-only wrapper
 - 对外公开给宿主时，`host seed-proactive / claim-checkin / settle-checkin` 只是在现有 scheduler 真相外面包一层 delegated execution lease；不要把它误读成第二套 scheduler
 - project radar 现在保持“本地 git 真相优先”，只有 git unavailable 时才补 GitHub activity fallback
 
@@ -322,7 +322,7 @@
 - workspace bootstrap config
 - logs
 
-Hermes Hosted Mode 下，这里不再承接 reminder queue 或 timeline screenshot queue 的主真相：
+Hosted Mode 下，这里不再承接 reminder queue 或 timeline screenshot queue 的主真相：
 
 - reminder 改走 Hermes cron/jobs
 - channel send-file / timeline screenshot --send 改走 Hermes repo-local origin delivery

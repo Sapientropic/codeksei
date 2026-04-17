@@ -66,7 +66,7 @@ const TOPIC_HELP = {
     body: [
       `  先用 ${buildTerminalEntryUsage("app.accounts", "public")} 看可用 sender id；不要填昵称或自己猜的微信号`,
       "  当前选中的 sender id 必须已经有可用的 context_token；否则命令会直接失败",
-      "  默认 --delivery direct 会创建用户可见提醒；Hermes Hosted Mode 下可用 --delivery proactive，把这条提醒改成未来 proactive 唤醒。",
+      "  默认 --delivery direct 会创建用户可见提醒；Hosted Mode 下可用 --delivery proactive，把这条提醒改成未来 proactive 唤醒。",
       "  不带 offset 的本地时间按当前 runtime timezone 解释；显式偏移时间戳按原值保留",
     ],
   }),
@@ -96,7 +96,7 @@ const TOPIC_HELP = {
     bodyLabel: "补充：",
     body: [
       "  host 是面向外部宿主的机器入口，不是仓内 TypeScript seam。",
-      "  daemon-first / bridge-first 仍是 runtime invariant；host 只描述 attach、bootstrap、doctor 与 delegated proactive lease。",
+      "  daemon-first / host-attachable 仍是 runtime invariant；host 只描述 attach、bootstrap、doctor 与 delegated proactive lease。",
       "  对 Hermes 这类宿主，优先用 host seed/claim/settle；operator hermes / system checkin-* 继续只保留兼容 building blocks。",
     ],
   }),
@@ -110,7 +110,7 @@ const TOPIC_HELP = {
       "  如果必须用 timeline:write --stdin，传完整 JSON 对象 {\"events\":[...]}，不要传裸数组",
       `  timeline 查分类先用 ${buildTerminalEntryUsage("timeline.categories", "public")}；改已有日程前先用 ${buildTerminalEntryUsage("timeline.read", "public")} --date YYYY-MM-DD`,
       "  不带 offset 的本地时间按当前 timezone 解释；如果 timeline state 已声明非 legacy timezone，会优先沿用它",
-      `  timeline 截图稳定入口是 ${buildTerminalActionExample("timeline.screenshot", { audience: "public", includeArgs: true })}；Bridge Mode 下会走本地桥接队列，Hermes Hosted Mode 下会走 repo-local send-back`,
+      `  timeline 截图稳定入口是 ${buildTerminalActionExample("timeline.screenshot", { audience: "public", includeArgs: true })}；Codex Mode 下会走本地桥接队列，Hosted Mode 下会走 repo-local send-back`,
     ],
   }),
   project: () => ({
@@ -297,8 +297,8 @@ const LEAF_HELP = {
     bodyLabel: "说明：",
     body: [
       "  将本地文件作为附件发回当前微信聊天。",
-      "  Bridge Mode 下默认会解析当前唯一稳定 sender；若目标不唯一，会直接返回 target_resolution_required。",
-      "  Hermes Hosted Mode 下会通过 repo-local shim + 当前 Hermes session 把文件发回 origin chat，不再依赖 Codeksei 自己的 bridge。",
+      "  Codex Mode 下默认会解析当前唯一稳定 sender；若目标不唯一，会直接返回 target_resolution_required。",
+      "  Hosted Mode 下会通过 repo-local shim + 当前 Hermes session 把文件发回 origin chat，不再依赖 Codeksei 自己的 first-party channel adapter。",
     ],
     examples: [`  ${buildExample("channel.send_file")}`],
     includeFlagBlock: true,
@@ -454,10 +454,10 @@ const LEAF_HELP = {
     usage: [buildExample("reminder.create", true)],
     bodyLabel: "说明：",
     body: [
-      "  Bridge Mode 下会创建提醒并放入本地 reminder queue。",
-      "  Bridge Mode 仍会解析唯一稳定 sender，并检查对应 context_token；缺失时直接报 auth_required。",
-      "  Hermes Hosted Mode 下默认 --delivery direct，会改走 repo-local Hermes cron，并把 deliver 绑定到当前 origin chat。",
-      "  Hermes Hosted Mode 下传 --delivery proactive，会把提醒改成未来 proactive 唤醒，而不是直接发一条用户可见消息。",
+      "  Codex Mode 下会创建提醒并放入本地 reminder queue。",
+      "  Codex Mode 仍会解析唯一稳定 sender，并检查对应 context_token；缺失时直接报 auth_required。",
+      "  Hosted Mode 下默认 --delivery direct，会改走 repo-local Hermes cron，并把 deliver 绑定到当前 origin chat。",
+      "  Hosted Mode 下传 --delivery proactive，会把提醒改成未来 proactive 唤醒，而不是直接发一条用户可见消息。",
     ],
     examples: [
       "  codeksei reminder write --delay 30m --text \"起身喝水\"",
@@ -485,7 +485,7 @@ const LEAF_HELP = {
     body: [
       "  向内部 system queue 写一条不可见触发消息。",
       "  --workspace 和 --user 可以显式传；没传时只会接受唯一稳定默认值，否则直接报 target_resolution_required。",
-      "  Hermes Hosted Mode 下仍会返回 unsupported_host_capability：上游源码里还没有可证实的 backstage-only 宿主原语，所以不会偷偷降级成可见消息。",
+      "  Hosted Mode 下仍会返回 unsupported_host_capability：上游源码里还没有可证实的 backstage-only 宿主原语，所以不会偷偷降级成可见消息。",
     ],
     examples: [
       "  codeksei system send --text \"提醒她今天早点睡\" --workspace \"$(pwd)\"",
@@ -541,7 +541,7 @@ const LEAF_HELP = {
       "  --trigger / --result 必填；--next-wake-at 与 --sleep-for 二选一。",
       `  ${CHECKIN_COMPLETION_CONTEXT_GUIDANCE}`,
       "  agent 给出过长时间会被 clamp 到 24h guardrail；缺失或无效时间会回退 fallback window。",
-      "  Hermes Hosted Mode 下，写回 state 后还会自动把下一组 wake/recovery jobs 重新 arm 给 Hermes，并清理多余的未来 job。",
+      "  Hosted Mode 下，写回 state 后还会自动把下一组 wake/recovery jobs 重新 arm 给 Hermes，并清理多余的未来 job。",
     ],
     examples: [
       `  codeksei system checkin-complete --user wxid_xxx --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for ${CHECKIN_COMPLETION_SLEEP_FOR_PLACEHOLDER}`,
@@ -624,9 +624,9 @@ const LEAF_HELP = {
     usage: [buildExample("timeline.screenshot", true)],
     bodyLabel: "说明：",
     body: [
-      "  Bridge Mode 下会先把截图任务排进本地队列，再由正在运行的微信 bridge 异步执行。",
-      "  Hermes Hosted Mode 下会先本地生成截图，再通过 repo-local shim 直接发回当前 Hermes origin chat。",
-      "  Bridge Mode 里 queued 不等于“已经发到微信”；只有 bridge 真正送达后，用户那边才会看到图片或文件。",
+      "  Codex Mode 下会先把截图任务排进本地队列，再由正在运行的 first-party Weixin adapter 异步执行。",
+      "  Hosted Mode 下会先本地生成截图，再通过 repo-local shim 直接发回当前 Hermes origin chat。",
+      "  Codex Mode 里 queued 不等于“已经发到聊天里”；只有 adapter 真正送达后，用户那边才会看到图片或文件。",
       "  泛泛地说“截个图”时，默认就是整页；只有明确说时间轴/分析区/事件列表这类局部区域时，才额外传 --selector。",
     ],
     examples: [
@@ -642,7 +642,7 @@ function buildHermesOperatorResourceHelpText(): string {
     usage: ["codeksei operator hermes <install-skill|sync-checkin|status|smoke>"],
     bodyLabel: "说明：",
     body: [
-      "  这是 Hermes Hosted Mode 的 operator resource。",
+      "  这是 Hosted Mode / Hermes recipe 的 operator resource。",
       "  install-skill：同步仓内 companion skill；支持 --dry-run 预览。",
       "  sync-checkin：按 Codeksei 当前状态为 Hermes 同步 wake/recovery one-shot job。",
       "  status：只读查看 Hermes hosted 集成状态。",

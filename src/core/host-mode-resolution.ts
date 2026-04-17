@@ -11,9 +11,14 @@ import { resolveHostAttachment } from "../host/attach/model";
 
 export interface HostModeResolution {
   profile: HostProfileId;
+  legacyProfileIds: string[];
   runtime: CodekseiRuntimeProvider;
+  runtimeProvider: CodekseiRuntimeProvider;
+  runtimeOwner: "codeksei" | "host";
   channelProvider: CodekseiChannelProvider;
   channel: string;
+  channelKind: string;
+  deliveryRecipe: string;
   mode: CodekseiExecutionMode;
   supported: boolean;
   reason: string;
@@ -34,25 +39,34 @@ export function resolveHostMode(config: HostModeConfigInput = {}): HostModeResol
   const matrixEntry = getHostProfileMatrixEntry(attachment.profile);
   return {
     profile: attachment.profile,
+    legacyProfileIds: attachment.legacyProfileIds,
     runtime: attachment.runtime,
+    runtimeProvider: attachment.runtimeProvider,
+    runtimeOwner: attachment.runtimeOwner,
     channelProvider: attachment.channelProvider,
     channel: attachment.channel,
+    channelKind: attachment.channelKind,
+    deliveryRecipe: attachment.deliveryRecipe,
     mode: matrixEntry.mode,
     supported: attachment.supported,
     reason: attachment.reason,
-    capabilities: matrixEntry.capabilities,
+    capabilities: attachment.capabilities,
   };
 }
 
-export function assertBridgeMode(config: HostModeConfigInput, commandLabel: string): HostModeResolution {
+export function assertCodexMode(config: HostModeConfigInput, commandLabel: string): HostModeResolution {
   const resolved = resolveHostMode(config);
-  if (resolved.profile === "bridge-codex-weixin") {
+  if (resolved.profile === "codex-mode") {
     return resolved;
   }
-  throw new Error(formatBridgeOnlyCommandMessage(resolved, commandLabel));
+  throw new Error(formatCodexOnlyCommandMessage(resolved, commandLabel));
 }
 
-export function formatBridgeOnlyCommandMessage(
+export function assertBridgeMode(config: HostModeConfigInput, commandLabel: string): HostModeResolution {
+  return assertCodexMode(config, commandLabel);
+}
+
+export function formatCodexOnlyCommandMessage(
   resolved: HostModeResolution,
   commandLabel: string,
 ): string {
@@ -60,18 +74,25 @@ export function formatBridgeOnlyCommandMessage(
   const matrixEntry = getHostProfileMatrixEntry(resolved.profile);
   if (matrixEntry.bridgeOnlyMessageKind === "hosted_bridge_replaced") {
     return [
-      `${label} 在 Hermes Hosted Mode 下不会启动 Codeksei 自己的 runtime/Weixin bridge。`,
-      "请改用 Hermes gateway，并使用 Codeksei 的 Hermes operator / skill 入口。",
+      `${label} 在 Hosted Mode 下不会启动 Codeksei 自己的 runtime/first-party channel adapter。`,
+      "请改用当前宿主的 gateway / channel bridge，并使用 Codeksei 的 host/operator/skill 入口。",
       `当前 profile: ${resolved.profile}`,
-      `当前组合: runtime=${resolved.runtime}, channelProvider=${resolved.channelProvider}, channel=${resolved.channel}`,
+      `当前组合: runtime=${resolved.runtimeProvider}, channelProvider=${resolved.channelProvider}, channel=${resolved.channelKind}`,
     ].join("\n");
   }
   return [
     `${label} 当前不可用。`,
     resolved.reason || "当前 host 组合不受支持。",
     `当前 profile: ${resolved.profile}`,
-    `当前组合: runtime=${resolved.runtime}, channelProvider=${resolved.channelProvider}, channel=${resolved.channel}`,
+    `当前组合: runtime=${resolved.runtimeProvider}, channelProvider=${resolved.channelProvider}, channel=${resolved.channelKind}`,
   ].join("\n");
+}
+
+export function formatBridgeOnlyCommandMessage(
+  resolved: HostModeResolution,
+  commandLabel: string,
+): string {
+  return formatCodexOnlyCommandMessage(resolved, commandLabel);
 }
 
 export type {

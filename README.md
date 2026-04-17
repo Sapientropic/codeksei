@@ -11,8 +11,8 @@
   </p>
   <p><a href="https://zread.ai/Sapientropic/codeksei" target="_blank"><img src="https://img.shields.io/badge/Ask_Zread-_.svg?style=for-the-badge&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff" alt="zread"/></a></p>
   <h3>一个会主动照看时间感、帮你把日常和项目线程慢慢接回来的本地优先陪伴者助理</h3>
-  <p><strong>以 WeChat 为入口，把 timeline、diary、reminders、reviews 和 project continuity 放进同一条共享线程。</strong></p>
-  <p>它不是一个只会等你开口的聊天框，也不是另一套 agent runtime。Codeksei 会在合适的时候帮你补记录、接回线索、留提醒、带你重新进入项目，也让你的状态、日志和生活痕迹尽量继续留在本地。</p>
+  <p><strong>把 timeline、diary、reminders、reviews 和 project continuity 收口进同一个本地优先 companion core，再按需要挂到不同宿主桥上。</strong></p>
+  <p>它不是一个只会等你开口的聊天框，也不是另一套 agent runtime。Codeksei 会在合适的时候帮你补记录、接回线索、留提醒、带你重新进入项目，也让你的状态、日志和生活痕迹尽量继续留在本地。WeChat 现在只是一个 first-party adapter，不再是唯一正门。</p>
   <p>
     <a href="#agent-quickstart">给 Agent</a> ·
     <a href="#setup">SETUP</a> ·
@@ -26,9 +26,9 @@
   </p>
 </div>
 
-- **它是什么**：一个本地优先、`daemon-first / bridge-first` 的 companion engine；对用户是陪伴型助理，对宿主是可附着的领域层
+- **它是什么**：一个本地优先、`daemon-first / host-attachable` 的 companion engine；对用户是陪伴型助理，对宿主是可附着的领域层
 - **CLI contract**：`codeksei help`、`codeksei schema`、`codeksei host manifest` 是默认 discovery 面；非 TTY 默认 JSON，`stdout` 留给结果，`stderr` 留给诊断
-- **推荐开始方式**：先做通用 `SETUP`，再按 `Bridge Mode` 或 `Hermes Hosted Mode` 分流
+- **推荐开始方式**：先做通用 `SETUP`，再按 `Codex Mode` 或 `Hosted Mode` 分流
 
 <a id="agent-quickstart"></a>
 
@@ -38,7 +38,7 @@
 
 1. 先读 repo 根的 `CODEKSEI_HOSTKIT.json`
 2. 把 README 当成人类说明，把 `HOSTKIT + codeksei host manifest/bootstrap/doctor/smoke` 当机器入口
-3. 默认优先 `Hermes Hosted Mode`
+3. 默认优先 `Hosted Mode`
 4. 把 `host bootstrap` 理解成“Codeksei attach/bootstrap 完成”，不要误读成 “Hermes gateway / Weixin live bring-up 已完成”
 
 推荐顺序：
@@ -55,12 +55,12 @@ npx -y codeksei@latest host smoke --provider hermes
 
 ## Host Modes
 
-Codeksei 现在把自己定义成 **daemon-first / bridge-first / companion engine**，不再默认等于某一个固定 agent 宿主。
+Codeksei 现在把自己定义成 **daemon-first / host-attachable / companion engine**，不再默认等于某一个固定 agent 宿主。
 
-- `Bridge Mode`
-  现有默认路径：`Codeksei Weixin bridge + Codex runtime`
-- `Hermes Hosted Mode`
-  Hermes 负责 agent loop 和官方 Weixin；Codeksei 通过 CLI / skill surface 暴露 timeline、diary、reminder、review、note、project radar 等能力
+- `Codex Mode`
+  现有默认路径：`Codeksei first-party Weixin adapter + Codex runtime`
+- `Hosted Mode`
+  Hermes 负责 agent loop 和宿主侧消息面；Codeksei 通过 CLI / skill surface 暴露 timeline、diary、reminder、review、note、project radar 等能力
 - `主动性判断上下文层`
   Hosted proactive wake 默认读 Codeksei 自己维护的 context board。它由 checkin state、当日日记、companion note、project radar 和 workspace continuity 聚合而成，再由 Hermes cron `script` 在运行前注入，不要求用户必须维护 Obsidian/vault
 - 外部宿主默认通过 `host attachment contract` 接入：
@@ -70,7 +70,7 @@ Codeksei 现在把自己定义成 **daemon-first / bridge-first / companion engi
 
 ## SETUP
 
-这块只负责通用安装、发现 contract、验证 CLI 正常，不预设你必须先选 `Bridge Mode` 或 `Hermes Hosted Mode`。
+这块只负责通用安装、发现 contract、验证 CLI 正常，不预设你必须先选 `Codex Mode` 或 `Hosted Mode`。
 
 ### 通用前提
 
@@ -115,8 +115,8 @@ codeksei host manifest
 ### SETUP 的边界
 
 - 这一步成功只代表 CLI、public schema、host attachment contract / hostkit 可发现
-- 这一步不代表 `Bridge Mode` 已扫码登录
-- 这一步也不代表 `Hermes Hosted Mode` 已 live attach 到 Hermes gateway / Weixin
+- 这一步不代表 `Codex Mode` 已扫码登录
+- 这一步也不代表 `Hosted Mode` 已 live attach 到 Hermes gateway / 宿主桥
 - 这一步更不代表提醒、check-in、repo-local shim 或 hosted send-back 已全部就绪
 
 <a id="mode-specific-bring-up"></a>
@@ -125,7 +125,7 @@ codeksei host manifest
 
 `SETUP` 完成后，再按实际使用方式分流。
 
-### Bridge Mode
+### Codex Mode
 
 适合你想直接复用这个仓库现有的共享线程链路时。
 
@@ -141,7 +141,7 @@ npm run shared:start
 
 补充：
 
-- Bridge Mode 的默认协议版本会跟随腾讯官方包 `@tencent-weixin/openclaw-weixin@2.1.8`
+- Codex Mode 的 first-party Weixin adapter 默认协议版本会跟随腾讯官方包 `@tencent-weixin/openclaw-weixin@2.1.8`
 - 海外 / 国际版 WeChat 当前仍可能受官方地域灰度限制；如果手机扫码直接报网络问题，优先核对账号与客户端资格
 
 常见后续命令：
@@ -151,7 +151,7 @@ npm run shared:open
 npm run shared:status
 ```
 
-### Hermes Hosted Mode
+### Hosted Mode
 
 适合你已经有 Hermes runtime / gateway / 官方 Weixin，希望 Codeksei 只作为 companion workflow surface 接入时。
 
@@ -192,17 +192,17 @@ codeksei host smoke --provider hermes
 
 - `Timeline`：把已经发生过的时间块、切换点和生活事实钉成时间感与记忆锚点，不让一天只剩模糊印象
 - `Diary`：Todo、碎片、补充记录、总结，以及和 timeline 紧密联动的时间线事实，帮你把零散日常慢慢收成可用痕迹
-- `Check-ins`：主动唤醒与主动分忧。发一句消息只是其中一种；它也会先回看上下文、整理后台、补一条 diary / timeline、留一个提醒，再决定是不是该主动露个面。Codeksei 负责生成 proactive trigger、维护 `tick -> ack -> complete` 的调度真相，并在 `checkin-complete` 时写回下一次唤醒；Bridge Mode 下由本地 poller 包装 heartbeat 与入队，Hermes Hosted Mode 下由 Hermes 只执行受控 wake/recovery job set，真正的下一次唤醒仍由 Codeksei 在 `checkin-complete` 里决定
+- `Check-ins`：主动唤醒与主动分忧。发一句消息只是其中一种；它也会先回看上下文、整理后台、补一条 diary / timeline、留一个提醒，再决定是不是该主动露个面。Codeksei 负责生成 proactive trigger、维护 `tick -> ack -> complete` 的调度真相，并在 `checkin-complete` 时写回下一次唤醒；Codex Mode 下由本地 poller 包装 heartbeat 与入队，Hosted Mode 下由 Hermes 只执行受控 wake/recovery job set，真正的下一次唤醒仍由 Codeksei 在 `checkin-complete` 里决定
 - `Onboarding`：首次激活不走表单，而是走聊天式访谈。长期真相写进 companion note，再由 context board 投影给宿主；没有 Obsidian / workspace schema 时也能自动回退到本地 state-dir 下的 companion profile
 - `Companion memory`：首访之后也会继续更新。只要用户新的自述、纠正、支持偏好、边界或近线任务会影响后续陪伴判断，就可以走 `companion remember` 这条 ongoing memory 主链，而不是把变化只留在宿主聊天记忆里
-- `Context board`：主动判断用的受控上下文层。它把 checkin state、今天事实、活跃线头、注意事项和重入入口收口到一份 prompt-ready briefing；Hermes Hosted Mode 下每次 cron 运行前都会现读最新 board，而不是盲扫原始 vault 文件
-- `Reminders`：提醒写入与调度，给生活节奏和待办推进一个外部支点。Hermes Hosted Mode 下默认是用户可见提醒；若要把内部后续跟进改成未来 proactive 唤醒，用 `reminder write --delivery proactive`
+- `Context board`：主动判断用的受控上下文层。它把 checkin state、今天事实、活跃线头、注意事项和重入入口收口到一份 prompt-ready briefing；Hosted Mode 下每次 cron 运行前都会现读最新 board，而不是盲扫原始 vault 文件
+- `Reminders`：提醒写入与调度，给生活节奏和待办推进一个外部支点。Hosted Mode 下默认是用户可见提醒；若要把内部后续跟进改成未来 proactive 唤醒，用 `reminder write --delivery proactive`
 - `Review`：nightly / weekly / monthly，把日常记录压成更稳定的节奏校准与复盘材料
 - `Project support`：workspace bootstrap、project radar、按 workspace 恢复共享线程。项目切走再回来时，不用先把整条线在脑子里重建一遍；本地 git 仍是第一真相，只有 repo 缺失或不是 git repo 时才回退到 GitHub activity continuity signal
 - `WeChat bridge`
-  Bridge Mode 下由 Codeksei 托管；Hermes Hosted Mode 下推荐直接用 Hermes 官方 Weixin
+  Codex Mode 下由 Codeksei 托管；Hosted Mode 下推荐直接用宿主自己的桥接能力
 - `Runtime host`
-  Bridge Mode 当前默认是 Codex；Hermes Hosted Mode 由 Hermes 自己托管 agent/runtime/审批/模型切换
+  Codex Mode 当前默认是 Codex；Hosted Mode 由宿主自己托管 agent/runtime/审批/模型切换
 - `Durable note`：`note:auto`、`note:maybe`、`note:sync`
 
 ## 这些人会喜欢它
@@ -251,9 +251,9 @@ codeksei host smoke --provider hermes
 - 统一全局参数：
   `--format json|text`、`--verbose`、`--workspace-root /absolute/path`
 
-## Bridge Mode 运行时配置
+## Codex Mode 运行时配置
 
-Bridge Mode 仍按“两阶段”补全环境变量：
+Codex Mode 仍按“两阶段”补全环境变量：
 
 1. 先保留当前进程里已经存在的环境变量
 2. 读取当前项目目录下的 `.env`
@@ -303,7 +303,7 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - 微信桥的正式 adapter 现在只保留 `v2`；issue #4 对应的媒体上传缺口只作为内部 legacy media fallback 处理，不再通过第二个 public adapter 暴露
 - `CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION` 默认跟随腾讯官方包 `@tencent-weixin/openclaw-weixin@2.1.8`；只有在有 source-backed 上游变更或兼容性回退证据时才建议手动覆盖
 - 国际版 / 海外 WeChat 扫码登录当前仍可能受官方地域灰度限制；腾讯公开资料提到香港地域已支持，其它地域仍在逐步开放
-- `CODEKSEI_RUNTIME` / `CODEKSEI_CHANNEL_PROVIDER` 决定当前是 `Bridge Mode` 还是 `Hermes Hosted Mode`
+- `CODEKSEI_RUNTIME` / `CODEKSEI_CHANNEL_PROVIDER` 决定当前是 `Codex Mode` 还是 `Hosted Mode`
 - `CODEKSEI_RUNTIME_ENDPOINT` / `CODEKSEI_RUNTIME_COMMAND` 是新的 host-neutral runtime 入口；旧的 `CODEKSEI_CODEX_*` 变量仍保留兼容
 - `CODEKSEI_REVIEW_SEMANTIC_HOST=auto|codex|hermes|deterministic` 可显式指定 review hybrid 语义宿主；默认 `auto`
 - `CODEKSEI_COMPANION_SEMANTIC_HOST=auto|codex|hermes|deterministic` 可为 ongoing companion memory 抽取单独指定宿主；留空时沿用默认 host 决策
@@ -318,7 +318,7 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - 如果你在共享模式下使用多 workspace，建议启动前就设置好 `CODEKSEI_WORKSPACE_ROOT`
 - `CODEKSEI_TIMEZONE` 可选；若显式设置，它会统一驱动 reminder / diary / review / timeline 的本地时间解释
 - `CODEKSEI_TIMELINE_LOCALE` 可选；当前用于 timeline dashboard 的文案、日期格式和 demo data 语言切换，支持 `zh-CN` 与 `en`
-- `CODEKSEI_HERMES_REPO_ROOT` 可选；Hermes Hosted Mode 下若 sibling `../hermes-agent` 不成立，用它显式指向 repo-local upstream checkout
+- `CODEKSEI_HERMES_REPO_ROOT` 可选；Hosted Mode 下若 sibling `../hermes-agent` 不成立，用它显式指向 repo-local upstream checkout
 - Hermes 原生 cron `env` 透传补丁现在作为可选资产跟仓发布；详细适用范围与 `git apply` 用法统一看 [`docs/hermes-cron-env-patch.md`](./docs/hermes-cron-env-patch.md)
 - 如果不设 `CODEKSEI_TIMEZONE`，Codeksei 会优先沿用 timeline state 里已声明的非 legacy timezone；否则回退到系统时区
 - 旧的 `Asia/Shanghai` legacy timeline state 在需要时会在下一次 timeline 命令时自动迁移到当前统一 timezone
@@ -328,7 +328,7 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 
 ## Windows 后台常驻
 
-如果你希望 Bridge Mode 登录后自动拉起，并在解锁或恢复睡眠后快速自愈：
+如果你希望 Codex Mode 登录后自动拉起，并在解锁或恢复睡眠后快速自愈：
 
 ```powershell
 npm run background:install
@@ -415,7 +415,7 @@ codeksei context briefing --user <wechat_user_id> --workspace /absolute/workspac
 - [docs/commands.md](./docs/commands.md)
 - [docs/timeline-integration.md](./docs/timeline-integration.md)
 - [docs/architecture.md](./docs/architecture.md)
-- [docs/hermes-cron-env-patch.md](./docs/hermes-cron-env-patch.md) `Hermes Hosted Mode 可选补丁`
+- [docs/hermes-cron-env-patch.md](./docs/hermes-cron-env-patch.md) `Hosted Mode 可选补丁`
 
 如果你在维护这个仓库，当前质量门分工是：
 
