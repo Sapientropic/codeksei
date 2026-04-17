@@ -235,3 +235,68 @@ test("runtime turn completion keeps split English content readable", async () =>
     text: "I'm switching to English now, and I'm keeping state-of-the-art formatting.",
   });
 });
+
+test("runtime turn completion keeps split English delta fragments readable", async () => {
+  const client = createFakeClient();
+  const completion = __testing.waitForTurnCompletion(client as WaitForTurnCompletionClient, "thread-1");
+
+  client.emit({
+    method: "turn/started",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-4",
+    },
+  });
+  client.emit({
+    method: "item/agentMessage/delta",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-4",
+      itemId: "item-delta-english",
+      delta: "I",
+      phase: "commentary",
+    },
+  });
+  client.emit({
+    method: "item/agentMessage/delta",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-4",
+      itemId: "item-delta-english",
+      delta: "'m",
+      phase: "commentary",
+    },
+  });
+  client.emit({
+    method: "item/agentMessage/delta",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-4",
+      itemId: "item-delta-english",
+      delta: " switching",
+      phase: "commentary",
+    },
+  });
+  client.emit({
+    method: "item/agentMessage/delta",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-4",
+      itemId: "item-delta-english",
+      delta: " to",
+      phase: "commentary",
+    },
+  });
+  client.emit({
+    method: "turn/completed",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-4",
+    },
+  });
+
+  assert.deepEqual(await completion, {
+    turnId: "turn-4",
+    text: "I'm switching to",
+  });
+});

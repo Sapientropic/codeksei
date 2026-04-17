@@ -5,6 +5,7 @@ import {
   type RuntimeEvent,
   normalizeRuntimeApprovalPayload,
   normalizeRuntimeIdentifier,
+  normalizeRuntimeReplyText,
   normalizeRuntimeText,
 } from "../contracts/runtime-events";
 import type { PendingApprovalState, UnknownRecord } from "../core/runtime-types";
@@ -82,7 +83,7 @@ export class ThreadStateStore {
       case RUNTIME_EVENT_TYPES.REPLY_COMPLETED:
         next.status = "running";
         next.turnId = normalizeRuntimeIdentifier(event.payload.turnId) || next.turnId;
-        next.lastReplyText = normalizeRuntimeText(event.payload.text) || next.lastReplyText;
+        next.lastReplyText = normalizeRuntimeReplyText(event.payload.text) || next.lastReplyText;
         break;
       case RUNTIME_EVENT_TYPES.APPROVAL_REQUESTED:
         next.status = "waiting_approval";

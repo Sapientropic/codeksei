@@ -2,6 +2,7 @@ const test: typeof import("node:test") = require("node:test");
 const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 
 const {
+  appendDeltaFragment,
   computeVisibleDeliveryDelta,
   mergeAuthoritativeItemText,
 } = require("../src/runtime/stream-delivery/delta-merge");
@@ -30,6 +31,13 @@ test("snapshot merge rewrites the authoritative block instead of concatenating d
       relation: "replace",
     }
   );
+});
+
+test("delta merge keeps English token boundaries readable", () => {
+  assert.equal(appendDeltaFragment("I", "'m"), "I'm");
+  assert.equal(appendDeltaFragment("I'm", " switching"), "I'm switching");
+  assert.equal(appendDeltaFragment("state-", "of"), "state-of");
+  assert.equal(appendDeltaFragment("done)", " Next"), "done) Next");
 });
 
 test("visible delta detects semantic extension and rewrite without extension separately", () => {

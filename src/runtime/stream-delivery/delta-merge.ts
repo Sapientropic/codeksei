@@ -1,5 +1,6 @@
 // @ts-check
 
+import { appendCodexTextFragment } from "../../adapters/runtime/codex/message-utils";
 import {
   buildVisibleItemDedupKey,
   normalizeLineEndings,
@@ -82,7 +83,7 @@ export function appendDeltaFragment(current: unknown, next: unknown): string {
       return `${base}${incoming.slice(size)}`;
     }
   }
-  return `${base}${incoming}`;
+  return appendCodexTextFragment(base, incoming);
 }
 
 export function appendStreamingText(current: unknown, next: unknown): string {

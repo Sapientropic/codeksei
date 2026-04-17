@@ -86,3 +86,25 @@ test("runtime approval payload drops polluted values and normalizes numeric requ
     promptedAt: "",
   });
 });
+
+test("runtime reply payload preserves token-leading spaces while still normalizing line endings", () => {
+  const deltaPayload = normalizeRuntimeEventPayload(RUNTIME_EVENT_TYPES.REPLY_DELTA, {
+    threadId: "thread-1",
+    turnId: "turn-1",
+    itemId: "item-1",
+    text: " switching\r\nnow",
+    fragmentKind: "delta",
+    phase: "commentary",
+  });
+
+  const completedPayload = normalizeRuntimeEventPayload(RUNTIME_EVENT_TYPES.REPLY_COMPLETED, {
+    threadId: "thread-1",
+    turnId: "turn-1",
+    itemId: "item-1",
+    text: " done\r\n",
+    phase: "final",
+  });
+
+  assert.equal(deltaPayload.text, " switching\nnow");
+  assert.equal(completedPayload.text, " done\n");
+});

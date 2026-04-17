@@ -66,6 +66,31 @@ test("codex runtime delta events classify snapshot resends separately", () => {
   });
 });
 
+test("codex runtime delta events preserve leading-space token fragments", () => {
+  const event = mapCodexMessageToRuntimeEvent({
+    method: "item/agentMessage/delta",
+    params: {
+      threadId: "thread-1",
+      turnId: "turn-leading-space",
+      itemId: "item-space",
+      delta: " switching",
+      phase: "commentary",
+    },
+  });
+
+  assert.deepEqual(event, {
+    type: "runtime.reply.delta",
+    payload: {
+      threadId: "thread-1",
+      turnId: "turn-leading-space",
+      itemId: "item-space",
+      text: " switching",
+      fragmentKind: "delta",
+      phase: "commentary",
+    },
+  });
+});
+
 test("codex runtime completed assistant items normalize final_answer phase", () => {
   const event = mapCodexMessageToRuntimeEvent({
     method: "item/completed",

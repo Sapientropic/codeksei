@@ -229,9 +229,21 @@ function joinCodexTextContentSegments(parts: string[]): string {
       joined = part;
       continue;
     }
-    joined += shouldInsertCodexSegmentSpace(joined, part) ? ` ${part}` : part;
+    joined = appendCodexTextFragment(joined, part);
   }
   return joined;
+}
+
+export function appendCodexTextFragment(current: unknown, next: unknown): string {
+  const base = String(current || "");
+  const incoming = String(next || "");
+  if (!incoming) {
+    return base;
+  }
+  if (!base) {
+    return incoming;
+  }
+  return shouldInsertCodexSegmentSpace(base, incoming) ? `${base} ${incoming}` : `${base}${incoming}`;
 }
 
 function shouldInsertCodexSegmentSpace(previousText: string, nextText: string): boolean {
