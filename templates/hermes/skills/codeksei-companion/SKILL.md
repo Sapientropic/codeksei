@@ -77,6 +77,16 @@ codeksei host settle-checkin --provider hermes --user <wechatUserId> --workspace
 4. If a command fails because local state or dependencies are missing, explain the missing prerequisite exactly and stop instead of guessing.
 5. Hosted send-back / reminder / proactive commands depend on the active Hermes session plus the sibling `hermes-agent` repo-local checkout. If `codeksei host doctor --provider hermes` says repo-local is missing, fix that first instead of improvising another delivery path.
 
+## Default Routing
+
+Use this decision order unless the user explicitly asks for something narrower:
+
+1. If the user is new, profile context is obviously thin, or you need to learn support style/boundaries before acting, call `onboarding status` first. If status is `not_started`, call `onboarding start`; if status is `in_progress` or `followup_needed`, route the latest user reply through `onboarding step` instead of freehand profiling in chat.
+2. If you need current proactive/review handoff context, call `context briefing` instead of reading raw notes or guessing from memory.
+3. If the user just said something that should change future support style, timing, boundaries, or likely next steps, persist it through `onboarding step` when onboarding is still active; otherwise write it into Codeksei state instead of leaving it only in Hermes chat memory.
+4. If the task is a hosted proactive wake, do not invent your own scheduler loop: use `host seed-proactive / claim-checkin / settle-checkin` as the default contract.
+5. Only skip Codeksei CLI when Hermes already owns the surface completely, such as host-native thread controls or approval actions.
+
 ## Hosted Proactive Checkin
 
 Preferred host contract:

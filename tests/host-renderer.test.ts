@@ -20,6 +20,8 @@ test("Hermes companion skill template stays generated from the renderer truth", 
   assert.match(rendered, /host claim-checkin/u);
   assert.match(rendered, /host settle-checkin/u);
   assert.match(rendered, /context briefing/u);
+  assert.match(rendered, /## Default Routing/u);
+  assert.match(rendered, /onboarding status/u);
   assert.match(rendered, /operator hermes sync-checkin/u);
 });
 

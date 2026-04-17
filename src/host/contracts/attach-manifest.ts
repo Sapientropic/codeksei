@@ -12,6 +12,34 @@ export interface HostEntrypointManifest {
   render: string[];
 }
 
+export interface HostWorkflowStep {
+  commandRef:
+    | "manifest"
+    | "bootstrap"
+    | "doctor"
+    | "smoke"
+    | "render"
+    | "seedProactive"
+    | "claimCheckin"
+    | "settleCheckin"
+    | "onboardingStart"
+    | "onboardingStep"
+    | "onboardingStatus"
+    | "contextBriefing";
+  reason: string;
+}
+
+export interface HostWorkflowHint {
+  id:
+    | "bootstrap_and_install_skill"
+    | "first_activation_onboarding"
+    | "proactive_checkin"
+    | "context_handoff_refresh"
+    | "user_correction_persistence";
+  trigger: string;
+  steps: HostWorkflowStep[];
+}
+
 export interface HostAttachmentManifest {
   contractVersion: 1;
   runtimeInvariant: "bridge-full";
@@ -25,5 +53,6 @@ export interface HostAttachmentManifest {
     fallback: string[][];
   };
   entrypoints: HostEntrypointManifest;
+  recommendedWorkflows: HostWorkflowHint[];
   recipes: HostRecipeDescriptor[];
 }
