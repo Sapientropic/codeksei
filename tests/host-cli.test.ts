@@ -8,6 +8,7 @@ const { CheckinConfigStore } = require("../src/state/checkin-config-store");
 const { CheckinScheduleStateStore } = require("../src/state/checkin-schedule-state-store");
 const { runHostBootstrapCommand } = require("../src/app/host-bootstrap-cli");
 const { runHostClaimCheckinCommand } = require("../src/app/host-claim-checkin-cli");
+const { runHostDoctorCommand } = require("../src/app/host-doctor-cli");
 const { runHostSeedProactiveCommand } = require("../src/app/host-seed-proactive-cli");
 const { runHostSettleCheckinCommand } = require("../src/app/host-settle-checkin-cli");
 const { runHostManifestCommand } = require("../src/app/host-manifest-cli");
@@ -57,6 +58,9 @@ test("host manifest returns bridge-full invariant and hermes recipe", async () =
   assert.equal(Array.isArray(result.data.recommendedWorkflows), true);
   assert.equal(result.data.recommendedWorkflows.some((entry: { id: string }) => entry.id === "first_activation_onboarding"), true);
   assert.equal(result.data.recommendedWorkflows.some((entry: { id: string }) => entry.id === "proactive_checkin"), true);
+  assert.equal(Array.isArray(result.data.entrypoints.onboardingStart), true);
+  assert.equal(Array.isArray(result.data.entrypoints.contextBriefing), true);
+  assert.equal(result.data.upgrade.startupDoctorRequired, true);
 });
 
 test("host bootstrap writes canonical config and previews Hermes bootstrap", async () => {
@@ -73,7 +77,38 @@ test("host bootstrap writes canonical config and previews Hermes bootstrap", asy
   assert.equal(result.meta.dryRun, true);
   assert.equal(result.data.provider, "hermes");
   assert.equal(result.data.config.$schema, "./schemas/codeksei-config-v1.json");
+  assert.equal(result.data.config.bootstrap.manifestContractVersion > 0, true);
+  assert.match(String(result.data.config.bootstrap.completedAt || ""), /T/u);
   assert.equal(fs.existsSync(configPath), false);
+});
+
+test("host doctor flags legacy config without bootstrap snapshot for re-bootstrap", async () => {
+  const fixture = createHostFixture("codeksei-host-doctor-upgrade-");
+  const configPath = path.join(fixture.workspaceRoot, "codeksei.config.json");
+  fs.writeFileSync(configPath, JSON.stringify({
+    $schema: "./schemas/codeksei-config-v1.json",
+    modeClass: "hosted-skill-only",
+    workspaceRoot: fixture.workspaceRoot,
+    stateDir: fixture.stateDir,
+    user: {
+      id: "wx-user",
+      name: "Tester",
+      timezone: "Asia/Shanghai",
+    },
+    host: {
+      provider: "generic-shell",
+      channel: "weixin",
+    },
+  }, null, 2), "utf8");
+
+  const result = await runHostDoctorCommand(fixture.config, [
+    "--provider", "generic-shell",
+    "--config", configPath,
+  ]);
+
+  assert.equal(result.data.upgrade.bootstrapSnapshotMissing, true);
+  assert.equal(result.data.upgrade.needsBootstrap, true);
+  assert.match(String(result.text || ""), /bootstrap_required: yes/u);
 });
 
 test("host bootstrap dry-run resolves workspace-scoped config path when config is omitted", async () => {

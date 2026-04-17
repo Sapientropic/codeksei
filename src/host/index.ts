@@ -3,6 +3,10 @@ export {
   buildHostEntrypointManifest,
 } from "./attach/manifest";
 export {
+  HOST_ATTACHMENT_CONTRACT_VERSION,
+  HOST_BOOTSTRAP_SNAPSHOT_VERSION,
+} from "./contracts/attach-manifest";
+export {
   collectHostDoctorReport,
   type HostDoctorReport,
 } from "./attach/doctor";

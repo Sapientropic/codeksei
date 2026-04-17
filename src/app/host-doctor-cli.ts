@@ -55,6 +55,11 @@ export async function runHostDoctorCommand(
       `supported: ${report.attachment.supported ? "yes" : "no"}`,
       `config: ${report.resolvedConfig.exists ? report.resolvedConfig.path : `${report.resolvedConfig.path} [missing]`}`,
       `daemon_owner: ${report.daemon.state.scheduleOwner}`,
+      `bootstrap_required: ${report.upgrade.needsBootstrap ? "yes" : "no"}`,
+      `skill_reinstall_required: ${report.upgrade.needsSkillInstall ? "yes" : "no"}`,
+      ...(report.upgrade.suggestedActions.length
+        ? [`next_action: ${report.upgrade.suggestedActions[0]}`]
+        : []),
     ].join("\n"),
   };
 }

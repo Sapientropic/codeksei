@@ -6,6 +6,8 @@ import { runCliMutation } from "../core/cli-mutation";
 import { normalizeText } from "../core/text-normalization";
 import type { AppRuntimeConfig } from "../core/app-service-contract";
 import {
+  HOST_ATTACHMENT_CONTRACT_VERSION,
+  HOST_BOOTSTRAP_SNAPSHOT_VERSION,
   resolveCodekseiConfigPath,
   writeCodekseiHostConfig,
   type CodekseiHostConfig,
@@ -177,6 +179,9 @@ function buildCanonicalHostConfig(
     || normalizeText(existing?.host.provider)
     || bootstrapTarget.provider
     || "generic-shell";
+  const skillPreview = provider === "hermes"
+    ? previewHermesCompanionSkillInstall(config)
+    : null;
   return {
     $schema: "./schemas/codeksei-config-v1.json",
     modeClass: (normalizeText(options.modeClass)
@@ -203,6 +208,13 @@ function buildCanonicalHostConfig(
       channel: normalizeText(options.channel)
         || normalizeText(existing?.host.channel)
         || "weixin",
+    },
+    bootstrap: {
+      snapshotVersion: HOST_BOOTSTRAP_SNAPSHOT_VERSION,
+      manifestContractVersion: HOST_ATTACHMENT_CONTRACT_VERSION,
+      companionSkillVersion: skillPreview?.repoSkillAsset.version || "",
+      companionSkillHash: skillPreview?.repoSkillAsset.hash || "",
+      completedAt: new Date().toISOString(),
     },
   };
 }
