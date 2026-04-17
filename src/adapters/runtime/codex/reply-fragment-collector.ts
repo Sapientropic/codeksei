@@ -1,10 +1,12 @@
 import {
   RUNTIME_EVENT_TYPES,
   normalizeRuntimeIdentifier,
+  normalizeRuntimeReplyText,
   normalizeRuntimeText,
   type RuntimeEvent,
 } from "../../../contracts/runtime-events";
 import type { UnknownRecord } from "../../../core/runtime-types";
+import { appendCodexTextFragment } from "./message-utils";
 
 export interface ReplyFragmentCollectorState {
   activeTurnId: string;
@@ -48,13 +50,13 @@ export function collectReplyFragment(
     state.textByItemId.set(itemId, "");
   }
 
-  const nextText = normalizeRuntimeText(event.payload.text);
+  const nextText = normalizeRuntimeReplyText(event.payload.text);
   if (!nextText) {
     return true;
   }
 
   if (event.type === RUNTIME_EVENT_TYPES.REPLY_DELTA && normalizeFragmentKind(event.payload.fragmentKind) === "delta") {
-    state.textByItemId.set(itemId, `${state.textByItemId.get(itemId) || ""}${nextText}`);
+    state.textByItemId.set(itemId, appendCodexTextFragment(state.textByItemId.get(itemId) || "", nextText));
     return true;
   }
 

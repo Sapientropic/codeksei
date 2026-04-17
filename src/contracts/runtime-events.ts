@@ -271,7 +271,7 @@ export function normalizeRuntimeReplyDeltaPayload(payload: unknown = {}): Runtim
   return {
     ...normalizeRuntimeTurnPayload(source),
     itemId: normalizeRuntimeIdentifier(source.itemId),
-    text: normalizeRuntimeText(source.text),
+    text: normalizeRuntimeReplyText(source.text),
     fragmentKind: normalizeFragmentKind(source.fragmentKind),
     phase: normalizeRuntimeReplyPhase(source.phase),
   };
@@ -282,7 +282,7 @@ export function normalizeRuntimeReplyCompletedPayload(payload: unknown = {}): Ru
   return {
     ...normalizeRuntimeTurnPayload(source),
     itemId: normalizeRuntimeIdentifier(source.itemId),
-    text: normalizeRuntimeText(source.text),
+    text: normalizeRuntimeReplyText(source.text),
     phase: normalizeRuntimeReplyPhase(source.phase),
   };
 }
@@ -322,6 +322,10 @@ export function normalizeRuntimeRequestId(value: unknown): string {
 
 export function normalizeRuntimeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+export function normalizeRuntimeReplyText(value: unknown): string {
+  return typeof value === "string" ? value.replace(/\r\n/g, "\n") : "";
 }
 
 export function normalizeRuntimeReplyPhase(value: unknown): RuntimeReplyPhase {

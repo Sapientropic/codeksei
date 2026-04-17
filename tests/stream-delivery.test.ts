@@ -440,6 +440,66 @@ test("stream mode only emits brief natural-language commentary in real time", as
   ]);
 });
 
+test("stream mode idle-flush keeps split English commentary readable", async (t) => {
+  enableMockTimers(t);
+  const { delivery, sent, attach } = createDelivery({
+    streamIdleFlushMs: 5,
+    streamForceFlushChars: 100,
+    streamBoundaryFlushChars: 100,
+  });
+  attach("thread-commentary-english");
+  await startTurn(delivery, "thread-commentary-english", "turn-commentary-english");
+
+  await sendDelta(delivery, {
+    threadId: "thread-commentary-english",
+    turnId: "turn-commentary-english",
+    itemId: "commentary-english-1",
+    text: "I",
+    phase: "commentary",
+  });
+  await sendDelta(delivery, {
+    threadId: "thread-commentary-english",
+    turnId: "turn-commentary-english",
+    itemId: "commentary-english-1",
+    text: "'m",
+    phase: "commentary",
+  });
+  await sendDelta(delivery, {
+    threadId: "thread-commentary-english",
+    turnId: "turn-commentary-english",
+    itemId: "commentary-english-1",
+    text: " switching",
+    phase: "commentary",
+  });
+  await sendDelta(delivery, {
+    threadId: "thread-commentary-english",
+    turnId: "turn-commentary-english",
+    itemId: "commentary-english-1",
+    text: " to",
+    phase: "commentary",
+  });
+  await sendDelta(delivery, {
+    threadId: "thread-commentary-english",
+    turnId: "turn-commentary-english",
+    itemId: "commentary-english-1",
+    text: " English",
+    phase: "commentary",
+  });
+  await sendDelta(delivery, {
+    threadId: "thread-commentary-english",
+    turnId: "turn-commentary-english",
+    itemId: "commentary-english-1",
+    text: " now.",
+    phase: "commentary",
+  });
+
+  await advanceDelivery(t, delivery, sent, { ms: 20, expectedLength: 1 });
+
+  assert.deepEqual(sent, [
+    { text: "I'm switching to English now.", preserveBlock: true },
+  ]);
+});
+
 test("stream mode keeps paragraph boundaries in final output", async () => {
   const { delivery, sent, attach } = createDelivery({
     streamForceFlushChars: 12,
