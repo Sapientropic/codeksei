@@ -3,8 +3,14 @@ import type {
   HostEntrypointManifest,
   HostWorkflowHint,
 } from "../contracts/attach-manifest";
+import {
+  HOST_ATTACHMENT_CONTRACT_VERSION,
+  HOST_BOOTSTRAP_SNAPSHOT_VERSION,
+} from "../contracts/attach-manifest";
 import { resolveHostAttachment, type HostAttachmentConfigInput } from "./model";
 import { listHostRecipes } from "../contracts/host-recipe";
+import { previewHermesCompanionSkillInstall } from "../recipes/hermes/skill";
+import type { HermesHostedSkillConfigInput } from "../recipes/hermes/skill";
 
 export function buildHostEntrypointManifest(): HostEntrypointManifest {
   return {
@@ -16,16 +22,21 @@ export function buildHostEntrypointManifest(): HostEntrypointManifest {
     claimCheckin: ["codeksei", "host", "claim-checkin", "--format", "json"],
     settleCheckin: ["codeksei", "host", "settle-checkin", "--format", "json"],
     render: ["codeksei", "host", "render", "--provider", "hermes", "--target", "skill", "--format", "json"],
+    onboardingStart: ["codeksei", "onboarding", "start", "--format", "json"],
+    onboardingStep: ["codeksei", "onboarding", "step", "--format", "json"],
+    onboardingStatus: ["codeksei", "onboarding", "status", "--format", "json"],
+    contextBriefing: ["codeksei", "context", "briefing", "--format", "json"],
   };
 }
 
 export function buildHostAttachmentManifest(
-  config: HostAttachmentConfigInput = {},
+  config: HostAttachmentConfigInput & HermesHostedSkillConfigInput = {},
 ): HostAttachmentManifest {
   const attachment = resolveHostAttachment(config);
   const entrypoints = buildHostEntrypointManifest();
+  const skillPreview = previewHermesCompanionSkillInstall(config);
   return {
-    contractVersion: 1,
+    contractVersion: HOST_ATTACHMENT_CONTRACT_VERSION,
     runtimeInvariant: "bridge-full",
     transport: attachment.transport,
     modeClass: attachment.modeClass,
@@ -37,6 +48,23 @@ export function buildHostAttachmentManifest(
       fallback: [["npm", "install", "-g", "codeksei"]],
     },
     entrypoints,
+    upgrade: {
+      bootstrapSnapshotVersion: HOST_BOOTSTRAP_SNAPSHOT_VERSION,
+      startupDoctorRequired: true,
+      companionSkill: {
+        version: skillPreview.repoSkillAsset.version,
+        hash: skillPreview.repoSkillAsset.hash,
+      },
+      rerunBootstrapWhen: [
+        "The stored host bootstrap snapshot is missing.",
+        "The stored manifest contract version is older than the current host manifest contract version.",
+        "The stored companion skill hash is older than the repo skill hash exposed by this manifest.",
+      ],
+      reinstallSkillWhen: [
+        "The installed Hermes companion skill is missing.",
+        "The installed Hermes companion skill hash differs from the repo skill hash exposed by this manifest.",
+      ],
+    },
     recommendedWorkflows: buildRecommendedHostWorkflows(),
     recipes: listHostRecipes(),
   };

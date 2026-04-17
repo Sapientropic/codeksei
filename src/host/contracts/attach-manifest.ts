@@ -1,6 +1,9 @@
 import type { HostModeClass, HostTransport } from "./attachment-capabilities";
 import type { HostRecipeDescriptor, HostRecipeId } from "./host-recipe";
 
+export const HOST_ATTACHMENT_CONTRACT_VERSION = 1 as const;
+export const HOST_BOOTSTRAP_SNAPSHOT_VERSION = 1 as const;
+
 export interface HostEntrypointManifest {
   manifest: string[];
   bootstrap: string[];
@@ -10,6 +13,10 @@ export interface HostEntrypointManifest {
   claimCheckin: string[];
   settleCheckin: string[];
   render: string[];
+  onboardingStart: string[];
+  onboardingStep: string[];
+  onboardingStatus: string[];
+  contextBriefing: string[];
 }
 
 export interface HostWorkflowStep {
@@ -41,7 +48,7 @@ export interface HostWorkflowHint {
 }
 
 export interface HostAttachmentManifest {
-  contractVersion: 1;
+  contractVersion: typeof HOST_ATTACHMENT_CONTRACT_VERSION;
   runtimeInvariant: "bridge-full";
   transport: HostTransport;
   modeClass: HostModeClass | "unsupported";
@@ -53,6 +60,16 @@ export interface HostAttachmentManifest {
     fallback: string[][];
   };
   entrypoints: HostEntrypointManifest;
+  upgrade: {
+    bootstrapSnapshotVersion: typeof HOST_BOOTSTRAP_SNAPSHOT_VERSION;
+    startupDoctorRequired: true;
+    companionSkill: {
+      version: string;
+      hash: string;
+    };
+    rerunBootstrapWhen: string[];
+    reinstallSkillWhen: string[];
+  };
   recommendedWorkflows: HostWorkflowHint[];
   recipes: HostRecipeDescriptor[];
 }

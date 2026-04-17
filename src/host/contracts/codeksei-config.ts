@@ -4,6 +4,10 @@ import { z } from "zod";
 
 import { normalizeText } from "../../contracts/text-normalization";
 import { resolveCrossPlatformPath } from "../../contracts/path-utils";
+import {
+  HOST_ATTACHMENT_CONTRACT_VERSION,
+  HOST_BOOTSTRAP_SNAPSHOT_VERSION,
+} from "./attach-manifest";
 
 const hostUserSchema = z.object({
   id: z.string().min(1),
@@ -16,6 +20,14 @@ const hostBindingSchema = z.object({
   channel: z.string().min(1),
 });
 
+const hostBootstrapSchema = z.object({
+  snapshotVersion: z.number().int().min(1).default(HOST_BOOTSTRAP_SNAPSHOT_VERSION),
+  manifestContractVersion: z.number().int().min(1).default(HOST_ATTACHMENT_CONTRACT_VERSION),
+  companionSkillVersion: z.string().default(""),
+  companionSkillHash: z.string().default(""),
+  completedAt: z.string().default(""),
+}).optional();
+
 export const codekseiHostConfigSchema = z.object({
   $schema: z.string().min(1),
   modeClass: z.enum(["bridge-full", "hosted-proactive", "hosted-skill-only", "cli-only"]),
@@ -23,6 +35,7 @@ export const codekseiHostConfigSchema = z.object({
   stateDir: z.string().min(1),
   user: hostUserSchema,
   host: hostBindingSchema,
+  bootstrap: hostBootstrapSchema,
 });
 
 export type CodekseiHostConfig = z.infer<typeof codekseiHostConfigSchema>;
