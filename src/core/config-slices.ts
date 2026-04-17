@@ -74,6 +74,10 @@ export interface SchemaAndTemplateConfig {
   reviewSemanticHost: ReviewSemanticHost;
   reviewSemanticModel: string;
   reviewSemanticTimeoutMs: number;
+  companionSemanticMode: string;
+  companionSemanticHost: ReviewSemanticHost | "";
+  companionSemanticModel: string;
+  companionSemanticTimeoutMs: number;
   onboardingSemanticMode: string;
   onboardingSemanticHost: ReviewSemanticHost | "";
   onboardingSemanticModel: string;

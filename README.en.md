@@ -190,6 +190,7 @@ Boundaries:
 - `Diary`: todos, fragments, supplements, summaries, and timeline-linked facts for daily traces that want to stay
 - `Check-ins`: proactive wake-ups and background care. Messaging is only one output path; Codeksei can also reread context, clean up backstage state, update diary/timeline, or leave a reminder before deciding whether it should surface. It owns proactive trigger generation, the `tick -> ack -> complete` schedule truth, and the next wake decision written in `checkin-complete`; Bridge Mode wraps that truth with a local poller, while Hermes Hosted Mode only executes a managed wake/recovery job set and still defers the true next wake to Codeksei
 - `Onboarding`: first activation can happen as a conversational interview instead of a form. Long-term truth lands in the companion note and is then projected through the context board; when there is no Obsidian/workspace schema, Codeksei can fall back to a local companion profile under the state dir
+- `Companion memory`: the system keeps updating after first activation. When a user's new self-description, correction, support preference, boundary, or near-term task should change future companionship judgement, route it through `companion remember` instead of leaving it only in host chat memory
 - `Context board`: the controlled context layer for proactive judgement. It turns checkin state, today's facts, active threads, cautions, and re-entry handles into a prompt-ready briefing; Hermes Hosted Mode refreshes and injects that board at cron runtime instead of scanning raw vault files
 - `Reminders`: reminder write and scheduling support for rhythm and follow-through. In Hermes Hosted Mode the default is a user-visible reminder; use `reminder write --delivery proactive` when the text should become a future proactive wake instead of a direct message
 - `Review`: nightly / weekly / monthly review, with hybrid semantic extraction by default
@@ -261,6 +262,9 @@ CODEKSEI_RUNTIME_ENDPOINT=ws://127.0.0.1:8765
 CODEKSEI_RUNTIME_COMMAND=codex
 CODEKSEI_HERMES_COMMAND=hermes
 CODEKSEI_REVIEW_SEMANTIC_HOST=auto
+CODEKSEI_COMPANION_SEMANTIC_HOST=
+CODEKSEI_COMPANION_SEMANTIC_MODEL=
+CODEKSEI_COMPANION_SEMANTIC_TIMEOUT_MS=15000
 CODEKSEI_ONBOARDING_SEMANTIC_HOST=
 CODEKSEI_ONBOARDING_SEMANTIC_MODEL=
 CODEKSEI_ONBOARDING_SEMANTIC_TIMEOUT_MS=15000
@@ -293,6 +297,9 @@ Notes:
 - `CODEKSEI_RUNTIME` / `CODEKSEI_CHANNEL_PROVIDER` decide whether the current runtime is `Bridge Mode` or `Hermes Hosted Mode`
 - `CODEKSEI_RUNTIME_ENDPOINT` / `CODEKSEI_RUNTIME_COMMAND` are the new host-neutral runtime ingress; legacy `CODEKSEI_CODEX_*` variables still remain for compatibility
 - `CODEKSEI_REVIEW_SEMANTIC_HOST=auto|codex|hermes|deterministic` lets you pin the semantic review host explicitly; default is `auto`
+- `CODEKSEI_COMPANION_SEMANTIC_HOST=auto|codex|hermes|deterministic` lets ongoing companion-memory extraction pick a dedicated semantic host; when left blank it follows the default host decision
+- `CODEKSEI_COMPANION_SEMANTIC_MODEL` can pin a cheaper model just for ongoing companion-memory extraction
+- `CODEKSEI_COMPANION_SEMANTIC_TIMEOUT_MS` defaults to `15000`; timeouts fall back to deterministic extraction so backstage memory updates do not block the host
 - `CODEKSEI_ONBOARDING_SEMANTIC_HOST=auto|codex|hermes|deterministic` lets onboarding extraction pick a dedicated semantic host; when left blank it follows the default host decision
 - `CODEKSEI_ONBOARDING_SEMANTIC_MODEL` can pin a cheaper model just for hidden onboarding extraction
 - `CODEKSEI_ONBOARDING_SEMANTIC_TIMEOUT_MS` defaults to `15000`; timeouts fall back to deterministic extraction so activation turns stay responsive
@@ -338,6 +345,7 @@ codeksei host manifest
 codeksei host bootstrap --provider hermes --ensure-daemon
 codeksei host doctor
 codeksei host smoke --provider hermes
+codeksei companion remember --user <wechat_user_id> --workspace /absolute/workspace --source host_user_turn --stdin
 codeksei onboarding start --user <wechat_user_id>
 codeksei onboarding status --user <wechat_user_id>
 codeksei context briefing --user <wechat_user_id> --workspace /absolute/workspace --mode proactive

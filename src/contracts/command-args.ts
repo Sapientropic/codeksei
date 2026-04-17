@@ -83,6 +83,19 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "mode", keys: ["--mode"], type: "string", defaultValue: "proactive", description: "proactive|review" },
     ],
   }),
+  companionRemember: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      COMMON_DRY_RUN_FLAG,
+      COMMON_IDEMPOTENCY_FLAG,
+      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "稳定 user id" },
+      { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "显式绝对 workspace 路径" },
+      { name: "source", keys: ["--source"], type: "string", defaultValue: "host_user_turn", description: "host_user_turn|onboarding_turn|checkin_followup|review_summary|diary_supplement|reminder_proactive" },
+      { name: "text", keys: ["--text"], type: "string", defaultValue: "", description: "要提炼的最新用户内容或 summary" },
+      { name: "contextFile", keys: ["--context-file"], type: "string", defaultValue: "", description: "可选 JSON 文件，补最小结构化上下文" },
+      { name: "useStdin", keys: ["--stdin"], type: "boolean", defaultValue: false, description: "从标准输入读取正文" },
+    ],
+  }),
   onboardingStart: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,

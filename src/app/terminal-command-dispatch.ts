@@ -1,4 +1,5 @@
 import { runChannelSendFileCommand } from "./channel-send-file-cli";
+import { runCompanionRememberCommand } from "./companion-remember-cli";
 import { runContextBriefingCommand } from "./context-briefing-cli";
 import { runDiaryWriteCommand } from "./diary-write-cli";
 import {
@@ -181,6 +182,9 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
   },
   "channel.send-file": async (_manifest, context) => {
     return runChannelSendFileCommand(context.getApp() as ChannelSendFileApp, context.leafArgs, context.config);
+  },
+  "companion.remember": async (_manifest, context) => {
+    return runCompanionRememberCommand(context.config, context.leafArgs);
   },
   "onboarding.start": async (_manifest, context) => {
     return runOnboardingStartCommand(context.config, context.leafArgs);

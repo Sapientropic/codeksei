@@ -266,7 +266,7 @@
 
 ## 8. Integrations And Operational Layer
 
-`src/integrations/*`、`src/checkin/*`、`src/context/*`、`src/review/*`、`src/notes/*`、`src/app/*`
+`src/integrations/*`、`src/checkin/*`、`src/context/*`、`src/companion-memory/*`、`src/review/*`、`src/notes/*`、`src/app/*`
 
 这几层共同构成更接近“陪伴感”和“节奏感”的工作流表面。
 
@@ -275,6 +275,7 @@
 - `src/integrations/*` 负责接上游能力，例如 timeline
 - `src/checkin/*` 负责 proactive checkin 的 target resolution、wake schedule truth 与 bridge poller scheduling
 - `src/context/*` 负责主动性判断上下文层：context board 的聚合、managed markdown 落盘、briefing CLI 与 Hermes script 注入合同
+- `src/companion-memory/*` 负责 host-neutral 的持续记忆主链：六域语义抽取、小模型优先/规则兜底、去重/纠错/runtime freshness state，以及把 onboarding / hosted chat / review / diary / reminder 的高价值事实统一写回 companion note
 - `src/review/*` 负责 nightly / weekly / monthly review
 - `src/notes/*` 负责 durable note routing 与写入
 - `src/app/*` 负责公开 CLI 入口命令
@@ -284,6 +285,7 @@
 - note / review / timeline / state 已经形成各自可读的 typed boundary
 - `src/contracts/command-surface.ts` 只保留命令 façade；`command-surface-definitions.ts` 已退回 thin composer，action definitions 与 classification tables 分别拆到 sibling truth layer
 - `src/review/review-draft.ts`、`src/review/review-semantic.ts`、`src/core/timezone.ts` 现在是 façade 入口，window / heuristics / render、prompt / runtime / normalize、state / config / formatting 已各自 owner 化
+- onboarding 的 persona 提取与 ongoing memory 现在共用 `src/companion-memory/*`；`src/onboarding/*` 只保留首访状态机、会话节奏和用户可见 follow-up，不再独占 durable memory 写入逻辑
 - `src/app/*` 继续只做公开入口，不重新吸回领域实现
 - `src/core` / `src/runtime` 不再依赖 style/type allowlist 才能维持这些边界
 - Hermes 集成当前优先走 skill / CLI / operator contract，而不是把 Hermes gateway 逻辑重新 vendoring 进来
@@ -315,6 +317,8 @@
 - sync buffers
 - reminder / system / timeline screenshot queues
 - context boards
+- companion notes
+- companion-memory runtime state
 - workspace bootstrap config
 - logs
 
@@ -325,6 +329,11 @@ Hermes Hosted Mode 下，这里不再承接 reminder queue 或 timeline screensh
 - `system send` 仍保留 bridge-only backstage queue 语义
 
 如果用户单独指定 `CODEKSEI_DIARY_DIR` / `CODEKSEI_TIMELINE_STATE_DIR`，业务数据会写到外部目录，状态目录保留运行态文件。
+
+其中 companion memory 继续严格分两层：
+
+- companion note 是唯一长期真相层
+- `CODEKSEI_STATE_DIR/companion-memory/<userKey>.json` 只存 dedupe、freshness、pending pattern candidate 等运行态，不是第二套 profile store
 
 本地优先会落实在这里：状态、日志、提醒队列和生活记录默认都留在自己手里。
 

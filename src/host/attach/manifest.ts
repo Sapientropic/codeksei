@@ -22,6 +22,7 @@ export function buildHostEntrypointManifest(): HostEntrypointManifest {
     claimCheckin: ["codeksei", "host", "claim-checkin", "--format", "json"],
     settleCheckin: ["codeksei", "host", "settle-checkin", "--format", "json"],
     render: ["codeksei", "host", "render", "--provider", "hermes", "--target", "skill", "--format", "json"],
+    companionRemember: ["codeksei", "companion", "remember", "--format", "json"],
     onboardingStart: ["codeksei", "onboarding", "start", "--format", "json"],
     onboardingStep: ["codeksei", "onboarding", "step", "--format", "json"],
     onboardingStatus: ["codeksei", "onboarding", "status", "--format", "json"],
@@ -117,6 +118,20 @@ function buildRecommendedHostWorkflows(): HostWorkflowHint[] {
       ],
     },
     {
+      id: "ongoing_companion_memory",
+      trigger: "The user just said something that should change future support style, timing, boundaries, current-state understanding, or likely re-entry behavior.",
+      steps: [
+        {
+          commandRef: "companionRemember",
+          reason: "Persist the new fact or correction through the shared ongoing companion-memory pipeline instead of leaving it only in host chat memory.",
+        },
+        {
+          commandRef: "contextBriefing",
+          reason: "Refresh the controlled handoff surface after important memory updates when the host needs the new state immediately.",
+        },
+      ],
+    },
+    {
       id: "proactive_checkin",
       trigger: "The host is running a delegated proactive wake and needs the default scheduling contract instead of improvising free-form logic.",
       steps: [
@@ -154,7 +169,11 @@ function buildRecommendedHostWorkflows(): HostWorkflowHint[] {
         },
         {
           commandRef: "onboardingStep",
-          reason: "Persist the correction through the shared extraction path so companion truth and board refresh stay aligned.",
+          reason: "When onboarding is still active, route the correction through the onboarding updater so session state and missing slots stay aligned.",
+        },
+        {
+          commandRef: "companionRemember",
+          reason: "Once onboarding is already ready, persist corrections through the ongoing companion-memory path instead of overloading onboarding-only state.",
         },
         {
           commandRef: "contextBriefing",

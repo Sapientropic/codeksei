@@ -50,6 +50,7 @@ public CLI：
 - `codeksei doctor`
 - `codeksei help`
 - `codeksei schema`
+- `codeksei companion remember`
 - `codeksei onboarding start`
 - `codeksei onboarding status`
 - `codeksei context briefing`
@@ -157,6 +158,20 @@ operator / bootstrap：
 - `step` 现在会优先走小模型语义抽取，再回退到 deterministic 规则兜底；六域 persona taxonomy 只作为 backstage schema
 - `status` 只看流程状态、session 和缺口
 - `reset` 只重置流程状态，不清空已经形成的长期 companion note
+
+## Companion Memory
+
+这一组入口负责 ongoing companion memory：把会影响未来支持方式、边界、节奏、当前定位或近期重入点的新事实提炼进 companion note，而不是只留在宿主聊天记忆里。
+
+- `codeksei companion remember --user <senderId> --workspace /absolute/workspace --source host_user_turn --stdin`
+
+说明：
+
+- 这是 ongoing memory 的统一公共写入口；所有宿主都应把高价值的新事实或纠正送到这里
+- 支持安全 over-call：普通寒暄或低信号输入会返回 `noop` 或 `deferred`
+- `source` 固定为 `host_user_turn|onboarding_turn|checkin_followup|review_summary|diary_supplement|reminder_proactive`
+- `--context-file` 可选，用来补最小结构化上下文；不要求宿主传完整会话窗口
+- 这条命令不负责写给用户看的回复，只负责 backstage 提炼、更新 companion note，并在需要时刷新 context board
 
 ## Host Attachment Contract
 
@@ -313,6 +328,9 @@ Durable note 负责把值得长期记住的判断、偏好和项目脉络，放�
 
 - 默认走 hybrid review：脚本保骨架，runtime 语义生成器做结构化提炼
 - `CODEKSEI_REVIEW_SEMANTIC_HOST=auto|codex|hermes|deterministic` 可显式指定语义宿主；默认 `auto`
+- `CODEKSEI_COMPANION_SEMANTIC_HOST=auto|codex|hermes|deterministic` 可为 ongoing companion memory 抽取单独指定宿主；留空时沿用默认 host 决策
+- `CODEKSEI_COMPANION_SEMANTIC_MODEL` 可给 ongoing companion memory 抽取单独指定模型
+- `CODEKSEI_COMPANION_SEMANTIC_TIMEOUT_MS` 默认 `15000`，超时自动退回 deterministic 提炼
 - `CODEKSEI_ONBOARDING_SEMANTIC_HOST=auto|codex|hermes|deterministic` 可为 onboarding 隐藏抽取单独指定宿主；留空时沿用默认 host 决策
 - `CODEKSEI_ONBOARDING_SEMANTIC_MODEL` 可给 onboarding 六域 persona 抽取单独指定模型
 - `CODEKSEI_ONBOARDING_SEMANTIC_TIMEOUT_MS` 默认 `15000`，超时自动退回 deterministic 抽取

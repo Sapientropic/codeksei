@@ -13,6 +13,7 @@ export interface HostEntrypointManifest {
   claimCheckin: string[];
   settleCheckin: string[];
   render: string[];
+  companionRemember: string[];
   onboardingStart: string[];
   onboardingStep: string[];
   onboardingStatus: string[];
@@ -32,6 +33,7 @@ export interface HostWorkflowStep {
     | "onboardingStart"
     | "onboardingStep"
     | "onboardingStatus"
+    | "companionRemember"
     | "contextBriefing";
   reason: string;
 }
@@ -40,6 +42,7 @@ export interface HostWorkflowHint {
   id:
     | "bootstrap_and_install_skill"
     | "first_activation_onboarding"
+    | "ongoing_companion_memory"
     | "proactive_checkin"
     | "context_handoff_refresh"
     | "user_correction_persistence";

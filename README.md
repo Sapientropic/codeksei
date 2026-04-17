@@ -194,6 +194,7 @@ codeksei host smoke --provider hermes
 - `Diary`：Todo、碎片、补充记录、总结，以及和 timeline 紧密联动的时间线事实，帮你把零散日常慢慢收成可用痕迹
 - `Check-ins`：主动唤醒与主动分忧。发一句消息只是其中一种；它也会先回看上下文、整理后台、补一条 diary / timeline、留一个提醒，再决定是不是该主动露个面。Codeksei 负责生成 proactive trigger、维护 `tick -> ack -> complete` 的调度真相，并在 `checkin-complete` 时写回下一次唤醒；Bridge Mode 下由本地 poller 包装 heartbeat 与入队，Hermes Hosted Mode 下由 Hermes 只执行受控 wake/recovery job set，真正的下一次唤醒仍由 Codeksei 在 `checkin-complete` 里决定
 - `Onboarding`：首次激活不走表单，而是走聊天式访谈。长期真相写进 companion note，再由 context board 投影给宿主；没有 Obsidian / workspace schema 时也能自动回退到本地 state-dir 下的 companion profile
+- `Companion memory`：首访之后也会继续更新。只要用户新的自述、纠正、支持偏好、边界或近线任务会影响后续陪伴判断，就可以走 `companion remember` 这条 ongoing memory 主链，而不是把变化只留在宿主聊天记忆里
 - `Context board`：主动判断用的受控上下文层。它把 checkin state、今天事实、活跃线头、注意事项和重入入口收口到一份 prompt-ready briefing；Hermes Hosted Mode 下每次 cron 运行前都会现读最新 board，而不是盲扫原始 vault 文件
 - `Reminders`：提醒写入与调度，给生活节奏和待办推进一个外部支点。Hermes Hosted Mode 下默认是用户可见提醒；若要把内部后续跟进改成未来 proactive 唤醒，用 `reminder write --delivery proactive`
 - `Review`：nightly / weekly / monthly，把日常记录压成更稳定的节奏校准与复盘材料
@@ -269,6 +270,9 @@ CODEKSEI_RUNTIME_ENDPOINT=ws://127.0.0.1:8765
 CODEKSEI_RUNTIME_COMMAND=codex
 CODEKSEI_HERMES_COMMAND=hermes
 CODEKSEI_REVIEW_SEMANTIC_HOST=auto
+CODEKSEI_COMPANION_SEMANTIC_HOST=
+CODEKSEI_COMPANION_SEMANTIC_MODEL=
+CODEKSEI_COMPANION_SEMANTIC_TIMEOUT_MS=15000
 CODEKSEI_ONBOARDING_SEMANTIC_HOST=
 CODEKSEI_ONBOARDING_SEMANTIC_MODEL=
 CODEKSEI_ONBOARDING_SEMANTIC_TIMEOUT_MS=15000
@@ -302,6 +306,9 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - `CODEKSEI_RUNTIME` / `CODEKSEI_CHANNEL_PROVIDER` 决定当前是 `Bridge Mode` 还是 `Hermes Hosted Mode`
 - `CODEKSEI_RUNTIME_ENDPOINT` / `CODEKSEI_RUNTIME_COMMAND` 是新的 host-neutral runtime 入口；旧的 `CODEKSEI_CODEX_*` 变量仍保留兼容
 - `CODEKSEI_REVIEW_SEMANTIC_HOST=auto|codex|hermes|deterministic` 可显式指定 review hybrid 语义宿主；默认 `auto`
+- `CODEKSEI_COMPANION_SEMANTIC_HOST=auto|codex|hermes|deterministic` 可为 ongoing companion memory 抽取单独指定宿主；留空时沿用默认 host 决策
+- `CODEKSEI_COMPANION_SEMANTIC_MODEL` 可给 ongoing companion memory 抽取单独指定低成本模型
+- `CODEKSEI_COMPANION_SEMANTIC_TIMEOUT_MS` 默认 `15000`，超时会自动退回 deterministic 提炼，避免宿主被后台记忆更新拖住
 - `CODEKSEI_ONBOARDING_SEMANTIC_HOST=auto|codex|hermes|deterministic` 可为 onboarding 隐藏抽取单独指定宿主；留空时沿用默认 host 决策
 - `CODEKSEI_ONBOARDING_SEMANTIC_MODEL` 可给 onboarding 隐藏抽取单独指定低成本模型
 - `CODEKSEI_ONBOARDING_SEMANTIC_TIMEOUT_MS` 默认 `15000`，超时会自动退回 deterministic 抽取，避免激活访谈把用户晾住
@@ -347,6 +354,7 @@ codeksei host manifest
 codeksei host bootstrap --provider hermes --ensure-daemon
 codeksei host doctor
 codeksei host smoke --provider hermes
+codeksei companion remember --user <wechat_user_id> --workspace /absolute/workspace --source host_user_turn --stdin
 codeksei onboarding start --user <wechat_user_id>
 codeksei onboarding status --user <wechat_user_id>
 codeksei context briefing --user <wechat_user_id> --workspace /absolute/workspace --mode proactive

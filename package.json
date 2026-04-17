@@ -61,6 +61,7 @@
     "background:install": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/install-background-tasks.ps1",
     "background:uninstall": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/uninstall-background-tasks.ps1",
     "channel:send-file": "node ./dist/src/index.js channel send-file",
+    "companion:remember": "node ./dist/src/index.js companion remember",
     "note:auto": "node ./dist/src/index.js note auto",
     "note:maybe": "node ./dist/src/index.js note maybe",
     "note:sync": "node ./dist/src/index.js note sync",

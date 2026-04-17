@@ -57,7 +57,9 @@ test("host manifest returns bridge-full invariant and hermes recipe", async () =
   assert.equal(result.data.recipes.some((entry: { id: string }) => entry.id === "hermes"), true);
   assert.equal(Array.isArray(result.data.recommendedWorkflows), true);
   assert.equal(result.data.recommendedWorkflows.some((entry: { id: string }) => entry.id === "first_activation_onboarding"), true);
+  assert.equal(result.data.recommendedWorkflows.some((entry: { id: string }) => entry.id === "ongoing_companion_memory"), true);
   assert.equal(result.data.recommendedWorkflows.some((entry: { id: string }) => entry.id === "proactive_checkin"), true);
+  assert.equal(Array.isArray(result.data.entrypoints.companionRemember), true);
   assert.equal(Array.isArray(result.data.entrypoints.onboardingStart), true);
   assert.equal(Array.isArray(result.data.entrypoints.contextBriefing), true);
   assert.equal(result.data.upgrade.startupDoctorRequired, true);
