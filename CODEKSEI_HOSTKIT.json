@@ -44,7 +44,12 @@
     "seedProactive": ["codeksei", "host", "seed-proactive", "--provider", "hermes", "--format", "json"],
     "claimCheckin": ["codeksei", "host", "claim-checkin", "--provider", "hermes", "--format", "json"],
     "settleCheckin": ["codeksei", "host", "settle-checkin", "--provider", "hermes", "--format", "json"],
-    "render": ["codeksei", "host", "render", "--provider", "hermes", "--target", "skill", "--format", "json"]
+    "render": ["codeksei", "host", "render", "--provider", "hermes", "--target", "skill", "--format", "json"],
+    "companionRemember": ["codeksei", "companion", "remember", "--format", "json"],
+    "onboardingStart": ["codeksei", "onboarding", "start", "--format", "json"],
+    "onboardingStep": ["codeksei", "onboarding", "step", "--format", "json"],
+    "onboardingStatus": ["codeksei", "onboarding", "status", "--format", "json"],
+    "contextBriefing": ["codeksei", "context", "briefing", "--format", "json"]
   },
   "config": {
     "canonicalFile": "codeksei.config.json",
@@ -82,6 +87,53 @@
       "defaultDeliveryRecipe": "generic-shell",
       "supportsDelegatedCheckin": false,
       "supportsToolSurface": true
+    }
+  ],
+  "recommendedWorkflows": [
+    {
+      "id": "bootstrap_and_install_skill",
+      "trigger": "The host is connecting to Codeksei for the first time or the local companion skill may be missing.",
+      "steps": [
+        { "commandRef": "manifest", "reason": "Read the current invariant, recipes, and entrypoints before assuming an integration path." },
+        { "commandRef": "bootstrap", "reason": "Write canonical config and install the companion skill when the provider is Hermes." },
+        { "commandRef": "doctor", "reason": "Confirm repo-local prerequisites, skill install state, and semantic-host readiness." },
+        { "commandRef": "smoke", "reason": "Verify the hosted provider recipe before treating the integration as ready." },
+        { "commandRef": "render", "reason": "Read the generated host skill if the runtime needs a human-readable decision tree instead of raw CLI discovery." }
+      ]
+    },
+    {
+      "id": "first_activation_onboarding",
+      "trigger": "The user is new, profile context is thin, or the host should not pretend it already knows the person.",
+      "steps": [
+        { "commandRef": "onboardingStatus", "reason": "Check whether onboarding is not started, already in progress, or already ready." },
+        { "commandRef": "onboardingStart", "reason": "Start the first activation conversation when there is no active onboarding session yet." },
+        { "commandRef": "onboardingStep", "reason": "Use the latest user reply to update companion truth and get the next natural follow-up line." }
+      ]
+    },
+    {
+      "id": "ongoing_companion_memory",
+      "trigger": "The user just said something that should change future support style, timing, boundaries, current-state understanding, or likely re-entry behavior.",
+      "steps": [
+        { "commandRef": "companionRemember", "reason": "Persist the new fact or correction through the shared ongoing companion-memory pipeline instead of leaving it only in host chat memory." },
+        { "commandRef": "contextBriefing", "reason": "Refresh the controlled handoff surface after important memory updates when the host needs the new state immediately." }
+      ]
+    },
+    {
+      "id": "context_handoff_refresh",
+      "trigger": "The host needs current-state context for proactive judgment or review framing.",
+      "steps": [
+        { "commandRef": "contextBriefing", "reason": "Read the controlled context board instead of injecting raw notes or guessing from chat memory." }
+      ]
+    },
+    {
+      "id": "user_correction_persistence",
+      "trigger": "The user says something that should change future support style, timing, boundaries, or follow-up behavior.",
+      "steps": [
+        { "commandRef": "onboardingStatus", "reason": "If onboarding is active or follow-up is still pending, corrections should keep flowing through the onboarding updater." },
+        { "commandRef": "onboardingStep", "reason": "When onboarding is still active, route the correction through the onboarding updater so session state and missing slots stay aligned." },
+        { "commandRef": "companionRemember", "reason": "Once onboarding is already ready, persist corrections through the ongoing companion-memory path instead of overloading onboarding-only state." },
+        { "commandRef": "contextBriefing", "reason": "Refresh the controlled handoff surface after important corrections if the host needs to inspect the new state immediately." }
+      ]
     }
   ],
   "discovery": {

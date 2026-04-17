@@ -41,6 +41,8 @@
 3. 默认优先 `Hosted Mode`
 4. 把 `host bootstrap` 理解成“Codeksei attach/bootstrap 完成”，不要误读成 “Hermes gateway / Weixin live bring-up 已完成”
 
+- `CODEKSEI_HOSTKIT.json` 现在也会带最小 entrypoint/workflow hints，足够让新 host 知道 onboarding / companion memory / context briefing 的默认路由；更完整的动态真相仍以 `codeksei host manifest` 为准
+
 推荐顺序：
 
 ```bash

@@ -5,6 +5,10 @@ const os: typeof import("node:os") = require("node:os");
 const path: typeof import("node:path") = require("node:path");
 
 const { loadWechatInstructions }: typeof import("../src/adapters/runtime/codex") = require("../src/adapters/runtime/codex");
+const {
+  createCompanionMemoryRuntimeStateStore,
+  createDefaultCompanionMemoryRuntimeState,
+}: typeof import("../src/companion-memory/runtime-state") = require("../src/companion-memory/runtime-state");
 
 test("loadWechatInstructions appends local overlays after public defaults", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-instructions-"));
@@ -60,6 +64,55 @@ test("weixin persona template keeps a natural collaboration contract without old
   assert.match(content, /当他在整理灵感、回看近况、做复盘/u);
   assert.doesNotMatch(content, /chief of staff|body double/u);
   assert.doesNotMatch(content, /第一物理动作|先接住，再定向，再推进/u);
+});
+
+test("weixin persona switches to english when the companion profile prefers english", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-instructions-english-"));
+  const stateDir = path.join(tempRoot, ".codeksei-state");
+  fs.mkdirSync(stateDir, { recursive: true });
+  createCompanionMemoryRuntimeStateStore({ stateDir }, "wx-user").setState({
+    ...createDefaultCompanionMemoryRuntimeState(),
+    profileSignals: {
+      preferredLanguage: "en",
+      gender: "neutral",
+    },
+  });
+
+  const content = loadWechatInstructions({
+    allowedUserIds: ["wx-user"],
+    codekseiHome: "E:/workspace/codeksei",
+    stateDir,
+    workspaceRoot: tempRoot,
+    weixinInstructionsFile: path.join(__dirname, "..", "templates", "weixin-instructions.md"),
+    weixinOperationsFile: path.join(__dirname, "..", "templates", "weixin-operations.md"),
+  });
+
+  assert.match(content, /You are with the person you're with on WeChat right now\./u);
+  assert.doesNotMatch(content, /你现在是在微信里陪/u);
+});
+
+test("weixin persona prefers companion-profile gender over stale config defaults", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-instructions-gender-"));
+  const stateDir = path.join(tempRoot, ".codeksei-state");
+  fs.mkdirSync(stateDir, { recursive: true });
+  createCompanionMemoryRuntimeStateStore({ stateDir }, "wx-user").setState({
+    ...createDefaultCompanionMemoryRuntimeState(),
+    profileSignals: {
+      preferredLanguage: "zh-CN",
+      gender: "male",
+    },
+  });
+
+  const content = loadWechatInstructions({
+    allowedUserIds: ["wx-user"],
+    stateDir,
+    userGender: "female",
+    workspaceRoot: tempRoot,
+    weixinInstructionsFile: path.join(__dirname, "..", "templates", "weixin-instructions.md"),
+  });
+
+  assert.match(content, /当他在整理灵感、回看近况、做复盘/u);
+  assert.doesNotMatch(content, /当她在整理灵感、回看近况、做复盘/u);
 });
 
 test("wechat instructions fall back to a warm generic person reference instead of 用户", () => {

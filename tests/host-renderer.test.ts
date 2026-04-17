@@ -35,3 +35,14 @@ test("hostkit static assets stay shipped at the repo root", () => {
   assert.equal(fs.existsSync(path.join(repoRoot, "schemas", "hostkit-v1.json")), true);
   assert.equal(fs.existsSync(path.join(repoRoot, "schemas", "codeksei-config-v1.json")), true);
 });
+
+test("hostkit static asset carries onboarding and ongoing companion workflow hints", () => {
+  const repoRoot = path.join(__dirname, "..");
+  const hostkit = JSON.parse(fs.readFileSync(path.join(repoRoot, "CODEKSEI_HOSTKIT.json"), "utf8"));
+
+  assert.deepEqual(hostkit.entrypoints.onboardingStart, ["codeksei", "onboarding", "start", "--format", "json"]);
+  assert.deepEqual(hostkit.entrypoints.companionRemember, ["codeksei", "companion", "remember", "--format", "json"]);
+  assert.deepEqual(hostkit.entrypoints.contextBriefing, ["codeksei", "context", "briefing", "--format", "json"]);
+  assert.equal(hostkit.recommendedWorkflows.some((entry: { id: string }) => entry.id === "first_activation_onboarding"), true);
+  assert.equal(hostkit.recommendedWorkflows.some((entry: { id: string }) => entry.id === "ongoing_companion_memory"), true);
+});

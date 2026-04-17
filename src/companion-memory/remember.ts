@@ -33,6 +33,10 @@ import {
   type CompanionMemoryPatternCandidate,
   type CompanionMemoryRuntimeState,
 } from "./runtime-state";
+import {
+  extractCompanionProfileSignalUpdatesFromText,
+} from "./profile-signals";
+import { mergeCompanionProfileSignals } from "./profile-signal-contracts";
 
 export interface CompanionMemoryRuntimeConfig extends ContextBoardConfig, CompanionMemorySemanticConfig {
   accountId?: string;
@@ -77,11 +81,14 @@ const MAX_RECENT_WRITES = 20;
 const MAX_PATTERN_CANDIDATES_PER_SLOT = 12;
 
 const BOUNDARY_RE = /(不要|别|不能|先别|必须先|不要在|别在|先问过|先问我|不能碰|别碰|不要碰)/u;
-const PREFERENCE_RE = /(喜欢|希望|更喜欢|最好|简短|详细|直接|温柔|主动|被动|数据|感受|别太|不要太|少一点|多一点|短一点|长一点)/u;
+const PREFERENCE_RE = /(喜欢|希望|更喜欢|最好|简短|详细|直接|温柔|主动|被动|数据|感受|别太|不要太|少一点|多一点|短一点|长一点|英文|英语|中文|english|chinese|mandarin|代词|pronoun|称呼我|叫我|he\/him|she\/her|they\/them)/iu;
 const RHYTHM_RE = /(\d{1,2}[:点时]\d{0,2}|早上|上午|中午|下午|傍晚|晚上|夜里|凌晨|起床|睡前|睡觉|熬夜|效率高|效率最好|高能|慢热|别打扰|打扰)/u;
 const NEXT_RE = /(接下来|下一步|最近要|最近会|明天|今晚|待会|之后|这周|这个周末|马上要|先做|准备去|打算)/u;
-const CURRENT_STATUS_RE = /(我是|我做|最近在|现在在|目前在|眼下在|一直在|最头疼|卡在|想解决|想让我帮|我主要)/u;
+const CURRENT_STATUS_RE = /(我是|我做|最近在|现在在|目前在|眼下在|一直在|最头疼|卡在|想解决|想让我帮|我主要|我是男|我是女|男生|女生|男性|女性|male|female|man\b|woman\b|non-?binary)/iu;
 const STRONG_LABEL_RE = /(人格|人格类型|mbti|adhd|抑郁症|焦虑症|双相|自闭|神经质|diagnosis|diagnosed)/iu;
+const LANGUAGE_RE = /\benglish\b|\bchinese\b|\bmandarin\b|英文|英语|中文|汉语|普通话/iu;
+const LANGUAGE_HINT_RE = /(回复|回答|说|讲|聊|交流|沟通|写|用|切换|改用|prefer|reply|respond|speak|talk|write|use|switch|keep)/iu;
+const PRONOUN_RE = /(he\/him|she\/her|they\/them|代词|pronoun|叫我他|叫我她|叫我ta|叫我TA|用他|用她|用ta|用TA|称呼我)/iu;
 
 const SLOT_TO_KIND: Record<CompanionMemorySlotId, CompanionMemoryKind> = {
   boundary: "boundary",
@@ -503,11 +510,15 @@ function updateRuntimeStateAfterWrites(
   for (const write of writes) {
     slotFreshness[write.slotId] = updatedAt;
   }
+  const profileSignals = writes.reduce((signals, write) => (
+    mergeCompanionProfileSignals(signals, extractCompanionProfileSignalUpdatesFromText(write.text))
+  ), state.profileSignals);
   return {
     ...state,
     lastProcessedHashes: appendProcessedHash(state.lastProcessedHashes, processedHash),
     recentWrites,
     slotFreshness,
+    profileSignals,
     pendingPatternCandidates: clearPromotedCandidates(state.pendingPatternCandidates, writes),
     lastSource: source,
     lastUpdatedAt: updatedAt,
@@ -725,7 +736,9 @@ function detectSlots(sentence: string): CompanionMemorySlotId[] {
   if (BOUNDARY_RE.test(sentence)) {
     slots.push("boundary");
   }
-  if (PREFERENCE_RE.test(sentence)) {
+  const hasLanguagePreference = LANGUAGE_RE.test(sentence)
+    && (LANGUAGE_HINT_RE.test(sentence) || PREFERENCE_RE.test(sentence));
+  if (PREFERENCE_RE.test(sentence) || hasLanguagePreference || PRONOUN_RE.test(sentence)) {
     slots.push("preference");
   }
   if (RHYTHM_RE.test(sentence)) {

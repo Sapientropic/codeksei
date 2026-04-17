@@ -31,6 +31,7 @@ export interface IdentityAndTimeConfig {
   timelineStateTimezone: string;
   userName: string;
   userGender: string;
+  userLanguage?: string;
   allowedUserIds: string[];
 }
 

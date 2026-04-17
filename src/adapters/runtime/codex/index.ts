@@ -26,10 +26,15 @@ import { createRuntimeLifecycle } from "./lifecycle";
 
 type CodexRuntimeConfig = Pick<
   AppRuntimeConfig,
+  | "allowedUserIds"
+  | "durableNoteSchemaConfigFile"
   | "sessionsFile"
   | "stateDir"
   | "runtimeEndpoint"
   | "runtimeCommand"
+  | "userGender"
+  | "userLanguage"
+  | "userName"
   | "weixinInstructionsFile"
   | "weixinOperationsFile"
   | "weixinInstructionsOverlayFile"
@@ -158,7 +163,11 @@ export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRunt
       accessMode = "",
     }) {
       return runtimeLifecycle.withRuntimeReconnect(async (runtimeClient) => {
-        const refreshText = buildInstructionRefreshText(config, workspaceRoot);
+        const refreshText = buildInstructionRefreshText(
+          config,
+          workspaceRoot,
+          bindingKey ? sessionStore.getBinding(bindingKey)?.senderId : "",
+        );
         const runtimeWorkspaceRoot = resolveCodexWorkspaceRoot(workspaceRoot);
         await runtimeClient.resumeThread({ threadId });
         const completion = waitForTurnCompletion(runtimeClient, threadId);
@@ -240,9 +249,19 @@ export function createCodexRuntimeAdapter(config: CodexRuntimeConfig): CodexRunt
         const needsWorkspaceBootstrap = startedNewThread
           || !sessionStore.hasWorkspaceBootstrapForThread(bindingKey, workspaceRoot, threadId);
         if (startedNewThread) {
-          outboundText = buildOpeningTurnText(config, workspaceRoot, text);
+          outboundText = buildOpeningTurnText(
+            config,
+            workspaceRoot,
+            text,
+            metadata?.senderId,
+          );
         } else if (needsWorkspaceBootstrap) {
-          outboundText = buildWorkspaceBootstrapTurnText(config, workspaceRoot, text);
+          outboundText = buildWorkspaceBootstrapTurnText(
+            config,
+            workspaceRoot,
+            text,
+            metadata?.senderId,
+          );
         }
 
         await sendUserMessageWithWorkspaceDiagnostics({

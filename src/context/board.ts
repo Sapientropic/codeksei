@@ -41,6 +41,8 @@ export interface ContextBoardConfig {
   sessionsFile?: string;
   stateDir?: string;
   timezone?: unknown;
+  userGender?: unknown;
+  userLanguage?: unknown;
   workspaceBootstrapConfigFile?: string;
   workspaceRoot?: unknown;
 }

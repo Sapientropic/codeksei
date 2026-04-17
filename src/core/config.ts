@@ -92,7 +92,8 @@ function parseEnvConfig(env: EnvSource, options: ReadConfigOptions = {}): AppRun
       timezoneExplicit: timezoneConfig.explicit,
       timelineStateTimezone: timezoneConfig.timelineStateTimezone,
       userName: readPrefixedEnv(env, "USER_NAME") || "",
-      userGender: readPrefixedEnv(env, "USER_GENDER") || "female",
+      userGender: readPrefixedEnv(env, "USER_GENDER") || "neutral",
+      userLanguage: readPrefixedEnv(env, "USER_LANGUAGE") || "zh-CN",
       allowedUserIds: readPrefixedListEnv(env, "ALLOWED_USER_IDS"),
     },
     weixinBridge: {

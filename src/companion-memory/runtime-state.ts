@@ -8,6 +8,12 @@ import {
   writeManagedJsonStateFile,
 } from "../state/json-state";
 import { COMPANION_MEMORY_SLOT_IDS, type CompanionMemorySlotId } from "./contracts";
+import {
+  createEmptyCompanionProfileSignals,
+  normalizeCompanionProfileGender,
+  normalizeCompanionProfileLanguage,
+  type CompanionProfileSignals,
+} from "./profile-signal-contracts";
 
 const companionMemoryCandidateSchema = z.object({
   count: z.number().int().min(0),
@@ -42,6 +48,7 @@ export interface CompanionMemoryRuntimeState {
   recentWrites: CompanionMemoryRecentWrite[];
   slotFreshness: Record<CompanionMemorySlotId, string>;
   pendingPatternCandidates: Record<CompanionMemorySlotId, CompanionMemoryPatternCandidate[]>;
+  profileSignals: CompanionProfileSignals;
   lastSource: string;
   lastUpdatedAt: string;
 }
@@ -51,6 +58,10 @@ const companionMemoryRuntimeStateSchema = z.object({
   recentWrites: z.array(companionMemoryRecentWriteSchema),
   slotFreshness: z.record(z.string()),
   pendingPatternCandidates: z.record(z.array(companionMemoryCandidateSchema)),
+  profileSignals: z.object({
+    preferredLanguage: z.string(),
+    gender: z.string(),
+  }).optional(),
   lastSource: z.string(),
   lastUpdatedAt: z.string(),
 });
@@ -99,6 +110,7 @@ export function createDefaultCompanionMemoryRuntimeState(): CompanionMemoryRunti
     recentWrites: [],
     slotFreshness: createEmptySlotFreshness(),
     pendingPatternCandidates: createEmptyPatternCandidateMap(),
+    profileSignals: createEmptyCompanionProfileSignals(),
     lastSource: "",
     lastUpdatedAt: "",
   };
@@ -139,6 +151,7 @@ export function normalizeCompanionMemoryRuntimeState(
     recentWrites: normalizeRecentWrites(record.recentWrites),
     slotFreshness: normalizeSlotFreshness(record.slotFreshness),
     pendingPatternCandidates: normalizePatternCandidateMap(record.pendingPatternCandidates),
+    profileSignals: normalizeProfileSignals(record.profileSignals),
     lastSource: normalizeText(record.lastSource),
     lastUpdatedAt: normalizeText(record.lastUpdatedAt),
   };
@@ -226,6 +239,16 @@ function createEmptyPatternCandidateMap(): Record<CompanionMemorySlotId, Compani
     next: [],
     preference: [],
     rhythm: [],
+  };
+}
+
+function normalizeProfileSignals(value: unknown): CompanionProfileSignals {
+  const record = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  return {
+    preferredLanguage: normalizeCompanionProfileLanguage(record.preferredLanguage),
+    gender: normalizeCompanionProfileGender(record.gender),
   };
 }
 
