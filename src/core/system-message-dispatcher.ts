@@ -1,7 +1,7 @@
 import { normalizeText } from "./text-normalization";
 import type { SystemMessage } from "../contracts/queue-items";
 import type { NormalizedIncomingMessage } from "./runtime-types";
-import { resolvePromptPersonEn } from "../contracts/person-reference";
+import { resolvePromptPersonEn, resolvePromptPersonZh } from "../contracts/person-reference";
 import { resolveInstructionLanguage } from "./instructions-template";
 
 interface SystemMessageDispatcherConfig {
@@ -114,17 +114,20 @@ function buildSystemInboundText(
   senderId: unknown = "",
 ): string {
   const body = normalizeText(text);
-  const person = resolvePromptPersonEn(config);
   const language = resolveInstructionLanguage({
     ...config,
     senderId,
   });
   if (language === "zh-CN") {
+    // Keep the backstage banner and person reference in the same language so
+    // fallback system messages do not regress into mixed zh/en copy.
+    const person = resolvePromptPersonZh(config);
     if (!body) {
       return `系统触发。\n这条消息只留在后台，不会直接对 ${person} 可见。`;
     }
     return `系统触发。\n这条消息只留在后台，不会直接对 ${person} 可见。\n${body}`;
   }
+  const person = resolvePromptPersonEn(config);
   if (!body) {
     return `System trigger.\nThis message stays backstage and is not visible to ${person}.`;
   }
