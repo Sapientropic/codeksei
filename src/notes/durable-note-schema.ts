@@ -25,18 +25,24 @@ const DURABLE_NOTE_SCOPE_ALIASES = {
 };
 
 interface DurableNoteConfig {
+  allowedUserIds?: unknown;
   durableNoteSchemaConfigFile?: unknown;
   projectRadarConfigFile?: unknown;
+  senderId?: unknown;
+  stateDir?: unknown;
   workspaceRoot?: unknown;
 }
 
 interface DurableNoteInspectionOptions {
   kind?: unknown;
   project?: unknown;
+  senderId?: unknown;
   scope?: unknown;
 }
 
 interface DurableNoteRouteDefinition {
+  createIfMissing?: boolean;
+  fileTitle?: string;
   maxItems: number;
   section: string;
   slot: string;
@@ -111,6 +117,10 @@ function resolveDurableNoteProfile(config: DurableNoteConfig = {}) {
   const workspaceProfile = selectWorkspaceProfile(schemaConfig.workspaces, workspaceRoot);
   const projectDefaults = normalizeFamily(workspaceProfile?.projectDefaults);
   const notes = normalizeNamedFamilies(workspaceProfile?.notes);
+  const fallbackCompanion = resolveFallbackCompanionFamily(config);
+  if (!notes.companion && fallbackCompanion) {
+    notes.companion = fallbackCompanion;
+  }
   return {
     workspaceRoot,
     projectDefaults,
@@ -138,7 +148,7 @@ function inspectDurableNoteRouting(
       kind,
       extra: {
         project: target.label,
-        availableProjects: listTrackedProjects(config).map((entry) => entry.slug),
+        availableProjects: listTrackedProjectsSafe(config).map((entry) => entry.slug),
       },
     });
   }
@@ -163,7 +173,7 @@ function inspectDurableNoteRouting(
     mode: "overview",
     workspaceRoot: profile.workspaceRoot,
     project: {
-      availableProjects: listTrackedProjects(config).map((entry) => entry.slug),
+      availableProjects: listTrackedProjectsSafe(config).map((entry) => entry.slug),
       sections: profile.projectDefaults.sections,
       kinds: Object.keys(profile.projectDefaults.kinds),
     },
@@ -195,13 +205,27 @@ function resolveDurableNoteRoute(
   return inspection.route;
 }
 
-function ensureDurableNoteSections(filePath: unknown, sections: unknown[] = []) {
+function ensureDurableNoteSections(
+  filePath: unknown,
+  sections: unknown[] = [],
+  {
+    createIfMissing = false,
+    fileTitle = "",
+  }: {
+    createIfMissing?: boolean;
+    fileTitle?: unknown;
+  } = {},
+) {
   const normalizedPath = normalizeText(filePath);
   if (!normalizedPath) {
     throw new Error("durable note filePath 不能为空");
   }
   if (!fs.existsSync(normalizedPath)) {
-    throw new Error(`durable note 文件不存在: ${normalizedPath}`);
+    if (!createIfMissing) {
+      throw new Error(`durable note 文件不存在: ${normalizedPath}`);
+    }
+    const title = normalizeText(fileTitle) || path.parse(normalizedPath).name;
+    writeForeignTextDocument(normalizedPath, ensureTrailingNewline(`# ${title}\n`), { encoding: "utf8" });
   }
   const stat = fs.statSync(normalizedPath);
   if (!stat.isFile()) {
@@ -248,7 +272,7 @@ function buildInspectionResult({
   familyLabel: string;
   filePath: string;
   kind: string;
-  kinds: Record<string, { maxItems: number; section: string; slot: string; style: string }>;
+  kinds: Record<string, { createIfMissing?: boolean; fileTitle?: string; maxItems: number; section: string; slot: string; style: string }>;
   sections: string[];
 }): DurableNoteRoutingInspection {
   const availableKinds = Object.keys(kinds);
@@ -277,9 +301,11 @@ function buildInspectionResult({
     sections: [...sections],
     kinds: availableKinds,
     route: {
+      createIfMissing: Boolean(matchedKind.createIfMissing),
       family: familyId,
       kind,
       filePath,
+      fileTitle: normalizeText(matchedKind.fileTitle),
       section: matchedKind.section,
       style: matchedKind.style,
       slot: matchedKind.slot,
@@ -354,16 +380,22 @@ function normalizeKinds(rawKinds: unknown) {
   if (!rawKinds || typeof rawKinds !== "object") {
     return {};
   }
-  const entries = Object.entries(rawKinds)
-    .map(([kind, rawRoute]) => {
-      const normalizedKind = normalizeText(kind).toLowerCase();
-      const route = normalizeRoute(rawRoute);
-      if (!normalizedKind || !route) {
-        return null;
-      }
-      return [normalizedKind, route];
-    })
-    .filter((entry): entry is [string, { section: string; style: string; slot: string; maxItems: number }] => Boolean(entry));
+  const entries: Array<[string, {
+    createIfMissing?: boolean;
+    fileTitle?: string;
+    section: string;
+    style: string;
+    slot: string;
+    maxItems: number;
+  }]> = [];
+  for (const [kind, rawRoute] of Object.entries(rawKinds)) {
+    const normalizedKind = normalizeText(kind).toLowerCase();
+    const route = normalizeRoute(rawRoute);
+    if (!normalizedKind || !route) {
+      continue;
+    }
+    entries.push([normalizedKind, route]);
+  }
   return Object.fromEntries(entries);
 }
 
@@ -376,6 +408,8 @@ function normalizeRoute(rawRoute: unknown) {
     return null;
   }
   return {
+    createIfMissing: Boolean(route.createIfMissing),
+    fileTitle: normalizeText(route.fileTitle),
     section,
     style: normalizeText(route.style).toLowerCase() === "paragraph" ? "paragraph" : "bullet",
     slot: normalizeText(route.slot),
@@ -419,6 +453,88 @@ function resolveWorkspaceNotePath(workspaceRoot: unknown, targetPath: unknown): 
 
 function listAvailableScopes(profile: { notes?: Record<string, unknown> }): string[] {
   return Object.keys(profile.notes || {});
+}
+
+function listTrackedProjectsSafe(config: DurableNoteConfig = {}) {
+  try {
+    return listTrackedProjects(config);
+  } catch {
+    return [];
+  }
+}
+
+function resolveFallbackCompanionFamily(config: DurableNoteConfig = {}): (DurableNoteFamily & { label: string }) | null {
+  const stateDir = normalizeText(config.stateDir);
+  if (!stateDir) {
+    return null;
+  }
+  const userKey = resolveFallbackCompanionUserKey(config);
+  return {
+    filePath: resolveCrossPlatformPathFromRoot(stateDir, "companions", userKey, "profile.md"),
+    kinds: {
+      status: {
+        createIfMissing: true,
+        fileTitle: "Codeksei Companion Profile",
+        maxItems: 1,
+        section: "当前定位",
+        slot: "current-position",
+        style: "paragraph",
+      },
+      pattern: {
+        createIfMissing: true,
+        fileTitle: "Codeksei Companion Profile",
+        maxItems: 10,
+        section: "协作节奏",
+        slot: "",
+        style: "bullet",
+      },
+      preference: {
+        createIfMissing: true,
+        fileTitle: "Codeksei Companion Profile",
+        maxItems: 12,
+        section: "支持偏好",
+        slot: "",
+        style: "bullet",
+      },
+      boundary: {
+        createIfMissing: true,
+        fileTitle: "Codeksei Companion Profile",
+        maxItems: 12,
+        section: "能力边界",
+        slot: "",
+        style: "bullet",
+      },
+      next: {
+        createIfMissing: true,
+        fileTitle: "Codeksei Companion Profile",
+        maxItems: 8,
+        section: "下一步",
+        slot: "",
+        style: "bullet",
+      },
+    },
+    label: "Codeksei companion fallback",
+    sections: ["当前定位", "协作节奏", "支持偏好", "能力边界", "下一步"],
+  };
+}
+
+function resolveFallbackCompanionUserKey(config: DurableNoteConfig = {}): string {
+  const explicitSender = normalizeText(config.senderId);
+  if (explicitSender) {
+    return sanitizePathSegment(explicitSender);
+  }
+  const allowedUserIds = Array.isArray(config.allowedUserIds)
+    ? config.allowedUserIds.map((entry) => normalizeText(entry)).filter(Boolean)
+    : [];
+  const singleAllowedUser = allowedUserIds.length === 1 ? allowedUserIds[0] || "" : "";
+  if (singleAllowedUser) {
+    return sanitizePathSegment(singleAllowedUser);
+  }
+  return "default";
+}
+
+function sanitizePathSegment(value: string): string {
+  return normalizeText(value).replace(/[\\/:*?"<>|]+/gu, "_") || "default";
 }
 
 function canonicalizeDurableNoteScope(value: unknown): string {

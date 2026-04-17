@@ -31,12 +31,16 @@ import {
   buildCheckinTargetKey,
   type CheckinResolvedTarget,
 } from "./target-resolution";
+import {
+  buildOnboardingCheckinPrompt,
+  createOnboardingStateStore,
+} from "../onboarding/state";
 
 const INTERNAL_CHECKIN_TRIGGER_TEMPLATE = "Take a quiet look at whether now is a good moment to reach out to %PERSON%. You may stay silent, send one short WeChat message, update diary/timeline, or take another useful backstage action. If no user-visible message should be sent, output exactly SILENT. If you do send a message, output only the message text.";
 const CHECKIN_MAX_SILENCE_MS = 24 * 60 * 60_000;
 export const CHECKIN_ACTIVE_WAKE_TIMEOUT_MS = 30 * 60_000;
 
-type CheckinTickConfig = Pick<AppRuntimeConfig, "checkinConfigFile" | "checkinScheduleStateFile"> & Partial<Pick<AppRuntimeConfig, "userName">>;
+type CheckinTickConfig = Pick<AppRuntimeConfig, "checkinConfigFile" | "checkinScheduleStateFile"> & Partial<Pick<AppRuntimeConfig, "stateDir" | "userName">>;
 
 interface CheckinTickArgs {
   ack?: string;
@@ -98,7 +102,7 @@ export interface CheckinScheduledWakeResult {
 }
 
 export function buildCheckinTriggerPayload(
-  config: Partial<Pick<AppRuntimeConfig, "userName">>,
+  config: Partial<Pick<AppRuntimeConfig, "stateDir" | "userName">>,
   target: CheckinResolvedTarget,
   {
     nowMs = Date.now(),
@@ -109,14 +113,16 @@ export function buildCheckinTriggerPayload(
   } = {},
 ): CheckinTriggerPayload {
   const person = resolvePromptPersonEn(config);
+  const onboardingPrompt = resolveOnboardingPrompt(config, target.senderId);
+  const basePrompt = onboardingPrompt || INTERNAL_CHECKIN_TRIGGER_TEMPLATE.replace("%PERSON%", person);
   return {
     createdAt: new Date(nowMs).toISOString(),
     kind: "checkin",
     senderId: target.senderId,
     source: "checkin_trigger",
     text: triggerId
-      ? buildScheduledCheckinPrompt(person, target, triggerId)
-      : INTERNAL_CHECKIN_TRIGGER_TEMPLATE.replace("%PERSON%", person),
+      ? buildScheduledCheckinPrompt(basePrompt, target, triggerId)
+      : basePrompt,
     workspaceRoot: target.workspaceRoot,
   };
 }
@@ -685,14 +691,14 @@ function buildTickResult({
 }
 
 function buildScheduledCheckinPrompt(
-  person: string,
+  leadPrompt: string,
   target: CheckinResolvedTarget,
   triggerId: string,
 ): string {
   const quotedWorkspace = JSON.stringify(target.workspaceRoot);
   const quotedSender = JSON.stringify(target.senderId);
   return [
-    INTERNAL_CHECKIN_TRIGGER_TEMPLATE.replace("%PERSON%", person),
+    leadPrompt,
     "",
     `Trigger id: ${triggerId}`,
     "After this proactive pass, you must decide when Codeksei should wake next and record it with exactly one completion command.",
@@ -706,6 +712,21 @@ function buildScheduledCheckinPrompt(
     `codeksei --workspace-root ${quotedWorkspace} system checkin-complete --user ${quotedSender} --workspace ${quotedWorkspace} --trigger ${triggerId} --result silent --sleep-for ${CHECKIN_COMPLETION_SLEEP_FOR_PLACEHOLDER}`,
     "You may replace --sleep-for with --next-wake-at 2026-04-15T09:00:00+08:00 if you want an exact wake time.",
   ].join("\n");
+}
+
+function resolveOnboardingPrompt(
+  config: Partial<Pick<AppRuntimeConfig, "stateDir">>,
+  senderId: string,
+): string {
+  try {
+    if (!normalizeText(config.stateDir)) {
+      return "";
+    }
+    const state = createOnboardingStateStore(config, senderId).getState();
+    return buildOnboardingCheckinPrompt(state);
+  } catch {
+    return "";
+  }
 }
 
 export function pickRandomDelayMs(minIntervalMs: number, maxIntervalMs: number): number {

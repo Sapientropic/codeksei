@@ -21,6 +21,7 @@ This skill is designed for **Hermes Hosted Mode**.
 - The user wants to record a real time block, diary item, reminder, or durable note.
 - The user wants a nightly/weekly/monthly review draft based on Codeksei's local data model.
 - The user wants project radar or "where did I leave this thread/project?" support.
+- The user is new enough that Hermes should start or continue the Codeksei onboarding conversation instead of pretending it already knows them.
 - The current host is Hermes, including Hermes-hosted Weixin.
 
 ## Important Boundary
@@ -45,6 +46,9 @@ codeksei timeline screenshot --send [--user <wechatUserId>] [--output /绝对路
 codeksei diary write --section todo --state open --text "内容"
 codeksei reminder write --delay 30m --text "提醒内容" [--delivery direct|proactive]
 codeksei note auto (--project <slug> | --scope <name>) --kind <kind> [--text "内容" | --stdin]
+codeksei onboarding start --user <wechat_user_id>
+codeksei onboarding step --user <wechat_user_id> --session <sessionId> [--text "内容" | --stdin]
+codeksei onboarding status --user <wechat_user_id>
 codeksei review nightly
 codeksei review weekly
 codeksei review monthly
@@ -64,6 +68,7 @@ codeksei host settle-checkin --provider hermes --user <wechatUserId> --workspace
    - `diary` for lived notes / supplements / todo transitions
    - `reminder` for user-visible nudges or future proactive wakes
    - `note` for durable memory
+   - `onboarding` for first-activation / profile-building chat turns
    - `review` for structured reflection
    - `project radar` for repo continuity
    - `context briefing` for inspecting the current proactive/review handoff board

@@ -120,3 +120,21 @@ test("ensureDurableNoteSections is idempotent once every required section exists
   assert.match(content, /## 当前定位/u);
   assert.match(content, /## 支持偏好/u);
 });
+
+test("resolveDurableNoteRoute falls back to a state-dir companion profile when schema is missing", () => {
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-durable-note-fallback-"));
+  const stateDir = path.join(workspaceRoot, ".codeksei-state");
+  const route = resolveDurableNoteRoute({
+    allowedUserIds: ["wx-user"],
+    stateDir,
+    workspaceRoot,
+  }, {
+    scope: "companion",
+    kind: "preference",
+  });
+
+  assert.equal(route.family, "companion");
+  assert.equal(route.section, "支持偏好");
+  assert.equal(route.createIfMissing, true);
+  assert.match(route.filePath.replace(/\\/g, "/"), /\/\.codeksei-state\/companions\/wx-user\/profile\.md$/u);
+});

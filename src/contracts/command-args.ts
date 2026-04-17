@@ -83,6 +83,39 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "mode", keys: ["--mode"], type: "string", defaultValue: "proactive", description: "proactive|review" },
     ],
   }),
+  onboardingStart: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      COMMON_DRY_RUN_FLAG,
+      COMMON_IDEMPOTENCY_FLAG,
+      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "稳定 user id" },
+    ],
+  }),
+  onboardingStep: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      COMMON_DRY_RUN_FLAG,
+      COMMON_IDEMPOTENCY_FLAG,
+      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "稳定 user id" },
+      { name: "session", keys: ["--session"], type: "string", defaultValue: "", description: "当前 onboarding session id" },
+      { name: "text", keys: ["--text"], type: "string", defaultValue: "", description: "用户最新一轮回复" },
+      { name: "useStdin", keys: ["--stdin"], type: "boolean", defaultValue: false, description: "从标准输入读取用户回复" },
+    ],
+  }),
+  onboardingStatus: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "稳定 user id" },
+    ],
+  }),
+  onboardingReset: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      COMMON_DRY_RUN_FLAG,
+      COMMON_IDEMPOTENCY_FLAG,
+      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "稳定 user id" },
+    ],
+  }),
   diaryWrite: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,

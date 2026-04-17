@@ -37,6 +37,20 @@ const TOPIC_HELP = {
       "  proactive 更偏主动判断；review 更偏复盘 framing 与重入提示。",
     ],
   }),
+  onboarding: () => ({
+    usage: [
+      buildExample("onboarding.start", true),
+      buildExample("onboarding.step", true),
+      buildExample("onboarding.status", true),
+      buildExample("onboarding.reset", true),
+    ],
+    bodyLabel: "补充：",
+    body: [
+      "  这是面向激活即访谈的本地流程入口，不是问卷生成器。",
+      "  start 负责开场；step 吸收一轮用户回复并回写 companion note；status 看覆盖；reset 只清流程状态。",
+      "  用户真正的长期画像继续留在 companion note，由 context board 投影给宿主消费。",
+    ],
+  }),
   reminder: () => ({
     usage: [buildExample("reminder.create", true)],
     bodyLabel: "补充：",
@@ -323,6 +337,56 @@ const LEAF_HELP = {
     examples: [
       "  codeksei context briefing --user <wechatUserId> --workspace /absolute/workspace",
       "  codeksei context briefing --user <wechatUserId> --workspace /absolute/workspace --mode review",
+    ],
+    includeFlagBlock: true,
+  }),
+  "onboarding.start": () => ({
+    usage: [buildExample("onboarding.start", true)],
+    bodyLabel: "说明：",
+    body: [
+      "  开始一轮聊天式激活访谈，返回第一句适合直接对用户说的话。",
+      "  它不会吐出问卷模板；真正的长期画像会落到 companion note，再由 context board 投影给宿主。",
+      "  如果当前已经有进行中的 onboarding，会返回续聊提示而不是静默重开一轮。",
+    ],
+    examples: [
+      "  codeksei onboarding start --user <wechatUserId>",
+    ],
+    includeFlagBlock: true,
+  }),
+  "onboarding.step": () => ({
+    usage: [buildExample("onboarding.step", true)],
+    bodyLabel: "说明：",
+    body: [
+      "  吸收用户最新一轮回复，提取最小画像事实，回写 companion note，并返回下一句适合直接说的话。",
+      "  这条命令偏自然聊天，不会输出 slot 名或问卷编号给用户看。",
+      "  长期真相继续只写 companion note；流程状态只写 onboarding state。step 也可用于后续轻量纠正。 ",
+    ],
+    examples: [
+      "  @'\n我下午两点以后比较能动，晚上别来追我太紧。\n'@ | codeksei onboarding step --user <wechatUserId> --session <sessionId> --stdin",
+    ],
+    includeFlagBlock: true,
+  }),
+  "onboarding.status": () => ({
+    usage: [buildExample("onboarding.status", true)],
+    bodyLabel: "说明：",
+    body: [
+      "  查看当前 onboarding 的流程状态、sessionId、缺口和轮次。",
+      "  这条命令只读，不会改长期 companion note。",
+    ],
+    examples: [
+      "  codeksei onboarding status --user <wechatUserId>",
+    ],
+    includeFlagBlock: true,
+  }),
+  "onboarding.reset": () => ({
+    usage: [buildExample("onboarding.reset", true)],
+    bodyLabel: "说明：",
+    body: [
+      "  只重置 onboarding 流程状态，不清空已经形成的 companion note。",
+      "  更适合内测和调试，不是默认用户路径。",
+    ],
+    examples: [
+      "  codeksei onboarding reset --user <wechatUserId>",
     ],
     includeFlagBlock: true,
   }),

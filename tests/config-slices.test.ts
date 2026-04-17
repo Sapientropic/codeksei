@@ -71,6 +71,10 @@ test("config slices compose into the legacy-compatible app runtime surface", () 
       reviewSemanticHost: "auto",
       reviewSemanticModel: "gpt-5.4",
       reviewSemanticTimeoutMs: 120000,
+      onboardingSemanticMode: "",
+      onboardingSemanticHost: "",
+      onboardingSemanticModel: "",
+      onboardingSemanticTimeoutMs: 15000,
     },
     checkinRuntime: {
       workspaceId: "workspace-1",
@@ -101,6 +105,7 @@ test("parseEnvConfig keeps workspace schema refs and state-backed checkin files 
   assert.equal(config.workspaceRoot, "E:/workspace/current");
   assert.equal(config.projectRadarConfigFile.replace(/\\/g, "/"), "E:/workspace/current/.codex/code-projects.json");
   assert.equal(config.reviewSchemaConfigFile.replace(/\\/g, "/"), "E:/workspace/current/.codex/review-schema.json");
+  assert.equal(config.onboardingSemanticTimeoutMs, 15000);
   assert.equal(config.checkinConfigFile.replace(/\\/g, "/"), "E:/state/checkin-config.json");
   assert.equal(config.systemMessageQueueFile.replace(/\\/g, "/"), "E:/state/system-message-queue.json");
 });

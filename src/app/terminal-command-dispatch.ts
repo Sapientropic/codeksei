@@ -33,6 +33,12 @@ import {
 } from "./hermes-operator-cli";
 import { runNoteAutoCommand, runNoteMaybeCommand } from "./note-auto-cli";
 import { runNoteSyncCommand } from "./note-sync-cli";
+import {
+  runOnboardingResetCommand,
+  runOnboardingStartCommand,
+  runOnboardingStatusCommand,
+  runOnboardingStepCommand,
+} from "./onboarding-cli";
 import { runProjectRadarCommand } from "./project-radar-cli";
 import { runReminderWriteCommand } from "./reminder-write-cli";
 import { runReviewCommand } from "./review-cli";
@@ -175,6 +181,18 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
   },
   "channel.send-file": async (_manifest, context) => {
     return runChannelSendFileCommand(context.getApp() as ChannelSendFileApp, context.leafArgs, context.config);
+  },
+  "onboarding.start": async (_manifest, context) => {
+    return runOnboardingStartCommand(context.config, context.leafArgs);
+  },
+  "onboarding.step": async (_manifest, context) => {
+    return runOnboardingStepCommand(context.config, context.leafArgs);
+  },
+  "onboarding.status": async (_manifest, context) => {
+    return runOnboardingStatusCommand(context.config, context.leafArgs);
+  },
+  "onboarding.reset": async (_manifest, context) => {
+    return runOnboardingResetCommand(context.config, context.leafArgs);
   },
   "context.briefing": async (_manifest, context) => {
     return runContextBriefingCommand(context.config, context.leafArgs);

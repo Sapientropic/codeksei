@@ -26,6 +26,7 @@ import {
 } from "../workspace/workspace-bootstrap";
 import { SessionStore } from "../adapters/runtime/codex/session-store";
 import { normalizeDisplayPath } from "../core/path-utils";
+import { createOnboardingStateStore } from "../onboarding/state";
 
 export type ContextBriefingMode = "proactive" | "review";
 
@@ -77,6 +78,12 @@ interface CheckinSnapshot {
   stateFound: boolean;
 }
 
+interface OnboardingSnapshot {
+  missingSlots: string[];
+  status: string;
+  updatedAt: string;
+}
+
 interface ContextBoardState {
   followupContext: string;
 }
@@ -111,6 +118,7 @@ export interface ContextBoardBriefing {
   followupContext: string;
   freshness: ContextBoardFreshness;
   mode: ContextBriefingMode;
+  onboarding: OnboardingSnapshot;
   projectRadar: ProjectRadarSnapshot;
   stale: boolean;
   staleReasons: string[];
@@ -213,8 +221,9 @@ export function buildContextBoardBriefing(
     todayDate,
     todayDate,
   )[0] || null;
-  const companionNote = collectCompanionNoteSnapshot(config);
+  const companionNote = collectCompanionNoteSnapshot(config, target.senderId);
   const checkin = collectCheckinSnapshot(config, target);
+  const onboarding = collectOnboardingSnapshot(config, target.senderId);
   const projectRadar = collectCurrentProjectRadar(config, target.workspaceRoot);
   const workspaceBootstrap = collectWorkspaceContinuitySnapshot(target.workspaceRoot, {
     workspaceBootstrapConfigFile: config.workspaceBootstrapConfigFile,
@@ -244,6 +253,7 @@ export function buildContextBoardBriefing(
       checkin,
       companionNote,
       freshness,
+      onboarding,
       projectRadar,
       staleReasons,
       todayDate,
@@ -270,6 +280,7 @@ export function buildContextBoardBriefing(
     followupContext: effectiveFollowupContext,
     freshness,
     mode,
+    onboarding,
     projectRadar,
     sections,
     stale,
@@ -491,6 +502,7 @@ function buildSourceStatusSection({
   checkin,
   companionNote,
   freshness,
+  onboarding,
   projectRadar,
   staleReasons,
   todayDate,
@@ -501,6 +513,7 @@ function buildSourceStatusSection({
   checkin: CheckinSnapshot;
   companionNote: CompanionNoteSnapshot;
   freshness: ContextBoardFreshness;
+  onboarding: OnboardingSnapshot;
   projectRadar: ProjectRadarSnapshot;
   staleReasons: string[];
   todayDate: string;
@@ -512,6 +525,7 @@ function buildSourceStatusSection({
     `board 更新时间：${updatedAt}`,
     `today diary：${freshness.diaryCurrent ? "present" : "missing"}${normalizeText(todayDiaryEntry?.filePath) ? ` | ${normalizeText(todayDiaryEntry?.filePath)}` : ` | ${todayDate}`}`,
     `companion note：${companionNote.exists ? "present" : "missing"}${companionNote.updatedAt ? ` | updated ${companionNote.updatedAt}` : ""}`,
+    `onboarding：${onboarding.status}${onboarding.updatedAt ? ` | updated ${onboarding.updatedAt}` : ""}${onboarding.missingSlots.length ? ` | missing ${onboarding.missingSlots.join(", ")}` : ""}`,
     `checkin completion：${checkin.lastCompletionAt ? checkin.lastCompletionAt : "missing"}`,
     `project radar：${projectRadar.available ? "available" : `unavailable${projectRadar.reason ? ` (${projectRadar.reason})` : ""}`}`,
     `workspace bootstrap files：${workspaceBootstrap.primaryFiles.length + workspaceBootstrap.recentFiles.length}`,
@@ -520,9 +534,13 @@ function buildSourceStatusSection({
   return renderBulletBlock(lines, "[⚠️ 需确认] 还没有可用的上下文来源状态。");
 }
 
-function collectCompanionNoteSnapshot(config: ContextBoardConfig): CompanionNoteSnapshot {
+function collectCompanionNoteSnapshot(config: ContextBoardConfig, senderId: string): CompanionNoteSnapshot {
   try {
-    const inspection = inspectDurableNoteRouting(config, {
+    const inspection = inspectDurableNoteRouting({
+      ...config,
+      allowedUserIds: [senderId],
+      senderId,
+    }, {
       scope: "companion",
     });
     if (!("filePath" in inspection) || !normalizeText(inspection.filePath) || !fs.existsSync(inspection.filePath)) {
@@ -557,6 +575,30 @@ function collectCompanionNoteSnapshot(config: ContextBoardConfig): CompanionNote
     };
   } catch {
     return emptyCompanionNoteSnapshot();
+  }
+}
+
+function collectOnboardingSnapshot(config: ContextBoardConfig, senderId: string): OnboardingSnapshot {
+  try {
+    if (!normalizeText(config.stateDir)) {
+      return {
+        missingSlots: [],
+        status: "not_started",
+        updatedAt: "",
+      };
+    }
+    const state = createOnboardingStateStore(config, senderId).getState();
+    return {
+      missingSlots: [...state.missingSlots],
+      status: state.status,
+      updatedAt: normalizeText(state.updatedAt),
+    };
+  } catch {
+    return {
+      missingSlots: [],
+      status: "not_started",
+      updatedAt: "",
+    };
   }
 }
 
