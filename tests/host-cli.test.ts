@@ -48,10 +48,14 @@ function normalizePathSeparators(value: string) {
   return value.replace(/\\/gu, "/");
 }
 
-test("host manifest returns bridge-full invariant and hermes recipe", async () => {
+test("host manifest returns host-neutral v2 identity plus compatibility invariant", async () => {
   const fixture = createHostFixture("codeksei-host-manifest-");
   const result = await runHostManifestCommand(fixture.config);
 
+  assert.equal(result.data.contractVersion, 2);
+  assert.equal(result.data.coreInvariant, "codeksei-core-owned");
+  assert.equal(result.data.scheduleTruthOwner, "codeksei");
+  assert.equal(result.data.hostIdentity.profile, "codex-mode");
   assert.equal(result.data.runtimeInvariant, "bridge-full");
   assert.equal(Array.isArray(result.data.recipes), true);
   assert.equal(result.data.recipes.some((entry: { id: string }) => entry.id === "hermes"), true);
@@ -78,7 +82,12 @@ test("host bootstrap writes canonical config and previews Hermes bootstrap", asy
 
   assert.equal(result.meta.dryRun, true);
   assert.equal(result.data.provider, "hermes");
-  assert.equal(result.data.config.$schema, "./schemas/codeksei-config-v1.json");
+  assert.equal(result.data.config.$schema, "./schemas/codeksei-config-v2.json");
+  assert.equal(result.data.config.host.runtimeProvider, "hermes");
+  assert.equal(result.data.config.host.runtimeOwner, "host");
+  assert.equal(result.data.config.host.channelProvider, "hermes");
+  assert.equal(result.data.config.host.channelKind, "weixin");
+  assert.equal(result.data.config.host.deliveryRecipe, "hermes-origin");
   assert.equal(result.data.config.bootstrap.manifestContractVersion > 0, true);
   assert.match(String(result.data.config.bootstrap.completedAt || ""), /T/u);
   assert.equal(fs.existsSync(configPath), false);

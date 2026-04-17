@@ -22,7 +22,7 @@ test("repo exposes the official Hermes companion skill asset", () => {
   assert.match(content, /codeksei timeline event/u);
   assert.match(content, /codeksei diary write/u);
   assert.match(content, /codeksei reminder write/u);
-  assert.match(content, /Hermes Hosted Mode/u);
+  assert.match(content, /Hosted Mode \/ Hermes recipe/u);
 });
 
 test("hosted Hermes doctor reports repo-local diagnostics and installed skill state", () => {
@@ -68,7 +68,7 @@ test("skill preview/install and smoke keep hosted Hermes readiness explicit", ()
   assert.equal(installResult.installedSkill.inSync, true);
 
   const smoke = runHermesHostedSmoke(config);
-  assert.equal(smoke.hostProfile.profile, "hosted-hermes-weixin");
+  assert.equal(smoke.hostProfile.profile, "hosted-mode");
   assert.equal(smoke.checks.repoLocal.ok, true);
   assert.equal(smoke.checks.installedSkill.ok, true);
   assert.equal(smoke.checks.hermesCommand.ok, false);

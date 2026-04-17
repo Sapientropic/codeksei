@@ -17,7 +17,7 @@ import type {
 
 async function main() {
   const hostMode = resolveHostMode(process.env);
-  if (hostMode.mode !== "bridge") {
+  if (hostMode.mode !== "codex") {
     writeStdoutLine(`profile=${hostMode.profile}`);
     writeStdoutLine(`mode=${hostMode.mode}`);
     writeStdoutLine(`runtime=${hostMode.runtime}`);

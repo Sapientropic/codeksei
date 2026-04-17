@@ -1,8 +1,9 @@
 export const HOST_MODE_CLASSES = [
-  "bridge-full",
+  "codex-managed",
   "hosted-proactive",
   "hosted-skill-only",
   "cli-only",
+  "bridge-full",
 ] as const;
 
 export const HOST_TRANSPORTS = [
@@ -13,6 +14,9 @@ export const HOST_CAPABILITY_IDS = [
   "invokeCodekseiAction",
   "deliverVisibleText",
   "deliverVisibleFile",
+  "upsertWakeJob",
+  "cancelWakeJob",
+  "resolveOriginSession",
   "upsertOneShotWake",
   "cancelOneShotWake",
   "persistedOriginRouting",
@@ -34,6 +38,9 @@ export interface HostCapabilityMap {
   invokeCodekseiAction: boolean;
   deliverVisibleText: boolean;
   deliverVisibleFile: boolean;
+  upsertWakeJob: boolean;
+  cancelWakeJob: boolean;
+  resolveOriginSession: boolean;
   upsertOneShotWake: boolean;
   cancelOneShotWake: boolean;
   persistedOriginRouting: boolean;
@@ -52,6 +59,9 @@ export function createEmptyHostCapabilityMap(): HostCapabilityMap {
     invokeCodekseiAction: false,
     deliverVisibleText: false,
     deliverVisibleFile: false,
+    upsertWakeJob: false,
+    cancelWakeJob: false,
+    resolveOriginSession: false,
     upsertOneShotWake: false,
     cancelOneShotWake: false,
     persistedOriginRouting: false,
@@ -72,6 +82,24 @@ export function buildHostCapabilityMap(
   const map = createEmptyHostCapabilityMap();
   for (const capability of capabilities) {
     map[capability] = true;
+    if (capability === "upsertWakeJob") {
+      map.upsertOneShotWake = true;
+    }
+    if (capability === "cancelWakeJob") {
+      map.cancelOneShotWake = true;
+    }
+    if (capability === "resolveOriginSession") {
+      map.resolveHostedSession = true;
+    }
+    if (capability === "upsertOneShotWake") {
+      map.upsertWakeJob = true;
+    }
+    if (capability === "cancelOneShotWake") {
+      map.cancelWakeJob = true;
+    }
+    if (capability === "resolveHostedSession") {
+      map.resolveOriginSession = true;
+    }
   }
   return map;
 }

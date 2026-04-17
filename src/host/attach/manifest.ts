@@ -1,11 +1,14 @@
 import type {
+  HostIdentity,
   HostAttachmentManifest,
   HostEntrypointManifest,
   HostWorkflowHint,
 } from "../contracts/attach-manifest";
 import {
+  HOST_CORE_INVARIANT,
   HOST_ATTACHMENT_CONTRACT_VERSION,
   HOST_BOOTSTRAP_SNAPSHOT_VERSION,
+  HOST_SCHEDULE_TRUTH_OWNER,
 } from "../contracts/attach-manifest";
 import { resolveHostAttachment, type HostAttachmentConfigInput } from "./model";
 import { listHostRecipes } from "../contracts/host-recipe";
@@ -38,6 +41,9 @@ export function buildHostAttachmentManifest(
   const skillPreview = previewHermesCompanionSkillInstall(config);
   return {
     contractVersion: HOST_ATTACHMENT_CONTRACT_VERSION,
+    coreInvariant: HOST_CORE_INVARIANT,
+    scheduleTruthOwner: HOST_SCHEDULE_TRUTH_OWNER,
+    hostIdentity: buildHostIdentity(attachment),
     runtimeInvariant: "bridge-full",
     transport: attachment.transport,
     modeClass: attachment.modeClass,
@@ -68,6 +74,21 @@ export function buildHostAttachmentManifest(
     },
     recommendedWorkflows: buildRecommendedHostWorkflows(),
     recipes: listHostRecipes(),
+  };
+}
+
+function buildHostIdentity(
+  attachment: ReturnType<typeof resolveHostAttachment>,
+): HostIdentity {
+  return {
+    profile: attachment.profile,
+    legacyProfileIds: [...attachment.legacyProfileIds],
+    mode: attachment.mode,
+    runtimeProvider: attachment.runtimeProvider,
+    runtimeOwner: attachment.runtimeOwner,
+    channelProvider: attachment.channelProvider,
+    channelKind: attachment.channelKind,
+    deliveryRecipe: attachment.deliveryRecipe,
   };
 }
 

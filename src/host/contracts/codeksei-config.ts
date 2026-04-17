@@ -15,9 +15,34 @@ const hostUserSchema = z.object({
   timezone: z.string().min(1),
 });
 
-const hostBindingSchema = z.object({
+const hostBindingSchemaV1 = z.object({
   provider: z.enum(["hermes", "generic-shell"]),
   channel: z.string().min(1),
+});
+
+const hostBindingSchemaV2 = z.object({
+  provider: z.enum(["hermes", "generic-shell"]),
+  runtimeProvider: z.enum(["codex", "hermes", "openclaw-reserved"]),
+  runtimeOwner: z.enum(["codeksei", "host"]),
+  channelProvider: z.enum(["codeksei", "hermes", "host"]),
+  channelKind: z.string().min(1),
+  deliveryRecipe: z.string().min(1),
+  channel: z.string().min(1).optional(),
+});
+
+const hostBindingSchema = z.union([hostBindingSchemaV2, hostBindingSchemaV1]).transform((value) => {
+  if ("runtimeProvider" in value) {
+    return value;
+  }
+  return {
+    provider: value.provider,
+    runtimeProvider: value.provider === "hermes" ? "hermes" : "codex",
+    runtimeOwner: value.provider === "hermes" ? "host" : "codeksei",
+    channelProvider: value.provider === "hermes" ? "hermes" : "host",
+    channelKind: value.channel || "none",
+    deliveryRecipe: value.provider === "hermes" ? "hermes-origin" : "generic-shell",
+    channel: value.channel,
+  };
 });
 
 const hostBootstrapSchema = z.object({
@@ -30,7 +55,7 @@ const hostBootstrapSchema = z.object({
 
 export const codekseiHostConfigSchema = z.object({
   $schema: z.string().min(1),
-  modeClass: z.enum(["bridge-full", "hosted-proactive", "hosted-skill-only", "cli-only"]),
+  modeClass: z.enum(["codex-managed", "hosted-proactive", "hosted-skill-only", "cli-only", "bridge-full"]),
   workspaceRoot: z.string().min(1),
   stateDir: z.string().min(1),
   user: hostUserSchema,

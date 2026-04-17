@@ -30,6 +30,8 @@ test("hostkit static assets stay shipped at the repo root", () => {
   const repoRoot = path.join(__dirname, "..");
   assert.equal(fs.existsSync(path.join(repoRoot, "CODEKSEI_HOSTKIT.json")), true);
   assert.equal(fs.existsSync(path.join(repoRoot, "codeksei.config.json")), true);
+  assert.equal(fs.existsSync(path.join(repoRoot, "schemas", "hostkit-v2.json")), true);
+  assert.equal(fs.existsSync(path.join(repoRoot, "schemas", "codeksei-config-v2.json")), true);
   assert.equal(fs.existsSync(path.join(repoRoot, "schemas", "hostkit-v1.json")), true);
   assert.equal(fs.existsSync(path.join(repoRoot, "schemas", "codeksei-config-v1.json")), true);
 });

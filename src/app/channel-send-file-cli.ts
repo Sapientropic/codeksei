@@ -62,7 +62,7 @@ async function runChannelSendFileCommand(
   const resolvedFilePath = resolveRequiredFilePath(options.path, {
     empty: "缺少 --path，指定要发回微信的本地文件路径",
   });
-  const deliveryMode = hostMode.profile === "hosted-hermes-weixin"
+  const deliveryMode = hostMode.mode === "hosted"
     ? "hermes_repo_local"
     : "bridge";
   return runCliMutation<Record<string, unknown>>({
@@ -84,7 +84,7 @@ async function runChannelSendFileCommand(
       ].join("\n"),
     },
     execute: async () => {
-      if (hostMode.profile === "hosted-hermes-weixin") {
+      if (hostMode.mode === "hosted") {
         const result = sendFileViaHermesRepoLocal(config, {
           file_path: resolvedFilePath,
           sender_id: normalizeText(options.user),
@@ -121,7 +121,7 @@ async function runChannelSendFileCommand(
     resolvedTargets: {
       deliveryMode,
       filePath: resolvedFilePath,
-      senderId: normalizeText(options.user) || (hostMode.profile === "hosted-hermes-weixin" ? "(active-session)" : "(runtime-default)"),
+      senderId: normalizeText(options.user) || (hostMode.mode === "hosted" ? "(active-session)" : "(runtime-default)"),
     },
     sideEffects: [
       {

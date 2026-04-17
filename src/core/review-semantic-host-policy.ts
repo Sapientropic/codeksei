@@ -19,7 +19,7 @@ export function resolveActiveSemanticReviewHost(
   if (requestedHost === "deterministic" || requestedHost === "codex" || requestedHost === "hermes") {
     return requestedHost;
   }
-  return resolveHostMode(config).profile === "hosted-hermes-weixin" ? "hermes" : "codex";
+  return resolveHostMode(config).mode === "hosted" ? "hermes" : "codex";
 }
 
 export function buildSemanticReviewUnavailableReason(

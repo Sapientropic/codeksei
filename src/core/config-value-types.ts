@@ -1,9 +1,9 @@
 import { normalizeText } from "../contracts/text-normalization";
 
-export type CodekseiChannel = "weixin";
+export type CodekseiChannel = string;
 export type CodekseiRuntimeProvider = "codex" | "hermes" | "openclaw-reserved";
-export type CodekseiChannelProvider = "codeksei" | "hermes";
-export type CodekseiExecutionMode = "bridge" | "hosted" | "unsupported";
+export type CodekseiChannelProvider = "codeksei" | "hermes" | "host";
+export type CodekseiExecutionMode = "codex" | "hosted" | "unsupported";
 export type WeixinReplyMode = "settled" | "stream";
 export type CodekseiRuntimeAccessMode = "" | "current" | "full-access" | "workspace-write";
 export type ReviewSemanticHost = "auto" | "codex" | "hermes" | "deterministic";
@@ -24,12 +24,15 @@ export function normalizeCodekseiChannelProvider(value: unknown): CodekseiChanne
   if (normalized === "hermes") {
     return "hermes";
   }
+  if (normalized === "host" || normalized === "generic-host") {
+    return "host";
+  }
   return normalized === "codeksei" ? "codeksei" : "";
 }
 
 export function normalizeCodekseiChannel(value: unknown): CodekseiChannel | "" {
   const normalized = normalizeText(value).toLowerCase();
-  return normalized === "weixin" ? "weixin" : "";
+  return normalized || "";
 }
 
 export function normalizeWeixinReplyMode(value: unknown): WeixinReplyMode {

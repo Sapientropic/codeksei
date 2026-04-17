@@ -489,5 +489,5 @@ function normalizeManagedRole(value: unknown): HostedCheckinCronRole | "" {
 }
 
 export function isHostedHermesCheckinEnabled(config: Partial<HostedCheckinConfig>): boolean {
-  return resolveHostMode(config).profile === "hosted-hermes-weixin";
+  return resolveHostMode(config).mode === "hosted";
 }

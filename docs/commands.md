@@ -11,17 +11,17 @@
 
 当前有两条官方路径：
 
-- `Bridge Mode`
+- `Codex Mode`
   `runtime=codex` + `channelProvider=codeksei` + `channel=weixin`
-- `Hermes Hosted Mode`
+- `Hosted Mode`
   `runtime=hermes` + `channelProvider=hermes` + `channel=weixin`
 
 边界：
 
-- `Bridge Mode` 下，Codeksei 自己托管 bridge / shared 线程
-- `Hermes Hosted Mode` 下，宿主控制命令交给 Hermes；Codeksei 主要暴露 timeline / diary / reminder / review / note / project radar / doctor / schema，并提供 Hermes operator 入口做 skill/status/smoke/sync-checkin
+- `Codex Mode` 下，Codeksei 自己托管 bridge / shared 线程
+- `Hosted Mode` 下，宿主控制命令交给 Hermes；Codeksei 主要暴露 timeline / diary / reminder / review / note / project radar / doctor / schema，并提供 Hermes operator 入口做 skill/status/smoke/sync-checkin
 - `channel send-file`、`timeline screenshot --send`、`reminder write` 已接上 Hermes repo-local 路径；`system send` 仍因缺少 backstage-only 宿主原语而保持 blocked
-- `Hermes Hosted Mode` 下，Hermes 只执行受控 wake/recovery job set；Codeksei 继续持有 `tick -> ack -> complete` 的调度真相，并通过 `operator hermes sync-checkin` 把下一次 wake/recovery 重新 arm 给 Hermes
+- `Hosted Mode` 下，Hermes 只执行受控 wake/recovery job set；Codeksei 继续持有 `tick -> ack -> complete` 的调度真相，并通过 `operator hermes sync-checkin` 把下一次 wake/recovery 重新 arm 给 Hermes
 - 外部宿主优先通过 `host attachment contract` 接入：`host manifest`、`host bootstrap`、`host doctor`、`host smoke`、`host seed-proactive`、`host claim-checkin`、`host settle-checkin`
 
 ## 命名
@@ -71,10 +71,10 @@ operator / bootstrap：
 - `codeksei operator hermes sync-checkin`
 - `codeksei operator hermes status`
 - `codeksei operator hermes smoke`
-- `codeksei login` `Bridge Mode only`
+- `codeksei login` `Codex Mode only`
   默认协议版本对齐腾讯官方包 `@tencent-weixin/openclaw-weixin@2.1.8`；海外 / 国际版 WeChat 扫码仍可能受官方地域灰度限制
-- `codeksei accounts` `Bridge Mode only`
-- `codeksei start` `Bridge Mode only`
+- `codeksei accounts` `Codex Mode only`
+- `codeksei start` `Codex Mode only`
 - `codeksei system checkin-trigger`
 - `codeksei system checkin-tick`
 - `codeksei system checkin-complete`
@@ -82,10 +82,10 @@ operator / bootstrap：
 
 仓库脚本 / shared 模式：
 
-- `npm run shared:start` `Bridge Mode only`
-- `npm run shared:open` `Bridge Mode only`
+- `npm run shared:start` `Codex Mode only`
+- `npm run shared:open` `Codex Mode only`
 - `npm run shared:status`
-- `npm run shared:watchdog` `Bridge Mode only`
+- `npm run shared:watchdog` `Codex Mode only`
 - `npm run background:install`
 - `npm run background:uninstall`
 
@@ -109,7 +109,7 @@ operator / bootstrap：
 
 - `codeksei help` / `codeksei schema` 默认只暴露 public finite command surface
 - `codeksei operator help` / `codeksei operator schema` 才会显示 bootstrap、shared、background、maintainer 入口
-- `codeksei operator hermes --help` / `codeksei operator schema operator hermes` 会列出 Hermes Hosted Mode 的 4 个 leaf action
+- `codeksei operator hermes --help` / `codeksei operator schema operator hermes` 会列出 Hosted Mode / Hermes recipe 的 4 个 leaf action
 - `codeksei operator hermes install-skill` 是唯一会改本机 Hermes skill 状态的 leaf action；支持 `--dry-run`
 - `codeksei operator hermes sync-checkin` 会按当前 target 的 checkin state 为 Hermes 创建/更新当前需要存在的受控 wake/recovery job set；支持 `--dry-run`
 - `Codeksei` 当前 hosted check-in 主链不再要求 Hermes upstream 先支持 cron `env`；若想把 Hermes 原生 cron `env` 能力也补上，可选补丁统一看 [`docs/hermes-cron-env-patch.md`](./hermes-cron-env-patch.md)
@@ -118,9 +118,9 @@ operator / bootstrap：
 - 全局参数统一支持：`--format json|text`、`--verbose`、`--workspace-root /absolute/path`
 - 日常使用默认走共享模式，让微信入口和终端执行落在同一条线上
 - `codeksei start` / `npm run start:checkin` 更适合 operator 调试，不再视作默认 public discovery 面
-- 如果当前配置是 `Hermes Hosted Mode`，`codeksei start` 与 `shared:start` 会明确提示“改由 Hermes gateway 托管”，不会隐式回退到 Codex app-server
+- 如果当前配置是 `Hosted Mode`，`codeksei start` 与 `shared:start` 会明确提示“改由 Hermes gateway 托管”，不会隐式回退到 Codex app-server
 - `codeksei system checkin-poller` 现在只保留 bridge 宿主包装；host-neutral 真相层是 `checkin-trigger`、`checkin-tick` 与 `checkin-complete`
-- `checkin-complete` 在 Hermes Hosted Mode 下会在写回 state 后自动 re-arm 下一组 wake/recovery jobs，并清理多余的未来 job
+- `checkin-complete` 在 Hosted Mode 下会在写回 state 后自动 re-arm 下一组 wake/recovery jobs，并清理多余的未来 job
 - `sync-checkin` 创建/更新 job 时需要 origin context；真正 cron 投递时，Hermes 直接读取持久化的 `job.origin`，不会再按 target 反查 live session
 - `sync-checkin` 现在会同时写入 Hermes cron `script`；每次 wake 前先调用 `codeksei context briefing` 读取最新 context board，再让 Hermes 用这份 handoff context 执行主动判断
 - `sync-checkin` 现在会先确保目标 wake/recovery job 已成功存在，再 best-effort 清理旧 job；中途失败时不会先把最后一条 recovery wake 删掉
@@ -140,7 +140,7 @@ operator / bootstrap：
 - board 落在 `CODEKSEI_STATE_DIR/context/boards/<targetKey>.md`
 - 来源固定为受控输入集：checkin state、当日日记、最近 companion note、proactive follow-up context、project radar、workspace continuity 入口
 - 缺源时显式标 `[⚠️ 需确认]`，不会编造
-- Hermes Hosted Mode 下的 proactive wake 会在 cron 运行前现读这份 board；原始 `AGENTS.md / Home.md / diary` 是输入源，不再是 cron prompt 的直接 surface
+- Hosted Mode 下的 proactive wake 会在 cron 运行前现读这份 board；原始 `AGENTS.md / Home.md / diary` 是输入源，不再是 cron prompt 的直接 surface
 
 ## Onboarding
 
@@ -194,12 +194,12 @@ operator / bootstrap：
 
 补充：
 
-- `bridge-full` 仍是 runtime invariant；外部宿主只是在 daemon-first 核心外面附着，不接管 poll loop、schedule truth 或 lease recovery。
+- canonical 真相层现在是 `coreInvariant=codeksei-core-owned` 与 `scheduleTruthOwner=codeksei`；`runtimeInvariant=bridge-full` 只保留给旧 hostkit / config consumer 做兼容读取，不再是公开主命名。
 - `operator hermes *` 与 `system checkin-*` 继续保留为兼容 building blocks；新宿主默认优先走 `host seed / claim / settle`。
 
 ## 微信命令
 
-下面这一组是 `Bridge Mode` 下 Codeksei 自带微信桥的命令。`Hermes Hosted Mode` 下，宿主控制命令应交给 Hermes 自己。
+下面这一组是 `Codex Mode` 下 Codeksei 自带微信桥的命令。`Hosted Mode` 下，宿主控制命令应交给 Hermes 自己。
 
 - `/bind`
 - `/status`
@@ -249,7 +249,7 @@ operator / bootstrap：
 - `timeline:write --stdin` 也要传完整 JSON 对象 `{"events":[...]}`，不要传裸数组
 - 不确定分类 id 时先跑 `timeline:categories`，改已有日程前先跑 `timeline:read`
 - 不带 offset 的本地时间按当前 runtime timezone 解释；如果 timeline state 已声明非 legacy timezone，会优先沿用它
-- 截图回微信统一走 `timeline:screenshot -- --send`；Bridge Mode 下经本地截图队列，Hosted Mode 下经 Hermes repo-local send-back
+- 截图回微信统一走 `timeline:screenshot -- --send`；Codex Mode 下经本地截图队列，Hosted Mode 下经 Hermes repo-local send-back
 
 这一层更接近生活事实层，优先留下发生过什么。
 
@@ -288,7 +288,7 @@ Diary 用来接那些更琐碎、更生活化、也最容易散掉的东西。
 
 - 适合写那些不想只靠脑子记住的事
 - 提醒最好短、明确、可执行
-- Bridge Mode 下写本地 reminder queue；Hosted Mode 下默认 `--delivery direct`，会创建 Hermes cron 并 deliver 回当前 origin chat
+- Codex Mode 下写本地 reminder queue；Hosted Mode 下默认 `--delivery direct`，会创建 Hermes cron 并 deliver 回当前 origin chat
 - Hosted Mode 下若正文是内部后续跟进而不是用户可见文案，改用 `--delivery proactive`，让它回到未来 proactive wake，而不是直接发给用户
 - 如果一条事同时需要后续回看，可以配合 `diary:write` 或 `timeline:event`
 
@@ -383,7 +383,7 @@ maintainer 仍需额外补一次真实账号 smoke：
   assisted smoke。脚本会等待 pending approval 落盘、自动重启 bridge，然后等待 `/yes` 之后 approval 清空和最终 delivered hash。
 - 这三条脚本都会在 `shared-wechat.log` / `shared-app-server.log` 里写 `[codeksei-smoke] stage=...` checkpoint，排查时优先从这些 marker 往后看。
 - `[⚠️ 需确认]` 这组真实 smoke 依赖可用的 WeChat 登录态、绑定 thread 和能触发 approval 的活跃 Codex runtime；环境不满足时脚本会直接报错，而不是静默跳过。
-- Hermes Hosted Mode 的真实验证不走这套 shared smoke；那条线要验证的是 Hermes gateway + Hermes Weixin + Codeksei companion skill。
+- Hosted Mode 的真实验证不走这套 shared smoke；那条线要验证的是 Hermes gateway + Hermes Weixin + Codeksei companion skill。
 - Hosted operator 侧的前置检查入口是 `codeksei operator hermes smoke`；它会验证 Hermes CLI / repo-local sibling checkout / Weixin account / skill parity / hosted semantic review 准备度，不伪造 live Weixin 成功。
 - 最近一次 recorded 结果入口统一看 [docs/maintainer/live-smoke.md](./maintainer/live-smoke.md)
 

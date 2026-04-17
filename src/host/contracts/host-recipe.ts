@@ -1,3 +1,7 @@
+import type {
+  CodekseiChannelProvider,
+  CodekseiRuntimeProvider,
+} from "../../core/config-value-types";
 import type { HostCapabilityId, HostModeClass, HostTransport } from "./attachment-capabilities";
 
 export const HOST_RECIPE_IDS = [
@@ -14,6 +18,10 @@ export interface HostRecipeDescriptor {
   transport: HostTransport;
   modeClasses: readonly HostModeClass[];
   capabilities: readonly HostCapabilityId[];
+  runtimeProviders: readonly CodekseiRuntimeProvider[];
+  channelProviders: readonly CodekseiChannelProvider[];
+  channelKinds: readonly string[];
+  defaultDeliveryRecipe: string;
   supportsDelegatedCheckin: boolean;
   supportsToolSurface: boolean;
 }
@@ -27,7 +35,11 @@ const HOST_RECIPES = Object.freeze<readonly HostRecipeDescriptor[]>([
     modeClasses: Object.freeze(["hosted-proactive", "hosted-skill-only", "cli-only"] satisfies HostModeClass[]),
     capabilities: Object.freeze([
       "invokeCodekseiAction",
+      "deliverVisibleText",
       "deliverVisibleFile",
+      "upsertWakeJob",
+      "cancelWakeJob",
+      "resolveOriginSession",
       "upsertOneShotWake",
       "cancelOneShotWake",
       "persistedOriginRouting",
@@ -36,6 +48,10 @@ const HOST_RECIPES = Object.freeze<readonly HostRecipeDescriptor[]>([
       "resolveHostedSession",
       "semanticReviewHybrid",
     ] satisfies HostCapabilityId[]),
+    runtimeProviders: Object.freeze(["hermes"] satisfies CodekseiRuntimeProvider[]),
+    channelProviders: Object.freeze(["hermes", "host"] satisfies CodekseiChannelProvider[]),
+    channelKinds: Object.freeze(["weixin", "discord", "telegram", "feishu", "generic"] satisfies string[]),
+    defaultDeliveryRecipe: "hermes-origin",
     supportsDelegatedCheckin: true,
     supportsToolSurface: true,
   }),
@@ -48,6 +64,10 @@ const HOST_RECIPES = Object.freeze<readonly HostRecipeDescriptor[]>([
     capabilities: Object.freeze([
       "invokeCodekseiAction",
     ] satisfies HostCapabilityId[]),
+    runtimeProviders: Object.freeze(["codex", "hermes"] satisfies CodekseiRuntimeProvider[]),
+    channelProviders: Object.freeze(["host"] satisfies CodekseiChannelProvider[]),
+    channelKinds: Object.freeze(["none", "discord", "telegram", "feishu", "generic"] satisfies string[]),
+    defaultDeliveryRecipe: "generic-shell",
     supportsDelegatedCheckin: false,
     supportsToolSurface: true,
   }),

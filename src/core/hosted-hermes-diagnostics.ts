@@ -172,8 +172,8 @@ export function runHermesHostedSmoke(
 
   const checks = {
     doctor: {
-      ok: profile.profile === "hosted-hermes-weixin" && profile.supported,
-      reason: profile.profile === "hosted-hermes-weixin" && profile.supported
+      ok: profile.mode === "hosted" && profile.supported,
+      reason: profile.mode === "hosted" && profile.supported
         ? ""
         : formatHostedExpectation(profile),
     },
@@ -277,9 +277,9 @@ export function collectHermesSkillCatalogProbe({
 }
 
 function formatHostedExpectation(resolved: HostModeResolution): string {
-  return resolved.profile === "hosted-hermes-weixin"
+  return resolved.mode === "hosted"
     ? ""
-    : `当前不是 Hermes Hosted Mode：profile=${resolved.profile}`;
+    : `当前不是 Hosted Mode：profile=${resolved.profile}`;
 }
 
 function resolveHermesCommand(config: HostedHermesDiagnosticsConfigInput): string {

@@ -50,19 +50,19 @@ export interface HostProfileMatrixEntry {
 }
 
 const HOST_PROFILE_MATRIX = Object.freeze<Record<HostProfileId, HostProfileMatrixEntry>>({
-  "bridge-codex-weixin": Object.freeze(buildCompatibilityEntry("bridge-codex-weixin")),
-  "hosted-hermes-weixin": Object.freeze(buildCompatibilityEntry("hosted-hermes-weixin")),
+  "codex-mode": Object.freeze(buildCompatibilityEntry("codex-mode")),
+  "hosted-mode": Object.freeze(buildCompatibilityEntry("hosted-mode")),
   unsupported: Object.freeze(buildCompatibilityEntry("unsupported")),
 });
 
 const SUPPORTED_HOST_PROFILE_IDS = Object.freeze<readonly SupportedHostProfileId[]>([
-  "bridge-codex-weixin",
-  "hosted-hermes-weixin",
+  "codex-mode",
+  "hosted-mode",
 ]);
 
 const HOST_SUPPORT_TIER_HINTS = Object.freeze<Record<CommandHostSupportTierDefinition, string>>({
-  bridge_only: "这条命令是 Bridge Mode 专用入口；切回 bridge-codex-weixin，或改走 Hermes gateway 的宿主控制路径。",
-  bridge_state_dependent: "这条命令当前还缺少 Hermes Hosted Mode 的 source-backed 宿主原语；不会自动降级成可见消息，先改走 bridge-codex-weixin 或 Hermes 原生 backstage 路径。",
+  bridge_only: "这条命令是 Codex Mode 专用入口；切回 codex-mode，或改走当前宿主自己的控制路径。",
+  bridge_state_dependent: "这条命令当前还缺少 Hosted Mode 的 source-backed 宿主原语；不会自动降级成可见消息，先改走 codex-mode 或宿主原生 backstage 路径。",
   host_neutral: "切换到兼容的 host profile，或改用对应宿主的官方入口。",
   hosted_ready: "切换到兼容的 host profile，或改用对应宿主的官方入口。",
 });
@@ -76,7 +76,7 @@ export function getHostProfileMatrixEntry(profile: HostProfileId): HostProfileMa
 }
 
 export function isSupportedHostProfileId(value: unknown): value is SupportedHostProfileId {
-  return value === "bridge-codex-weixin" || value === "hosted-hermes-weixin";
+  return value === "codex-mode" || value === "hosted-mode";
 }
 
 export function listSupportedHostProfileIds(): SupportedHostProfileId[] {
@@ -84,16 +84,16 @@ export function listSupportedHostProfileIds(): SupportedHostProfileId[] {
 }
 
 function buildCompatibilityEntry(profile: HostProfileId): HostProfileMatrixEntry {
-  const attachment = profile === "bridge-codex-weixin"
-    ? resolveHostAttachment({ runtime: "codex", channelProvider: "codeksei" })
-    : profile === "hosted-hermes-weixin"
+  const attachment = profile === "codex-mode"
+    ? resolveHostAttachment({ runtime: "codex", channelProvider: "codeksei", channel: "weixin" })
+    : profile === "hosted-mode"
       ? resolveHostAttachment({ runtime: "hermes", channelProvider: "hermes" })
       : resolveHostAttachment({ runtime: "openclaw-reserved" });
 
   return {
-    bridgeOnlyMessageKind: profile === "bridge-codex-weixin"
+    bridgeOnlyMessageKind: profile === "codex-mode"
       ? "bridge_ready"
-      : profile === "hosted-hermes-weixin"
+      : profile === "hosted-mode"
         ? "hosted_bridge_replaced"
         : "unsupported_profile",
     capabilities: Object.freeze({ ...attachment.capabilities }),
@@ -106,7 +106,7 @@ function buildCompatibilityEntry(profile: HostProfileId): HostProfileMatrixEntry
 }
 
 function resolveChannelOperations(profile: HostProfileId): ChannelAdapterOperations {
-  if (profile === "bridge-codex-weixin") {
+  if (profile === "codex-mode") {
     return {
       pollUpdates: true,
       login: true,
@@ -127,7 +127,7 @@ function resolveChannelOperations(profile: HostProfileId): ChannelAdapterOperati
 }
 
 function resolveRuntimeOperations(profile: HostProfileId): RuntimeAdapterOperations {
-  if (profile === "bridge-codex-weixin") {
+  if (profile === "codex-mode") {
     return {
       initialize: true,
       interactiveTurn: true,

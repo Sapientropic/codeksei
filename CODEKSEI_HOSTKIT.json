@@ -1,6 +1,18 @@
 {
-  "$schema": "./schemas/hostkit-v1.json",
-  "contractVersion": 1,
+  "$schema": "./schemas/hostkit-v2.json",
+  "contractVersion": 2,
+  "coreInvariant": "codeksei-core-owned",
+  "scheduleTruthOwner": "codeksei",
+  "hostIdentity": {
+    "profile": "codex-mode",
+    "legacyProfileIds": ["bridge-codex-weixin"],
+    "mode": "codex",
+    "runtimeProvider": "codex",
+    "runtimeOwner": "codeksei",
+    "channelProvider": "codeksei",
+    "channelKind": "weixin",
+    "deliveryRecipe": "codeksei-weixin-bridge"
+  },
   "runtimeInvariant": "bridge-full",
   "package": {
     "name": "codeksei",
@@ -36,10 +48,10 @@
   },
   "config": {
     "canonicalFile": "codeksei.config.json",
-    "schema": "./schemas/codeksei-config-v1.json"
+    "schema": "./schemas/codeksei-config-v2.json"
   },
   "contracts": {
-    "hostkit": "./schemas/hostkit-v1.json",
+    "hostkit": "./schemas/hostkit-v2.json",
     "attachmentCapabilities": "./schemas/host-capabilities-v1.json",
     "commandEnvelope": "./schemas/command-envelope-v1.json",
     "claimCheckin": "./schemas/host-claim-checkin-v1.json",
@@ -54,12 +66,20 @@
     {
       "id": "hermes",
       "kind": "first_party",
+      "runtimeProviders": ["hermes"],
+      "channelProviders": ["hermes", "host"],
+      "channelKinds": ["weixin", "discord", "telegram", "feishu", "generic"],
+      "defaultDeliveryRecipe": "hermes-origin",
       "supportsDelegatedCheckin": true,
       "supportsToolSurface": true
     },
     {
       "id": "generic-shell",
       "kind": "generic",
+      "runtimeProviders": ["codex", "hermes"],
+      "channelProviders": ["host"],
+      "channelKinds": ["none", "discord", "telegram", "feishu", "generic"],
+      "defaultDeliveryRecipe": "generic-shell",
       "supportsDelegatedCheckin": false,
       "supportsToolSurface": true
     }

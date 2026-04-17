@@ -25,14 +25,12 @@ export function applyHostConfigEnvFallback(
 
   setEnvIfMissing(env, "CODEKSEI_STATE_DIR", config.stateDir);
   setEnvIfMissing(env, "CODEKSEI_WORKSPACE_ROOT", config.workspaceRoot);
-  setEnvIfMissing(env, "CODEKSEI_CHANNEL", config.host.channel);
+  setEnvIfMissing(env, "CODEKSEI_CHANNEL", config.host.channelKind || config.host.channel || "");
   setEnvIfMissing(env, "CODEKSEI_ALLOWED_USER_IDS", config.user.id);
   setEnvIfMissing(env, "CODEKSEI_USER_NAME", config.user.name);
   setEnvIfMissing(env, "CODEKSEI_TIMEZONE", config.user.timezone);
-  if (config.host.provider === "hermes") {
-    setEnvIfMissing(env, "CODEKSEI_RUNTIME", "hermes");
-    setEnvIfMissing(env, "CODEKSEI_CHANNEL_PROVIDER", "hermes");
-  }
+  setEnvIfMissing(env, "CODEKSEI_RUNTIME", config.host.runtimeProvider);
+  setEnvIfMissing(env, "CODEKSEI_CHANNEL_PROVIDER", config.host.channelProvider);
   return config;
 }
 

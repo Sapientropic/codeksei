@@ -22,7 +22,7 @@ export function renderHermesCompanionSkill(): string {
     "",
     "Use this skill when Hermes should call Codeksei's companion/domain workflows instead of re-inventing them in free-form chat.",
     "",
-    "This skill is designed for **Hermes Hosted Mode**.",
+    "This skill is designed for **Hosted Mode / Hermes recipe**.",
     "",
     "## When to Use",
     "",

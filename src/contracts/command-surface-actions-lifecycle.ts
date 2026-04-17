@@ -402,7 +402,7 @@ export const LIFECYCLE_COMMAND_ACTION_DEFINITIONS = [
   {
     action: "system.checkin_poller",
     groupId: "lifecycle",
-    summary: "Bridge Mode 下按 heartbeat 驱动 check-in tick 并在本地入队",
+    summary: "Codex Mode 下按 heartbeat 驱动 check-in tick 并在本地入队",
     terminal: ["system checkin-poller"],
     weixin: [],
     status: "active",

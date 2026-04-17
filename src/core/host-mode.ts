@@ -1,5 +1,7 @@
 export {
+  assertCodexMode,
   assertBridgeMode,
+  formatCodexOnlyCommandMessage,
   formatBridgeOnlyCommandMessage,
   resolveHostMode,
   type CodekseiChannelProvider,

@@ -1,8 +1,26 @@
+import type {
+  CodekseiChannelProvider,
+  CodekseiExecutionMode,
+  CodekseiRuntimeProvider,
+} from "../../core/config-value-types";
 import type { HostModeClass, HostTransport } from "./attachment-capabilities";
 import type { HostRecipeDescriptor, HostRecipeId } from "./host-recipe";
 
-export const HOST_ATTACHMENT_CONTRACT_VERSION = 1 as const;
-export const HOST_BOOTSTRAP_SNAPSHOT_VERSION = 1 as const;
+export const HOST_ATTACHMENT_CONTRACT_VERSION = 2 as const;
+export const HOST_BOOTSTRAP_SNAPSHOT_VERSION = 2 as const;
+export const HOST_CORE_INVARIANT = "codeksei-core-owned" as const;
+export const HOST_SCHEDULE_TRUTH_OWNER = "codeksei" as const;
+
+export interface HostIdentity {
+  profile: "codex-mode" | "hosted-mode" | "unsupported";
+  legacyProfileIds: string[];
+  mode: CodekseiExecutionMode;
+  runtimeProvider: CodekseiRuntimeProvider;
+  runtimeOwner: "codeksei" | "host";
+  channelProvider: CodekseiChannelProvider;
+  channelKind: string;
+  deliveryRecipe: string;
+}
 
 export interface HostEntrypointManifest {
   manifest: string[];
@@ -52,6 +70,9 @@ export interface HostWorkflowHint {
 
 export interface HostAttachmentManifest {
   contractVersion: typeof HOST_ATTACHMENT_CONTRACT_VERSION;
+  coreInvariant: typeof HOST_CORE_INVARIANT;
+  scheduleTruthOwner: typeof HOST_SCHEDULE_TRUTH_OWNER;
+  hostIdentity: HostIdentity;
   runtimeInvariant: "bridge-full";
   transport: HostTransport;
   modeClass: HostModeClass | "unsupported";

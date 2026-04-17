@@ -50,7 +50,7 @@ test("codeksei start fails fast in Hermes hosted mode", async () => {
 
   await assert.rejects(
     createTerminalAppFacade(config).start(),
-    /Hermes Hosted Mode/u,
+    /Hosted Mode/u,
   );
 });
 
@@ -60,6 +60,6 @@ test("shared:start rejects in Hermes hosted mode", async () => {
       CODEKSEI_RUNTIME: "hermes",
       CODEKSEI_CHANNEL_PROVIDER: "hermes",
     }, async () => runSharedStart()),
-    /Hermes Hosted Mode/u,
+    /Hosted Mode/u,
   );
 });

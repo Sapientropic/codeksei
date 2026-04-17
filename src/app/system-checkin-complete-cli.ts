@@ -110,7 +110,7 @@ export async function runSystemCheckinCompleteCommand(
       mode: "proactive",
     });
     const hostMode = resolveHostMode(config);
-    const hostedWakeSync = hostMode.profile === "hosted-hermes-weixin"
+    const hostedWakeSync = hostMode.mode === "hosted"
       ? syncHostedWakeAfterCompletion(config, resolution.value, completion.nextWakeAt)
       : null;
     return {

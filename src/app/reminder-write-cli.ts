@@ -149,17 +149,17 @@ async function runReminderWriteCommand(
   }
   const hostMode = resolveHostMode(config);
   const deliveryMode = resolveDeliveryMode(options.delivery);
-  if (deliveryMode === "proactive" && hostMode.profile !== "hosted-hermes-weixin") {
+  if (deliveryMode === "proactive" && hostMode.mode !== "hosted") {
     throw buildUnsupportedHostCapabilityError(
-      "reminder write --delivery proactive 只支持 Hermes Hosted Mode",
+      "reminder write --delivery proactive 只支持 Hosted Mode",
       {
         delivery: deliveryMode,
         hostProfile: hostMode.profile,
       },
-      "切到 Hermes Hosted Mode，或移除 --delivery proactive 后改用普通用户提醒。"
+      "切到 Hosted Mode，或移除 --delivery proactive 后改用普通用户提醒。"
     );
   }
-  if (hostMode.profile === "hosted-hermes-weixin") {
+  if (hostMode.mode === "hosted") {
     const dueAtIso = new Date(dueAtMs).toISOString();
     const workspaceRoot = normalizeText(config.workspaceRoot) || process.cwd();
     const jobsFile = path.join(resolveHermesHomePath(config), "cron", "jobs.json");
@@ -547,7 +547,7 @@ function buildReminderWriteHelp(timezone: string): string {
     "",
     "说明：",
     "  默认 --delivery direct：创建用户可见提醒。",
-    "  Hermes Hosted Mode 下可用 --delivery proactive，把这条提醒改写成一次未来 proactive 唤醒，而不是直接给用户发消息。",
+    "  Hosted Mode 下可用 --delivery proactive，把这条提醒改写成一次未来 proactive 唤醒，而不是直接给用户发消息。",
     `  不带 offset 的本地时间按 ${timezone} 解释。`,
     "  默认会解析唯一稳定 sender；若不唯一会直接返回 target_resolution_required。",
   ].join("\n");

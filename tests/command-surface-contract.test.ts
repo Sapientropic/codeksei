@@ -188,7 +188,7 @@ test("command classification helpers cover representative explicit and default b
   assert.equal(resolveCommandSafetyTierDefinition("app.schema"), "open");
   assert.equal(resolveCommandHostSupportTierDefinition("timeline.write"), "host_neutral");
   assert.equal(resolveCommandHostSupportTierDefinition("timeline.screenshot"), "hosted_ready");
-  assert.deepEqual(resolveCommandHostProfileIdsDefinition("timeline.screenshot"), ["bridge-codex-weixin", "hosted-hermes-weixin"]);
+  assert.deepEqual(resolveCommandHostProfileIdsDefinition("timeline.screenshot"), ["codex-mode", "hosted-mode"]);
 });
 
 test("every command action resolves through either an explicit classification override or the documented default", () => {
@@ -218,7 +218,7 @@ test("every command action resolves through either an explicit classification ov
 
     const resolvedHostProfiles = resolveCommandHostProfileIdsDefinition(action.action);
     if (!hostProfileOverrideIds.has(action.action)) {
-      assert.deepEqual(resolvedHostProfiles, ["bridge-codex-weixin", "hosted-hermes-weixin"], `${action.action} should use the default host profile set when not overridden`);
+      assert.deepEqual(resolvedHostProfiles, ["codex-mode", "hosted-mode"], `${action.action} should use the default host profile set when not overridden`);
     }
 
     const resolvedMutability = resolveCommandMutabilityDefinition(action.action);

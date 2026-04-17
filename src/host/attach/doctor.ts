@@ -62,7 +62,7 @@ export function collectHostDoctorReport(
   const daemonState: AttachedDaemonState = {
     instanceId: "local-cli-state-owner",
     bridgeProfile: attachment.profile,
-    pollLoopActive: attachment.profile === "bridge-codex-weixin",
+    pollLoopActive: attachment.profile === "codex-mode" && attachment.channelKind === "weixin" && attachment.channelProvider === "codeksei",
     scheduleOwner: "daemon",
     recoveryOwner: "daemon",
   };

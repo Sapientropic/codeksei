@@ -13,6 +13,7 @@
 
 ### Added
 
+- host attachment contract v2：`host manifest` / `host bootstrap` / `host doctor` / 示例资产现在会输出结构化 `hostIdentity`，并新增 `coreInvariant=codeksei-core-owned`、`scheduleTruthOwner=codeksei`、`schemas/hostkit-v2.json` 与 `schemas/codeksei-config-v2.json`。
 - 语义化 onboarding persona 提取主链，支持“小模型优先、规则兜底”的六域 backstage 抽取，并继续把长期真相只写回 companion note，而不是新建第二套 profile store。`adb6b90`
 - `codeksei onboarding start|step|status|reset` 公共 CLI 面，以及无 workspace schema / 无 Obsidian 时自动回退到 `CODEKSEI_STATE_DIR/companions/<userKey>/profile.md` 的 companion profile。`adb6b90`
 - 统一的 semantic JSON runtime 抽取基础件，供 onboarding 和 review semantic host 复用，减少重复的 Codex/Hermes JSON 提取逻辑。`adb6b90`
@@ -22,6 +23,9 @@
 
 ### Changed
 
+- 公开 mode 命名现在收口到 `Codex Mode` 与 `Hosted Mode`；`Bridge Mode`、`Hermes Hosted Mode`、`bridge-codex-weixin`、`hosted-hermes-weixin` 退到兼容别名层，不再是公开主命名。
+- host config / host recipe / host resolution 改成宿主无关：不再把 `channel=weixin` 写死成唯一支持组合；`codex + host-managed telegram/discord/feishu` 与 `hermes + host-managed channel` 现在都能通过同一条 attach contract 解析，first-party Weixin adapter 只保留给 `Codex Mode + codeksei/weixin`。
+- `shared:*` shell wrapper 明确只支持 `Codex Mode + codeksei/weixin`；一旦切到 Hosted Mode 或 host-managed channel，就直接提示改走宿主桥，而不是误落回本地 Weixin 脚本。
 - 主上下文策略切到 `context board first / raw vault injection second`。宿主默认应先读受控的 context board handoff，而不是把原始 vault/note 直接塞进 prompt。`9b8012f`
 - Hermes companion skill 与 host manifest 不再只是命令清单，而是带默认 routing/workflow 提示，明确何时先看 onboarding、何时先看 context briefing、以及 hosted proactive 必须走 `seed-proactive / claim-checkin / settle-checkin`。`678b3eb`
 - onboarding 的 durable memory 写入逻辑已退回 shared companion-memory 内核；`onboarding step` 继续负责首访状态机和自然追问，但长期真相更新、去重、纠错和 runtime freshness 现在与后续 ongoing memory 共用同一条 host-neutral 管线。
@@ -33,6 +37,8 @@
 
 ### Upgrade Notes
 
+- 若你消费 `host manifest` / hostkit schema，把 `hostIdentity.*`、`coreInvariant`、`scheduleTruthOwner` 视为新 canonical 真相；`runtimeInvariant=bridge-full` 只保留给旧 consumer 兼容读取。
+- 若你之前把公开命名写成 `Bridge Mode` / `Hermes Hosted Mode`，现在统一改成 `Codex Mode` / `Hosted Mode`；旧 profile id 仍可读，但 help / doctor / schema 都会把它们当成 legacy alias。
 - 这条发布线的核心变化不是“多了几个命令”，而是宿主默认接法已经从“拿命令列表自己拼”升级为“由 `host manifest`、skill 和 `host doctor` 共同驱动默认工作流”。
 - onboarding 现在是正式的一等入口，新用户或薄画像用户不应再假设已有 durable profile；长期真相也不应旁路写入，而应继续回到 companion note。
 - onboarding 之上的记忆更新能力已经进一步泛化成 host-neutral 的 ongoing companion memory。对已完成 onboarding 的用户，后续纠正、支持偏好变化、节奏变化和近线任务更新，默认应走 `codeksei companion remember`，不要继续把 `onboarding step` 当作长期记忆的总入口。
@@ -41,6 +47,9 @@
 
 ### Host / Installer Checklist
 
+- [ ] 如果你消费 `CODEKSEI_HOSTKIT.json` 或 `codeksei.config.json`，升级到 `hostkit-v2` / `codeksei-config-v2` 字段面：读取 `hostIdentity.*`、`runtimeProvider`、`runtimeOwner`、`channelProvider`、`channelKind`、`deliveryRecipe`，不要再把公开 profile 绑定死在 `bridge-codex-weixin` / `hosted-hermes-weixin`。
+- [ ] 把公开文案和宿主 UI 里的 `Bridge Mode` / `Hermes Hosted Mode` 统一改成 `Codex Mode` / `Hosted Mode`。
+- [ ] 如果宿主之前会直接调 `shared:*` 或微信脚本，确认它们只在 `Codex Mode + codeksei/weixin` 下使用；Hosted Mode 和其他 host-managed channel 需要走宿主自己的 bridge / gateway。
 - [ ] 先跑一次 `codeksei host doctor --provider hermes`，确认当前安装是否需要重新 bootstrap 或重装 skill。
 - [ ] 如果 `host doctor` 返回 `bootstrap_required: yes`，执行 `codeksei host bootstrap --provider hermes --ensure-daemon`。
 - [ ] 如果 `host doctor` 返回 `skill_reinstall_required: yes`，执行 `codeksei operator hermes install-skill`。
