@@ -7,18 +7,13 @@ import type {
   SystemMessageDispatcherLike,
   SystemMessageQueueLike,
   ThreadStateStoreLike,
-  TimelineScreenshotQueueLike,
 } from "../core/app-service-contract";
-import { supportsChannelOperation } from "../core/app-service-contract";
-import { ignoreBestEffortError } from "../core/error-handling";
-import { logError, logWarn } from "../core/logging";
-import { operatorMessages, userFacingMessages } from "../core/message-catalog";
+import { logWarn } from "../core/logging";
 import type {
   HandlePreparedMessageOptions,
   NormalizedIncomingMessage,
   PendingApprovalState,
   SystemDispatchResult,
-  TimelineScreenshotRequest,
 } from "../core/runtime-types";
 
 interface AccountRef {
@@ -39,7 +34,6 @@ type HandlePreparedMessage = (
 ) => Promise<{ status: string; reason?: string } | void>;
 type HasRpcId = (requestId: unknown) => boolean;
 type NormalizeText = (value: unknown) => string;
-type SendTimelineScreenshot = (payload: TimelineScreenshotRequest) => Promise<unknown>;
 type BuildReminderSystemTrigger = (reminder: ReminderQueueEntry, config: BackstageConfig) => string;
 type ResolveWorkspaceRoot = (bindingKey: string) => string;
 
@@ -56,11 +50,9 @@ interface BackstageTaskLifecycleDependencies {
   normalizeText: NormalizeText;
   reminderQueue: ReminderQueueLike;
   runtimeAdapter: RuntimeAdapterLike;
-  sendTimelineScreenshot: SendTimelineScreenshot;
   systemMessageBusyRetryMs: number;
   systemMessageQueue: SystemMessageQueueLike;
   threadStateStore: ThreadStateStoreLike;
-  timelineScreenshotQueue: TimelineScreenshotQueueLike;
   buildReminderSystemTrigger: BuildReminderSystemTrigger;
   resolveWorkspaceRoot: ResolveWorkspaceRoot;
 }
@@ -78,11 +70,9 @@ export class BackstageTaskLifecycle {
   readonly reminderQueue: ReminderQueueLike;
   readonly resolveWorkspaceRoot: ResolveWorkspaceRoot;
   readonly runtimeAdapter: RuntimeAdapterLike;
-  readonly sendTimelineScreenshot: SendTimelineScreenshot;
   readonly systemMessageBusyRetryMs: number;
   readonly systemMessageQueue: SystemMessageQueueLike;
   readonly threadStateStore: ThreadStateStoreLike;
-  readonly timelineScreenshotQueue: TimelineScreenshotQueueLike;
 
   constructor({
     channelAdapter,
@@ -95,11 +85,9 @@ export class BackstageTaskLifecycle {
     normalizeText,
     reminderQueue,
     runtimeAdapter,
-    sendTimelineScreenshot,
     systemMessageBusyRetryMs,
     systemMessageQueue,
     threadStateStore,
-    timelineScreenshotQueue,
     buildReminderSystemTrigger,
     resolveWorkspaceRoot,
   }: BackstageTaskLifecycleDependencies) {
@@ -113,11 +101,9 @@ export class BackstageTaskLifecycle {
     this.normalizeText = normalizeText;
     this.reminderQueue = reminderQueue;
     this.runtimeAdapter = runtimeAdapter;
-    this.sendTimelineScreenshot = sendTimelineScreenshot;
     this.systemMessageBusyRetryMs = systemMessageBusyRetryMs;
     this.systemMessageQueue = systemMessageQueue;
     this.threadStateStore = threadStateStore;
-    this.timelineScreenshotQueue = timelineScreenshotQueue;
     this.buildReminderSystemTrigger = buildReminderSystemTrigger;
     this.resolveWorkspaceRoot = resolveWorkspaceRoot;
   }
@@ -175,43 +161,6 @@ export class BackstageTaskLifecycle {
             );
           }
           break;
-        }
-      }
-    }
-  }
-
-  async flushPendingTimelineScreenshots(account: AccountRef): Promise<void> {
-    const pendingJobs = this.timelineScreenshotQueue.drainForAccount(account.accountId);
-    for (const job of pendingJobs) {
-      try {
-        await this.sendTimelineScreenshot({
-          senderId: job.senderId,
-          args: job.args,
-          outputFile: job.outputFile,
-        });
-      } catch (error) {
-        const messageText = error instanceof Error ? error.message : String(error || "unknown error");
-        logError(operatorMessages.timelineScreenshotJobFailed(job.id, messageText));
-        // The job has already failed locally. Clearing typing state and sending
-        // the user-facing failure notice are best-effort cleanup steps only.
-        if (supportsChannelOperation(this.channelAdapter, "visibleTypingDelivery")) {
-          await ignoreBestEffortError(this.channelAdapter.sendTyping({
-            userId: job.senderId,
-            status: 0,
-          }), {
-            label: "backstage timeline screenshot typing stop",
-            reason: "typing stop is best-effort cleanup after the screenshot job already failed locally",
-          });
-        }
-        if (supportsChannelOperation(this.channelAdapter, "visibleTextDelivery")) {
-          await ignoreBestEffortError(this.channelAdapter.sendText({
-            userId: job.senderId,
-            text: userFacingMessages.timelineScreenshotFailed(messageText),
-            preserveBlock: true,
-          }), {
-            label: "backstage timeline screenshot failure notice",
-            reason: "failure notice should not mask the original screenshot job failure",
-          });
         }
       }
     }

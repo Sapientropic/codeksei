@@ -19,12 +19,10 @@ const {
   reminderQueueStateSchema,
   systemMessageDeadLetterStateSchema,
   systemMessageQueueStateSchema,
-  timelineScreenshotQueueStateSchema,
 }: typeof import("../src/contracts/queue-items") = require("../src/contracts/queue-items");
 const { sessionStoreStateSchema }: typeof import("../src/contracts/session-state") = require("../src/contracts/session-state");
 const { ReminderQueueStore }: typeof import("../src/state/reminder-queue-store") = require("../src/state/reminder-queue-store");
 const { SystemMessageQueueStore }: typeof import("../src/state/system-message-queue-store") = require("../src/state/system-message-queue-store");
-const { TimelineScreenshotQueueStore }: typeof import("../src/state/timeline-screenshot-queue-store") = require("../src/state/timeline-screenshot-queue-store");
 const {
   readSharedBridgeHeartbeat,
   writeSharedBridgeHeartbeat,
@@ -59,11 +57,6 @@ test("managed state ownership matrix stays single-owner and executable", () => {
       file: "system-message-queue.json",
       schemaExports: [systemMessageQueueStateSchema, systemMessageDeadLetterStateSchema],
       storeExports: [SystemMessageQueueStore],
-    },
-    {
-      file: "timeline-screenshot-queue.json",
-      schemaExports: [timelineScreenshotQueueStateSchema],
-      storeExports: [TimelineScreenshotQueueStore],
     },
     {
       file: "reminder-queue.json",

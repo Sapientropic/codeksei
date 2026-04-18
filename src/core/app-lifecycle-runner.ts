@@ -33,7 +33,6 @@ interface AppLifecycleRunnerArgs {
   handleIncomingMessage(message: unknown): Promise<void>;
   flushDueReminders(account: { accountId: string }): Promise<void>;
   flushPendingSystemMessages(): Promise<void>;
-  flushPendingTimelineScreenshots(account: { accountId: string }): Promise<void>;
 }
 
 export async function runCodekseiAppLifecycle({
@@ -50,7 +49,6 @@ export async function runCodekseiAppLifecycle({
   handleIncomingMessage,
   flushDueReminders,
   flushPendingSystemMessages,
-  flushPendingTimelineScreenshots,
 }: AppLifecycleRunnerArgs): Promise<void> {
   const account = channelAdapter.resolveAccount();
   setActiveAccountId(account.accountId);
@@ -121,7 +119,6 @@ export async function runCodekseiAppLifecycle({
       channelAdapter,
       flushDueReminders,
       flushPendingSystemMessages,
-      flushPendingTimelineScreenshots,
       resolveLongPollTimeoutMs,
       handleIncomingMessage,
       updateBridgeHeartbeat,

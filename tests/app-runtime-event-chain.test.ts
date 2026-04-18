@@ -29,7 +29,6 @@ test("runtime event chain keeps later events alive after an earlier handler fail
             dispatchSystemMessage: async () => ({ status: "sent", reason: "" }),
             flushDueReminders: async () => undefined,
             flushPendingSystemMessages: async () => undefined,
-            flushPendingTimelineScreenshots: async () => undefined,
           },
           channelAdapter: {
             describe: () => ({ id: "test-channel" }),
@@ -80,7 +79,6 @@ test("runtime event chain keeps later events alive after an earlier handler fail
             prepareIncomingMessageForRuntime: async () => undefined,
             sendLocalFileToCurrentChat: async () => undefined,
             sendPreparedMessageToRuntime: async () => ({ status: "sent" }),
-            sendTimelineScreenshot: async () => undefined,
             withUserTyping: async (_payload: unknown, work: () => Promise<unknown>) => work(),
           },
           runtimeWatchdogLifecycle: {
@@ -117,7 +115,6 @@ test("runtime event chain keeps later events alive after an earlier handler fail
           timelineIntegration: {
             describe: () => ({ id: "test-timeline" }),
           },
-          timelineScreenshotQueue: {},
         } as never;
       },
     });

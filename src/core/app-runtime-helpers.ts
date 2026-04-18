@@ -161,14 +161,3 @@ function stringifyRpcId(value: unknown): string {
 export function hasRpcId(value: unknown): boolean {
   return stringifyRpcId(value) !== "";
 }
-
-export function resolveTimelineScreenshotOutput(args: unknown): string {
-  const normalizedArgs = Array.isArray(args) ? args : [];
-  for (let index = 0; index < normalizedArgs.length; index += 1) {
-    if (String(normalizedArgs[index] || "").trim() !== "--output") {
-      continue;
-    }
-    return String(normalizedArgs[index + 1] || "").trim();
-  }
-  return "";
-}

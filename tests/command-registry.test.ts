@@ -65,7 +65,7 @@ test("timeline screenshot leaf help keeps generic screenshots on the default ful
 
   assert.match(help, /主语义是本地截图/u);
   assert.match(help, /默认就是整页/u);
-  assert.match(help, /codeksei timeline screenshot --send/u);
+  assert.match(help, /codeksei channel send-file/u);
 });
 
 test("timeline serve and dev leaf help expose their own usage instead of falling back to topic help", () => {

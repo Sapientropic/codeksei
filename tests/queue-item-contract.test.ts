@@ -4,11 +4,9 @@ const assert = require("node:assert/strict");
 const {
   normalizeReminderQueueEntry,
   normalizeSystemMessage,
-  normalizeTimelineScreenshotJob,
   reminderQueueStateSchema,
   systemMessageDeadLetterStateSchema,
   systemMessageQueueStateSchema,
-  timelineScreenshotQueueStateSchema,
 } = require("../src/contracts/queue-items");
 
 test("system message contract normalizes delivery metadata", () => {
@@ -75,26 +73,6 @@ test("system message contract clamps invalid numeric and timestamp edge cases", 
     lastFailureReason: "",
     deliveryState: "pending",
     inFlightAt: "",
-    createdAt: "2026-04-12T00:00:00.000Z",
-  });
-});
-
-test("timeline screenshot queue contract normalizes args and output file", () => {
-  const normalized = normalizeTimelineScreenshotJob({
-    id: "shot-1",
-    accountId: "acct-1",
-    senderId: "user-1",
-    outputFile: "C:/tmp/shot.png",
-    args: ["--selector", "timeline", ""],
-    createdAt: "2026-04-12T00:00:00.000Z",
-  });
-
-  assert.deepEqual(normalized, {
-    id: "shot-1",
-    accountId: "acct-1",
-    senderId: "user-1",
-    outputFile: "C:/tmp/shot.png",
-    args: ["--selector", "timeline"],
     createdAt: "2026-04-12T00:00:00.000Z",
   });
 });
@@ -194,31 +172,6 @@ test("system message dead letter schema canonicalizes legacy entries at ingress"
     createdAt: "2026-04-12T00:00:00.000Z",
     deadLetterReason: "dead_letter",
     deadLetterAt: "2026-04-12T01:00:00.000Z",
-  }]);
-});
-
-test("timeline screenshot queue schema canonicalizes legacy queue payloads at ingress", () => {
-  const parsed = timelineScreenshotQueueStateSchema.safeParse({
-    retained: true,
-    jobs: [{
-      id: "shot-1",
-      accountId: "acct-1",
-      senderId: "user-1",
-      outputFile: "C:/tmp/shot.png",
-      args: ["--selector", "timeline", ""],
-      createdAt: "2026-04-12T00:00:00.000Z",
-    }],
-  });
-
-  assert.equal(parsed.success, true);
-  assert.equal(parsed.data.retained, true);
-  assert.deepEqual(parsed.data.jobs, [{
-    id: "shot-1",
-    accountId: "acct-1",
-    senderId: "user-1",
-    outputFile: "C:/tmp/shot.png",
-    args: ["--selector", "timeline"],
-    createdAt: "2026-04-12T00:00:00.000Z",
   }]);
 });
 

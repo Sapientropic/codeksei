@@ -80,7 +80,6 @@ function parseEnvConfig(env: EnvSource, options: ReadConfigOptions = {}): AppRun
       timelineStateDir,
       logDir: path.join(stateDir, "logs"),
       reminderQueueFile: path.join(stateDir, "reminder-queue.json"),
-      timelineScreenshotQueueFile: path.join(stateDir, "timeline-screenshot-queue.json"),
       cliIdempotencyLedgerFile: path.join(stateDir, "cli-idempotency-ledger.json"),
       syncBufferDir: path.join(stateDir, "sync-buffers"),
       sessionsFile: path.join(stateDir, "sessions.json"),

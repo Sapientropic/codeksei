@@ -15,13 +15,6 @@ test("app poll loop timeout collapses to min timeout for busy queues and reminde
   }), 2_000);
 
   assert.equal(resolveLongPollTimeoutMs({
-    activeAccountId: "acct-1",
-    timelineScreenshotQueue: { hasPendingForAccount: () => true },
-    defaultLongPollTimeoutMs: 35_000,
-    minLongPollTimeoutMs: 2_000,
-  }), 2_000);
-
-  assert.equal(resolveLongPollTimeoutMs({
     reminderQueue: { peekNextDueAtMs: () => 12_000 },
     defaultLongPollTimeoutMs: 35_000,
     minLongPollTimeoutMs: 2_000,
@@ -61,9 +54,6 @@ test("app poll loop keeps flush ordering around successful getUpdates cycles", a
     flushPendingSystemMessages: async () => {
       callOrder.push("flushPendingSystemMessages");
     },
-    flushPendingTimelineScreenshots: async () => {
-      callOrder.push("flushPendingTimelineScreenshots");
-    },
     resolveLongPollTimeoutMs: () => {
       callOrder.push("resolveLongPollTimeoutMs");
       return 35_000;
@@ -83,14 +73,12 @@ test("app poll loop keeps flush ordering around successful getUpdates cycles", a
   assert.deepEqual(callOrder, [
     "flushDueReminders",
     "flushPendingSystemMessages",
-    "flushPendingTimelineScreenshots",
     "loadSyncBuffer",
     "resolveLongPollTimeoutMs",
     "getUpdates",
     "handleIncomingMessage",
     "flushDueReminders",
     "flushPendingSystemMessages",
-    "flushPendingTimelineScreenshots",
   ]);
   assert.equal(heartbeatPatches.length, 2);
   const firstHeartbeat = heartbeatPatches[0];
@@ -120,7 +108,6 @@ test("app poll loop turns session-expired transport failures into the login hint
       },
       flushDueReminders: async () => {},
       flushPendingSystemMessages: async () => {},
-      flushPendingTimelineScreenshots: async () => {},
       resolveLongPollTimeoutMs: () => 35_000,
       handleIncomingMessage: async () => {},
       updateBridgeHeartbeat: () => {},
@@ -151,7 +138,6 @@ test("app poll loop escalates from retry delay to backoff delay after repeated f
     },
     flushDueReminders: async () => {},
     flushPendingSystemMessages: async () => {},
-    flushPendingTimelineScreenshots: async () => {},
     resolveLongPollTimeoutMs: () => 35_000,
     handleIncomingMessage: async () => {},
     updateBridgeHeartbeat: (patch) => {

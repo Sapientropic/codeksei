@@ -20,7 +20,6 @@ interface TestHarness {
       normalized: NormalizedIncomingMessage,
       options: { allowCommands: boolean },
     ): Promise<{ status: string } | void>;
-    sendTimelineScreenshot(payload: { senderId: string; args: string[]; outputFile: string }): Promise<unknown>;
     sendLocalFileToCurrentChat(payload: { senderId: string; filePath: string }): Promise<unknown>;
   };
   callOrder: string[];
@@ -56,24 +55,6 @@ function buildIncomingMessage(): NormalizedIncomingMessage {
     attachments: [],
   };
 }
-
-test("sendTimelineScreenshot clears typing when screenshot generation fails", async () => {
-  const harness = createTestAppHarness({
-    async runTimelineSubcommandImpl() {
-      throw new Error("screenshot boom");
-    },
-  });
-
-  await assert.rejects(
-    () => harness.app.sendTimelineScreenshot({
-      senderId: "user-1",
-      args: ["--selector", "main"],
-      outputFile: path.join(harness.tempRoot, "timeline.png"),
-    }),
-    /screenshot boom/,
-  );
-  assert.deepEqual(harness.typingCalls.map((entry: { status: number }) => entry.status), [1, 0]);
-});
 
 test("sendLocalFileToCurrentChat clears typing when file delivery fails", async () => {
   const harness = createTestAppHarness({

@@ -13,7 +13,6 @@ import type {
   NormalizedIncomingMessage,
   RuntimeTurnSendResult,
   SendLocalFileRequest,
-  TimelineScreenshotRequest,
 } from "./runtime-types";
 import { runCodekseiAppLifecycle } from "./app-lifecycle-runner";
 import { attachRuntimeEventPipeline } from "./app-runtime-event-pipeline";
@@ -30,7 +29,6 @@ import {
   handleReplyDeliveryFailureDelegate,
   resolveAppLongPollWindow,
   sendRuntimeLocalFile,
-  sendRuntimeTimelineScreenshot,
 } from "./app-runtime-delegates";
 import { assertBridgeMode } from "./host-mode";
 import { logError } from "./logging";
@@ -122,10 +120,6 @@ export class CodekseiApp {
     return this.services.timelineIntegration;
   }
 
-  get timelineScreenshotQueue(): AppServices["timelineScreenshotQueue"] {
-    return this.services.timelineScreenshotQueue;
-  }
-
   printDoctor(): void {
     printDoctorReport({
       config: this.config,
@@ -180,28 +174,12 @@ export class CodekseiApp {
         activeAccountId: this.activeAccountId,
         reminderQueue: this.reminderQueue,
         systemMessageDispatcher: this.systemMessageDispatcher,
-        timelineScreenshotQueue: this.timelineScreenshotQueue,
       }),
       handleIncomingMessage: (message: unknown) => this.handleIncomingMessage(message),
       flushDueReminders: (currentAccount: { accountId: string }) => {
         return this.backstageTaskLifecycle.flushDueReminders(currentAccount);
       },
       flushPendingSystemMessages: () => this.backstageTaskLifecycle.flushPendingSystemMessages(),
-      flushPendingTimelineScreenshots: (currentAccount: { accountId: string }) => {
-        return this.backstageTaskLifecycle.flushPendingTimelineScreenshots(currentAccount);
-      },
-    });
-  }
-
-  async sendTimelineScreenshot({
-    senderId = "",
-    args = [],
-    outputFile = "",
-  }: TimelineScreenshotRequest = {}): Promise<unknown> {
-    assertBridgeMode(this.config, "Codeksei bridge timeline screenshot");
-    return sendRuntimeTimelineScreenshot({
-      payload: { senderId, args, outputFile },
-      runtimeTurnLifecycle: this.runtimeTurnLifecycle,
     });
   }
 

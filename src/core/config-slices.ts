@@ -16,7 +16,6 @@ export interface WorkspacePathsConfig {
   timelineStateDir: string;
   logDir: string;
   reminderQueueFile: string;
-  timelineScreenshotQueueFile: string;
   cliIdempotencyLedgerFile: string;
   syncBufferDir: string;
   sessionsFile: string;

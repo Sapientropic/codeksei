@@ -111,14 +111,13 @@
 
 - `json-state.ts`
 - `system-message-queue-store.ts`
-- `timeline-screenshot-queue-store.ts`
 - `reminder-queue-store.ts`
 
 设计规则：
 
 - schema / validate 只在 ingress canonicalize
 - store 只操作 canonical state
-- queue / reminder / screenshot 这类 managed state 不再挂在 `src/core`
+- queue / reminder 这类 managed state 不再挂在 `src/core`
 - note / review / timeline consumer 通过 typed boundary 进入 state owner，不再靠 allowlist 或 `@ts-nocheck` 兜底
 
 这一层是“状态怎么进、怎么存、怎么隔离坏文件”的真相层。
@@ -315,17 +314,17 @@
 - accounts
 - sessions
 - sync buffers
-- reminder / system / timeline screenshot queues
+- reminder / system queues
 - context boards
 - companion notes
 - companion-memory runtime state
 - workspace bootstrap config
 - logs
 
-Hosted Mode 下，这里不再承接 reminder queue 或 timeline screenshot queue 的主真相：
+Hosted Mode 下，这里不再承接 reminder queue 的主真相：
 
 - reminder 改走 Hermes cron/jobs
-- channel send-file / timeline screenshot --send 改走 Hermes repo-local origin delivery
+- channel send-file 直接走 Hermes repo-local origin delivery
 - `system send` 仍保留 bridge-only backstage queue 语义
 
 如果用户单独指定 `CODEKSEI_DIARY_DIR` / `CODEKSEI_TIMELINE_STATE_DIR`，业务数据会写到外部目录，状态目录保留运行态文件。

@@ -4,16 +4,7 @@ const assert: typeof import("node:assert/strict") = require("node:assert/strict"
 const {
   buildRuntimeInboundText,
   hasRpcId,
-  resolveTimelineScreenshotOutput,
 } = require("../src/core/app-runtime-helpers");
-
-test("app runtime helpers extract the explicit timeline screenshot output path", () => {
-  assert.equal(
-    resolveTimelineScreenshotOutput(["--selector", "timeline", "--output", "C:/tmp/shot.png"]),
-    "C:/tmp/shot.png"
-  );
-  assert.equal(resolveTimelineScreenshotOutput(["--selector", "timeline"]), "");
-});
 
 test("app runtime helpers keep attachment guidance and local time in inbound text", () => {
   const text = buildRuntimeInboundText({

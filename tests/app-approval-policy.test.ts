@@ -89,7 +89,7 @@ test("approval command policy keeps non-whitelisted terminal commands blocked", 
 
 test("approval command policy still recognizes the legacy timeline screenshot shell wrapper", () => {
   assert.equal(matchesBuiltInCommandPrefix(["bash", "./scripts/timeline-screenshot.sh"]), true);
-  assert.equal(matchesBuiltInCommandPrefix(["sh", "-lc", "./scripts/timeline-screenshot.sh --send"]), true);
+  assert.equal(matchesBuiltInCommandPrefix(["sh", "-lc", "./scripts/timeline-screenshot.sh --selector timeline"]), true);
 });
 
 test("approval command policy keeps Windows executable aliases in parity with repo entrypoints", () => {

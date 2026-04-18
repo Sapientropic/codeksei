@@ -111,7 +111,7 @@ const TOPIC_HELP = {
       "  如果必须用 timeline:write --stdin，传完整 JSON 对象 {\"events\":[...]}，不要传裸数组",
       `  timeline 查分类先用 ${buildTerminalEntryUsage("timeline.categories", "public")}；改已有日程前先用 ${buildTerminalEntryUsage("timeline.read", "public")} --date YYYY-MM-DD`,
       "  不带 offset 的本地时间按当前 timezone 解释；如果 timeline state 已声明非 legacy timezone，会优先沿用它",
-      `  timeline 截图默认只生成本地文件；需要回传当前聊天时再用 ${buildTerminalActionExample("timeline.screenshot", { audience: "public", includeArgs: true })} --send，或直接配合 ${buildTerminalActionExample("channel.send_file", { audience: "public", includeArgs: true })}`,
+      `  timeline 截图只生成本地文件；需要回传当前聊天时，再配合 ${buildTerminalActionExample("channel.send_file", { audience: "public", includeArgs: true })}`,
     ],
   }),
   project: () => ({
@@ -630,15 +630,13 @@ const LEAF_HELP = {
     usage: [buildExample("timeline.screenshot", true)],
     bodyLabel: "说明：",
     body: [
-      "  不带 --send 时，主语义是本地截图：先构建 dashboard，再把图片保存到本机输出路径。",
-      "  带 --send 时，它只是兼容 wrapper：先本地截图，再复用当前宿主的文件发送能力。",
-      "  Hosted Mode 下会走 repo-local shim 发回当前 Hermes origin chat；Codex Mode 下会复用 bridge 的本地文件发送能力。",
+      "  主语义是本地截图：先构建 dashboard，再把图片保存到本机输出路径。",
+      `  需要回传当前聊天时，先运行这条命令生成图片，再配合 ${buildTerminalActionExample("channel.send_file", { audience: "public", includeArgs: true })}。`,
       "  泛泛地说“截个图”时，默认就是整页；只有明确说时间轴/分析区/事件列表这类局部区域时，才额外传 --selector。",
     ],
     examples: [
       "  codeksei timeline screenshot",
       "  codeksei timeline screenshot --selector timeline",
-      "  codeksei timeline screenshot --send --selector timeline",
     ],
     includeFlagBlock: true,
   }),

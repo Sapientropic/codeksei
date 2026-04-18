@@ -7,7 +7,6 @@ import type {
   RuntimeWatchdogLifecycleLike,
   SessionStoreWriterLike,
   ThreadStateStoreLike,
-  TimelineScreenshotQueueLike,
 } from "./app-service-contract";
 import type {
   DeliveryFailurePayload,
@@ -16,7 +15,6 @@ import type {
   RuntimeTurnSendResult,
   SendLocalFileRequest,
   SystemDispatchResult,
-  TimelineScreenshotRequest,
 } from "./runtime-types";
 import { handleReplyDeliveryFailure as processReplyDeliveryFailure } from "./reply-delivery-failure";
 import { resolveLongPollTimeoutMs as resolveAppLongPollTimeoutMs } from "./app-poll-loop";
@@ -50,16 +48,6 @@ export async function handlePreparedRuntimeMessage({
   return runtimeTurnLifecycle.handlePreparedMessage(normalized, options);
 }
 
-export async function sendRuntimeTimelineScreenshot({
-  payload,
-  runtimeTurnLifecycle,
-}: {
-  payload: TimelineScreenshotRequest;
-  runtimeTurnLifecycle: Pick<RuntimeTurnLifecycleLike, "sendTimelineScreenshot">;
-}): Promise<unknown> {
-  return runtimeTurnLifecycle.sendTimelineScreenshot(payload);
-}
-
 export async function sendRuntimeLocalFile({
   payload,
   runtimeTurnLifecycle,
@@ -74,17 +62,14 @@ export function resolveAppLongPollWindow({
   activeAccountId,
   reminderQueue,
   systemMessageDispatcher,
-  timelineScreenshotQueue,
 }: {
   activeAccountId: string;
   reminderQueue: ReminderQueueLike;
   systemMessageDispatcher: { hasPending(): boolean } | null;
-  timelineScreenshotQueue: TimelineScreenshotQueueLike;
 }): number {
   return resolveAppLongPollTimeoutMs({
     systemMessageDispatcher,
     activeAccountId,
-    timelineScreenshotQueue,
     reminderQueue,
     defaultLongPollTimeoutMs: 35_000,
     minLongPollTimeoutMs: 2_000,
