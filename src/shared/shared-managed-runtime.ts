@@ -7,6 +7,7 @@ import { readPrefixedEnv } from "../contracts/app-env";
 import { classifySharedBridgeHeartbeat, readSharedBridgeHeartbeat } from "./shared-bridge-heartbeat";
 import { resolveBundledCodexBinary } from "../contracts/codex-spawn";
 import { probeCodexAppServerCapabilities } from "../contracts/codex-capability";
+import { resolvePreferredSystemTimelineBrowserPath } from "../timeline/runtime/application/timeline/browser-paths";
 import {
   ensureLogDir,
   isPidAlive,
@@ -102,9 +103,7 @@ async function ensureSharedAppServer(): Promise<{ pid: number; status: string }>
   if (!process.env.CODEKSEI_SCREENSHOT_CHROME_PATH && !process.env.TIMELINE_FOR_AGENT_CHROME_PATH) {
     env.CODEKSEI_SCREENSHOT_CHROME_PATH =
       readPrefixedEnv(process.env, "SCREENSHOT_CHROME_PATH")
-      || (process.platform === "darwin"
-        ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-        : "");
+      || resolvePreferredSystemTimelineBrowserPath();
   }
 
   const command = readPrefixedEnv(process.env, "CODEX_COMMAND") || "codex";

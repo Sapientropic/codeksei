@@ -2,7 +2,6 @@ import { normalizeText } from "../core/text-normalization";
 import * as crypto from "node:crypto";
 import * as path from "node:path";
 
-import { SessionStore } from "../adapters/runtime/codex/session-store";
 import { rememberCompanionMemory } from "../companion-memory/remember";
 import {
   resolveSelectedAccount,
@@ -36,6 +35,7 @@ import { parseCompactDurationMs } from "../core/duration";
 import { ReminderQueueStore } from "../state/reminder-queue-store";
 import { inspectPreferredSenderId } from "../workspace/default-targets";
 import { seedProactiveCheckin } from "../host/delegation/seed-proactive";
+import { createSessionStore } from "../session/session-store-factory";
 
 export interface ReminderWriteConfig extends WeixinAccountConfig, Pick<
   AppRuntimeConfig,
@@ -174,7 +174,7 @@ async function runReminderWriteCommand(
         accountId: normalizeText(config.accountId),
         config: targetConfig,
         explicitUser: normalizeText(options.user),
-        sessionStore: config.sessionsFile ? new SessionStore({ filePath: config.sessionsFile }) : null,
+        sessionStore: createSessionStore(config.sessionsFile),
       });
       if (!targetResolution.ok || !targetResolution.value) {
         throw buildTargetResolutionRequiredError(
@@ -352,7 +352,7 @@ async function runReminderWriteCommand(
   }
 
   const account = resolveSelectedAccount(config);
-  const sessionStore = new SessionStore({ filePath: config.sessionsFile });
+  const sessionStore = createSessionStore(config.sessionsFile);
   const senderResolution = inspectPreferredSenderId({
     config,
     accountId: account.accountId,

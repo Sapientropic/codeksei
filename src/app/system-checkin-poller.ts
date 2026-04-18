@@ -7,13 +7,13 @@ import type {
 
 import { PACKAGE_NAME } from "../contracts/app-env";
 import { resolveSelectedAccount } from "../adapters/channel/weixin/account-store";
-import { SessionStore } from "../adapters/runtime/codex/session-store";
 import {
   processBridgeCheckinPollerIteration,
 } from "../checkin";
 import { logInfo } from "../core/logging";
 import { formatCheckinRange } from "../state/checkin-config";
 import { SystemMessageQueueStore } from "../state/system-message-queue-store";
+import { createSessionStore } from "../session/session-store-factory";
 
 const CHECKIN_POLLER_HEARTBEAT_MS = 30_000;
 
@@ -28,7 +28,10 @@ export async function runSystemCheckinPoller(config: CheckinPollerConfig) {
     deadLetterFilePath: normalizeText(config.systemMessageDeadLetterFile),
     filePath: normalizeText(config.systemMessageQueueFile),
   });
-  const sessionStore = new SessionStore({ filePath: normalizeText(config.sessionsFile) });
+  const sessionStore = createSessionStore(config.sessionsFile);
+  if (!sessionStore) {
+    throw new Error("缺少 sessionsFile，无法启动 checkin poller");
+  }
   let lastRangeLabel = "";
   let lastNextWakeAt = "";
   let lastActiveTriggerId = "";

@@ -1,6 +1,5 @@
 import { getCommandArgsSchema } from "../contracts/command-args";
 import type { CommandExecutionResult } from "../contracts/cli-contract";
-import { SessionStore } from "../adapters/runtime/codex/session-store";
 import { parseCliArgs } from "../core/cli-args";
 import { buildTargetResolutionRequiredError } from "../core/cli-contract";
 import {
@@ -11,6 +10,7 @@ import {
 import { buildTerminalLeafHelp } from "../core/command-registry";
 import type { AppRuntimeConfig } from "../core/app-service-contract";
 import { normalizeText } from "../core/text-normalization";
+import { createSessionStore } from "../session/session-store-factory";
 
 interface SystemCheckinTriggerOptions {
   help: boolean;
@@ -49,7 +49,7 @@ export async function runSystemCheckinTriggerCommand(
     config,
     explicitUser: options.user,
     explicitWorkspace: options.workspace,
-    sessionStore: config.sessionsFile ? new SessionStore({ filePath: config.sessionsFile }) : null,
+    sessionStore: createSessionStore(config.sessionsFile),
   });
   if (!resolution.ok || !resolution.value) {
     throw buildTargetResolutionRequiredError(

@@ -6,6 +6,10 @@ import * as path from "node:path";
 
 import { chromium, type Browser, type Page } from "playwright-core";
 import { ignoreCleanupError } from "../../../../core/error-handling";
+import {
+  buildTimelineBrowserNotFoundMessage,
+  resolveTimelineBrowserExecutablePath,
+} from "./browser-paths";
 
 import type {
   TimelineRangeKey,
@@ -294,22 +298,15 @@ function normalizeLookupValue(value: string | undefined): string {
 }
 
 function resolveChromeExecutablePath(config: TimelineRuntimeConfig): string {
-  const configuredPath = String(config.chromeExecutablePath || "").trim();
   const playwrightManagedPath = resolvePlaywrightExecutablePath();
-  const candidates = dedupePaths([
-    configuredPath,
-    playwrightManagedPath,
-    ...resolveSystemBrowserCandidates(),
-  ]);
-
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) {
-      return candidate;
-    }
+  try {
+    return resolveTimelineBrowserExecutablePath({
+      configuredPath: config.chromeExecutablePath,
+      playwrightManagedPath,
+    });
+  } catch {
+    throw new Error(buildTimelineBrowserNotFoundMessage());
   }
-  throw new Error(
-    "找不到可用的 Chromium/Chrome，可设置 CODEKSEI_SCREENSHOT_CHROME_PATH 或先安装 Playwright 浏览器"
-  );
 }
 
 function resolvePlaywrightExecutablePath(): string {
@@ -321,60 +318,6 @@ function resolvePlaywrightExecutablePath(): string {
   } catch {
     return "";
   }
-}
-
-function resolveSystemBrowserCandidates(): string[] {
-  if (process.platform === "darwin") {
-    return [
-      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-      path.join(os.homedir(), "Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
-      "/Applications/Chromium.app/Contents/MacOS/Chromium",
-      path.join(os.homedir(), "Applications/Chromium.app/Contents/MacOS/Chromium"),
-      "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-      path.join(os.homedir(), "Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"),
-    ];
-  }
-
-  if (process.platform === "win32") {
-    const localAppData = String(process.env.LOCALAPPDATA || "").trim();
-    const programFiles = String(process.env.PROGRAMFILES || "").trim();
-    const programFilesX86 = String(process.env["PROGRAMFILES(X86)"] || "").trim();
-    return [
-      path.join(localAppData, "Google", "Chrome", "Application", "chrome.exe"),
-      path.join(programFiles, "Google", "Chrome", "Application", "chrome.exe"),
-      path.join(programFilesX86, "Google", "Chrome", "Application", "chrome.exe"),
-      path.join(localAppData, "Chromium", "Application", "chrome.exe"),
-      path.join(programFiles, "Chromium", "Application", "chrome.exe"),
-      path.join(programFilesX86, "Chromium", "Application", "chrome.exe"),
-      path.join(localAppData, "Microsoft", "Edge", "Application", "msedge.exe"),
-      path.join(programFiles, "Microsoft", "Edge", "Application", "msedge.exe"),
-      path.join(programFilesX86, "Microsoft", "Edge", "Application", "msedge.exe"),
-    ];
-  }
-
-  return [
-    "/usr/bin/google-chrome-stable",
-    "/usr/bin/google-chrome",
-    "/usr/bin/chromium-browser",
-    "/usr/bin/chromium",
-    "/snap/bin/chromium",
-    "/opt/google/chrome/chrome",
-    "/opt/microsoft/msedge/msedge",
-  ];
-}
-
-function dedupePaths(paths: string[]): string[] {
-  const seen = new Set();
-  const output = [];
-  for (const candidate of Array.isArray(paths) ? paths : []) {
-    const normalized = String(candidate || "").trim();
-    if (!normalized || seen.has(normalized)) {
-      continue;
-    }
-    seen.add(normalized);
-    output.push(normalized);
-  }
-  return output;
 }
 
 async function waitForDashboardReady(page: Page, selector: string = ".page"): Promise<void> {

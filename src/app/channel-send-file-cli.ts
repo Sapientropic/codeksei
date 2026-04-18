@@ -5,11 +5,13 @@ import { buildTerminalLeafHelp } from "../core/command-registry";
 import { runCliMutation } from "../core/cli-mutation";
 import type { AppRuntimeConfig } from "../core/app-service-contract";
 import {
-  sendFileViaHermesRepoLocal,
-} from "../core/hermes-repo-local";
-import { resolveHostMode } from "../core/host-mode";
+  deliverLocalFileToCurrentChat,
+  type LocalFileDeliveryApp,
+  type LocalFileDeliveryConfig,
+} from "../core/local-file-delivery";
 import { resolveRequiredFilePath } from "../core/local-file-path";
 import { normalizeText } from "../core/text-normalization";
+import { resolveHostMode } from "../core/host-mode";
 
 interface ChannelSendFileOptions {
   dryRun?: boolean;
@@ -23,23 +25,11 @@ interface ChannelSendFileResult {
   filePath: string;
 }
 
-interface ChannelSendFileApp {
-  sendLocalFileToCurrentChat(args: {
-    senderId: string;
-    filePath: string;
-  }): Promise<ChannelSendFileResult>;
-}
+type ChannelSendFileApp = LocalFileDeliveryApp;
 
-type ChannelSendFileConfig = Partial<Pick<
+type ChannelSendFileConfig = LocalFileDeliveryConfig & Partial<Pick<
   AppRuntimeConfig,
-  | "channel"
-  | "channelProvider"
-  | "cliIdempotencyLedgerFile"
-  | "hermesHome"
-  | "hermesPythonCommand"
-  | "hermesRepoLocalShimPath"
-  | "hermesRepoRoot"
-  | "runtime"
+  "cliIdempotencyLedgerFile"
 >>;
 
 async function runChannelSendFileCommand(
@@ -84,32 +74,22 @@ async function runChannelSendFileCommand(
       ].join("\n"),
     },
     execute: async () => {
-      if (hostMode.mode === "hosted") {
-        const result = sendFileViaHermesRepoLocal(config, {
-          file_path: resolvedFilePath,
-          sender_id: normalizeText(options.user),
-        });
-        return {
-          data: {
-            chatId: result.chatId,
-            filePath: result.filePath,
-            platform: result.platform,
-            sessionId: result.sessionId,
-            sessionKey: result.sessionKey,
-            threadId: result.threadId,
-          },
-          text: `file sent via Hermes repo-local: ${result.filePath}`,
-        };
-      }
-      const result = await app.sendLocalFileToCurrentChat({
-        senderId: options.user,
+      const result = await deliverLocalFileToCurrentChat(app, config, {
         filePath: resolvedFilePath,
+        senderId: normalizeText(options.user),
       });
       return {
         data: {
+          chatId: result.chatId,
           filePath: result.filePath,
+          platform: result.platform,
+          sessionId: result.sessionId,
+          sessionKey: result.sessionKey,
+          threadId: result.threadId,
         },
-        text: `file sent: ${result.filePath}`,
+        text: hostMode.mode === "hosted"
+          ? `file sent via Hermes repo-local: ${result.filePath}`
+          : `file sent: ${result.filePath}`,
       };
     },
     idempotencyKey: normalizeText(options.idempotencyKey),

@@ -8,6 +8,7 @@ import {
   type NormalizedWorkspaceOverrideProfile,
 } from "../contracts/config-files";
 import { loadJsonConfig } from "../core/config-loader";
+import { listWorkspaceScopedRelativePathCandidates } from "../core/workspace-config-paths";
 
 interface WorkspaceBootstrapOptions {
   workspaceBootstrapConfigFile?: unknown;
@@ -69,19 +70,19 @@ const DEFAULT_BOOTSTRAP_PROFILE: WorkspaceBootstrapProfile = Object.freeze({
       when: "",
     },
     {
-      relativePath: ".codex/AGENT_GUIDE.md",
+      relativePath: ".codeksei/AGENT_GUIDE.md",
       role: "agent write/update rules for this workspace",
       when: "",
     },
     {
-      relativePath: ".codex/AGENT_GUIDE.local.md",
+      relativePath: ".codeksei/AGENT_GUIDE.local.md",
       role: "private agent write/update overlay for this workspace",
       when: "",
     },
   ],
   conditionalFiles: [
     {
-      relativePath: ".codex/timeline/README.md",
+      relativePath: ".codeksei/timeline/README.md",
       role: "timeline write/read contract for this workspace",
       when: "timeline read/write/build/screenshot work, or cutover/closeout bookkeeping that may append timeline facts/events",
     },
@@ -275,12 +276,8 @@ function normalizeRecentFileSpec(rawSpec: unknown): RecentFileSpec | null {
 function collectExistingFiles(workspaceRoot: string, candidates: FileCandidate[]): CollectedFile[] {
   const files: CollectedFile[] = [];
   for (const candidate of candidates) {
-    const relativePath = normalizeRelativePath(candidate.relativePath);
-    if (!relativePath) {
-      continue;
-    }
-    const absolutePath = path.join(workspaceRoot, ...relativePath.split("/"));
-    if (!isReadableFile(absolutePath)) {
+    const absolutePath = resolveExistingWorkspaceFile(workspaceRoot, candidate.relativePath);
+    if (!absolutePath) {
       continue;
     }
     files.push({
@@ -290,6 +287,20 @@ function collectExistingFiles(workspaceRoot: string, candidates: FileCandidate[]
     });
   }
   return files;
+}
+
+function resolveExistingWorkspaceFile(workspaceRoot: string, relativePath: string): string {
+  const normalizedRelativePath = normalizeRelativePath(relativePath);
+  if (!normalizedRelativePath) {
+    return "";
+  }
+  for (const candidatePath of listWorkspaceScopedRelativePathCandidates(normalizedRelativePath)) {
+    const absolutePath = path.join(workspaceRoot, ...candidatePath.split("/"));
+    if (isReadableFile(absolutePath)) {
+      return absolutePath;
+    }
+  }
+  return "";
 }
 
 function collectRecentFiles(workspaceRoot: string, specs: RecentFileSpec[]): CollectedFile[] {

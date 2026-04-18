@@ -4,7 +4,6 @@ import * as path from "node:path";
 
 import { resolveSelectedAccount } from "../adapters/channel/weixin/account-store";
 import { loadPersistedContextTokens } from "../adapters/channel/weixin/context-token-store";
-import { SessionStore } from "../adapters/runtime/codex/session-store";
 import { getCommandArgsSchema } from "../contracts/command-args";
 import type { CommandExecutionResult } from "../contracts/cli-contract";
 import { parseCliArgs } from "../core/cli-args";
@@ -12,6 +11,7 @@ import { buildAuthRequiredError, buildTargetResolutionRequiredError } from "../c
 import { buildTerminalLeafHelp } from "../core/command-registry";
 import { runCliMutation } from "../core/cli-mutation";
 import { normalizeText } from "../core/text-normalization";
+import { createSessionStore } from "../session/session-store-factory";
 import { SystemMessageQueueStore } from "../state/system-message-queue-store";
 import { inspectPreferredSenderId, inspectPreferredWorkspaceRoot } from "../workspace/default-targets";
 
@@ -59,7 +59,7 @@ async function runSystemSendCommand(config: RuntimeConfig, args: string[] = []) 
   }
 
   const account = resolveSelectedAccount(config);
-  const sessionStore = new SessionStore({ filePath: config.sessionsFile });
+  const sessionStore = createSessionStore(config.sessionsFile);
   const senderResolution = inspectPreferredSenderId({
     config,
     accountId: account.accountId,

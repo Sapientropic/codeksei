@@ -1,7 +1,6 @@
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 
-import { SessionStore } from "../adapters/runtime/codex/session-store";
 import { resolveCheckinTarget } from "../checkin";
 import { bestEffortRefreshContextBoard, type ContextBoardConfig } from "../context/board";
 import { normalizeText } from "../core/text-normalization";
@@ -37,6 +36,7 @@ import {
   extractCompanionProfileSignalUpdatesFromText,
 } from "./profile-signals";
 import { mergeCompanionProfileSignals } from "./profile-signal-contracts";
+import { createSessionStore } from "../session/session-store-factory";
 
 export interface CompanionMemoryRuntimeConfig extends ContextBoardConfig, CompanionMemorySemanticConfig {
   accountId?: string;
@@ -257,7 +257,7 @@ export async function bestEffortRememberCompanionMemory(
       },
       explicitUser: normalizeText(explicitUser),
       explicitWorkspace: normalizeText(explicitWorkspace),
-      sessionStore: config.sessionsFile ? new SessionStore({ filePath: config.sessionsFile }) : null,
+      sessionStore: createSessionStore(config.sessionsFile),
     });
     if (!resolution.ok || !resolution.value) {
       return null;

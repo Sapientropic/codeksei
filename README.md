@@ -285,11 +285,11 @@ CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION=2.1.8
 CODEKSEI_TIMEZONE=Asia/Shanghai
 CODEKSEI_TIMELINE_LOCALE=zh-CN
 CODEKSEI_DIARY_DIR=/绝对路径/你的 vault/日记
-CODEKSEI_TIMELINE_STATE_DIR=/绝对路径/你的 vault/.codex/timeline
+CODEKSEI_TIMELINE_STATE_DIR=/绝对路径/你的 Codeksei 状态根
 CODEKSEI_WORKSPACE_BOOTSTRAP_CONFIG=/绝对路径/你的 workspace-bootstrap.json
-CODEKSEI_PROJECT_RADAR_CONFIG=/绝对路径/你的 workspace/.codex/code-projects.json
-CODEKSEI_DURABLE_NOTE_SCHEMA_CONFIG=/绝对路径/你的 workspace/.codex/durable-note-schema.json
-CODEKSEI_REVIEW_SCHEMA_CONFIG=/绝对路径/你的 workspace/.codex/review-schema.json
+CODEKSEI_PROJECT_RADAR_CONFIG=/绝对路径/你的 workspace/.codeksei/code-projects.json
+CODEKSEI_DURABLE_NOTE_SCHEMA_CONFIG=/绝对路径/你的 workspace/.codeksei/durable-note-schema.json
+CODEKSEI_REVIEW_SCHEMA_CONFIG=/绝对路径/你的 workspace/.codeksei/review-schema.json
 CODEKSEI_SHARED_USE_BUNDLED_CODEX_BINARY=1
 CODEKSEI_SHARED_DISABLE_PLUGINS=0
 CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
@@ -320,6 +320,7 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - 如果你在共享模式下使用多 workspace，建议启动前就设置好 `CODEKSEI_WORKSPACE_ROOT`
 - `CODEKSEI_TIMEZONE` 可选；若显式设置，它会统一驱动 reminder / diary / review / timeline 的本地时间解释
 - `CODEKSEI_TIMELINE_LOCALE` 可选；当前用于 timeline dashboard 的文案、日期格式和 demo data 语言切换，支持 `zh-CN` 与 `en`
+- workspace 级 schema / radar 自动发现现在优先 `.codeksei/*`；旧的 `.codex/*` 仍保留兼容回退
 - `CODEKSEI_HERMES_REPO_ROOT` 可选；Hosted Mode 下若 sibling `../hermes-agent` 不成立，用它显式指向 repo-local upstream checkout
 - Hermes 原生 cron `env` 透传补丁现在作为可选资产跟仓发布；详细适用范围与 `git apply` 用法统一看 [`docs/hermes-cron-env-patch.md`](./docs/hermes-cron-env-patch.md)
 - 如果不设 `CODEKSEI_TIMEZONE`，Codeksei 会优先沿用 timeline state 里已声明的非 legacy timezone；否则回退到系统时区

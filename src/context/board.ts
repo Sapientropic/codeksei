@@ -24,10 +24,10 @@ import {
   collectWorkspaceContinuitySnapshot,
   type WorkspaceContinuityFile,
 } from "../workspace/workspace-bootstrap";
-import { SessionStore } from "../adapters/runtime/codex/session-store";
 import { normalizeDisplayPath } from "../core/path-utils";
 import { createCompanionMemoryRuntimeStateStore } from "../companion-memory/runtime-state";
 import { createOnboardingStateStore } from "../onboarding/state";
+import { createSessionStore } from "../session/session-store-factory";
 
 export type ContextBriefingMode = "proactive" | "review";
 
@@ -328,7 +328,7 @@ export function bestEffortRefreshContextBoard(
       config: config as Partial<Pick<AppRuntimeConfig, "allowedUserIds" | "workspaceRoot">>,
       explicitUser: normalizeText(options.user),
       explicitWorkspace: normalizeText(options.workspace),
-      sessionStore: config.sessionsFile ? new SessionStore({ filePath: config.sessionsFile }) : null,
+      sessionStore: createSessionStore(config.sessionsFile),
     });
     if (!resolution.ok || !resolution.value) {
       return null;

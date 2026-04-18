@@ -1,4 +1,3 @@
-import { SessionStore } from "../adapters/runtime/codex/session-store";
 import type { AppRuntimeConfig } from "../core/app-service-contract";
 import { CliError, buildTargetResolutionRequiredError } from "../core/cli-contract";
 import { normalizeText } from "../core/text-normalization";
@@ -8,6 +7,7 @@ import {
   type CheckinResolvedTarget,
 } from "../checkin";
 import { loadResolvedHostConfig } from "../host";
+import { createSessionStore } from "../session/session-store-factory";
 
 export type HostCliRuntimeConfig = Partial<Pick<
   AppRuntimeConfig,
@@ -45,7 +45,7 @@ export function resolveHostCheckinTarget(
     config,
     explicitUser: normalizeText(user),
     explicitWorkspace: normalizeText(workspace),
-    sessionStore: config.sessionsFile ? new SessionStore({ filePath: config.sessionsFile }) : null,
+    sessionStore: createSessionStore(config.sessionsFile),
   });
   if (!resolution.ok || !resolution.value) {
     throw buildTargetResolutionRequiredError(

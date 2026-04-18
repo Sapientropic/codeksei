@@ -42,7 +42,7 @@ This skill is designed for **Hosted Mode / Hermes recipe**.
 codeksei doctor
 codeksei channel send-file --path /绝对路径
 codeksei timeline event --date YYYY-MM-DD --start HH:mm --end HH:mm --title "标题" (--event-node <id> | --subcategory <id>) [其他参数]
-codeksei timeline screenshot --send [--user <wechatUserId>] [--output /绝对路径] [其他 timeline screenshot 参数]
+codeksei timeline screenshot [--output /绝对路径] [其他 timeline screenshot 参数] [--send [--user <wechatUserId>]]
 codeksei diary write --section todo --state open --text "内容"
 codeksei reminder write --delay 30m --text "提醒内容" [--delivery direct|proactive]
 codeksei companion remember --user <wechat_user_id> --workspace /绝对路径 --source host_user_turn [--text "内容" | --stdin]

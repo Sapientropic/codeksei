@@ -160,7 +160,7 @@ export const COMMAND_AUTH_OVERRIDES = {
   "channel.send_file": "runtime_bootstrap",
   "reminder.create": "context_token",
   "system.send": "context_token",
-  "timeline.screenshot": "context_token",
+  "timeline.screenshot": "none",
 } as const satisfies Record<string, CommandAuthRequirementDefinition>;
 
 export const COMMAND_HOST_SUPPORT_TIER_OVERRIDES = Object.freeze(

@@ -6,6 +6,7 @@ import { ensureTimelineStateTimezone } from "./state-sync";
 import { readPrefixedEnv } from "../../contracts/app-env";
 import { resolvePackageRoot } from "../../core/path-utils";
 import { resolveRuntimeEntrypointAbsolute } from "../../contracts/runtime-entrypoints";
+import { resolvePreferredSystemTimelineBrowserPath } from "../../timeline/runtime/application/timeline/browser-paths";
 
 
 interface TimelineIntegrationConfig {
@@ -196,10 +197,7 @@ function resolveTimelineChromePath() {
   if (configured) {
     return configured;
   }
-  if (process.platform === "darwin") {
-    return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-  }
-  return "";
+  return resolvePreferredSystemTimelineBrowserPath();
 }
 
 function detectTimelineWriteFailure(stdout: string, stderr: string): string {
