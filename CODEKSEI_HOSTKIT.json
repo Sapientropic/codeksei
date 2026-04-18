@@ -63,7 +63,6 @@
       "bootstrap",
       "--provider",
       "hermes",
-      "--ensure-daemon",
       "--format",
       "json"
     ],

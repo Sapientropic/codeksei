@@ -269,62 +269,64 @@ function buildHostedCheckinCronPrompt(
     followupContext?: string;
   } = {},
 ): string {
-  // The prompt teaches Hermes when to tick/ack/complete, while actual delivery
-  // routing comes from the persisted cron job origin metadata written by sync-checkin.
-  const tickCommand = buildHostedCheckinCliCommand(target.workspaceRoot, [
-    "system",
-    "checkin-tick",
-    "--user",
-    target.senderId,
-    "--workspace",
-    target.workspaceRoot,
-  ]);
-  const syncCommand = buildHostedCheckinCliCommand(target.workspaceRoot, [
-    "operator",
+  // The prompt teaches Hermes to claim and settle delegated proactive passes,
+  // while actual delivery routing comes from the persisted cron job origin
+  // metadata written by the hosted wake sync helper.
+  const claimCommand = buildHostedCheckinCliCommand(target.workspaceRoot, [
+    "host",
+    "claim-checkin",
+    "--provider",
     "hermes",
-    "sync-checkin",
     "--user",
     target.senderId,
     "--workspace",
     target.workspaceRoot,
   ]);
-  const ackTemplate = buildHostedCheckinCliCommand(target.workspaceRoot, [
-    "system",
-    "checkin-tick",
+  const settleSilent = buildHostedCheckinCliCommand(target.workspaceRoot, [
+    "host",
+    "settle-checkin",
+    "--provider",
+    "hermes",
     "--user",
     target.senderId,
     "--workspace",
     target.workspaceRoot,
-    "--ack",
-    "<triggerId>",
-  ]);
-  const completeSilent = buildHostedCheckinCliCommand(target.workspaceRoot, [
-    "system",
-    "checkin-complete",
-    "--user",
-    target.senderId,
-    "--workspace",
-    target.workspaceRoot,
-    "--trigger",
-    "<triggerId>",
+    "--lease",
+    "<leaseId>",
     "--result",
     "silent",
     "--sleep-for",
     CHECKIN_COMPLETION_SLEEP_FOR_PLACEHOLDER,
   ]);
-  const completeSent = buildHostedCheckinCliCommand(target.workspaceRoot, [
-    "system",
-    "checkin-complete",
+  const settleSent = buildHostedCheckinCliCommand(target.workspaceRoot, [
+    "host",
+    "settle-checkin",
+    "--provider",
+    "hermes",
     "--user",
     target.senderId,
     "--workspace",
     target.workspaceRoot,
-    "--trigger",
-    "<triggerId>",
+    "--lease",
+    "<leaseId>",
     "--result",
     "sent_message",
     "--sleep-for",
     CHECKIN_COMPLETION_SLEEP_FOR_PLACEHOLDER,
+  ]);
+  const settleFailed = buildHostedCheckinCliCommand(target.workspaceRoot, [
+    "host",
+    "settle-checkin",
+    "--provider",
+    "hermes",
+    "--user",
+    target.senderId,
+    "--workspace",
+    target.workspaceRoot,
+    "--lease",
+    "<leaseId>",
+    "--result",
+    "failed",
   ]);
   return [
     "[SYSTEM: You are running one Codeksei hosted proactive checkin on Hermes. Hermes only executes the managed wake/recovery job set; Codeksei remains the schedule source of truth.]",
@@ -339,20 +341,20 @@ function buildHostedCheckinCronPrompt(
       ]
       : []),
     "",
-    `1. Run this command first and inspect its JSON result: ${tickCommand}`,
-    "2. Branch by tick status:",
-    `   - scheduled: run ${syncCommand}, then respond with exactly [SILENT].`,
-    "   - in_progress: this means another proactive pass is still active or timed out but not yet recovered. Run sync-checkin once so Hermes keeps only the recovery fallback job, then respond with exactly [SILENT].",
-    `   - due: extract payload.triggerId and payload.text, then immediately ack with ${ackTemplate}.`,
-    `3. Right after ack, run ${syncCommand}. This re-arms the 30 minute recovery fallback while the current proactive pass is executing.`,
-    "4. Execute exactly one proactive pass using payload.text as the task instruction. Keep it stateful and lightweight. You may stay silent, produce one short final message, or only do backstage work.",
-    "5. Before ending the run, you must execute exactly one completion command.",
-    `   - ${CHECKIN_COMPLETION_CONTEXT_GUIDANCE}`,
+    `1. Run this command first and inspect its JSON result: ${claimCommand}`,
+    "2. Branch by claim status:",
+    "   - idle: no proactive pass is due right now. Respond with exactly [SILENT].",
+    "   - in_progress: another proactive pass already owns the lease. Respond with exactly [SILENT].",
+    "   - claimed: extract lease.id and payload.text, then continue with this proactive pass.",
+    "3. Execute exactly one proactive pass using payload.text as the task instruction. Keep it stateful and lightweight. You may stay silent, produce one short final message, or only do backstage work.",
+    "4. Before ending the run, you must execute exactly one settle command.",
+    `   - ${CHECKIN_COMPLETION_CONTEXT_GUIDANCE.replaceAll("checkin-complete", "host settle-checkin")}`,
     ...buildCheckinCompletionDurationGuidanceLines().map((line) => `   - ${line}`),
-    `   - If your final response is the actual user-visible message, use a command like: ${completeSent}`,
-    `   - If you intentionally stay silent, use a command like: ${completeSilent} and make your final response exactly [SILENT].`,
+    `   - If your final response is the actual user-visible message, use a command like: ${settleSent}`,
+    `   - If you intentionally stay silent, use a command like: ${settleSilent} and make your final response exactly [SILENT].`,
     "   - Use result=backstage_only only when you only did backstage work; in that case your final response must also be exactly [SILENT].",
-    "6. Never skip checkin-complete after ack. Never execute more than one completion command in the same run.",
+    `   - If Hermes cannot complete this delegated pass truthfully after claim, use: ${settleFailed}`,
+    "5. Never skip host settle-checkin after a claimed lease. Never execute more than one settle command in the same run.",
   ].join("\n");
 }
 

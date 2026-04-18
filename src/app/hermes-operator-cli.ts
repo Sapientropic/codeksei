@@ -1,5 +1,3 @@
-import * as path from "node:path";
-
 import type { CommandExecutionResult } from "../contracts/cli-contract";
 import { getCommandArgsSchema } from "../contracts/command-args";
 import { parseCliArgs } from "../core/cli-args";
@@ -20,19 +18,14 @@ import {
 } from "../core/host-mode";
 import {
   collectHostedCheckinCronSummary,
-  createHostedCheckinCronPlanSetFromTick,
   type HostedCheckinCronSummary,
 } from "../core/hosted-checkin-cron";
 import {
   buildCheckinTargetResolutionErrorMessage,
   resolveCheckinTarget,
-  runCheckinTick,
 } from "../checkin";
-import {
-  resolveHermesHomePath,
-} from "../core/hermes-repo-local";
+import { buildRemovedLiveCommandError } from "../core/removed-command-guidance";
 import { normalizeText } from "../core/text-normalization";
-import { syncHostedCheckinPlanSetViaHermes } from "../host/recipes/hermes/wake-forwarder";
 import { createSessionStore } from "../session/session-store-factory";
 
 interface HermesInstallSkillOptions {
@@ -51,14 +44,6 @@ interface HermesStatusOptions {
   workspace: string;
 }
 
-interface HermesSyncCheckinOptions {
-  dryRun?: boolean;
-  help: boolean;
-  idempotencyKey?: string;
-  user: string;
-  workspace: string;
-}
-
 type HermesInstallSkillMutationData = HermesSkillInstallPreview | HermesSkillInstallResult;
 type HermesInstallSkillRequest = {
   installedPath: string;
@@ -71,46 +56,6 @@ type HermesInstallSkillResolvedTarget = {
 type HermesInstallSkillSideEffect = {
   kind: "backup_existing_skill" | "write_skill_file";
   target: string;
-};
-
-type HermesSyncCheckinMutationData = {
-  planned: {
-    jobs: Array<{
-      name: string;
-      nextRunAt: string;
-      role: "recovery" | "wake";
-      targetKey: string;
-    }>;
-    targetKey: string;
-  };
-  summary: HostedCheckinCronSummary;
-  sync: {
-    chatId: string;
-    deliver: string;
-    jobs: Array<{
-      created: boolean;
-      deliver: string;
-      jobId: string;
-      name: string;
-      nextRunAt: string;
-      role: "recovery" | "wake";
-    }>;
-    platform: string;
-    removedJobIds: string[];
-    threadId: string;
-  };
-  target: {
-    senderId: string;
-    senderSource: string;
-    workspaceRoot: string;
-    workspaceSource: string;
-  };
-  tick: {
-    due: boolean;
-    nextWakeAt: string;
-    status: string;
-    triggerId: string;
-  };
 };
 
 type HermesOperatorConfig = Pick<
@@ -136,17 +81,20 @@ type HermesOperatorConfig = Pick<
 >;
 
 export function buildHermesOperatorValidationError(value: string) {
+  const removedCommandError = buildRemovedLiveCommandError(["operator", "hermes", value], { code: "validation_error" });
+  if (removedCommandError) {
+    return removedCommandError;
+  }
   return buildValidationError(
     `不支持的 Hermes operator 子命令: ${value}`,
     {
       subcommands: [
         "install-skill",
-        "sync-checkin",
         "status",
         "smoke",
       ],
     },
-    "可用子命令：install-skill, sync-checkin, status, smoke",
+    "可用子命令：install-skill, status, smoke",
   );
 }
 
@@ -244,7 +192,7 @@ export async function runHermesStatusCommand(
       ] : []),
     ].join("\n"),
     next: report.hermes.installedSkill.inSync
-      ? ["codeksei operator hermes sync-checkin", "codeksei operator hermes smoke"]
+      ? ["codeksei operator hermes smoke"]
       : ["codeksei operator hermes install-skill"],
   };
 }
@@ -272,163 +220,6 @@ export async function runHermesSmokeCommand(
     ].join("\n"),
     next: smoke.next,
   };
-}
-
-export async function runHermesSyncCheckinCommand(
-  config: HermesOperatorConfig,
-  args: string[] = [],
-): Promise<CommandExecutionResult> {
-  const options = parseCliArgs<HermesSyncCheckinOptions>(args, getCommandArgsSchema("hermesSyncCheckin"));
-  if (options.help) {
-    return {
-      data: null,
-      text: buildTerminalLeafHelp("operator.hermes.sync_checkin"),
-    };
-  }
-
-  const resolution = resolveCheckinTarget({
-    accountId: normalizeText(config.accountId),
-    config,
-    explicitUser: options.user,
-    explicitWorkspace: options.workspace,
-    sessionStore: createSessionStore(config.sessionsFile),
-  });
-  if (!resolution.ok || !resolution.value) {
-    throw buildTargetResolutionRequiredError(
-      buildCheckinTargetResolutionErrorMessage(resolution),
-      {
-        senderCandidates: resolution.senderResolution.candidates,
-        senderSource: resolution.senderResolution.source,
-        workspaceCandidates: resolution.workspaceResolution.candidates,
-        workspaceSource: resolution.workspaceResolution.source,
-      },
-      "显式传 --user / --workspace，或先把唯一稳定默认值写进配置。"
-    );
-  }
-  const target = resolution.value;
-
-  const tick = runCheckinTick({
-    config,
-    target,
-  });
-  const planSet = createHostedCheckinCronPlanSetFromTick(config, target, tick);
-  const jobsFile = path.join(resolveHermesHomePath(config), "cron", "jobs.json");
-
-  return runCliMutation<HermesSyncCheckinMutationData>({
-    commandKey: "operator.hermes.sync_checkin",
-    config,
-    configSource: {
-      hermesHome: resolveHermesHomePath(config),
-      jobsFile,
-    },
-    dryRun: Boolean(options.dryRun),
-    dryRunResult: {
-      data: {
-        planned: {
-          jobs: planSet.jobs.map((job) => ({
-            name: job.name,
-            nextRunAt: job.plannedWakeAt,
-            role: job.role,
-            targetKey: job.targetKey,
-          })),
-          targetKey: planSet.targetKey,
-        },
-        summary: collectHostedCheckinCronSummary(config, target),
-        sync: {
-          chatId: "",
-          deliver: "origin",
-          jobs: planSet.jobs.map((job) => ({
-            created: false,
-            deliver: "origin",
-            jobId: "",
-            name: job.name,
-            nextRunAt: job.plannedWakeAt,
-            role: job.role,
-          })),
-          platform: "weixin",
-          removedJobIds: [],
-          threadId: "",
-        },
-        target,
-        tick: {
-          due: tick.due,
-          nextWakeAt: tick.nextWakeAt,
-          status: tick.status,
-          triggerId: normalizeText(tick.payload?.triggerId) || normalizeText(tick.activeWake?.triggerId),
-        },
-      },
-      text: [
-        "hosted checkin sync dry-run",
-        `status: ${tick.status}`,
-        `target: ${planSet.targetKey}`,
-        `roles: ${planSet.jobs.map((job) => job.role).join(", ")}`,
-        `nextRunAt: ${planSet.jobs.map((job) => `${job.role}:${job.plannedWakeAt}`).join(", ")}`,
-        `jobsFile: ${jobsFile}`,
-      ].join("\n"),
-    },
-    execute: async () => {
-      const sync = syncHostedCheckinPlanSetViaHermes(config, planSet);
-      const summary = collectHostedCheckinCronSummary(config, target);
-      return {
-        data: {
-          planned: {
-            jobs: planSet.jobs.map((job) => ({
-              name: job.name,
-              nextRunAt: job.plannedWakeAt,
-              role: job.role,
-              targetKey: job.targetKey,
-            })),
-            targetKey: planSet.targetKey,
-          },
-          summary,
-          sync: {
-            chatId: sync.chatId,
-            deliver: sync.deliver,
-            jobs: sync.jobs,
-            platform: sync.platform,
-            removedJobIds: sync.removedJobIds,
-            threadId: sync.threadId,
-          },
-          target,
-          tick: {
-            due: tick.due,
-            nextWakeAt: tick.nextWakeAt,
-            status: tick.status,
-            triggerId: normalizeText(tick.payload?.triggerId) || normalizeText(tick.activeWake?.triggerId),
-          },
-        },
-        text: [
-          `hosted checkin synced: ${sync.jobs.map((job) => `${job.role}:${job.jobId}`).join(", ")}`,
-          `status: ${tick.status}`,
-          `roles: ${planSet.jobs.map((job) => job.role).join(", ")}`,
-          `nextRunAt: ${sync.jobs.map((job) => `${job.role}:${job.nextRunAt}`).join(", ")}`,
-          `removedFutureJobs: ${sync.removedJobIds.length}`,
-        ].join("\n"),
-      };
-    },
-    idempotencyKey: normalizeText(options.idempotencyKey),
-    request: {
-      roles: planSet.jobs.map((job) => job.role),
-      senderId: planSet.senderId,
-      status: tick.status,
-      targetKey: planSet.targetKey,
-      workspaceRoot: planSet.workspaceRoot,
-      nextRunAt: planSet.jobs.map((job) => job.plannedWakeAt),
-    },
-    resolvedTargets: {
-      jobsFile,
-      roles: planSet.jobs.map((job) => job.role),
-      senderId: planSet.senderId,
-      targetKey: planSet.targetKey,
-      workspaceRoot: planSet.workspaceRoot,
-    },
-    sideEffects: [
-      {
-        kind: "sync_hermes_checkin_cron_job",
-        target: jobsFile,
-      },
-    ],
-  });
 }
 
 function buildHermesInstallSkillSideEffects(preview: HermesSkillInstallPreview): HermesInstallSkillSideEffect[] {

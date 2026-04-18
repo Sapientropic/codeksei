@@ -11,6 +11,7 @@ import { buildTerminalLeafHelpText, hasTerminalTopicHelp } from "../contracts/co
 import { listCommandArgFlagsForHelp } from "../contracts/command-args";
 import { buildTerminalActionExample } from "./terminal-command-usage";
 import { listGlobalCliFlags } from "./cli-contract";
+import { buildSchemaTargetNotFoundError } from "./removed-command-guidance";
 import { normalizeText } from "./text-normalization";
 
 interface BuildCommandSchemaArgs {
@@ -39,7 +40,7 @@ function buildCommandSchema(args: BuildCommandSchemaArgs): Record<string, unknow
     return buildTopicSchema(args.audience, singleTopic);
   }
 
-  throw new Error(`${args.audience} schema target not found: ${targetTokens.join(" ")}`);
+  throw buildSchemaTargetNotFoundError(args.audience, targetTokens);
 }
 
 function buildCommandCollectionSchema(audience: CliAudience): Record<string, unknown> {

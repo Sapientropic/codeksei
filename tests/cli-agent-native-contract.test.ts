@@ -83,15 +83,15 @@ test("channel send-file schema exposes warned mutation flags", () => {
   assert.match(String(asRecord(payload.data).helpText || ""), /--dry-run/u);
 });
 
-test("reminder write schema exposes delivery mode for hosted proactive follow-up", () => {
+test("reminder write schema no longer exposes proactive delivery routing", () => {
   const result = runCli(["schema", "reminder", "write"]);
   assert.equal(result.status, 0, result.stderr || "expected reminder write schema to succeed");
 
   const payload = parseEnvelope(result.stdout);
   const args = asCommandArgs(asRecord(asRecord(payload.data).args).command);
   const argNames = args.map((entry) => entry.name);
-  assert.ok(argNames.includes("delivery"));
-  assert.match(String(asRecord(payload.data).helpText || ""), /proactive/u);
+  assert.ok(!argNames.includes("delivery"));
+  assert.doesNotMatch(String(asRecord(payload.data).helpText || ""), /proactive/u);
 });
 
 test("hosted mode channel send-file routes through Hermes repo-local shim", () => {
@@ -140,24 +140,6 @@ test("operator hermes install-skill schema exposes dry-run and side effects", ()
   assert.equal(Array.isArray(data.sideEffects), true);
 });
 
-test("operator hermes sync-checkin schema exposes dry-run and side effects", () => {
-  const result = runCli(["operator", "schema", "operator", "hermes", "sync-checkin"]);
-  assert.equal(result.status, 0, result.stderr || "expected operator hermes sync-checkin schema to succeed");
-
-  const payload = parseEnvelope(result.stdout);
-  const data = asRecord(payload.data);
-  const args = asCommandArgs(asRecord(data.args).command);
-  const argNames = args.map((entry) => entry.name);
-  assert.equal(data.action, "operator.hermes.sync_checkin");
-  assert.equal(data.mutability, "write");
-  assert.equal(data.supportsDryRun, true);
-  assert.ok(argNames.includes("dryRun"));
-  assert.ok(argNames.includes("idempotencyKey"));
-  assert.ok(argNames.includes("user"));
-  assert.ok(argNames.includes("workspace"));
-  assert.equal(Array.isArray(data.sideEffects), true);
-});
-
 test("operator hermes prefix schema lists leaf actions progressively", () => {
   const result = runCli(["operator", "schema", "operator", "hermes"]);
   assert.equal(result.status, 0, result.stderr || "expected operator hermes schema topic to succeed");
@@ -170,7 +152,6 @@ test("operator hermes prefix schema lists leaf actions progressively", () => {
     "operator.hermes.install_skill",
     "operator.hermes.smoke",
     "operator.hermes.status",
-    "operator.hermes.sync_checkin",
   ]);
 });
 
@@ -195,61 +176,31 @@ test("operator hermes install-skill dry-run previews without writing files", () 
   assert.equal(fs.existsSync(path.join(hermesHome, "skills", "codeksei-companion", "SKILL.md")), false);
 });
 
-test("operator hermes sync-checkin routes through Hermes repo-local shim and updates managed jobs", () => {
-  const tempRoot = createCliFixture();
-  const repoLocal = createFakeHermesRepoLocalFixture(
-    fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-cli-hermes-sync-checkin-"))
-  );
-  const result = runCli([
-    "operator",
-    "hermes",
-    "sync-checkin",
-    "--user",
-    "wx-user",
-    "--workspace",
-    tempRoot.workspaceRoot,
-  ], {
-    ...tempRoot.env,
-    ...repoLocal.env,
-  });
-
-  assert.equal(result.status, 0, result.stderr || "expected operator hermes sync-checkin to succeed");
-  const payload = parseEnvelope(result.stdout);
-  assert.equal(payload.ok, true);
-  assert.deepEqual((asRecord(asRecord(payload.data).planned).jobs as Array<Record<string, unknown>>).map((job) => job.role), ["wake", "recovery"]);
-  assert.equal(Array.isArray(asRecord(asRecord(payload.data).sync).jobs), true);
-  assert.equal(asRecord(asRecord(payload.data).summary).wakeJobs ? true : false, true);
-
-  const requests = readFakeHermesRepoLocalLog(repoLocal.logFile);
-  assert.equal(requests.length, 1);
-  assert.equal(requests[0].action, "sync_checkin_cron");
-  assert.equal(asRecord(requests[0].payload).sender_id, "wx-user");
-  const plans = asRecord(requests[0].payload).plans as Array<Record<string, unknown>>;
-  assert.equal(Array.isArray(plans), true);
-  assert.equal(plans.length, 2);
-  assert.equal(asRecord(plans[0] || {}).env ? asRecord(asRecord(plans[0] || {}).env).CODEKSEI_RUNTIME : "", "hermes");
-  const jobsState = JSON.parse(fs.readFileSync(repoLocal.jobsFile, "utf8"));
-  assert.equal(jobsState.jobs.length, 2);
-  assert.equal(fs.existsSync(path.join(repoLocal.hermesHome, "scripts", "codeksei_context_briefing.py")), true);
-  for (const job of jobsState.jobs) {
-    assert.equal(job.deliver, "origin");
-    assert.match(String(job.script || ""), /codeksei_context_briefing\.py$/u);
-    assert.equal(job.env.CODEKSEI_STATE_DIR, tempRoot.stateDir);
-    assert.deepEqual(job.origin, {
-      platform: "weixin",
-      chat_id: "wxid_sender",
-      chat_name: "Test Chat",
-      thread_id: "",
-    });
-  }
-});
-
 test("operator hermes invalid leaf returns validation_error instead of unknown_command", () => {
   const result = runCli(["operator", "hermes", "bogus"]);
   assert.equal(result.status, 3);
   const payload = parseEnvelope(result.stdout);
   assert.equal(payload.ok, false);
   assert.equal(payload.error.code, "validation_error");
+});
+
+test("operator hermes sync-checkin now returns validation_error as a removed leaf", () => {
+  const result = runCli(["operator", "hermes", "sync-checkin"]);
+  assert.equal(result.status, 3);
+  const payload = parseEnvelope(result.stdout);
+  assert.equal(payload.ok, false);
+  const error = asRecord(payload.error);
+  assert.equal(error.code, "validation_error");
+  assert.match(String(error.hint || ""), /host seed-proactive/u);
+  const context = asRecord(error.context);
+  assert.equal(context.reason, "removed_public_surface");
+  assert.equal(context.removed, true);
+  assert.equal(context.requestedTarget, "operator hermes sync-checkin");
+  assert.deepEqual(asStringList(context.relatedCommands), [
+    "codeksei host seed-proactive --provider hermes",
+    "codeksei host claim-checkin --provider hermes",
+    "codeksei host settle-checkin --provider hermes",
+  ]);
 });
 
 test("unknown command returns fixed unknown_command routing", () => {
@@ -290,105 +241,6 @@ test("timeline read defaults to JSON envelope in non-tty mode", () => {
   assert.equal(payload.data.exists, false);
 });
 
-test("system send dry-run resolves explicit targets without writing queue state", () => {
-  const tempRoot = createCliFixture({
-    contextTokens: { "user-1": "ctx-1" },
-  });
-  const result = runCli(
-    [
-      "system",
-      "send",
-      "--text",
-      "hello",
-      "--user",
-      "user-1",
-      "--workspace",
-      tempRoot.workspaceRoot,
-      "--dry-run",
-    ],
-    tempRoot.env,
-  );
-
-  assert.equal(result.status, 0, result.stderr || "expected dry-run to succeed");
-  const payload = parseEnvelope(result.stdout);
-  assert.equal(payload.ok, true);
-  const meta = asRecord(payload.meta);
-  assert.equal(meta.dryRun, true);
-  const resolvedTargets = asRecord(meta.resolvedTargets);
-  assert.equal(resolvedTargets.senderId, "user-1");
-  assert.equal(resolvedTargets.workspaceRoot, tempRoot.workspaceRoot.replace(/\\/g, "/"));
-  assert.equal(fs.existsSync(path.join(tempRoot.stateDir, "system-message-queue.json")), false);
-});
-
-test("system send replays identical idempotent requests and avoids duplicate queue writes", () => {
-  const tempRoot = createCliFixture({
-    contextTokens: { "user-1": "ctx-1" },
-  });
-  const args = [
-    "system",
-    "send",
-    "--text",
-    "hello",
-    "--idempotency-key",
-    "system-send-1",
-  ];
-
-  const first = runCli(args, tempRoot.env);
-  assert.equal(first.status, 0, first.stderr || "expected first enqueue to succeed");
-  const firstPayload = parseEnvelope(first.stdout);
-  assert.equal(firstPayload.ok, true);
-
-  const second = runCli(args, tempRoot.env);
-  assert.equal(second.status, 0, second.stderr || "expected second enqueue to succeed");
-  const secondPayload = parseEnvelope(second.stdout);
-  assert.equal(secondPayload.ok, true);
-  const secondMeta = asRecord(secondPayload.meta);
-  assert.equal(asRecord(secondMeta.idempotency).replayed, true);
-  assert.equal(asRecord(secondPayload.data).id, asRecord(firstPayload.data).id);
-
-  const queueState = JSON.parse(fs.readFileSync(path.join(tempRoot.stateDir, "system-message-queue.json"), "utf8"));
-  assert.equal(Array.isArray(queueState.messages), true);
-  assert.equal(queueState.messages.length, 1);
-});
-
-test("system send surfaces target_resolution_required when sender defaults are ambiguous", () => {
-  const tempRoot = createCliFixture({
-    contextTokens: {
-      "user-1": "ctx-1",
-      "user-2": "ctx-2",
-    },
-  });
-  const result = runCli([
-    "system",
-    "send",
-    "--text",
-    "hello",
-  ], tempRoot.env);
-
-  assert.equal(result.status, 4);
-  const payload = parseEnvelope(result.stdout);
-  assert.equal(payload.ok, false);
-  assert.equal(payload.error.code, "target_resolution_required");
-  assert.deepEqual(payload.error.context?.candidates, ["user-1", "user-2"]);
-});
-
-test("system send surfaces auth_required when sender lacks context token", () => {
-  const tempRoot = createCliFixture();
-  const result = runCli([
-    "system",
-    "send",
-    "--text",
-    "hello",
-    "--user",
-    "user-1",
-  ], tempRoot.env);
-
-  assert.equal(result.status, 2);
-  const payload = parseEnvelope(result.stdout);
-  assert.equal(payload.ok, false);
-  assert.equal(payload.error.code, "auth_required");
-});
-
 test("hosted mode reminder write routes through Hermes repo-local shim and skips local reminder queue", () => {
   const tempRoot = createCliFixture();
   const repoLocal = createFakeHermesRepoLocalFixture(
@@ -419,11 +271,8 @@ test("hosted mode reminder write routes through Hermes repo-local shim and skips
   assert.equal(asRecord(requests[0].payload).text, "hello");
 });
 
-test("hosted mode reminder write with delivery proactive seeds hosted checkin instead of creating a direct reminder cron", () => {
+test("reminder write rejects removed --delivery flag with validation_error", () => {
   const tempRoot = createCliFixture();
-  const repoLocal = createFakeHermesRepoLocalFixture(
-    fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-cli-hermes-repo-local-reminder-proactive-"))
-  );
   const result = runCli([
     "reminder",
     "write",
@@ -432,48 +281,91 @@ test("hosted mode reminder write with delivery proactive seeds hosted checkin in
     "--delivery",
     "proactive",
     "--text",
-    "白天再主动接回这条线",
-    "--user",
-    "wx-user",
-  ], {
-    ...tempRoot.env,
-    ...repoLocal.env,
-    CODEKSEI_RUNTIME: "hermes",
-    CODEKSEI_CHANNEL_PROVIDER: "hermes",
-    CODEKSEI_ALLOWED_USER_IDS: "wx-user",
-  });
-
-  assert.equal(result.status, 0, result.stderr || "expected hosted proactive reminder write to succeed");
+    "hello",
+  ], tempRoot.env);
+  assert.equal(result.status, 3);
   const payload = parseEnvelope(result.stdout);
-  assert.equal(payload.ok, true);
-  assert.equal(asRecord(payload.data).deliveryMode, "hermes_proactive_checkin");
-  assert.equal(Array.isArray(asRecord(payload.data).syncJobs), true);
-  const requests = readFakeHermesRepoLocalLog(repoLocal.logFile);
-  assert.equal(requests.length, 1);
-  assert.equal(requests[0].action, "sync_checkin_cron");
-  assert.equal(fs.existsSync(path.join(tempRoot.stateDir, "reminder-queue.json")), false);
-  const jobsState = JSON.parse(fs.readFileSync(repoLocal.jobsFile, "utf8"));
-  assert.equal(jobsState.jobs.length, 2);
-  assert.deepEqual(jobsState.jobs.map((job: { codeksei_checkin_role: string }) => job.codeksei_checkin_role).sort(), ["recovery", "wake"]);
-  assert.equal(jobsState.jobs.every((job: { script: string }) => /codeksei_context_briefing\.py$/u.test(job.script)), true);
+  assert.equal(payload.ok, false);
+  assert.equal(payload.error.code, "validation_error");
 });
 
-test("hosted mode system send still fails fast with unsupported_host_capability", () => {
+test("system send now returns unknown_command after public surface removal", () => {
   const tempRoot = createCliFixture();
   const result = runCli([
     "system",
     "send",
     "--text",
     "hello",
-  ], {
-    ...tempRoot.env,
-    CODEKSEI_RUNTIME: "hermes",
-    CODEKSEI_CHANNEL_PROVIDER: "hermes",
-  });
-  assert.equal(result.status, 5);
+  ], tempRoot.env);
+  assert.equal(result.status, 3);
   const payload = parseEnvelope(result.stdout);
   assert.equal(payload.ok, false);
-  assert.equal(payload.error.code, "unsupported_host_capability");
+  const error = asRecord(payload.error);
+  assert.equal(error.code, "unknown_command");
+  assert.match(String(error.hint || ""), /channel send-file/u);
+  const context = asRecord(error.context);
+  assert.equal(context.reason, "removed_public_surface");
+  assert.equal(context.removed, true);
+  assert.equal(context.requestedTarget, "system send");
+  assert.deepEqual(asStringList(context.relatedCommands), [
+    "codeksei channel send-file --path /absolute/path/to/file",
+    "codeksei host seed-proactive --provider hermes",
+    "codeksei host claim-checkin --provider hermes",
+    "codeksei host settle-checkin --provider hermes",
+  ]);
+});
+
+test("schema system send returns validation_error with removed command guidance", () => {
+  const result = runCli(["schema", "system", "send"]);
+  assert.equal(result.status, 3);
+  const payload = parseEnvelope(result.stdout);
+  assert.equal(payload.ok, false);
+  const error = asRecord(payload.error);
+  assert.equal(error.code, "validation_error");
+  assert.match(String(error.hint || ""), /channel send-file/u);
+  const context = asRecord(error.context);
+  assert.equal(context.reason, "removed_public_surface");
+  assert.equal(context.removed, true);
+  assert.equal(context.requestedTarget, "system send");
+  assert.deepEqual(asStringList(context.relatedCommands), [
+    "codeksei channel send-file --path /absolute/path/to/file",
+    "codeksei host seed-proactive --provider hermes",
+    "codeksei host claim-checkin --provider hermes",
+    "codeksei host settle-checkin --provider hermes",
+  ]);
+});
+
+test("operator schema removed sync-checkin returns validation_error with removed command guidance", () => {
+  const result = runCli(["operator", "schema", "operator", "hermes", "sync-checkin"]);
+  assert.equal(result.status, 3);
+  const payload = parseEnvelope(result.stdout);
+  assert.equal(payload.ok, false);
+  const error = asRecord(payload.error);
+  assert.equal(error.code, "validation_error");
+  assert.match(String(error.hint || ""), /host claim-checkin/u);
+  const context = asRecord(error.context);
+  assert.equal(context.reason, "removed_public_surface");
+  assert.equal(context.removed, true);
+  assert.equal(context.requestedTarget, "operator hermes sync-checkin");
+  assert.deepEqual(asStringList(context.relatedCommands), [
+    "codeksei host seed-proactive --provider hermes",
+    "codeksei host claim-checkin --provider hermes",
+    "codeksei host settle-checkin --provider hermes",
+  ]);
+});
+
+test("generic schema target miss returns validation_error with discoverable context", () => {
+  const result = runCli(["schema", "system", "bogus"]);
+  assert.equal(result.status, 3);
+  const payload = parseEnvelope(result.stdout);
+  assert.equal(payload.ok, false);
+  const error = asRecord(payload.error);
+  assert.equal(error.code, "validation_error");
+  assert.match(String(error.hint || ""), /codeksei schema/u);
+  const context = asRecord(error.context);
+  assert.equal(context.reason, "schema_target_not_found");
+  assert.equal(context.audience, "public");
+  assert.equal(context.requestedTarget, "system bogus");
 });
 
 function createCliFixture({
@@ -516,7 +408,7 @@ function parseEnvelope(stdout: string) {
   return JSON.parse(stdout) as {
     ok: boolean | string;
     data: Record<string, unknown>;
-    error: { code: string; context?: Record<string, unknown> };
+    error: { code: string; context?: Record<string, unknown>; hint?: string };
     meta: Record<string, unknown>;
   };
 }
@@ -537,6 +429,12 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {};
+}
+
+function asStringList(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
 }
 
 function runCli(args: string[], extraEnv: Record<string, string> = {}) {

@@ -44,7 +44,7 @@ codeksei channel send-file --path /绝对路径
 codeksei timeline event --date YYYY-MM-DD --start HH:mm --end HH:mm --title "标题" (--event-node <id> | --subcategory <id>) [其他参数]
 codeksei timeline screenshot [--output /绝对路径] [其他 timeline screenshot 参数]
 codeksei diary write --section todo --state open --text "内容"
-codeksei reminder write --delay 30m --text "提醒内容" [--delivery direct|proactive]
+codeksei reminder write --delay 30m --text "提醒内容"
 codeksei companion remember --user <wechat_user_id> --workspace /绝对路径 --source host_user_turn [--text "内容" | --stdin]
 codeksei note auto (--project <slug> | --scope <name>) --kind <kind> [--text "内容" | --stdin]
 codeksei onboarding start --user <wechat_user_id>
@@ -67,7 +67,7 @@ codeksei host settle-checkin --provider hermes --user <wechatUserId> --workspace
    - `channel send-file` for explicit local artifact send-back
    - `timeline` for concrete time blocks and dashboard screenshots
    - `diary` for lived notes / supplements / todo transitions
-   - `reminder` for user-visible nudges or future proactive wakes
+   - `reminder` for user-visible nudges
    - `companion remember` for ongoing durable memory updates after onboarding
    - `note` for durable memory
    - `onboarding` for first-activation / profile-building chat turns
@@ -113,13 +113,8 @@ Flow:
 Reminder note:
 
 - Default `reminder write` is for user-visible reminders.
-- Use `codeksei reminder write --delivery proactive ...` when the text is internal follow-up context that should re-enter the proactive checkin chain later instead of being sent directly to the user.
+- If Hermes needs a future proactive wake, use the hosted checkin contract instead of overloading `reminder write`.
 - If the user says something that should affect future proactive judgement, do not leave it only in chat memory: route it through `companion remember`, or through `onboarding step` if onboarding is still active.
-
-Compatibility note:
-
-- `codeksei operator hermes sync-checkin` and `codeksei system checkin-*` still exist as compatibility building blocks.
-- New host integrations should prefer `host seed-proactive / claim-checkin / settle-checkin` instead of stitching the old tick/ack/complete flow by hand.
 
 ## Verification
 

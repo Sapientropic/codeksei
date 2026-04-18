@@ -66,7 +66,7 @@ const TOPIC_HELP = {
     body: [
       `  先用 ${buildTerminalEntryUsage("app.accounts", "public")} 看可用 sender id；不要填昵称或自己猜的微信号`,
       "  当前选中的 sender id 必须已经有可用的 context_token；否则命令会直接失败",
-      "  默认 --delivery direct 会创建用户可见提醒；Hosted Mode 下可用 --delivery proactive，把这条提醒改成未来 proactive 唤醒。",
+      "  这条命令只负责创建提醒，不再兼做 proactive 调度入口。",
       "  不带 offset 的本地时间按当前 runtime timezone 解释；显式偏移时间戳按原值保留",
     ],
   }),
@@ -85,7 +85,7 @@ const TOPIC_HELP = {
   }),
   system: () => ({
     usage: [
-      `${buildExample("system.send", true)} / ${buildTerminalActionExample("system.checkin_config", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("system.checkin_trigger", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("system.checkin_tick", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("system.checkin_complete", { audience: "public", includeArgs: true })} / ${buildTerminalEntryUsage("system.checkin_poller", "public")}`,
+      `${buildTerminalActionExample("system.checkin_config", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("system.checkin_trigger", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("system.checkin_tick", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("system.checkin_complete", { audience: "public", includeArgs: true })}`,
     ],
   }),
   host: () => ({
@@ -98,7 +98,7 @@ const TOPIC_HELP = {
       "  host 是面向外部宿主的机器入口，不是仓内 TypeScript seam。",
       "  host manifest 输出默认 Hosted Mode / Hermes 机器合同；当前环境与当前 canonical config 的真实状态统一看 host doctor。",
       "  daemon-first / host-attachable 仍是 runtime invariant；public host 命令默认走 Hermes recipe，generic-shell 继续支持但需要显式指定。",
-      "  对 Hermes 这类宿主，优先用 host seed/claim/settle；operator hermes / system checkin-* 继续只保留兼容 building blocks。",
+      "  对 Hermes 这类宿主，优先用 host seed/claim/settle；hosted proactive 不再通过 reminder flag 或 operator glue 侧门收口。",
     ],
   }),
   timeline: () => ({
@@ -174,7 +174,7 @@ const LEAF_HELP = {
     body: [
       "  写入 canonical codeksei.config.json，并按 provider 走最小 bootstrap。",
       "  public host bootstrap 默认 provider=hermes；只有显式传 --provider generic-shell，或已有 canonical config 已锁定 provider 时，才会走 generic-shell。",
-      "  Hermes provider 当前会通过兼容路径同步 companion skill；--ensure-daemon 只声明并检查 v1 的 local CLI/state-owner readiness，不会偷开第二套常驻进程。",
+      "  Hermes provider 当前会通过兼容路径同步 companion skill；daemon-first readiness 已是 bootstrap 的默认语义，不再通过额外 flag 分叉。",
     ],
     includeFlagBlock: true,
   }),
@@ -260,20 +260,6 @@ const LEAF_HELP = {
     examples: [
       "  codeksei operator hermes status",
       "  codeksei operator hermes status --user wxid_xxx --workspace /absolute/workspace",
-    ],
-    includeFlagBlock: true,
-  }),
-  "operator.hermes.sync_checkin": () => ({
-    usage: [buildTerminalActionExample("operator.hermes.sync_checkin", { audience: "public", includeArgs: true })],
-    bodyLabel: "说明：",
-    body: [
-      "  按 Codeksei 当前 checkin state 为 Hermes 同步当前需要存在的受控 wake/recovery job set。",
-      "  scheduled -> wake；due -> 立即执行的 wake；in_progress -> 30 分钟 recovery fallback。",
-      "  这是宿主 re-arm 入口，不会改写 Codeksei 自己的 nextWakeAt 真相源。",
-    ],
-    examples: [
-      "  codeksei operator hermes sync-checkin --user wxid_xxx --workspace /absolute/workspace",
-      "  codeksei operator hermes sync-checkin --dry-run --user wxid_xxx --workspace /absolute/workspace",
     ],
     includeFlagBlock: true,
   }),
@@ -462,13 +448,11 @@ const LEAF_HELP = {
     body: [
       "  Codex Mode 下会创建提醒并放入本地 reminder queue。",
       "  Codex Mode 仍会解析唯一稳定 sender，并检查对应 context_token；缺失时直接报 auth_required。",
-      "  Hosted Mode 下默认 --delivery direct，会改走 repo-local Hermes cron，并把 deliver 绑定到当前 origin chat。",
-      "  Hosted Mode 下传 --delivery proactive，会把提醒改成未来 proactive 唤醒，而不是直接发一条用户可见消息。",
+      "  Hosted Mode 下会改走 repo-local Hermes cron，并把 deliver 绑定到当前 origin chat。",
     ],
     examples: [
       "  codeksei reminder write --delay 30m --text \"起身喝水\"",
       "  codeksei reminder write --at 2026-04-07 21:30 --text \"收今晚的日记\"",
-      "  codeksei reminder write --delay 2h --delivery proactive --text \"白天再主动关心一下这条线\"",
     ],
     includeFlagBlock: true,
   }),
@@ -482,19 +466,6 @@ const LEAF_HELP = {
     examples: [
       "  codeksei diary write --section todo --state open --text \"继续收口 codeksei CLI plan\"",
       "  codeksei diary write --section supplement --title \"CLI contract\" --text \"统一 stdout/stderr/exit code 约束。\"",
-    ],
-    includeFlagBlock: true,
-  }),
-  "system.send": () => ({
-    usage: [buildExample("system.send", true)],
-    bodyLabel: "说明：",
-    body: [
-      "  向内部 system queue 写一条不可见触发消息。",
-      "  --workspace 和 --user 可以显式传；没传时只会接受唯一稳定默认值，否则直接报 target_resolution_required。",
-      "  Hosted Mode 下仍会返回 unsupported_host_capability：上游源码里还没有可证实的 backstage-only 宿主原语，所以不会偷偷降级成可见消息。",
-    ],
-    examples: [
-      "  codeksei system send --text \"提醒她今天早点睡\" --workspace \"$(pwd)\"",
     ],
     includeFlagBlock: true,
   }),
@@ -644,18 +615,16 @@ const LEAF_HELP = {
 
 function buildHermesOperatorResourceHelpText(): string {
   return renderHelpDocument({
-    usage: ["codeksei operator hermes <install-skill|sync-checkin|status|smoke>"],
+    usage: ["codeksei operator hermes <install-skill|status|smoke>"],
     bodyLabel: "说明：",
     body: [
       "  这是 Hosted Mode / Hermes recipe 的 operator resource。",
       "  install-skill：同步仓内 companion skill；支持 --dry-run 预览。",
-      "  sync-checkin：按 Codeksei 当前状态为 Hermes 同步 wake/recovery one-shot job。",
       "  status：只读查看 Hermes hosted 集成状态。",
       "  smoke：只读执行 hosted parity 前置检查。",
     ],
     examples: [
       "  codeksei operator hermes install-skill --dry-run",
-      "  codeksei operator hermes sync-checkin --user wxid_xxx --workspace /absolute/workspace",
       "  codeksei operator hermes status",
       "  codeksei operator hermes smoke",
     ],

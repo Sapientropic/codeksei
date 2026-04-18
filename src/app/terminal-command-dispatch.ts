@@ -30,7 +30,6 @@ import {
   runHermesInstallSkillCommand,
   runHermesSmokeCommand,
   runHermesStatusCommand,
-  runHermesSyncCheckinCommand,
 } from "./hermes-operator-cli";
 import { runNoteAutoCommand, runNoteMaybeCommand } from "./note-auto-cli";
 import { runNoteSyncCommand } from "./note-sync-cli";
@@ -47,8 +46,6 @@ import { runSystemCheckinConfigCommand } from "./system-checkin-config-cli";
 import { runSystemCheckinCompleteCommand } from "./system-checkin-complete-cli";
 import { runSystemCheckinTickCommand } from "./system-checkin-tick-cli";
 import { runSystemCheckinTriggerCommand } from "./system-checkin-trigger-cli";
-import { runSystemCheckinPoller } from "./system-checkin-poller";
-import { runSystemSendCommand } from "./system-send-cli";
 import { runTimelineEventCommand } from "./timeline-event-cli";
 import { runTimelineScreenshotCommand } from "./timeline-screenshot-cli";
 import type { CommandExecutionResult } from "../contracts/cli-contract";
@@ -161,9 +158,6 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
   "operator.hermes.smoke": async (_manifest, context) => {
     return runHermesSmokeCommand(context.config, context.leafArgs);
   },
-  "operator.hermes.sync_checkin": async (_manifest, context) => {
-    return runHermesSyncCheckinCommand(context.config, context.leafArgs);
-  },
   login: async (_manifest, context) => {
     await context.getApp().login();
   },
@@ -225,9 +219,6 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
   "diary.write": async (_manifest, context) => {
     return runDiaryWriteCommand(context.config, context.leafArgs);
   },
-  "system.send": async (_manifest, context) => {
-    return runSystemSendCommand(context.config, context.leafArgs);
-  },
   "system.checkin-config": async (_manifest, context) => {
     return runSystemCheckinConfigCommand(context.config, context.leafArgs);
   },
@@ -239,9 +230,6 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
   },
   "system.checkin-trigger": async (_manifest, context) => {
     return runSystemCheckinTriggerCommand(context.config, context.leafArgs);
-  },
-  "system.checkin-poller": async (_manifest, context) => {
-    await runSystemCheckinPoller(context.config);
   },
   "timeline.event": async (_manifest, context) => {
     return runTimelineEventCommand(context.config, context.leafArgs);

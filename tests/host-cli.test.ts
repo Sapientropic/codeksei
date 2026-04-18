@@ -68,7 +68,7 @@ test("host manifest returns the hosted-first discovery contract plus compatibili
   assert.equal(result.data.recommendedWorkflows.some((entry: { id: string }) => entry.id === "first_activation_onboarding"), true);
   assert.equal(result.data.recommendedWorkflows.some((entry: { id: string }) => entry.id === "ongoing_companion_memory"), true);
   assert.equal(result.data.recommendedWorkflows.some((entry: { id: string }) => entry.id === "proactive_checkin"), true);
-  assert.deepEqual(result.data.entrypoints.bootstrap, ["codeksei", "host", "bootstrap", "--provider", "hermes", "--ensure-daemon", "--format", "json"]);
+  assert.deepEqual(result.data.entrypoints.bootstrap, ["codeksei", "host", "bootstrap", "--provider", "hermes", "--format", "json"]);
   assert.deepEqual(result.data.entrypoints.doctor, ["codeksei", "host", "doctor", "--provider", "hermes", "--format", "json"]);
   assert.deepEqual(result.data.entrypoints.seedProactive, ["codeksei", "host", "seed-proactive", "--provider", "hermes", "--format", "json"]);
   assert.deepEqual(result.data.entrypoints.claimCheckin, ["codeksei", "host", "claim-checkin", "--provider", "hermes", "--format", "json"]);
@@ -86,7 +86,6 @@ test("host bootstrap defaults to hermes on clean install when provider is omitte
 
   const result = await runHostBootstrapCommand(fixture.config, [
     "--workspace", targetWorkspace,
-    "--ensure-daemon",
     "--dry-run",
   ]);
 
@@ -114,7 +113,6 @@ test("host bootstrap writes canonical config and previews Hermes bootstrap", asy
   const result = await runHostBootstrapCommand(fixture.config, [
     "--provider", "hermes",
     "--config", configPath,
-    "--ensure-daemon",
     "--dry-run",
   ]);
 
@@ -245,7 +243,6 @@ test("host bootstrap hermes dry-run previews skill install without drifting the 
   const result = await runHostBootstrapCommand(runtimeConfig, [
     "--provider", "hermes",
     "--workspace", targetWorkspace,
-    "--ensure-daemon",
     "--dry-run",
   ]);
 

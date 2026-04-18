@@ -130,7 +130,7 @@ function buildHostUpgradeStatus(
   const needsSkillInstall = !needsBootstrap && installedSkillOutdated;
   const suggestedActions: string[] = [];
   if (needsBootstrap) {
-    suggestedActions.push(`codeksei host bootstrap --provider ${providerId || "generic-shell"} --ensure-daemon`);
+    suggestedActions.push(`codeksei host bootstrap --provider ${providerId || "generic-shell"}`);
   } else if (needsSkillInstall) {
     suggestedActions.push("codeksei operator hermes install-skill");
   } else if (manifest.upgrade.startupDoctorRequired) {

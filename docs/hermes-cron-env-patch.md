@@ -18,7 +18,7 @@
 
 ## Codeksei 现在自己兜住了什么
 
-当前主链靠两层保证避免“sync-checkin 一失败整条链断掉”：
+当前主链靠两层保证避免“hosted wake sync 一失败整条链断掉”：
 
 1. hosted check-in 相关 CLI 现在会从 `codeksei.config.json` 回填关键 `CODEKSEI_*` 变量。
 
@@ -27,7 +27,7 @@
 - 命令带了 `--workspace-root`
 - workspace 下有 canonical `codeksei.config.json`
 
-`system checkin-tick` / `system checkin-complete` / `operator hermes sync-checkin` 仍能自举到正确的 hosted mode。
+`host seed-proactive` / `host claim-checkin` / `host settle-checkin` 仍能自举到正确的 hosted mode。
 
 2. repo-local `sync_checkin_cron` 现在按“先确保新 job 成功，再删旧 job”执行。
 

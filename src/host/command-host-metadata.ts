@@ -121,53 +121,17 @@ const COMMAND_HOST_ACCESS_OVERRIDES = Object.freeze<Record<string, CommandHostAc
     supportTier: "hosted_ready",
     enforceCurrentProfile: false,
   }),
-  "operator.hermes.sync_checkin": Object.freeze({
-    modeClasses: Object.freeze(["cli-only"] satisfies HostModeClass[]),
-    capabilities: Object.freeze([
-      "upsertOneShotWake",
-      "cancelOneShotWake",
-      "persistedOriginRouting",
-      "resolveHostedSession",
-      "installCompanionSkill",
-    ] satisfies HostCapabilityId[]),
-    providerRecipes: Object.freeze(["hermes"] satisfies HostRecipeId[]),
-    supportTier: "hosted_ready",
-    enforceCurrentProfile: false,
-  }),
   "reminder.create": Object.freeze({
     modeClasses: Object.freeze(["codex-managed", "hosted-proactive", "hosted-skill-only"] satisfies HostModeClass[]),
     capabilities: Object.freeze([
       "bridgeQueueAccess",
       "contextTokenAccess",
       "weixinAccountAccess",
-      "upsertOneShotWake",
       "persistedOriginRouting",
       "resolveHostedSession",
     ] satisfies HostCapabilityId[]),
     providerRecipes: Object.freeze(["hermes"] satisfies HostRecipeId[]),
     supportTier: "hosted_ready",
-    enforceCurrentProfile: true,
-  }),
-  "system.send": Object.freeze({
-    modeClasses: Object.freeze(["codex-managed"] satisfies HostModeClass[]),
-    capabilities: Object.freeze([
-      "bridgeQueueAccess",
-      "contextTokenAccess",
-      "weixinAccountAccess",
-    ] satisfies HostCapabilityId[]),
-    providerRecipes: Object.freeze([] satisfies HostRecipeId[]),
-    supportTier: "bridge_state_dependent",
-    enforceCurrentProfile: true,
-  }),
-  "system.checkin_poller": Object.freeze({
-    modeClasses: Object.freeze(["codex-managed"] satisfies HostModeClass[]),
-    capabilities: Object.freeze([
-      "bridgeQueueAccess",
-      "bridgeRuntimeLifecycle",
-      "weixinAccountAccess",
-    ] satisfies HostCapabilityId[]),
-    providerRecipes: Object.freeze([] satisfies HostRecipeId[]),
-    supportTier: "bridge_only",
     enforceCurrentProfile: true,
   }),
   "host.manifest": Object.freeze({

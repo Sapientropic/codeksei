@@ -26,6 +26,7 @@ import { createTerminalCommandContext } from "./app/terminal-command-context";
 import { runTerminalManifestCommand } from "./app/terminal-command-dispatch";
 import type { TerminalCommandManifestEntry } from "./contracts/command-surface";
 import { buildHermesOperatorValidationError } from "./app/hermes-operator-cli";
+import { buildRemovedLiveCommandError } from "./core/removed-command-guidance";
 
 
 interface ParsedCommandIntent {
@@ -55,6 +56,11 @@ export async function main(): Promise<void> {
       emitCliResult(result, cli);
     }
     return;
+  }
+
+  const removedCommandError = buildRemovedLiveCommandError(argv, { code: "unknown_command" });
+  if (removedCommandError) {
+    throw removedCommandError;
   }
 
   throw new CliError({
