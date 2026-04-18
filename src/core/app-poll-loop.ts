@@ -7,10 +7,6 @@ interface LongPollSystemMessageDispatcher {
   hasPending(): boolean;
 }
 
-interface LongPollTimelineScreenshotQueue {
-  hasPendingForAccount?(accountId: string): boolean;
-}
-
 interface LongPollReminderQueue {
   peekNextDueAtMs?(): number;
 }
@@ -18,7 +14,6 @@ interface LongPollReminderQueue {
 interface ResolveLongPollTimeoutMsArgs {
   systemMessageDispatcher?: LongPollSystemMessageDispatcher | null;
   activeAccountId?: string;
-  timelineScreenshotQueue?: LongPollTimelineScreenshotQueue | null;
   reminderQueue?: LongPollReminderQueue | null;
   defaultLongPollTimeoutMs?: number;
   minLongPollTimeoutMs?: number;
@@ -48,7 +43,6 @@ interface RunAppPollLoopArgs {
   channelAdapter: Pick<ChannelAdapterLike, "getUpdates" | "loadSyncBuffer">;
   flushDueReminders: (account: Pick<ChannelAccount, "accountId">) => Promise<void>;
   flushPendingSystemMessages: () => Promise<void>;
-  flushPendingTimelineScreenshots: (account: Pick<ChannelAccount, "accountId">) => Promise<void>;
   resolveLongPollTimeoutMs: () => number;
   handleIncomingMessage: (message: unknown) => Promise<void>;
   updateBridgeHeartbeat: (patch: Record<string, unknown>) => void;
@@ -61,16 +55,12 @@ interface RunAppPollLoopArgs {
 export function resolveLongPollTimeoutMs({
   systemMessageDispatcher = null,
   activeAccountId = "",
-  timelineScreenshotQueue = null,
   reminderQueue = null,
   defaultLongPollTimeoutMs = 35_000,
   minLongPollTimeoutMs = 2_000,
   now = () => Date.now(),
 }: ResolveLongPollTimeoutMsArgs): number {
   if (systemMessageDispatcher?.hasPending()) {
-    return minLongPollTimeoutMs;
-  }
-  if (activeAccountId && timelineScreenshotQueue?.hasPendingForAccount?.(activeAccountId)) {
     return minLongPollTimeoutMs;
   }
 
@@ -93,7 +83,6 @@ export async function runAppPollLoop({
   channelAdapter,
   flushDueReminders,
   flushPendingSystemMessages,
-  flushPendingTimelineScreenshots,
   resolveLongPollTimeoutMs,
   handleIncomingMessage,
   updateBridgeHeartbeat,
@@ -115,7 +104,6 @@ export async function runAppPollLoop({
       });
       await flushDueReminders(account);
       await flushPendingSystemMessages();
-      await flushPendingTimelineScreenshots(account);
       const response = await channelAdapter.getUpdates({
         syncBuffer: channelAdapter.loadSyncBuffer(),
         timeoutMs: resolveLongPollTimeoutMs(),
@@ -141,7 +129,6 @@ export async function runAppPollLoop({
       }
       await flushDueReminders(account);
       await flushPendingSystemMessages();
-      await flushPendingTimelineScreenshots(account);
     } catch (error) {
       if (shutdown.stopped) {
         break;

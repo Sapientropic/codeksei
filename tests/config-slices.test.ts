@@ -17,7 +17,6 @@ test("config slices compose into the legacy-compatible app runtime surface", () 
       timelineStateDir: "E:/state/timeline",
       logDir: "E:/state/logs",
       reminderQueueFile: "E:/state/reminder-queue.json",
-      timelineScreenshotQueueFile: "E:/state/timeline-screenshot-queue.json",
       cliIdempotencyLedgerFile: "E:/state/cli-idempotency-ledger.json",
       syncBufferDir: "E:/state/sync-buffers",
       sessionsFile: "E:/state/sessions.json",

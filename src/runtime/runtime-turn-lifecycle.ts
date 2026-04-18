@@ -4,7 +4,6 @@ import type {
   ChannelAdapterLike,
   RuntimeAdapterLike,
   StreamDeliveryLike,
-  TimelineIntegrationLike,
 } from "../core/app-service-contract";
 import { supportsChannelOperation as canUseChannelOperation } from "../core/app-service-contract";
 import type {
@@ -13,7 +12,6 @@ import type {
   PreparedRuntimeMessage,
   RuntimeTurnSendResult,
   SendLocalFileRequest,
-  TimelineScreenshotRequest,
   UserTypingOptions,
 } from "../core/runtime-types";
 import {
@@ -37,7 +35,6 @@ import type {
   PersistIncomingWeixinAttachments,
   QueuePendingWorkspaceBootstrap,
   ResolveDefaultTerminalUser,
-  ResolveTimelineScreenshotOutput,
   ResolveWorkspaceRoot,
   RuntimeTurnConfig,
   RuntimeTurnLifecycleDependencies,
@@ -68,12 +65,10 @@ export class RuntimeTurnLifecycle {
     persistIncomingWeixinAttachments,
     queuePendingWorkspaceBootstrap,
     resolveDefaultTerminalUser,
-    resolveTimelineScreenshotOutput,
     resolveWorkspaceRoot,
     runtimeAdapter,
     scheduleRuntimeEventWatchdog,
     streamDelivery,
-    timelineIntegration,
     buildRuntimeInboundText,
   }: RuntimeTurnLifecycleDependencies) {
     this.channelAdapter = channelAdapter;
@@ -93,8 +88,6 @@ export class RuntimeTurnLifecycle {
       channelAdapter,
       normalizeText,
       resolveDefaultTerminalUser,
-      resolveTimelineScreenshotOutput,
-      timelineIntegration,
     });
     this.preparation = createRuntimeTurnPreparation({
       buildRuntimeInboundText,
@@ -112,10 +105,6 @@ export class RuntimeTurnLifecycle {
       streamDelivery,
       withUserTyping: (options, work) => this.actions.withUserTyping(options, work),
     });
-  }
-
-  async sendTimelineScreenshot({ senderId = "", args = [], outputFile = "" }: TimelineScreenshotRequest = {}) {
-    return this.actions.sendTimelineScreenshot({ senderId, args, outputFile });
   }
 
   async sendLocalFileToCurrentChat({ senderId = "", filePath = "" }: SendLocalFileRequest = {}) {

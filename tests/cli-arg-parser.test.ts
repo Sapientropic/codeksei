@@ -33,10 +33,8 @@ test("cli arg parser handles boolean, string, and repeated string flags", () => 
   });
 });
 
-test("cli arg parser preserves passthrough timeline screenshot args while ignoring bridge-only flags", () => {
+test("cli arg parser preserves passthrough timeline screenshot args while ignoring help-only flags", () => {
   const parsed = parseCliArgs([
-    "--send",
-    "--user", "wx-user",
     "--selector", "timeline",
     "--demo",
     "--output", "shot.png",
@@ -46,8 +44,6 @@ test("cli arg parser preserves passthrough timeline screenshot args while ignori
     help: false,
     dryRun: false,
     idempotencyKey: "",
-    send: true,
-    user: "wx-user",
     outputFile: "shot.png",
     forwardArgs: ["--selector", "timeline"],
   });

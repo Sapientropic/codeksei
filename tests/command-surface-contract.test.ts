@@ -180,14 +180,14 @@ test("leaf-help actions all resolve to non-empty leaf help text", () => {
 test("command classification helpers cover representative explicit and default branches", () => {
   assert.equal(resolveCommandAudienceDefinition("app.shared_start", "script"), "operator");
   assert.equal(resolveCommandAudienceDefinition("timeline.build", "cli"), "public");
-  assert.equal(resolveCommandAuthRequirementDefinition("timeline.screenshot"), "context_token");
+  assert.equal(resolveCommandAuthRequirementDefinition("timeline.screenshot"), "none");
   assert.equal(resolveCommandAuthRequirementDefinition("timeline.build"), "none");
   assert.equal(resolveCommandMutabilityDefinition("background.install"), "bootstrap");
   assert.equal(resolveCommandMutabilityDefinition("app.help"), "read");
   assert.equal(resolveCommandSafetyTierDefinition("timeline.write"), "warned");
   assert.equal(resolveCommandSafetyTierDefinition("app.schema"), "open");
   assert.equal(resolveCommandHostSupportTierDefinition("timeline.write"), "host_neutral");
-  assert.equal(resolveCommandHostSupportTierDefinition("timeline.screenshot"), "hosted_ready");
+  assert.equal(resolveCommandHostSupportTierDefinition("timeline.screenshot"), "host_neutral");
   assert.deepEqual(resolveCommandHostProfileIdsDefinition("timeline.screenshot"), ["codex-mode", "hosted-mode"]);
 });
 

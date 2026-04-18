@@ -455,12 +455,11 @@ codeksei context briefing --user <wechat_user_id> --workspace /absolute/workspac
 - `reminder-queue.json`
 - `system-message-queue.json`
 - `system-message-dead-letter.json`
-- `timeline-screenshot-queue.json`
 - `diary/`
 - `timeline/`
 - `logs/`
 
-连续性关键的状态文件目前包括 `sessions.json`、`reminder-queue.json`、`system-message-queue.json`、`timeline-screenshot-queue.json`。这几类文件现在会走原子写；如果 JSON 可读但关键 schema 已坏、或者文件本身损坏，运行时会把原文件隔离成 `*.corrupt-<timestamp>.json` 再回到空默认状态继续启动。
+连续性关键的状态文件目前包括 `sessions.json`、`reminder-queue.json`、`system-message-queue.json`。这几类文件现在会走原子写；如果 JSON 可读但关键 schema 已坏、或者文件本身损坏，运行时会把原文件隔离成 `*.corrupt-<timestamp>.json` 再回到空默认状态继续启动。
 
 如果你单独设置了 `CODEKSEI_DIARY_DIR` 或 `CODEKSEI_TIMELINE_STATE_DIR`，真正的数据会写到你指定的位置，状态目录只保留运行态文件。
 

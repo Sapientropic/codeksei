@@ -20,7 +20,6 @@ import type {
   SystemMessageQueueLike,
   ThreadStateStoreLike,
   TimelineIntegrationLike,
-  TimelineScreenshotQueueLike,
 } from "../../src/core/app-service-contract";
 const { BackstageTaskLifecycle }: typeof import("../../src/runtime/backstage-task-lifecycle") = require("../../src/runtime/backstage-task-lifecycle");
 const { RuntimeTurnLifecycle }: typeof import("../../src/runtime/runtime-turn-lifecycle") = require("../../src/runtime/runtime-turn-lifecycle");
@@ -43,13 +42,6 @@ interface AppHarnessOptions {
     accessMode?: string;
     metadata?: Record<string, unknown>;
   }) => Promise<RuntimeTurnSendState>;
-}
-
-interface QueueEntry {
-  id: string;
-  senderId: string;
-  outputFile: string;
-  args: string[];
 }
 
 interface TestAppHarness {
@@ -168,7 +160,6 @@ function createTestAppHarness({
     checkinScheduleStateFile: path.join(tempRoot, "checkin-schedule-state.json"),
     systemMessageDeadLetterFile: path.join(tempRoot, "system-message-dead-letter.json"),
     systemMessageQueueFile: path.join(tempRoot, "system-message-queue.json"),
-    timelineScreenshotQueueFile: path.join(tempRoot, "timeline-screenshot-queue.json"),
     cliIdempotencyLedgerFile: path.join(tempRoot, "cli-idempotency-ledger.json"),
     weixinInstructionsFile: path.join(tempRoot, "weixin-instructions.md"),
     weixinInstructionsOverlayFile: path.join(tempRoot, "weixin-instructions.local.md"),
@@ -407,15 +398,6 @@ function createTestAppHarness({
     },
   };
 
-  const timelineScreenshotQueue: TimelineScreenshotQueueLike = {
-    drainForAccount() {
-      return [] as QueueEntry[];
-    },
-    hasPendingForAccount() {
-      return false;
-    },
-  };
-
   const timelineIntegration: TimelineIntegrationLike = {
     describe() {
       return { id: "test-timeline" };
@@ -472,7 +454,6 @@ function createTestAppHarness({
         runtimeWatchdogLifecycle.queuePendingWorkspaceBootstrap(payload);
       },
       resolveDefaultTerminalUser,
-      resolveTimelineScreenshotOutput: (args: string[]) => resolveTimelineScreenshotOutput(tempRoot, args),
       resolveWorkspaceRoot,
       runtimeAdapter,
       scheduleRuntimeEventWatchdog: (payload: {
@@ -482,7 +463,6 @@ function createTestAppHarness({
         threadId?: string;
       }) => runtimeWatchdogLifecycle.scheduleRuntimeEventWatchdog(payload),
       streamDelivery,
-      timelineIntegration,
     });
 
     const backstageTaskLifecycle = new BackstageTaskLifecycle({
@@ -498,11 +478,9 @@ function createTestAppHarness({
       reminderQueue,
       resolveWorkspaceRoot,
       runtimeAdapter,
-      sendTimelineScreenshot: (payload) => runtimeTurnLifecycle.sendTimelineScreenshot(payload),
       systemMessageBusyRetryMs: 30_000,
       systemMessageQueue,
       threadStateStore,
-      timelineScreenshotQueue,
     });
 
     return {
@@ -519,7 +497,6 @@ function createTestAppHarness({
       systemMessageQueue,
       threadStateStore,
       timelineIntegration,
-      timelineScreenshotQueue,
     };
   };
 
@@ -543,15 +520,6 @@ function createTestAppHarness({
 
 function formatErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message || error.stack || String(error) : String(error || "unknown error");
-}
-
-function resolveTimelineScreenshotOutput(tempRoot: string, args: string[]): string {
-  for (let index = 0; index < args.length; index += 1) {
-    if (args[index] === "--output" && args[index + 1]) {
-      return path.resolve(String(args[index + 1]));
-    }
-  }
-  return path.join(tempRoot, "timeline-screenshot.png");
 }
 
 module.exports = {

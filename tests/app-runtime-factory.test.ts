@@ -59,7 +59,6 @@ function createRuntimeConfig(): AppRuntimeConfig {
     syncBufferDir: path.join(tempRoot, "sync-buffers"),
     systemMessageDeadLetterFile: path.join(tempRoot, "system-message-dead-letter.json"),
     systemMessageQueueFile: path.join(tempRoot, "system-message-queue.json"),
-    timelineScreenshotQueueFile: path.join(tempRoot, "timeline-screenshot-queue.json"),
     timelineStateDir: tempRoot,
     timelineStateTimezone: "",
     timezone: "Asia/Shanghai",
@@ -105,7 +104,6 @@ test("CodekseiApp passes only config into the factory seam", () => {
           dispatchSystemMessage: async () => ({ status: "sent", reason: "" }),
           flushDueReminders: async () => undefined,
           flushPendingSystemMessages: async () => undefined,
-          flushPendingTimelineScreenshots: async () => undefined,
         },
         channelAdapter: {
           describe: () => ({ id: "test-channel" }),
@@ -152,7 +150,6 @@ test("CodekseiApp passes only config into the factory seam", () => {
           prepareIncomingMessageForRuntime: async () => null,
           sendLocalFileToCurrentChat: async () => undefined,
           sendPreparedMessageToRuntime: async () => ({ status: "sent", threadId: "thread-1" }),
-          sendTimelineScreenshot: async () => undefined,
           withUserTyping: async (_options: unknown, work: () => Promise<unknown>) => work(),
         },
         runtimeWatchdogLifecycle: {
@@ -185,7 +182,6 @@ test("CodekseiApp passes only config into the factory seam", () => {
           describe: () => ({ id: "test-timeline" }),
           runSubcommand: async () => undefined,
         },
-        timelineScreenshotQueue: {},
       } as never;
     },
   });

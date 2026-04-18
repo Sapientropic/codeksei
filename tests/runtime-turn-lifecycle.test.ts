@@ -93,7 +93,6 @@ function createLifecycle({
   const sendTypingCalls: Array<{ status: number }> = [];
   const sendTextTurnCalls: Record<string, unknown>[] = [];
   const bootstrapCalls: Record<string, unknown>[] = [];
-  const timelineCalls: Array<{ command: string; args: string[] }> = [];
   const watchdogCalls: Record<string, unknown>[] = [];
 
   const runtimeAdapter = {
@@ -154,9 +153,6 @@ function createLifecycle({
     resolveDefaultTerminalUser() {
       return defaultTerminalUser;
     },
-    resolveTimelineScreenshotOutput() {
-      return "E:/repo/current/shots/capture.png";
-    },
     resolveWorkspaceRoot() {
       return "E:/repo/current";
     },
@@ -168,11 +164,6 @@ function createLifecycle({
       queueReplyTargetForThread() {},
       setReplyTarget() {},
     },
-    timelineIntegration: {
-      async runSubcommand(command: string, args: string[]) {
-        timelineCalls.push({ command, args });
-      },
-    },
     buildRuntimeInboundText: buildRuntimeInboundTextImpl,
   });
 
@@ -183,7 +174,6 @@ function createLifecycle({
     sendTextCalls,
     sendTextTurnCalls,
     sendTypingCalls,
-    timelineCalls,
     watchdogCalls,
   };
 }
@@ -206,46 +196,6 @@ test("prepareIncomingMessageForRuntime notifies the user when attachment-only in
   assert.equal(harness.sendTextCalls.length, 1);
   assert.ok(harness.sendTextCalls[0]);
   assert.match(harness.sendTextCalls[0].text, /附件接收失败|download failed/u);
-});
-
-test("sendTimelineScreenshot runs timeline capture and delivers the file to the current chat", async () => {
-  const harness = createLifecycle();
-
-  const result = await harness.lifecycle.sendTimelineScreenshot({
-    senderId: "user-1",
-    args: ["--selector", "timeline"],
-  });
-
-  assert.deepEqual(result, {
-    userId: "user-1",
-    filePath: "E:/repo/current/shots/capture.png",
-  });
-  assert.deepEqual(harness.timelineCalls, [{
-    command: "screenshot",
-    args: ["--selector", "timeline"],
-  }]);
-  assert.deepEqual(harness.fileCalls, [{
-    userId: "user-1",
-    filePath: "E:/repo/current/shots/capture.png",
-    contextToken: "ctx-1",
-  }]);
-  assert.deepEqual(harness.sendTypingCalls.map((entry) => entry.status), [1, 0]);
-});
-
-test("sendTimelineScreenshot fails when the target user has no known context token", async () => {
-  const harness = createLifecycle({
-    defaultTerminalUser: "user-missing",
-    knownContextTokens: {},
-  });
-
-  await assert.rejects(
-    () => harness.lifecycle.sendTimelineScreenshot({
-      args: ["--selector", "timeline"],
-    }),
-    /context token/u,
-  );
-  assert.deepEqual(harness.timelineCalls, []);
-  assert.deepEqual(harness.fileCalls, []);
 });
 
 test("sendLocalFileToCurrentChat sends the resolved file path to the active chat", async (t) => {

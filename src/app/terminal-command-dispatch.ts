@@ -247,7 +247,7 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
     return runTimelineEventCommand(context.config, context.leafArgs);
   },
   "timeline.screenshot": async (_manifest, context) => {
-    return runTimelineScreenshotCommand(context.config, context.leafArgs, context.getApp() as ChannelSendFileApp);
+    return runTimelineScreenshotCommand(context.config, context.leafArgs);
   },
   "timeline.subcommand": async (manifest, context) => {
     if (!manifest.timelineSubcommand) {

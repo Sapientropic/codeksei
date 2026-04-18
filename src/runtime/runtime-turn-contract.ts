@@ -44,7 +44,6 @@ export type QueuePendingWorkspaceBootstrap = (payload: {
   threadId: string;
 }) => void;
 export type ResolveDefaultTerminalUser = () => string;
-export type ResolveTimelineScreenshotOutput = (args: string[]) => string;
 export type ResolveWorkspaceRoot = (bindingKey: string) => string;
 export type ScheduleRuntimeEventWatchdog = (payload: {
   bindingKey: string;
@@ -67,8 +66,6 @@ export interface RuntimeTurnActionDependencies {
   channelAdapter: ChannelAdapterLike;
   normalizeText: NormalizeText;
   resolveDefaultTerminalUser: ResolveDefaultTerminalUser;
-  resolveTimelineScreenshotOutput: ResolveTimelineScreenshotOutput;
-  timelineIntegration: TimelineIntegrationLike;
 }
 
 export interface RuntimeTurnPreparationDependencies {
@@ -99,10 +96,8 @@ export interface RuntimeTurnLifecycleDependencies {
   persistIncomingWeixinAttachments: PersistIncomingWeixinAttachments;
   queuePendingWorkspaceBootstrap: QueuePendingWorkspaceBootstrap;
   resolveDefaultTerminalUser: ResolveDefaultTerminalUser;
-  resolveTimelineScreenshotOutput: ResolveTimelineScreenshotOutput;
   resolveWorkspaceRoot: ResolveWorkspaceRoot;
   runtimeAdapter: RuntimeAdapterLike;
   scheduleRuntimeEventWatchdog: ScheduleRuntimeEventWatchdog;
   streamDelivery: StreamDeliveryLike;
-  timelineIntegration: TimelineIntegrationLike;
 }

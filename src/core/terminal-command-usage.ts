@@ -54,7 +54,7 @@ const ACTION_USAGE_ARGS: Readonly<Partial<Record<CommandActionId, string>>> = Ob
   "timeline.proposals": "[--date YYYY-MM-DD]",
   "timeline.serve": "[--port 4317]",
   "timeline.dev": "[--port 4317]",
-  "timeline.screenshot": "[--output /绝对路径] [其他 timeline screenshot 参数] [--send [--user <wechatUserId>]]",
+  "timeline.screenshot": "[--output /绝对路径] [其他 timeline screenshot 参数]",
 });
 
 export function buildTerminalEntryUsage(action: CommandActionLike | CommandActionId | string, audience: TerminalAudience): string {

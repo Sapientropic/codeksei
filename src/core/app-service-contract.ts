@@ -34,7 +34,6 @@ import type {
   SendLocalFileRequest,
   SystemDispatchResult,
   ThreadBindingRef,
-  TimelineScreenshotRequest,
   UnknownRecord,
 } from "./runtime-types";
 
@@ -269,16 +268,6 @@ export interface SystemMessageQueueLike {
   takeReadyForAccount(accountId: string, options?: { nowMs?: number }): SystemMessage[];
 }
 
-export interface TimelineScreenshotQueueLike {
-  drainForAccount(accountId: string): Array<{
-    id: string;
-    senderId: string;
-    outputFile: string;
-    args: string[];
-  }>;
-  hasPendingForAccount?(accountId: string): boolean;
-}
-
 export interface SystemMessageDispatcherLike {
   buildPreparedMessage(message: SystemMessage, contextToken?: string): NormalizedIncomingMessage | null;
   complete(message: SystemMessage): void;
@@ -311,7 +300,6 @@ export interface RuntimeTurnLifecycleLike {
     normalized: NormalizedIncomingMessage;
     prepared: PreparedRuntimeMessage;
   }): Promise<RuntimeTurnSendResult>;
-  sendTimelineScreenshot(payload?: TimelineScreenshotRequest): Promise<unknown>;
   withUserTyping<T>(
     options: { userId: string; contextToken?: string; clearOnSuccess?: boolean },
     work: () => Promise<T>,
@@ -346,7 +334,6 @@ export interface BackstageTaskLifecycleLike {
   dispatchSystemMessage(message: SystemMessage): Promise<SystemDispatchResult>;
   flushDueReminders(account: { accountId: string }): Promise<void>;
   flushPendingSystemMessages(): Promise<void>;
-  flushPendingTimelineScreenshots(account: { accountId: string }): Promise<void>;
 }
 
 export interface SystemMessageDispatcherRef {
@@ -367,7 +354,6 @@ export interface AppServices {
   systemMessageQueue: SystemMessageQueueLike;
   threadStateStore: ThreadStateStoreLike;
   timelineIntegration: TimelineIntegrationLike;
-  timelineScreenshotQueue: TimelineScreenshotQueueLike;
 }
 
 export interface StreamDeliveryLike {

@@ -8,7 +8,6 @@ import { RuntimeTurnLifecycle } from "../runtime/runtime-turn-lifecycle";
 import { RuntimeWatchdogLifecycle } from "../runtime/runtime-watchdog-lifecycle";
 import { ReminderQueueStore } from "../state/reminder-queue-store";
 import { SystemMessageQueueStore } from "../state/system-message-queue-store";
-import { TimelineScreenshotQueueStore } from "../state/timeline-screenshot-queue-store";
 import { persistIncomingWeixinAttachments } from "../adapters/channel/weixin/media-receive";
 import type {
   AppRuntimeConfig,
@@ -22,7 +21,6 @@ import type {
   NormalizedIncomingMessage,
   PreparedRuntimeMessage,
   ReplyTarget,
-  TimelineScreenshotRequest,
 } from "./runtime-types";
 import { ChannelCommandRouter } from "./channel-command-router";
 import { createControlCommandHandlers } from "./channel-command-control-handlers";
@@ -40,7 +38,6 @@ import {
   buildRuntimeInboundText,
   getSystemMessageFailureRetryDelayMs,
   hasRpcId,
-  resolveTimelineScreenshotOutput,
 } from "./app-runtime-helpers";
 import { formatErrorMessage } from "./app-poll-loop";
 import { handleReplyDeliveryFailureDelegate } from "./app-runtime-delegates";
@@ -77,7 +74,6 @@ interface AppInfrastructure {
   systemMessageQueue: AppServices["systemMessageQueue"];
   threadStateStore: AppServices["threadStateStore"];
   timelineIntegration: AppServices["timelineIntegration"];
-  timelineScreenshotQueue: AppServices["timelineScreenshotQueue"];
 }
 
 function createAppInfrastructure({
@@ -99,7 +95,6 @@ function createAppInfrastructure({
     filePath: config.systemMessageQueueFile,
     deadLetterFilePath: config.systemMessageDeadLetterFile,
   });
-  const timelineScreenshotQueue = new TimelineScreenshotQueueStore({ filePath: config.timelineScreenshotQueueFile });
   const reminderQueue = new ReminderQueueStore({ filePath: config.reminderQueueFile });
   const replyFailureHandlerRef: ReplyFailureHandlerRef = {
     current: async () => undefined,
@@ -122,7 +117,6 @@ function createAppInfrastructure({
     systemMessageQueue,
     threadStateStore,
     timelineIntegration,
-    timelineScreenshotQueue,
   };
 }
 
@@ -146,7 +140,6 @@ function createRuntimeWorkflowServices({
     systemMessageQueue,
     threadStateStore,
     timelineIntegration,
-    timelineScreenshotQueue,
   } = infrastructure;
 
   const resolveDefaultTerminalUser = () => resolveAppDefaultTerminalUser({
@@ -220,7 +213,6 @@ function createRuntimeWorkflowServices({
       threadId: string;
     }) => runtimeWatchdogLifecycle.queuePendingWorkspaceBootstrap(payload),
     resolveDefaultTerminalUser,
-    resolveTimelineScreenshotOutput,
     resolveWorkspaceRoot,
     runtimeAdapter,
     scheduleRuntimeEventWatchdog: (payload: {
@@ -230,7 +222,6 @@ function createRuntimeWorkflowServices({
       threadId?: string;
     }) => runtimeWatchdogLifecycle.scheduleRuntimeEventWatchdog(payload),
     streamDelivery,
-    timelineIntegration,
     buildRuntimeInboundText: (normalized, persisted) => buildRuntimeInboundText(
       normalized,
       persisted,
@@ -261,11 +252,9 @@ function createRuntimeWorkflowServices({
     normalizeText: normalizeTrimmedText,
     reminderQueue,
     runtimeAdapter,
-    sendTimelineScreenshot: (payload: TimelineScreenshotRequest) => runtimeTurnLifecycle.sendTimelineScreenshot(payload),
     systemMessageBusyRetryMs: SYSTEM_MESSAGE_BUSY_RETRY_MS,
     systemMessageQueue,
     threadStateStore,
-    timelineScreenshotQueue,
     buildReminderSystemTrigger,
     resolveWorkspaceRoot,
   });

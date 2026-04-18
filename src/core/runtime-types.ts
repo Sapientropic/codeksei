@@ -77,12 +77,6 @@ export interface UserTypingOptions {
   clearOnSuccess?: boolean;
 }
 
-export interface TimelineScreenshotRequest {
-  senderId?: string;
-  args?: string[];
-  outputFile?: string;
-}
-
 export interface SendLocalFileRequest {
   senderId?: string;
   filePath?: string;

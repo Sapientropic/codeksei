@@ -446,12 +446,11 @@ Typical runtime contents:
 - `reminder-queue.json`
 - `system-message-queue.json`
 - `system-message-dead-letter.json`
-- `timeline-screenshot-queue.json`
 - `diary/`
 - `timeline/`
 - `logs/`
 
-The continuity-critical state files currently covered are `sessions.json`, `reminder-queue.json`, `system-message-queue.json`, and `timeline-screenshot-queue.json`. Those files now use atomic writes, and if JSON parsing succeeds but the critical schema is broken, or if the file itself is corrupt, the runtime moves the original file aside as `*.corrupt-<timestamp>.json` before falling back to an empty default state.
+The continuity-critical state files currently covered are `sessions.json`, `reminder-queue.json`, and `system-message-queue.json`. Those files now use atomic writes, and if JSON parsing succeeds but the critical schema is broken, or if the file itself is corrupt, the runtime moves the original file aside as `*.corrupt-<timestamp>.json` before falling back to an empty default state.
 
 If you set `CODEKSEI_DIARY_DIR` or `CODEKSEI_TIMELINE_STATE_DIR`, business data is stored there and the state directory keeps runtime files only.
 

@@ -43,10 +43,6 @@ const systemMessageDeadLetterStateIngressSchema = z.object({
   entries: z.array(z.unknown()),
 }).passthrough();
 
-const timelineScreenshotQueueStateIngressSchema = z.object({
-  jobs: z.array(z.unknown()),
-}).passthrough();
-
 const reminderQueueStateIngressSchema = z.object({
   reminders: z.array(z.unknown()),
 }).passthrough();
@@ -66,15 +62,6 @@ export type SystemMessageDeadLetterEntry = SystemMessage & {
   deadLetterReason: string;
   deadLetterAt: string;
 };
-
-export interface TimelineScreenshotJob {
-  id: string;
-  accountId: string;
-  senderId: string;
-  outputFile: string;
-  args: string[];
-  createdAt: string;
-}
 
 export interface ReminderQueueEntry {
   id: string;
@@ -187,41 +174,6 @@ export function validateSystemMessageDeadLetterState(state: unknown): true | str
     : (parsed.error.issues[0]?.message || "system message dead letter is invalid");
 }
 
-export function normalizeTimelineScreenshotJob(job: unknown): TimelineScreenshotJob | null {
-  if (!isPlainObject(job)) {
-    return null;
-  }
-
-  const id = normalizeText(job.id);
-  const accountId = normalizeText(job.accountId);
-  const senderId = normalizeText(job.senderId);
-  const outputFile = normalizeText(job.outputFile);
-  const createdAt = normalizeIsoTime(job.createdAt);
-  const args = Array.isArray(job.args)
-    ? job.args.map((value: unknown) => normalizeText(value)).filter(Boolean)
-    : [];
-
-  if (!id || !accountId || !senderId) {
-    return null;
-  }
-
-  return {
-    id,
-    accountId,
-    senderId,
-    outputFile,
-    args,
-    createdAt: createdAt || new Date().toISOString(),
-  };
-}
-
-export function validateTimelineScreenshotQueueState(state: unknown): true | string {
-  const parsed = timelineScreenshotQueueStateSchema.safeParse(state);
-  return parsed.success
-    ? true
-    : (parsed.error.issues[0]?.message || "timeline screenshot queue is invalid");
-}
-
 export function normalizeReminderQueueEntry(reminder: unknown): ReminderQueueEntry | null {
   if (!isPlainObject(reminder)) {
     return null;
@@ -280,25 +232,6 @@ export const systemMessageDeadLetterStateSchema = systemMessageDeadLetterStateIn
   };
 });
 
-export const timelineScreenshotQueueStateSchema = timelineScreenshotQueueStateIngressSchema.transform((value, ctx) => {
-  const jobs: TimelineScreenshotJob[] = [];
-  for (let index = 0; index < value.jobs.length; index += 1) {
-    const normalized = normalizeTimelineScreenshotJob(value.jobs[index]);
-    if (!normalized) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `timeline screenshot queue jobs[${index}] is invalid`,
-      });
-      return z.NEVER;
-    }
-    jobs.push(normalized);
-  }
-  return {
-    ...value,
-    jobs,
-  };
-});
-
 export const reminderQueueStateSchema = reminderQueueStateIngressSchema.transform((value, ctx) => {
   const reminders: ReminderQueueEntry[] = [];
   for (let index = 0; index < value.reminders.length; index += 1) {
@@ -335,15 +268,6 @@ export function compareSystemMessages(left: Partial<SystemMessage> | null | unde
 export function compareSystemMessageDeadLetters(left: Partial<SystemMessageDeadLetterEntry> | null | undefined, right: Partial<SystemMessageDeadLetterEntry> | null | undefined): number {
   const leftTime = parseIsoTime(left?.deadLetterAt) || 0;
   const rightTime = parseIsoTime(right?.deadLetterAt) || 0;
-  if (leftTime !== rightTime) {
-    return leftTime - rightTime;
-  }
-  return String(left?.id || "").localeCompare(String(right?.id || ""));
-}
-
-export function compareTimelineScreenshotJobs(left: Partial<TimelineScreenshotJob> | null | undefined, right: Partial<TimelineScreenshotJob> | null | undefined): number {
-  const leftTime = parseIsoTime(left?.createdAt) || 0;
-  const rightTime = parseIsoTime(right?.createdAt) || 0;
   if (leftTime !== rightTime) {
     return leftTime - rightTime;
   }

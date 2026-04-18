@@ -225,7 +225,6 @@ test("parseEnvConfig keeps the default bridge host shape explicit", () => {
   assert.equal(config.channelProvider, "codeksei");
   assert.equal(config.reminderQueueFile.replace(/\\/g, "/"), "E:/state/reminder-queue.json");
   assert.equal(config.systemMessageQueueFile.replace(/\\/g, "/"), "E:/state/system-message-queue.json");
-  assert.equal(config.timelineScreenshotQueueFile.replace(/\\/g, "/"), "E:/state/timeline-screenshot-queue.json");
 });
 
 test("parseEnvConfig derives hosted Hermes defaults and normalizes reply/access modes", () => {
