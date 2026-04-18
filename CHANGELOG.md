@@ -4,12 +4,14 @@
 
 - 面向安装者、宿主维护者，以及需要快速判断“最近到底更新到哪了”的人。
 - 重点是发布节奏、升级影响和需要执行的动作，不直接镜像 `git log`。
-- `0.4.0` / `0.4.1` 当前以 release commit 为锚点；repo 里的 Git tag 目前停在 `v0.3.0`。
+- `0.4.0` 之后的版本统一以 release commit / GitHub Release 为锚点。
 - 从 `0.3.0` 开始补详版 changelog；更早历史先以 Git tag 和 commit 为准。
 
 ## [Unreleased]
 
-当前 `package.json` 仍是 `0.4.1`。下面这些变更都发生在 `0.4.1` 之后、下一次正式发版之前。
+暂无。
+
+## [0.5.0] - 2026-04-18
 
 ### Added
 
@@ -23,6 +25,8 @@
 
 ### Changed
 
+- `timeline screenshot` 现在只负责生成本地截图文件；文件发送统一收口到 `channel send-file`，并移除了旧的 `timeline screenshot --send/--user` 路径及相关内部发送链路。`bc66471` `ee6ac84` `f854ec3`
+- reminder / host / system / operator 的命令面进一步做减法收口：`reminder write --delivery proactive`、`system send`、外部 `system checkin-poller`、`operator hermes sync-checkin`、`host bootstrap --ensure-daemon` 已移除，不再作为 public/operator surface 保留。`74b7bb8`
 - 公开 mode 命名现在收口到 `Codex Mode` 与 `Hosted Mode`；`Bridge Mode`、`Hermes Hosted Mode`、`bridge-codex-weixin`、`hosted-hermes-weixin` 退到兼容别名层，不再是公开主命名。
 - host config / host recipe / host resolution 改成宿主无关：不再把 `channel=weixin` 写死成唯一支持组合；`codex + host-managed telegram/discord/feishu` 与 `hermes + host-managed channel` 现在都能通过同一条 attach contract 解析，first-party Weixin adapter 只保留给 `Codex Mode + codeksei/weixin`。
 - `shared:*` shell wrapper 明确只支持 `Codex Mode + codeksei/weixin`；一旦切到 Hosted Mode 或 host-managed channel，就直接提示改走宿主桥，而不是误落回本地 Weixin 脚本。
@@ -35,11 +39,16 @@
 - Weixin 默认值与腾讯官方插件对齐，包括协议 client version、登录相关默认行为，以及 repo-local bridge 对应的兼容更新。`35c784a`
 - Weixin 路由和 Hermes hosted checkin 路径先做了一轮收口式简化，并补上 Hermes cron `env` passthrough patch 文档与资产。`f67f383`
 
+### Fixed
+
+- stale schema 探测如 `codeksei schema system send` 与 `codeksei operator schema operator hermes sync-checkin` 不再回 `internal_error`，而是返回稳定的 `validation_error`，并给 agent/tooling 明确的 removed-command guidance。`74b7bb8`
+
 ### Upgrade Notes
 
 - 若你消费 `host manifest` / hostkit schema，把 `hostIdentity.*`、`coreInvariant`、`scheduleTruthOwner` 视为新 canonical 真相；`runtimeInvariant=bridge-full` 只保留给旧 consumer 兼容读取。
 - 若你之前把公开命名写成 `Bridge Mode` / `Hermes Hosted Mode`，现在统一改成 `Codex Mode` / `Hosted Mode`；旧 profile id 仍可读，但 help / doctor / schema 都会把它们当成 legacy alias。
 - 这条发布线的核心变化不是“多了几个命令”，而是宿主默认接法已经从“拿命令列表自己拼”升级为“由 `host manifest`、skill 和 `host doctor` 共同驱动默认工作流”。
+- 如果你之前还在调用 `timeline screenshot --send`、`reminder write --delivery proactive`、`system send`、`operator hermes sync-checkin` 或 `host bootstrap --ensure-daemon`，现在需要切到新的公开主链，不要再依赖旧兼容入口。
 - onboarding 现在是正式的一等入口，新用户或薄画像用户不应再假设已有 durable profile；长期真相也不应旁路写入，而应继续回到 companion note。
 - onboarding 之上的记忆更新能力已经进一步泛化成 host-neutral 的 ongoing companion memory。对已完成 onboarding 的用户，后续纠正、支持偏好变化、节奏变化和近线任务更新，默认应走 `codeksei companion remember`，不要继续把 `onboarding step` 当作长期记忆的总入口。
 - 主动判断上下文现在应优先依赖 `context briefing` / context board，而不是直接注入 raw vault。
@@ -53,6 +62,8 @@
 - [ ] 先跑一次 `codeksei host doctor --provider hermes`，确认当前安装是否需要重新 bootstrap 或重装 skill。
 - [ ] 如果 `host doctor` 返回 `bootstrap_required: yes`，执行 `codeksei host bootstrap --provider hermes`。
 - [ ] 如果 `host doctor` 返回 `skill_reinstall_required: yes`，执行 `codeksei operator hermes install-skill`。
+- [ ] 如果你之前把截图和发送绑在一起，改成 `codeksei timeline screenshot ...` 之后再显式运行 `codeksei channel send-file --path ...`。
+- [ ] 如果你之前把 proactive 唤醒、scheduler glue 或 daemon readiness 绑在旧命令/flag 上，改成 `host seed-proactive / claim-checkin / settle-checkin` 与默认的 `host bootstrap --provider hermes`。
 - [ ] 如果宿主之前只缓存了命令清单，改为读取 `codeksei host manifest --format json`，并消费其中的 `recommendedWorkflows` 与 `entrypoints`。
 - [ ] 把“新用户 / 薄画像”默认链路改成 `onboarding status -> onboarding start|step`，不要再假设已有 companion profile。
 - [ ] 把“onboarding 已完成后的持续记忆更新”默认链路改成 `codeksei companion remember --user <id> --workspace <path> --source host_user_turn --stdin`，不要再复用 `onboarding step` 承担全部长期纠正。
@@ -64,6 +75,11 @@
 - `678b3eb` Teach hosts the default companion workflow
 - `adb6b90` Add semantic onboarding persona extraction
 - `9b8012f` Switch to "whiteboard/context board first, raw vault injection second"
+- `74b7bb8` Clean up removed command surfaces
+- `3164496` chore: refresh react 19.2.5 lockfile
+- `ee6ac84` Remove timeline screenshot send wrapper
+- `f854ec3` Tighten timeline screenshot command contract
+- `bc66471` Decouple timeline screenshot delivery and workspace config paths
 - `35c784a` Align Weixin defaults with Tencent plugin
 - `f5aaeec` Fix hosted proactive wake jobs and reminder delivery
 - `f67f383` Simplify Weixin routing and harden Hermes hosted checkins
@@ -173,7 +189,8 @@
 - `643529e` add host-neutral core and Hermes hosted mode
 - `29080b7` Bump release version to 0.3.0
 
-[Unreleased]: https://github.com/Sapientropic/codeksei/compare/2b712b5...HEAD
+[Unreleased]: https://github.com/Sapientropic/codeksei/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Sapientropic/codeksei/compare/2b712b5...v0.5.0
 [0.4.1]: https://github.com/Sapientropic/codeksei/compare/9fe7d9d...2b712b5
 [0.4.0]: https://github.com/Sapientropic/codeksei/compare/v0.3.0...9fe7d9d
 [0.3.0]: https://github.com/Sapientropic/codeksei/releases/tag/v0.3.0
