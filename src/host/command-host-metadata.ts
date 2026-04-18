@@ -171,11 +171,20 @@ const COMMAND_HOST_ACCESS_OVERRIDES = Object.freeze<Record<string, CommandHostAc
     enforceCurrentProfile: true,
   }),
   "timeline.screenshot": Object.freeze({
-    modeClasses: Object.freeze(["codex-managed", "hosted-proactive", "hosted-skill-only", "cli-only"] satisfies HostModeClass[]),
-    capabilities: Object.freeze(["invokeCodekseiAction"] satisfies HostCapabilityId[]),
+    // The default screenshot path is local-file generation, but the same
+    // public action still carries the `--send` compatibility wrapper. Keep the
+    // action-level host contract conservative until the command surface can
+    // describe option-sensitive delivery capabilities.
+    modeClasses: Object.freeze(["codex-managed", "hosted-proactive", "hosted-skill-only"] satisfies HostModeClass[]),
+    capabilities: Object.freeze([
+      "deliverVisibleFile",
+      "bridgeQueueAccess",
+      "contextTokenAccess",
+      "resolveHostedSession",
+    ] satisfies HostCapabilityId[]),
     providerRecipes: Object.freeze(["hermes"] satisfies HostRecipeId[]),
-    supportTier: "host_neutral",
-    enforceCurrentProfile: false,
+    supportTier: "hosted_ready",
+    enforceCurrentProfile: true,
   }),
   "host.manifest": Object.freeze({
     modeClasses: Object.freeze(["cli-only"] satisfies HostModeClass[]),

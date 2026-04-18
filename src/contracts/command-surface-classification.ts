@@ -160,7 +160,12 @@ export const COMMAND_AUTH_OVERRIDES = {
   "channel.send_file": "runtime_bootstrap",
   "reminder.create": "context_token",
   "system.send": "context_token",
-  "timeline.screenshot": "none",
+  // `timeline screenshot` without `--send` is host-neutral, but the same
+  // public action also retains the compatibility `--send` wrapper. Because the
+  // static command surface cannot express option-sensitive auth today, keep
+  // the action-level contract conservative instead of promising auth-free send
+  // flows to hosts that only inspect manifest metadata.
+  "timeline.screenshot": "context_token",
 } as const satisfies Record<string, CommandAuthRequirementDefinition>;
 
 export const COMMAND_HOST_SUPPORT_TIER_OVERRIDES = Object.freeze(

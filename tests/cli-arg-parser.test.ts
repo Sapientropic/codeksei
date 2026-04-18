@@ -46,6 +46,7 @@ test("cli arg parser preserves passthrough timeline screenshot args while ignori
     help: false,
     dryRun: false,
     idempotencyKey: "",
+    send: true,
     user: "wx-user",
     outputFile: "shot.png",
     forwardArgs: ["--selector", "timeline"],
