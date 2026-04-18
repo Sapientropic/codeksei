@@ -13,6 +13,7 @@ import {
   resolveCrossPlatformPathFromRoot,
 } from "../core/path-utils";
 import { captureSubprocess } from "../core/subprocess-capture";
+import { resolveWorkspaceScopedConfigFile } from "../core/workspace-config-paths";
 
 interface ProjectRadarConfigInput {
   ghCommand?: unknown;
@@ -95,7 +96,7 @@ interface GithubActivityProvider {
 function loadProjectRadarConfig(config: ProjectRadarConfigInput = {}) {
   const workspaceRoot = resolveCrossPlatformPath(String(config.workspaceRoot || process.cwd()));
   const configFile = resolveCrossPlatformPath(String(
-    config.projectRadarConfigFile || path.join(workspaceRoot, ".codex", "code-projects.json")
+    config.projectRadarConfigFile || resolveWorkspaceScopedConfigFile(workspaceRoot, "code-projects.json")
   ));
   const parsed = loadJsonConfig<NormalizedProjectRadarConfig>({
     filePath: configFile,

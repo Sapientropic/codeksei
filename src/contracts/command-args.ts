@@ -385,12 +385,13 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       COMMON_HELP_FLAG,
       COMMON_DRY_RUN_FLAG,
       COMMON_IDEMPOTENCY_FLAG,
+      { name: "send", keys: ["--send"], type: "boolean", defaultValue: false, description: "截图后通过当前宿主发送文件；不传时只生成本地文件" },
       { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id" },
       { name: "outputFile", keys: ["--output"], type: "string", defaultValue: "", description: "截图输出绝对路径" },
     ],
     passthrough: {
       key: "forwardArgs",
-      ignoreKeys: ["--send", "--demo"],
+      ignoreKeys: ["--demo"],
     },
   }),
   timelineRead: createCommandArgSchema({

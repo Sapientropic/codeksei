@@ -113,15 +113,47 @@ test("readConfig keeps Windows workspace roots absolute across platforms", () =>
 
     assert.equal(
       config.projectRadarConfigFile.replace(/\\/g, "/"),
-      "E:/workspace/codeksei/.codex/code-projects.json"
+      "E:/workspace/codeksei/.codeksei/code-projects.json"
     );
     assert.equal(
       config.durableNoteSchemaConfigFile.replace(/\\/g, "/"),
-      "E:/workspace/codeksei/.codex/durable-note-schema.json"
+      "E:/workspace/codeksei/.codeksei/durable-note-schema.json"
     );
     assert.equal(
       config.reviewSchemaConfigFile.replace(/\\/g, "/"),
-      "E:/workspace/codeksei/.codex/review-schema.json"
+      "E:/workspace/codeksei/.codeksei/review-schema.json"
+    );
+  } finally {
+    process.argv = originalArgv;
+  }
+});
+
+test("readConfig falls back to legacy .codex workspace files when .codeksei files are absent", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-config-legacy-fallback-"));
+  const legacyDir = path.join(tempRoot, ".codex");
+  fs.mkdirSync(legacyDir, { recursive: true });
+  fs.writeFileSync(path.join(legacyDir, "code-projects.json"), "{\"projects\":[]}", "utf8");
+  fs.writeFileSync(path.join(legacyDir, "durable-note-schema.json"), "{\"defaults\":{}}", "utf8");
+  fs.writeFileSync(path.join(legacyDir, "review-schema.json"), "{\"defaults\":{}}", "utf8");
+
+  const originalArgv = process.argv;
+  process.argv = ["node", "codeksei.js"];
+  try {
+    const config = withPatchedEnv({
+      CODEKSEI_WORKSPACE_ROOT: tempRoot,
+    }, () => readConfig());
+
+    assert.equal(
+      config.projectRadarConfigFile.replace(/\\/g, "/"),
+      path.join(tempRoot, ".codex", "code-projects.json").replace(/\\/g, "/"),
+    );
+    assert.equal(
+      config.durableNoteSchemaConfigFile.replace(/\\/g, "/"),
+      path.join(tempRoot, ".codex", "durable-note-schema.json").replace(/\\/g, "/"),
+    );
+    assert.equal(
+      config.reviewSchemaConfigFile.replace(/\\/g, "/"),
+      path.join(tempRoot, ".codex", "review-schema.json").replace(/\\/g, "/"),
     );
   } finally {
     process.argv = originalArgv;
@@ -223,10 +255,10 @@ test("parseEnvConfig lets workspaceRoot override env and keeps workspace-scoped 
   assert.equal(config.workspaceRoot, "E:/workspace/from-cli");
   assert.equal(
     config.projectRadarConfigFile.replace(/\\/g, "/"),
-    "E:/workspace/from-cli/.codex/code-projects.json",
+    "E:/workspace/from-cli/.codeksei/code-projects.json",
   );
   assert.equal(
     config.reviewSchemaConfigFile.replace(/\\/g, "/"),
-    "E:/workspace/from-cli/.codex/review-schema.json",
+    "E:/workspace/from-cli/.codeksei/review-schema.json",
   );
 });

@@ -64,9 +64,9 @@ test("config slices compose into the legacy-compatible app runtime surface", () 
       weixinOperationsFile: "E:/codeksei/templates/weixin-operations.md",
       weixinOperationsOverlayFile: "E:/state/weixin-operations.local.md",
       workspaceBootstrapConfigFile: "E:/state/workspace-bootstrap.json",
-      projectRadarConfigFile: "E:/workspace/.codex/code-projects.json",
-      durableNoteSchemaConfigFile: "E:/workspace/.codex/durable-note-schema.json",
-      reviewSchemaConfigFile: "E:/workspace/.codex/review-schema.json",
+      projectRadarConfigFile: "E:/workspace/.codeksei/code-projects.json",
+      durableNoteSchemaConfigFile: "E:/workspace/.codeksei/durable-note-schema.json",
+      reviewSchemaConfigFile: "E:/workspace/.codeksei/review-schema.json",
       reviewSemanticMode: "hybrid",
       reviewSemanticHost: "auto",
       reviewSemanticModel: "gpt-5.4",
@@ -94,7 +94,7 @@ test("config slices compose into the legacy-compatible app runtime surface", () 
   });
 
   assert.equal(config.workspaceRoot, "E:/workspace");
-  assert.equal(config.reviewSchemaConfigFile, "E:/workspace/.codex/review-schema.json");
+  assert.equal(config.reviewSchemaConfigFile, "E:/workspace/.codeksei/review-schema.json");
   assert.equal(config.checkinConfigFile, "E:/state/checkin-config.json");
   assert.equal(config.weixinBaseUrl, "http://127.0.0.1");
 });
@@ -107,8 +107,8 @@ test("parseEnvConfig keeps workspace schema refs and state-backed checkin files 
   });
 
   assert.equal(config.workspaceRoot, "E:/workspace/current");
-  assert.equal(config.projectRadarConfigFile.replace(/\\/g, "/"), "E:/workspace/current/.codex/code-projects.json");
-  assert.equal(config.reviewSchemaConfigFile.replace(/\\/g, "/"), "E:/workspace/current/.codex/review-schema.json");
+  assert.equal(config.projectRadarConfigFile.replace(/\\/g, "/"), "E:/workspace/current/.codeksei/code-projects.json");
+  assert.equal(config.reviewSchemaConfigFile.replace(/\\/g, "/"), "E:/workspace/current/.codeksei/review-schema.json");
   assert.equal(config.companionSemanticTimeoutMs, 15000);
   assert.equal(config.onboardingSemanticTimeoutMs, 15000);
   assert.equal(config.checkinConfigFile.replace(/\\/g, "/"), "E:/state/checkin-config.json");

@@ -63,6 +63,7 @@ test("review leaf help uses codeksei syntax", () => {
 test("timeline screenshot leaf help keeps generic screenshots on the default full-page path", () => {
   const help = buildTerminalLeafHelp("timeline.screenshot");
 
+  assert.match(help, /主语义是本地截图/u);
   assert.match(help, /默认就是整页/u);
   assert.match(help, /codeksei timeline screenshot --send/u);
 });

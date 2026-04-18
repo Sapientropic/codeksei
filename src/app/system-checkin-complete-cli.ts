@@ -1,4 +1,3 @@
-import { SessionStore } from "../adapters/runtime/codex/session-store";
 import { getCommandArgsSchema } from "../contracts/command-args";
 import type { CommandExecutionResult } from "../contracts/cli-contract";
 import { parseCliArgs } from "../core/cli-args";
@@ -21,6 +20,7 @@ import { createHostedCheckinWakePlanSet } from "../core/hosted-checkin-cron";
 import { formatCheckinRange } from "../state/checkin-config";
 import { normalizeText } from "../core/text-normalization";
 import { syncHostedCheckinPlanSetViaHermes } from "../host/recipes/hermes/wake-forwarder";
+import { createSessionStore } from "../session/session-store-factory";
 
 interface SystemCheckinCompleteOptions {
   help: boolean;
@@ -65,7 +65,7 @@ export async function runSystemCheckinCompleteCommand(
     config,
     explicitUser: options.user,
     explicitWorkspace: options.workspace,
-    sessionStore: config.sessionsFile ? new SessionStore({ filePath: config.sessionsFile }) : null,
+    sessionStore: createSessionStore(config.sessionsFile),
   });
   if (!resolution.ok || !resolution.value) {
     throw buildTargetResolutionRequiredError(

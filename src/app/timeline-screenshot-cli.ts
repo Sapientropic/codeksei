@@ -1,102 +1,83 @@
-import * as crypto from "node:crypto";
 import * as path from "node:path";
 
-import { resolveSelectedAccount } from "../adapters/channel/weixin/account-store";
-import { SessionStore } from "../adapters/runtime/codex/session-store";
 import { getCommandArgsSchema } from "../contracts/command-args";
 import type { CommandExecutionResult } from "../contracts/cli-contract";
 import type { AppRuntimeConfig } from "../core/app-service-contract";
 import { parseCliArgs } from "../core/cli-args";
-import { buildTargetResolutionRequiredError } from "../core/cli-contract";
 import { buildTerminalLeafHelp } from "../core/command-registry";
 import { runCliMutation } from "../core/cli-mutation";
-import { sendFileViaHermesRepoLocal } from "../core/hermes-repo-local";
+import {
+  deliverLocalFileToCurrentChat,
+  type LocalFileDeliveryApp,
+  type DeliveredLocalFile,
+  type LocalFileDeliveryConfig,
+} from "../core/local-file-delivery";
 import { resolveHostMode } from "../core/host-mode";
 import { resolveTimelineRuntimeConfig } from "../timeline/runtime-config";
-import { TimelineScreenshotQueueStore } from "../state/timeline-screenshot-queue-store";
 import {
   captureTimelineScreenshot,
 } from "../timeline/runtime/application/timeline/capture-screenshot";
 import {
   parseTimelineScreenshotRuntimeArgs,
 } from "../timeline/runtime/app/timeline-screenshot-cli";
-import { inspectPreferredSenderId } from "../workspace/default-targets";
 
 interface TimelineScreenshotOptions {
   dryRun: boolean;
   help: boolean;
   idempotencyKey: string;
-  user: string;
   outputFile: string;
+  send: boolean;
+  user: string;
   forwardArgs: string[];
 }
 
-type RuntimeConfig = Pick<
+type RuntimeConfig = LocalFileDeliveryConfig & Partial<Pick<
   AppRuntimeConfig,
-  | "accountId"
-  | "accountsDir"
-  | "allowedUserIds"
-  | "channel"
-  | "channelProvider"
   | "cliIdempotencyLedgerFile"
-  | "hermesHome"
-  | "hermesPythonCommand"
-  | "hermesRepoLocalShimPath"
-  | "hermesRepoRoot"
-  | "runtime"
-  | "sessionsFile"
   | "stateDir"
   | "timelineStateDir"
-  | "timelineScreenshotQueueFile"
-  | "weixinBaseUrl"
-  | "weixinRouteTag"
-  | "workspaceId"
   | "workspaceRoot"
->;
+>>;
 
-interface SelectedAccount {
-  accountId: string;
-}
+type TimelineScreenshotApp = LocalFileDeliveryApp;
 
 interface TimelineScreenshotCommandDeps {
   captureTimelineScreenshot?: typeof captureTimelineScreenshot;
-  sendFileViaHermesRepoLocal?: typeof sendFileViaHermesRepoLocal;
+  deliverLocalFileToCurrentChat?: (
+    app: TimelineScreenshotApp | null,
+    config: RuntimeConfig,
+    args: { filePath: string; senderId?: string },
+  ) => Promise<DeliveredLocalFile>;
 }
 
-interface HostedTimelineScreenshotDryRunData {
-  deliveryMode: "hermes_repo_local_origin";
-  forwardArgs: string[];
+interface TimelineScreenshotCaptureData {
+  deliveryMode: "local_file";
   outputFile: string;
-  senderId: string;
+  selector: string;
+  url: string;
+  width: number;
+  height: number;
 }
 
-interface HostedTimelineScreenshotResultData {
+interface TimelineScreenshotSentData {
   chatId: string;
+  deliveryMode: "current_host_delivery";
+  height: number;
   outputFile: string;
   platform: string;
   selector: string;
+  senderId: string;
   sessionId: string;
   sessionKey: string;
   threadId: string;
   url: string;
-}
-
-interface BridgeTimelineScreenshotDryRunData {
-  forwardArgs: string[];
-  outputFile: string;
-  senderId: string;
-}
-
-interface BridgeTimelineScreenshotResultData {
-  args: string[];
-  id: string;
-  outputFile: string;
-  senderId: string;
+  width: number;
 }
 
 async function runTimelineScreenshotCommand(
   config: RuntimeConfig,
   args: string[] = [],
+  app: TimelineScreenshotApp | null = null,
   deps: TimelineScreenshotCommandDeps = {},
 ) {
   const options = parseTimelineScreenshotArgs(args);
@@ -106,20 +87,21 @@ async function runTimelineScreenshotCommand(
       text: buildTerminalLeafHelp("timeline.screenshot"),
     } satisfies CommandExecutionResult;
   }
+
   const hostMode = resolveHostMode(config);
-  if (hostMode.mode === "hosted") {
-    const timelineConfig = resolveTimelineRuntimeConfig(config);
-    const runtimeArgs = buildHostedRuntimeArgs(options);
-    const runtimeOptions = parseTimelineScreenshotRuntimeArgs(runtimeArgs, timelineConfig);
-    if (runtimeOptions.help) {
-      return {
-        data: null,
-        text: buildTerminalLeafHelp("timeline.screenshot"),
-      } satisfies CommandExecutionResult;
-    }
-    return runCliMutation<
-      HostedTimelineScreenshotDryRunData | HostedTimelineScreenshotResultData
-    >({
+  const timelineConfig = resolveTimelineRuntimeConfig(config);
+  const runtimeOptions = parseTimelineScreenshotRuntimeArgs(buildRuntimeArgs(options), timelineConfig);
+  if (runtimeOptions.help) {
+    return {
+      data: null,
+      text: buildTerminalLeafHelp("timeline.screenshot"),
+    } satisfies CommandExecutionResult;
+  }
+
+  const captureScreenshot = deps.captureTimelineScreenshot || captureTimelineScreenshot;
+  const deliverFile = deps.deliverLocalFileToCurrentChat || deliverLocalFileToCurrentChat;
+  if (!options.send) {
+    return runCliMutation<TimelineScreenshotCaptureData>({
       commandKey: "timeline.screenshot",
       config,
       configSource: {
@@ -129,146 +111,130 @@ async function runTimelineScreenshotCommand(
       dryRun: options.dryRun,
       dryRunResult: {
         data: {
-          deliveryMode: "hermes_repo_local_origin",
-          forwardArgs: options.forwardArgs,
+          deliveryMode: "local_file",
           outputFile: runtimeOptions.outputFile,
-          senderId: options.user,
+          selector: runtimeOptions.selector,
+          url: "",
+          width: runtimeOptions.width,
+          height: runtimeOptions.height,
         },
         text: [
           "timeline screenshot dry-run",
-          "delivery: hermes_repo_local_origin",
+          "delivery: local_file",
           `output: ${runtimeOptions.outputFile}`,
+          `selector: ${runtimeOptions.selector}`,
         ].join("\n"),
       },
       execute: async () => {
-        const captureScreenshot = deps.captureTimelineScreenshot || captureTimelineScreenshot;
-        const sendFile = deps.sendFileViaHermesRepoLocal || sendFileViaHermesRepoLocal;
         const screenshot = await captureScreenshot(timelineConfig, runtimeOptions);
-        const delivery = sendFile(config, {
-          file_path: screenshot.outputFile,
-          sender_id: options.user,
-        });
         return {
           data: {
-            chatId: delivery.chatId,
+            deliveryMode: "local_file",
             outputFile: screenshot.outputFile,
-            platform: delivery.platform,
             selector: screenshot.selector,
-            sessionId: delivery.sessionId,
-            sessionKey: delivery.sessionKey,
-            threadId: delivery.threadId,
             url: screenshot.url,
+            width: screenshot.width,
+            height: screenshot.height,
           },
-          text: [
-            `timeline screenshot sent via Hermes repo-local: ${screenshot.outputFile}`,
-            "delivery_status: delivered",
-          ].join("\n"),
+          text: `timeline screenshot saved: ${screenshot.outputFile}`,
         };
       },
       idempotencyKey: options.idempotencyKey,
       request: {
         args: options.forwardArgs,
-        deliveryMode: "hermes_repo_local_origin",
         outputFile: runtimeOptions.outputFile,
-        senderId: options.user,
       },
       resolvedTargets: {
         outputFile: runtimeOptions.outputFile,
-        senderId: options.user || "(active-session)",
+        selector: runtimeOptions.selector,
       },
       sideEffects: [
         {
           kind: "capture_timeline_screenshot",
           target: runtimeOptions.outputFile,
         },
-        {
-          kind: "send_wechat_file",
-          target: runtimeOptions.outputFile,
-        },
       ],
     });
   }
 
-  const account = resolveSelectedAccount(config);
-  const sessionStore = new SessionStore({ filePath: config.sessionsFile });
-  const senderResolution = inspectPreferredSenderId({
-    config,
-    accountId: account.accountId,
-    explicitUser: options.user,
-    sessionStore,
-  });
-  if (!senderResolution.value) {
-    throw buildTargetResolutionRequiredError(
-      senderResolution.ambiguous
-        ? "timeline screenshot 无法确定唯一 sender；请显式传 --user"
-        : "timeline screenshot 缺少可用 sender；请显式传 --user 或先完成 bootstrap",
-      { candidates: senderResolution.candidates, source: senderResolution.source },
-      "显式传 --user，或让唯一目标用户先和 bot 聊过一次。"
-    );
-  }
-  const senderId = senderResolution.value;
-
-  return runCliMutation<
-    BridgeTimelineScreenshotDryRunData | BridgeTimelineScreenshotResultData
-  >({
+  return runCliMutation<TimelineScreenshotCaptureData | TimelineScreenshotSentData>({
     commandKey: "timeline.screenshot",
     config,
     configSource: {
-      sessionsFile: config.sessionsFile,
-      timelineScreenshotQueueFile: config.timelineScreenshotQueueFile,
+      hostProfile: hostMode.profile,
+      timelineStateDir: timelineConfig.timelineDir,
+      timelineSiteDir: timelineConfig.timelineSiteDir,
     },
     dryRun: options.dryRun,
     dryRunResult: {
       data: {
-        forwardArgs: options.forwardArgs,
-        outputFile: options.outputFile,
-        senderId,
+        chatId: "",
+        deliveryMode: "current_host_delivery",
+        outputFile: runtimeOptions.outputFile,
+        platform: "",
+        selector: runtimeOptions.selector,
+        senderId: options.user,
+        sessionId: "",
+        sessionKey: "",
+        threadId: "",
+        url: "",
+        width: runtimeOptions.width,
+        height: runtimeOptions.height,
       },
       text: [
         "timeline screenshot dry-run",
-        `sender: ${senderId}`,
-        `queue: ${config.timelineScreenshotQueueFile}`,
+        "delivery: current_host_delivery",
+        `output: ${runtimeOptions.outputFile}`,
+        `selector: ${runtimeOptions.selector}`,
+        `sender: ${options.user || (hostMode.mode === "hosted" ? "(active-session)" : "(runtime-default)")}`,
       ].join("\n"),
     },
     execute: async () => {
-      const queue = new TimelineScreenshotQueueStore({ filePath: config.timelineScreenshotQueueFile });
-      const queued = queue.enqueue({
-        id: crypto.randomUUID(),
-        accountId: account.accountId,
-        senderId,
-        outputFile: options.outputFile,
-        args: options.forwardArgs,
-        createdAt: new Date().toISOString(),
+      const screenshot = await captureScreenshot(timelineConfig, runtimeOptions);
+      const delivery = await deliverFile(app, config, {
+        filePath: screenshot.outputFile,
+        senderId: options.user,
       });
-
       return {
         data: {
-          args: queued.args,
-          id: queued.id,
-          outputFile: queued.outputFile,
-          senderId: queued.senderId,
+          chatId: delivery.chatId,
+          deliveryMode: "current_host_delivery",
+          outputFile: screenshot.outputFile,
+          platform: delivery.platform,
+          selector: screenshot.selector,
+          senderId: options.user,
+          sessionId: delivery.sessionId,
+          sessionKey: delivery.sessionKey,
+          threadId: delivery.threadId,
+          url: screenshot.url,
+          width: screenshot.width,
+          height: screenshot.height,
         },
-        text: [
-          `timeline screenshot queued: ${queued.id}`,
-          "delivery_status: pending_bridge_send",
-        ].join("\n"),
+        text: hostMode.mode === "hosted"
+          ? `timeline screenshot sent via Hermes repo-local: ${screenshot.outputFile}`
+          : `timeline screenshot sent: ${screenshot.outputFile}`,
       };
     },
     idempotencyKey: options.idempotencyKey,
     request: {
       args: options.forwardArgs,
-      outputFile: options.outputFile,
-      senderId,
+      outputFile: runtimeOptions.outputFile,
+      send: true,
+      senderId: options.user,
     },
     resolvedTargets: {
-      queueFile: config.timelineScreenshotQueueFile,
-      senderId,
-      senderSource: senderResolution.source,
+      outputFile: runtimeOptions.outputFile,
+      selector: runtimeOptions.selector,
+      senderId: options.user || (hostMode.mode === "hosted" ? "(active-session)" : "(runtime-default)"),
     },
     sideEffects: [
       {
-        kind: "enqueue_timeline_screenshot",
-        target: config.timelineScreenshotQueueFile,
+        kind: "capture_timeline_screenshot",
+        target: runtimeOptions.outputFile,
+      },
+      {
+        kind: "send_wechat_file",
+        target: runtimeOptions.outputFile,
       },
     ],
   });
@@ -287,7 +253,7 @@ export {
   parseTimelineScreenshotArgs,
 };
 
-function buildHostedRuntimeArgs(options: TimelineScreenshotOptions): string[] {
+function buildRuntimeArgs(options: TimelineScreenshotOptions): string[] {
   const runtimeArgs = [...options.forwardArgs];
   if (options.outputFile) {
     runtimeArgs.push("--output", options.outputFile);

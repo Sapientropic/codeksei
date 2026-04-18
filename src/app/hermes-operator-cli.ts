@@ -2,7 +2,6 @@ import * as path from "node:path";
 
 import type { CommandExecutionResult } from "../contracts/cli-contract";
 import { getCommandArgsSchema } from "../contracts/command-args";
-import { SessionStore } from "../adapters/runtime/codex/session-store";
 import { parseCliArgs } from "../core/cli-args";
 import {
   buildTargetResolutionRequiredError,
@@ -34,6 +33,7 @@ import {
 } from "../core/hermes-repo-local";
 import { normalizeText } from "../core/text-normalization";
 import { syncHostedCheckinPlanSetViaHermes } from "../host/recipes/hermes/wake-forwarder";
+import { createSessionStore } from "../session/session-store-factory";
 
 interface HermesInstallSkillOptions {
   dryRun?: boolean;
@@ -291,7 +291,7 @@ export async function runHermesSyncCheckinCommand(
     config,
     explicitUser: options.user,
     explicitWorkspace: options.workspace,
-    sessionStore: config.sessionsFile ? new SessionStore({ filePath: config.sessionsFile }) : null,
+    sessionStore: createSessionStore(config.sessionsFile),
   });
   if (!resolution.ok || !resolution.value) {
     throw buildTargetResolutionRequiredError(
@@ -486,7 +486,7 @@ function resolveManagedCheckinSummary(
     config,
     explicitUser: options.user,
     explicitWorkspace: options.workspace,
-    sessionStore: config.sessionsFile ? new SessionStore({ filePath: config.sessionsFile }) : null,
+    sessionStore: createSessionStore(config.sessionsFile),
   });
   if (!resolution.ok || !resolution.value) {
     if (wantsExplicitTarget) {

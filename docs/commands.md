@@ -20,7 +20,7 @@
 
 - `Codex Mode` 下，Codeksei 自己托管 bridge / shared 线程
 - `Hosted Mode` 下，宿主控制命令交给 Hermes；Codeksei 主要暴露 timeline / diary / reminder / review / note / project radar / doctor / schema，并提供 Hermes operator 入口做 skill/status/smoke/sync-checkin
-- `channel send-file`、`timeline screenshot --send`、`reminder write` 已接上 Hermes repo-local 路径；`system send` 仍因缺少 backstage-only 宿主原语而保持 blocked
+- `channel send-file`、`timeline screenshot --send` 兼容 wrapper、`reminder write` 已接上 Hermes repo-local 路径；`system send` 仍因缺少 backstage-only 宿主原语而保持 blocked
 - `Hosted Mode` 下，Hermes 只执行受控 wake/recovery job set；Codeksei 继续持有 `tick -> ack -> complete` 的调度真相，并通过 `operator hermes sync-checkin` 把下一次 wake/recovery 重新 arm 给 Hermes
 - 外部宿主优先通过 `host attachment contract` 接入：`host manifest`、`host bootstrap`、`host doctor`、`host smoke`、`host seed-proactive`、`host claim-checkin`、`host settle-checkin`
 
@@ -232,6 +232,7 @@ operator / bootstrap：
 - `codeksei timeline build`
 - `codeksei timeline serve`
 - `codeksei timeline dev`
+- `codeksei timeline screenshot`
 - `codeksei timeline screenshot --send`
 
 平台前提、agent / MCP 接入顺序、结构化截图合同统一见 [timeline-integration.md](./timeline-integration.md)。
@@ -250,7 +251,8 @@ operator / bootstrap：
 - `timeline:write --stdin` 也要传完整 JSON 对象 `{"events":[...]}`，不要传裸数组
 - 不确定分类 id 时先跑 `timeline:categories`，改已有日程前先跑 `timeline:read`
 - 不带 offset 的本地时间按当前 runtime timezone 解释；如果 timeline state 已声明非 legacy timezone，会优先沿用它
-- 截图回微信统一走 `timeline:screenshot -- --send`；Codex Mode 下经本地截图队列，Hosted Mode 下经 Hermes repo-local send-back
+- `timeline screenshot` 默认只生成本地文件；需要回传当前聊天时再加 `--send`
+- 截图回微信时，Hosted Mode 下经 Hermes repo-local send-back；Codex Mode 下复用 bridge 的本地文件发送能力
 
 这一层更接近生活事实层，优先留下发生过什么。
 

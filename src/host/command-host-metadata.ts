@@ -171,16 +171,11 @@ const COMMAND_HOST_ACCESS_OVERRIDES = Object.freeze<Record<string, CommandHostAc
     enforceCurrentProfile: true,
   }),
   "timeline.screenshot": Object.freeze({
-    modeClasses: Object.freeze(["codex-managed", "hosted-proactive", "hosted-skill-only"] satisfies HostModeClass[]),
-    capabilities: Object.freeze([
-      "deliverVisibleFile",
-      "bridgeQueueAccess",
-      "contextTokenAccess",
-      "resolveHostedSession",
-    ] satisfies HostCapabilityId[]),
+    modeClasses: Object.freeze(["codex-managed", "hosted-proactive", "hosted-skill-only", "cli-only"] satisfies HostModeClass[]),
+    capabilities: Object.freeze(["invokeCodekseiAction"] satisfies HostCapabilityId[]),
     providerRecipes: Object.freeze(["hermes"] satisfies HostRecipeId[]),
-    supportTier: "hosted_ready",
-    enforceCurrentProfile: true,
+    supportTier: "host_neutral",
+    enforceCurrentProfile: false,
   }),
   "host.manifest": Object.freeze({
     modeClasses: Object.freeze(["cli-only"] satisfies HostModeClass[]),

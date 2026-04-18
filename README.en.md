@@ -277,11 +277,11 @@ CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION=2.1.8
 CODEKSEI_TIMEZONE=Asia/Shanghai
 CODEKSEI_TIMELINE_LOCALE=zh-CN
 CODEKSEI_DIARY_DIR=/absolute/path/to/your/vault/diary
-CODEKSEI_TIMELINE_STATE_DIR=/absolute/path/to/your/vault/.codex/timeline
+CODEKSEI_TIMELINE_STATE_DIR=/absolute/path/to/your/Codeksei-state-root
 CODEKSEI_WORKSPACE_BOOTSTRAP_CONFIG=/absolute/path/to/your/workspace-bootstrap.json
-CODEKSEI_PROJECT_RADAR_CONFIG=/absolute/path/to/your/workspace/.codex/code-projects.json
-CODEKSEI_DURABLE_NOTE_SCHEMA_CONFIG=/absolute/path/to/your/workspace/.codex/durable-note-schema.json
-CODEKSEI_REVIEW_SCHEMA_CONFIG=/absolute/path/to/your/workspace/.codex/review-schema.json
+CODEKSEI_PROJECT_RADAR_CONFIG=/absolute/path/to/your/workspace/.codeksei/code-projects.json
+CODEKSEI_DURABLE_NOTE_SCHEMA_CONFIG=/absolute/path/to/your/workspace/.codeksei/durable-note-schema.json
+CODEKSEI_REVIEW_SCHEMA_CONFIG=/absolute/path/to/your/workspace/.codeksei/review-schema.json
 CODEKSEI_SHARED_USE_BUNDLED_CODEX_BINARY=1
 CODEKSEI_SHARED_DISABLE_PLUGINS=0
 CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
@@ -311,6 +311,7 @@ Notes:
 - If you use multiple workspaces in shared mode, set `CODEKSEI_WORKSPACE_ROOT` before startup
 - `CODEKSEI_TIMEZONE` is optional; when set, it becomes the single local-time contract for reminder / diary / review / timeline flows
 - `CODEKSEI_TIMELINE_LOCALE` is optional; it currently switches timeline dashboard copy, date formatting, and demo data between `zh-CN` and `en`
+- workspace-scoped schema / radar auto-discovery now prefers `.codeksei/*`; legacy `.codex/*` paths still remain as compatibility fallback
 - `CODEKSEI_HERMES_REPO_ROOT` is optional; if the default sibling checkout `../hermes-agent` is not available in Hosted Mode, point it at the repo-local upstream checkout explicitly
 - The Hermes native cron-env passthrough patch now ships as an optional Codeksei asset; see [docs/hermes-cron-env-patch.md](./docs/hermes-cron-env-patch.md) for applicability and `git apply` usage
 - If `CODEKSEI_TIMEZONE` is unset, Codeksei first reuses any non-legacy timezone already declared by the timeline state; otherwise it falls back to the system timezone

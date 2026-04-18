@@ -1,4 +1,3 @@
-import { SessionStore } from "../adapters/runtime/codex/session-store";
 import { getCommandArgsSchema } from "../contracts/command-args";
 import type { CommandExecutionResult } from "../contracts/cli-contract";
 import { parseCliArgs } from "../core/cli-args";
@@ -6,6 +5,7 @@ import { buildTargetResolutionRequiredError } from "../core/cli-contract";
 import { buildTerminalLeafHelp } from "../core/command-registry";
 import type { AppRuntimeConfig } from "../core/app-service-contract";
 import { normalizeText } from "../core/text-normalization";
+import { createSessionStore } from "../session/session-store-factory";
 import {
   buildCheckinTargetResolutionErrorMessage,
   resolveCheckinTarget,
@@ -49,7 +49,7 @@ export async function runContextBriefingCommand(
     config,
     explicitUser: normalizeText(options.user),
     explicitWorkspace: normalizeText(options.workspace),
-    sessionStore: config.sessionsFile ? new SessionStore({ filePath: config.sessionsFile }) : null,
+    sessionStore: createSessionStore(config.sessionsFile),
   });
   if (!resolution.ok || !resolution.value) {
     throw buildTargetResolutionRequiredError(

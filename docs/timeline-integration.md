@@ -37,7 +37,8 @@
    - 刷新静态产物：`codeksei timeline build`
    - 稳定查看本地页面：`codeksei timeline serve`
    - 一边改一边看：`codeksei timeline dev`
-   - 导出图片：`codeksei timeline screenshot`
+   - 导出本地图片：`codeksei timeline screenshot`
+   - 截完后回传当前聊天：`codeksei timeline screenshot --send`
 
 约束：
 
@@ -73,6 +74,7 @@
 
 - 只要用户想看某个分类 / 明细的时间分布，优先 `analytics`
 - 只有明确要看事件卡片或事件列表时，才用 `events`
+- `timeline screenshot` 默认只生成本地文件；发送回聊天属于后置 delivery，不是 timeline 本体语义
 
 ## Agent And MCP Boundary
 

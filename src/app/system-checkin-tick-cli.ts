@@ -1,6 +1,5 @@
 import { getCommandArgsSchema } from "../contracts/command-args";
 import type { CommandExecutionResult } from "../contracts/cli-contract";
-import { SessionStore } from "../adapters/runtime/codex/session-store";
 import { parseCliArgs } from "../core/cli-args";
 import {
   buildTargetResolutionRequiredError,
@@ -15,6 +14,7 @@ import { buildTerminalLeafHelp } from "../core/command-registry";
 import type { AppRuntimeConfig } from "../core/app-service-contract";
 import { formatCheckinRange } from "../state/checkin-config";
 import { normalizeText } from "../core/text-normalization";
+import { createSessionStore } from "../session/session-store-factory";
 
 interface SystemCheckinTickOptions {
   ack: string;
@@ -52,7 +52,7 @@ export async function runSystemCheckinTickCommand(
     config,
     explicitUser: options.user,
     explicitWorkspace: options.workspace,
-    sessionStore: config.sessionsFile ? new SessionStore({ filePath: config.sessionsFile }) : null,
+    sessionStore: createSessionStore(config.sessionsFile),
   });
   if (!resolution.ok || !resolution.value) {
     throw buildTargetResolutionRequiredError(

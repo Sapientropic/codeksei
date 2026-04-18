@@ -5,6 +5,7 @@ import {
   resolveCrossPlatformPathFromRoot,
   resolvePackageRoot,
 } from "./path-utils";
+import { resolveWorkspaceScopedConfigFile } from "./workspace-config-paths";
 import {
   resolveHermesHomePath,
   resolveHermesRepoLocalShimPath,
@@ -138,11 +139,11 @@ function parseEnvConfig(env: EnvSource, options: ReadConfigOptions = {}): AppRun
       workspaceBootstrapConfigFile: readPrefixedEnv(env, "WORKSPACE_BOOTSTRAP_CONFIG")
         || path.join(stateDir, "workspace-bootstrap.json"),
       projectRadarConfigFile: readPrefixedEnv(env, "PROJECT_RADAR_CONFIG")
-        || resolveCrossPlatformPathFromRoot(workspaceRoot, ".codex", "code-projects.json"),
+        || resolveWorkspaceScopedConfigFile(workspaceRoot, "code-projects.json"),
       durableNoteSchemaConfigFile: readPrefixedEnv(env, "DURABLE_NOTE_SCHEMA_CONFIG")
-        || resolveCrossPlatformPathFromRoot(workspaceRoot, ".codex", "durable-note-schema.json"),
+        || resolveWorkspaceScopedConfigFile(workspaceRoot, "durable-note-schema.json"),
       reviewSchemaConfigFile: readPrefixedEnv(env, "REVIEW_SCHEMA_CONFIG")
-        || resolveCrossPlatformPathFromRoot(workspaceRoot, ".codex", "review-schema.json"),
+        || resolveWorkspaceScopedConfigFile(workspaceRoot, "review-schema.json"),
       reviewSemanticMode: readPrefixedEnv(env, "REVIEW_SEMANTIC_MODE") || "hybrid",
       reviewSemanticHost: normalizeReviewSemanticHost(readPrefixedEnv(env, "REVIEW_SEMANTIC_HOST")),
       reviewSemanticModel: readPrefixedEnv(env, "REVIEW_SEMANTIC_MODEL") || "",
