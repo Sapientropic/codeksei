@@ -40,7 +40,6 @@ function assertSharedReadmeCliContract(doc: string, name: string) {
   assert.ok(doc.includes(buildTerminalEntryUsage("host.settle_checkin", "public")), `${name} should mention host settle-checkin`);
   assert.ok(doc.includes("codeksei system checkin-trigger"), `${name} should mention checkin-trigger`);
   assert.ok(doc.includes("codeksei system checkin-complete"), `${name} should mention checkin-complete`);
-  assert.ok(doc.includes("codeksei operator hermes sync-checkin"), `${name} should mention hermes sync-checkin`);
   assert.ok(doc.includes(buildTerminalEntryUsage("app.shared_start", "repo")), `${name} should keep repo shared:start`);
   assert.ok(doc.includes("./docs/timeline-integration.md"), `${name} should link timeline integration docs`);
   assert.ok(doc.includes("CODEKSEI_TIMELINE_LOCALE"), `${name} should mention timeline locale`);
@@ -80,18 +79,21 @@ test("docs/commands keeps public CLI examples aligned with the terminal usage so
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("system.checkin_trigger", "public")));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("system.checkin_tick", "public")));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("system.checkin_complete", "public")));
-  assert.ok(commandsDoc.includes(buildTerminalEntryUsage("operator.hermes.sync_checkin", "public")));
   assert.ok(commandsDoc.includes(buildTerminalActionExample("review.weekly", { audience: "public", includeArgs: false })));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("app.shared_status", "repo")));
   assert.ok(commandsDoc.includes("./timeline-integration.md"));
-  assert.match(commandsDoc, /--delivery proactive/u);
+  assert.doesNotMatch(commandsDoc, /sync-checkin/u);
+  assert.doesNotMatch(commandsDoc, /--delivery proactive/u);
+  assert.doesNotMatch(commandsDoc, /--ensure-daemon/u);
   assert.doesNotMatch(commandsDoc, /--sleep-for 6h/u);
 });
 
-test("public docs remove fixed 6h checkin anchors and mention proactive reminder delivery", () => {
+test("public docs remove fixed 6h anchors and stale proactive/bootstrap compatibility flags", () => {
   for (const { name, content } of readmeDocs) {
     assert.doesNotMatch(content, /--sleep-for 6h/u, `${name} should not anchor hosted checkins to 6h`);
-    assert.match(content, /delivery proactive/u, `${name} should mention proactive reminder delivery`);
+    assert.doesNotMatch(content, /delivery proactive/u, `${name} should not mention removed proactive reminder flag`);
+    assert.doesNotMatch(content, /sync-checkin/u, `${name} should not mention removed sync-checkin surface`);
+    assert.doesNotMatch(content, /--ensure-daemon/u, `${name} should not mention removed ensure-daemon flag`);
   }
 });
 

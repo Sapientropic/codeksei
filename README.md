@@ -47,7 +47,7 @@
 
 ```bash
 npx -y codeksei@latest host manifest
-npx -y codeksei@latest host bootstrap --provider hermes --ensure-daemon
+npx -y codeksei@latest host bootstrap --provider hermes
 npx -y codeksei@latest host doctor --provider hermes
 npx -y codeksei@latest host smoke --provider hermes
 ```
@@ -161,7 +161,7 @@ npm run shared:status
 
 ```bash
 codeksei host manifest
-codeksei host bootstrap --provider hermes --ensure-daemon
+codeksei host bootstrap --provider hermes
 codeksei host doctor --provider hermes
 codeksei host smoke --provider hermes
 ```
@@ -198,7 +198,7 @@ codeksei host smoke --provider hermes
 - `Onboarding`：首次激活不走表单，而是走聊天式访谈。长期真相写进 companion note，再由 context board 投影给宿主；没有 Obsidian / workspace schema 时也能自动回退到本地 state-dir 下的 companion profile
 - `Companion memory`：首访之后也会继续更新。只要用户新的自述、纠正、支持偏好、边界或近线任务会影响后续陪伴判断，就可以走 `companion remember` 这条 ongoing memory 主链，而不是把变化只留在宿主聊天记忆里
 - `Context board`：主动判断用的受控上下文层。它把 checkin state、今天事实、活跃线头、注意事项和重入入口收口到一份 prompt-ready briefing；Hosted Mode 下每次 cron 运行前都会现读最新 board，而不是盲扫原始 vault 文件
-- `Reminders`：提醒写入与调度，给生活节奏和待办推进一个外部支点。Hosted Mode 下默认是用户可见提醒；若要把内部后续跟进改成未来 proactive 唤醒，用 `reminder write --delivery proactive`
+- `Reminders`：提醒写入与调度，给生活节奏和待办推进一个外部支点。Hosted Mode 下默认会把用户可见提醒绑定回当前 origin chat；未来 proactive 唤醒统一走 hosted check-in 主链
 - `Review`：nightly / weekly / monthly，把日常记录压成更稳定的节奏校准与复盘材料
 - `Project support`：workspace bootstrap、project radar、按 workspace 恢复共享线程。项目切走再回来时，不用先把整条线在脑子里重建一遍；本地 git 仍是第一真相，只有 repo 缺失或不是 git repo 时才回退到 GitHub activity continuity signal
 - `WeChat bridge`
@@ -354,7 +354,7 @@ codeksei doctor
 codeksei help
 codeksei schema
 codeksei host manifest
-codeksei host bootstrap --provider hermes --ensure-daemon
+codeksei host bootstrap --provider hermes
 codeksei host doctor
 codeksei host smoke --provider hermes
 codeksei companion remember --user <wechat_user_id> --workspace /absolute/workspace --source host_user_turn --stdin
@@ -409,7 +409,6 @@ codeksei system checkin-trigger --user <wechat_user_id> --workspace /absolute/wo
 codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace
 codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace --ack <triggerId>
 codeksei system checkin-complete --user <wechat_user_id> --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for <duration>
-codeksei operator hermes sync-checkin --user <wechat_user_id> --workspace /absolute/workspace
 codeksei context briefing --user <wechat_user_id> --workspace /absolute/workspace --mode review
 ```
 

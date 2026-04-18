@@ -51,7 +51,7 @@
 - [ ] 把公开文案和宿主 UI 里的 `Bridge Mode` / `Hermes Hosted Mode` 统一改成 `Codex Mode` / `Hosted Mode`。
 - [ ] 如果宿主之前会直接调 `shared:*` 或微信脚本，确认它们只在 `Codex Mode + codeksei/weixin` 下使用；Hosted Mode 和其他 host-managed channel 需要走宿主自己的 bridge / gateway。
 - [ ] 先跑一次 `codeksei host doctor --provider hermes`，确认当前安装是否需要重新 bootstrap 或重装 skill。
-- [ ] 如果 `host doctor` 返回 `bootstrap_required: yes`，执行 `codeksei host bootstrap --provider hermes --ensure-daemon`。
+- [ ] 如果 `host doctor` 返回 `bootstrap_required: yes`，执行 `codeksei host bootstrap --provider hermes`。
 - [ ] 如果 `host doctor` 返回 `skill_reinstall_required: yes`，执行 `codeksei operator hermes install-skill`。
 - [ ] 如果宿主之前只缓存了命令清单，改为读取 `codeksei host manifest --format json`，并消费其中的 `recommendedWorkflows` 与 `entrypoints`。
 - [ ] 把“新用户 / 薄画像”默认链路改成 `onboarding status -> onboarding start|step`，不要再假设已有 companion profile。
@@ -81,7 +81,7 @@
 
 ### Host / Installer Checklist
 
-- [ ] Windows 宿主如果已经在 `0.4.0` 上生成过模板、skill 或 attach 资产，建议重新跑一次 `codeksei host bootstrap --provider hermes --ensure-daemon`。
+- [ ] Windows 宿主如果已经在 `0.4.0` 上生成过模板、skill 或 attach 资产，建议重新跑一次 `codeksei host bootstrap --provider hermes`。
 - [ ] 跑一次 `codeksei host doctor --provider hermes`，确认 bootstrap 快照与当前 repo 合同一致。
 - [ ] 如果之前看到的是纯换行噪音或模板 diff 异常，升级后优先确认这些症状是否已经消失，再继续追更深层问题。
 
@@ -118,7 +118,7 @@
 ### Host / Installer Checklist
 
 - [ ] 把默认接法切到 `codeksei host manifest`，不要再从 README prose 或仓库内部脚本反推接入流程。
-- [ ] 至少顺序跑一遍 `codeksei host bootstrap --provider hermes --ensure-daemon`、`codeksei host doctor --provider hermes`、`codeksei host smoke --provider hermes`。
+- [ ] 至少顺序跑一遍 `codeksei host bootstrap --provider hermes`、`codeksei host doctor --provider hermes`、`codeksei host smoke --provider hermes`。
 - [ ] 如果宿主自己维护 workspace/bootstrap 路径拼接，确认已经跟 `host bootstrap` 的 targeting 行为对齐。
 - [ ] 如果你依赖 repo-local Hermes bridge 或 hosted one-shot checkin，升级后重新 smoke 这些路径，不要假设旧 env loading 或调度脚本仍然完全兼容。
 

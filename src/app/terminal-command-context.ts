@@ -40,7 +40,7 @@ export function createTerminalCommandContext(
   // clean environment. Rehydrate their CODEKSEI_* defaults from the canonical
   // workspace config before the second env pass so state-dir .env and hosted
   // runtime flags come back without leaking hosted user defaults into unrelated
-  // bridge commands like `system send`.
+  // bridge-only commands.
   if (shouldApplyHostedConfigFallback(manifest)) {
     applyHostConfigEnvFallback(process.env, bootstrapCwd);
   }
@@ -119,10 +119,8 @@ const HOSTED_CONFIG_FALLBACK_ACTIONS = new Set<string>([
   "host.seed_proactive",
   "host.claim_checkin",
   "host.settle_checkin",
-  "operator.hermes.sync_checkin",
   "system.checkin_config",
   "system.checkin_trigger",
   "system.checkin_tick",
   "system.checkin_complete",
-  "system.checkin_poller",
 ]);

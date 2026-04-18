@@ -39,6 +39,9 @@ const {
   buildTerminalLeafHelp,
   buildTerminalTopicHelp,
 } = require("../src/core/command-registry");
+const {
+  getCommandArgsSchema,
+} = require("../src/contracts/command-args");
 
 test("terminal manifest declares unique command keys", () => {
   const manifest = listTerminalCommandManifest();
@@ -52,11 +55,14 @@ test("command surface can resolve routed terminal commands from a single manifes
   assert.equal(findTerminalCommandManifest("timeline", "screenshot")?.runner, "timeline.screenshot");
   assert.equal(findTerminalCommandManifest("review", "weekly")?.argsSchemaKey, "review");
   assert.equal(findTerminalCommandManifest("operator", "hermes install-skill")?.action, "operator.hermes.install_skill");
-  assert.equal(findTerminalCommandManifest("operator", "hermes sync-checkin")?.action, "operator.hermes.sync_checkin");
   assert.equal(findTerminalCommandManifestFromArgv(["operator", "hermes", "status"])?.action, "operator.hermes.status");
   assert.equal(findTerminalManifestByScriptName("note:auto")?.action, "note.auto");
   assert.equal(findTerminalCommandManifest(" NOTE ", " AUTO ")?.action, "note.auto");
   assert.equal(findTerminalManifestByScriptName(" Note:Auto ")?.action, "note.auto");
+});
+
+test("removed operator sync-checkin arg schema no longer exists", () => {
+  assert.equal(getCommandArgsSchema("hermesSyncCheckin"), null);
 });
 
 test("command surface groups still expose terminal and weixin help entries", () => {
@@ -121,11 +127,9 @@ test("package scripts keep runtime entrypoints aligned with the published-runtim
     "review:monthly": buildNodeRuntimeInvocation("cli", ["review", "monthly"]),
     "reminder:write": buildNodeRuntimeInvocation("cli", ["reminder", "write"]),
     "diary:write": buildNodeRuntimeInvocation("cli", ["diary", "write"]),
-    "system:send": buildNodeRuntimeInvocation("cli", ["system", "send"]),
     "system:checkin-trigger": buildNodeRuntimeInvocation("cli", ["system", "checkin-trigger"]),
     "system:checkin-tick": buildNodeRuntimeInvocation("cli", ["system", "checkin-tick"]),
     "system:checkin-complete": buildNodeRuntimeInvocation("cli", ["system", "checkin-complete"]),
-    "system:checkin": buildNodeRuntimeInvocation("cli", ["system", "checkin-poller"]),
     "timeline:event": buildNodeRuntimeInvocation("cli", ["timeline", "event"]),
     "timeline:write": buildNodeRuntimeInvocation("cli", ["timeline", "write"]),
     "timeline:read": buildNodeRuntimeInvocation("cli", ["timeline", "read"]),

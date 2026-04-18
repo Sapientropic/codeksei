@@ -291,8 +291,8 @@
 - Hosted Mode 的 repo-local send-back / cron 现在通过 Codeksei 自己的薄 Python shim 对接 sibling `hermes-agent` checkout，不在 TS 里重写 Weixin/CDN/context_token/cron 细节
 - Hosted proactive cron 的 handoff context 现在由 `context briefing` + Hermes pre-run `script` 提供；稳定状态、今天事实和重入入口先在 Codeksei 内部收口成 board，再交给宿主消费
 - review hybrid 现在由宿主策略层选择 semantic host：Codex Mode 默认走 Codex，Hosted Mode 默认走 Hermes，文件路由与落盘逻辑仍保留在 Codeksei 自己手里
-- checkin 现在按 host-neutral core 收口：`system checkin-trigger` 提供 one-shot payload，`system checkin-tick` / `system checkin-complete` 维护调度真相；Hosted Mode 通过 `operator hermes sync-checkin` + repo-local shim 只保留一个未来 wake 或 recovery one-shot job，运行时 delivery 直接读持久化的 `job.origin`，`system checkin-poller` 退回 codex-mode-only wrapper
-- 对外公开给宿主时，`host seed-proactive / claim-checkin / settle-checkin` 只是在现有 scheduler 真相外面包一层 delegated execution lease；不要把它误读成第二套 scheduler
+- checkin 现在按 host-neutral core 收口：`system checkin-trigger` 提供 one-shot payload，`system checkin-tick` / `system checkin-complete` 维护调度真相；Hosted Mode 对外默认通过 `host seed-proactive / claim-checkin / settle-checkin` 交出 delegated execution lease，内部再通过 repo-local shim 维护未来 wake/recovery one-shot job
+- `system checkin-poller` 仍是 codex-mode-only 内部 wrapper；对外公开给宿主时，不再把它暴露成第二套 scheduler 入口
 - project radar 现在保持“本地 git 真相优先”，只有 git unavailable 时才补 GitHub activity fallback
 
 架构保护规则默认守住：
@@ -325,7 +325,7 @@ Hosted Mode 下，这里不再承接 reminder queue 的主真相：
 
 - reminder 改走 Hermes cron/jobs
 - channel send-file 直接走 Hermes repo-local origin delivery
-- `system send` 仍保留 bridge-only backstage queue 语义
+- bridge-only backstage queue 语义仍由内部 `system message queue` owner 保留，但不再暴露 `system send` public CLI
 
 如果用户单独指定 `CODEKSEI_DIARY_DIR` / `CODEKSEI_TIMELINE_STATE_DIR`，业务数据会写到外部目录，状态目录保留运行态文件。
 

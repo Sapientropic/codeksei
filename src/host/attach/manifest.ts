@@ -33,7 +33,7 @@ export function buildHostEntrypointManifest({
   const providerArgs = ["--provider", defaultProvider];
   return {
     manifest: ["codeksei", "host", "manifest", "--format", "json"],
-    bootstrap: ["codeksei", "host", "bootstrap", ...providerArgs, "--ensure-daemon", "--format", "json"],
+    bootstrap: ["codeksei", "host", "bootstrap", ...providerArgs, "--format", "json"],
     doctor: ["codeksei", "host", "doctor", ...providerArgs, "--format", "json"],
     smoke: ["codeksei", "host", "smoke", ...providerArgs, "--format", "json"],
     seedProactive: ["codeksei", "host", "seed-proactive", ...providerArgs, "--format", "json"],

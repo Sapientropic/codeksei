@@ -19,7 +19,6 @@ interface HostBootstrapOptions {
   channel: string;
   config: string;
   dryRun: boolean;
-  ensureDaemon: boolean;
   help: boolean;
   idempotencyKey: string;
   modeClass: string;
@@ -36,7 +35,6 @@ interface HostBootstrapResultData {
   config: CodekseiHostConfig;
   daemon: {
     required: true;
-    ensured: boolean;
     state: string;
   };
   provider: string;
@@ -76,7 +74,6 @@ export async function runHostBootstrapCommand(
         config: nextConfig,
         daemon: {
           required: true,
-          ensured: Boolean(options.ensureDaemon),
           state: "local_cli_ready",
         },
         provider: bootstrapTarget.provider,
@@ -87,7 +84,6 @@ export async function runHostBootstrapCommand(
       text: JSON.stringify({
         config: nextConfig,
         provider: bootstrapTarget.provider,
-        ensureDaemon: Boolean(options.ensureDaemon),
       }, null, 2),
       next: bootstrapTarget.provider === "hermes"
         ? ["codeksei host doctor --provider hermes", "codeksei host smoke --provider hermes"]
@@ -103,7 +99,6 @@ export async function runHostBootstrapCommand(
           config: written,
           daemon: {
             required: true,
-            ensured: Boolean(options.ensureDaemon),
             state: "local_cli_ready",
           },
           provider: bootstrapTarget.provider,
@@ -113,7 +108,7 @@ export async function runHostBootstrapCommand(
           `host bootstrap written: ${bootstrapTarget.configFilePath}`,
           `provider: ${bootstrapTarget.provider}`,
           `modeClass: ${written.modeClass}`,
-          `ensureDaemon: ${options.ensureDaemon ? "yes" : "no"}`,
+          `daemonState: local_cli_ready`,
         ].join("\n"),
         next: bootstrapTarget.provider === "hermes"
           ? ["codeksei host doctor --provider hermes", "codeksei host smoke --provider hermes"]
@@ -123,7 +118,6 @@ export async function runHostBootstrapCommand(
     idempotencyKey: options.idempotencyKey,
     request: {
       config: nextConfig,
-      ensureDaemon: Boolean(options.ensureDaemon),
       provider: bootstrapTarget.provider,
     },
     resolvedTargets: {

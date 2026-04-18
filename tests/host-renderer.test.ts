@@ -28,7 +28,6 @@ test("Hermes companion skill template stays generated from the renderer truth", 
   assert.match(rendered, /context briefing/u);
   assert.match(rendered, /## Default Routing/u);
   assert.match(rendered, /onboarding status/u);
-  assert.match(rendered, /operator hermes sync-checkin/u);
 });
 
 test("hostkit static assets stay shipped at the repo root", () => {
@@ -51,7 +50,7 @@ test("hostkit static asset stays round-tripped from the hosted-first renderer tr
   assert.equal(hostkit.hostIdentity.profile, "hosted-mode");
   assert.equal(hostkit.hostIdentity.runtimeProvider, "hermes");
   assert.equal(hostkit.hostIdentity.deliveryRecipe, "hermes-origin");
-  assert.deepEqual(hostkit.entrypoints.bootstrap, ["codeksei", "host", "bootstrap", "--provider", "hermes", "--ensure-daemon", "--format", "json"]);
+  assert.deepEqual(hostkit.entrypoints.bootstrap, ["codeksei", "host", "bootstrap", "--provider", "hermes", "--format", "json"]);
   assert.deepEqual(hostkit.entrypoints.claimCheckin, ["codeksei", "host", "claim-checkin", "--provider", "hermes", "--format", "json"]);
   assert.deepEqual(hostkit.entrypoints.settleCheckin, ["codeksei", "host", "settle-checkin", "--provider", "hermes", "--format", "json"]);
   assert.equal(hostkit.recommendedWorkflows.some((entry: { id: string }) => entry.id === "first_activation_onboarding"), true);

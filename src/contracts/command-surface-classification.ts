@@ -29,10 +29,8 @@ export const COMMAND_AUDIENCE_OVERRIDES = {
   "operator.hermes.install_skill": "operator",
   "operator.hermes.smoke": "operator",
   "operator.hermes.status": "operator",
-  "operator.hermes.sync_checkin": "operator",
   "operator.help": "operator",
   "operator.schema": "operator",
-  "system.checkin_poller": "operator",
 } as const satisfies Record<string, CommandAudienceDefinition>;
 
 export const COMMAND_SAFETY_OVERRIDES = {
@@ -65,7 +63,6 @@ export const COMMAND_SAFETY_OVERRIDES = {
   "operator.hermes.install_skill": "operator",
   "operator.hermes.smoke": "operator",
   "operator.hermes.status": "operator",
-  "operator.hermes.sync_checkin": "operator",
   "operator.help": "operator",
   "operator.schema": "operator",
   "project.radar": "open",
@@ -77,8 +74,6 @@ export const COMMAND_SAFETY_OVERRIDES = {
   "system.checkin_complete": "warned",
   "system.checkin_tick": "warned",
   "system.checkin_trigger": "open",
-  "system.checkin_poller": "operator",
-  "system.send": "warned",
   "timeline.build": "open",
   "timeline.categories": "open",
   "timeline.dev": "open",
@@ -124,7 +119,6 @@ export const COMMAND_MUTABILITY_OVERRIDES = {
   "operator.hermes.install_skill": "write",
   "operator.hermes.smoke": "read",
   "operator.hermes.status": "read",
-  "operator.hermes.sync_checkin": "write",
   "operator.help": "read",
   "operator.schema": "read",
   "project.radar": "read",
@@ -136,8 +130,6 @@ export const COMMAND_MUTABILITY_OVERRIDES = {
   "system.checkin_complete": "write",
   "system.checkin_tick": "write",
   "system.checkin_trigger": "read",
-  "system.checkin_poller": "long_running",
-  "system.send": "write",
   "timeline.build": "read",
   "timeline.categories": "read",
   "timeline.dev": "long_running",
@@ -159,7 +151,6 @@ export const COMMAND_AUTH_OVERRIDES = {
   "app.start": "runtime_bootstrap",
   "channel.send_file": "runtime_bootstrap",
   "reminder.create": "context_token",
-  "system.send": "context_token",
   "timeline.screenshot": "none",
 } as const satisfies Record<string, CommandAuthRequirementDefinition>;
 

@@ -191,15 +191,6 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       COMMON_HELP_FLAG,
     ],
   }),
-  hermesSyncCheckin: createCommandArgSchema({
-    flags: [
-      COMMON_HELP_FLAG,
-      COMMON_DRY_RUN_FLAG,
-      COMMON_IDEMPOTENCY_FLAG,
-      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id；没传时尝试唯一稳定默认值或当前 active session" },
-      { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "显式绝对 workspace 路径；没传时尝试唯一稳定默认值" },
-    ],
-  }),
   hostManifest: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,
@@ -220,7 +211,6 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "name", keys: ["--name"], type: "string", defaultValue: "", description: "canonical config 里的 user.name" },
       { name: "timezone", keys: ["--timezone"], type: "string", defaultValue: "", description: "canonical config 里的 user.timezone" },
       { name: "channel", keys: ["--channel"], type: "string", defaultValue: "", description: "canonical config 里的 host.channel" },
-      { name: "ensureDaemon", keys: ["--ensure-daemon"], type: "boolean", defaultValue: false, description: "把 daemon-first 前提写进 bootstrap 结果；当前 v1 为本地 CLI/state owner readiness" },
     ],
   }),
   hostDoctor: createCommandArgSchema({
@@ -296,7 +286,6 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "delay", keys: ["--delay"], type: "string", defaultValue: "", description: "相对延迟，如 30m / 2h / 1d" },
       { name: "at", keys: ["--at"], type: "string", defaultValue: "", description: "绝对时间，按当前 timezone 解释本地时间" },
       { name: "text", keys: ["--text"], type: "string", defaultValue: "", description: "提醒正文" },
-      { name: "delivery", keys: ["--delivery"], type: "string", defaultValue: "direct", description: "direct|proactive；Hosted Mode 下 proactive 会改成未来 proactive 唤醒" },
       { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id" },
       { name: "useStdin", keys: ["--stdin"], type: "boolean", defaultValue: false, description: "从标准输入读取正文" },
     ],
@@ -312,16 +301,6 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "week", keys: ["--week"], type: "string", defaultValue: "", placeholder: "YYYY-Www", description: "显式周标签" },
       { name: "month", keys: ["--month"], type: "string", defaultValue: "", placeholder: "YYYY-MM", description: "显式月标签" },
       { name: "model", keys: ["--model"], type: "string", defaultValue: "", description: "覆盖 hybrid 语义提炼模型" },
-    ],
-  }),
-  systemSend: createCommandArgSchema({
-    flags: [
-      COMMON_HELP_FLAG,
-      COMMON_DRY_RUN_FLAG,
-      COMMON_IDEMPOTENCY_FLAG,
-      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id" },
-      { name: "text", keys: ["--text"], type: "string", defaultValue: "", required: true, description: "系统触发消息正文" },
-      { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "显式绝对 workspace 路径；没传时尝试唯一稳定默认值" },
     ],
   }),
   systemCheckinConfig: createCommandArgSchema({

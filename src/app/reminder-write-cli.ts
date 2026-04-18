@@ -2,7 +2,6 @@ import { normalizeText } from "../core/text-normalization";
 import * as crypto from "node:crypto";
 import * as path from "node:path";
 
-import { rememberCompanionMemory } from "../companion-memory/remember";
 import {
   resolveSelectedAccount,
   type WeixinAccountConfig,
@@ -15,7 +14,6 @@ import { parseCliArgs } from "../core/cli-args";
 import {
   buildAuthRequiredError,
   buildTargetResolutionRequiredError,
-  buildUnsupportedHostCapabilityError,
 } from "../core/cli-contract";
 import { runCliMutation } from "../core/cli-mutation";
 import {
@@ -24,17 +22,12 @@ import {
 } from "../core/hermes-repo-local";
 import { resolveHostMode } from "../core/host-mode";
 import {
-  buildCheckinTargetResolutionErrorMessage,
-  resolveCheckinTarget,
-} from "../checkin";
-import {
   LEGACY_TIMELINE_TIMEZONE,
   coerceLocalDateTimeToIso,
 } from "../core/timezone";
 import { parseCompactDurationMs } from "../core/duration";
 import { ReminderQueueStore } from "../state/reminder-queue-store";
 import { inspectPreferredSenderId } from "../workspace/default-targets";
-import { seedProactiveCheckin } from "../host/delegation/seed-proactive";
 import { createSessionStore } from "../session/session-store-factory";
 
 export interface ReminderWriteConfig extends WeixinAccountConfig, Pick<
@@ -59,7 +52,6 @@ export interface ReminderWriteConfig extends WeixinAccountConfig, Pick<
 }
 
 interface ReminderWriteOptions extends Record<string, unknown> {
-  delivery?: unknown;
   dryRun?: boolean;
   help?: boolean;
   idempotencyKey?: string;
@@ -71,7 +63,7 @@ interface ReminderWriteOptions extends Record<string, unknown> {
 }
 
 interface HostedReminderWriteDryRunData {
-  deliveryMode: "hermes_proactive_checkin" | "hermes_repo_local_origin";
+  deliveryMode: "hermes_repo_local_origin";
   dueAtIso: string;
   dueAtMs: number;
   senderId: string;
@@ -91,22 +83,6 @@ interface HostedReminderWriteDirectResultData {
   threadId: string;
 }
 
-interface HostedReminderWriteProactiveResultData {
-  deliveryMode: "hermes_proactive_checkin";
-  dueAtMs: number;
-  nextWakeAt: string;
-  removedJobIds: string[];
-  status: string;
-  syncJobs: Array<{
-    created: boolean;
-    jobId: string;
-    nextRunAt: string;
-    role: "recovery" | "wake";
-  }>;
-  text: string;
-  workspaceRoot: string;
-}
-
 interface BridgeReminderWriteDryRunData {
   dueAtMs: number;
   deliveryMode: "bridge_local_queue";
@@ -121,8 +97,6 @@ interface BridgeReminderWriteResultData {
   senderId: string;
   text: string;
 }
-
-type ReminderDeliveryMode = "direct" | "proactive";
 
 async function runReminderWriteCommand(
   config: ReminderWriteConfig,
@@ -148,135 +122,10 @@ async function runReminderWriteCommand(
     );
   }
   const hostMode = resolveHostMode(config);
-  const deliveryMode = resolveDeliveryMode(options.delivery);
-  if (deliveryMode === "proactive" && hostMode.mode !== "hosted") {
-    throw buildUnsupportedHostCapabilityError(
-      "reminder write --delivery proactive 只支持 Hosted Mode",
-      {
-        delivery: deliveryMode,
-        hostProfile: hostMode.profile,
-      },
-      "切到 Hosted Mode，或移除 --delivery proactive 后改用普通用户提醒。"
-    );
-  }
   if (hostMode.mode === "hosted") {
     const dueAtIso = new Date(dueAtMs).toISOString();
     const workspaceRoot = normalizeText(config.workspaceRoot) || process.cwd();
     const jobsFile = path.join(resolveHermesHomePath(config), "cron", "jobs.json");
-    if (deliveryMode === "proactive") {
-      const targetConfig: Partial<Pick<AppRuntimeConfig, "allowedUserIds" | "workspaceRoot">> = {
-        workspaceRoot,
-      };
-      if (Array.isArray(config.allowedUserIds)) {
-        targetConfig.allowedUserIds = config.allowedUserIds;
-      }
-      const targetResolution = resolveCheckinTarget({
-        accountId: normalizeText(config.accountId),
-        config: targetConfig,
-        explicitUser: normalizeText(options.user),
-        sessionStore: createSessionStore(config.sessionsFile),
-      });
-      if (!targetResolution.ok || !targetResolution.value) {
-        throw buildTargetResolutionRequiredError(
-          buildCheckinTargetResolutionErrorMessage(targetResolution),
-          {
-            senderCandidates: targetResolution.senderResolution.candidates,
-            senderSource: targetResolution.senderResolution.source,
-            workspaceCandidates: targetResolution.workspaceResolution.candidates,
-            workspaceSource: targetResolution.workspaceResolution.source,
-          },
-          "显式传 --user，或把唯一稳定 workspace/sender 默认值写进配置。"
-        );
-      }
-      const target = targetResolution.value;
-      return runCliMutation<
-        HostedReminderWriteDryRunData | HostedReminderWriteProactiveResultData
-      >({
-        commandKey: "reminder.write",
-        config,
-        configSource: {
-          hermesHome: resolveHermesHomePath(config),
-          timezone,
-          workspaceRoot: target.workspaceRoot,
-        },
-        dryRun: Boolean(options.dryRun),
-        dryRunResult: {
-          data: {
-            deliveryMode: "hermes_proactive_checkin",
-            dueAtIso,
-            dueAtMs,
-            senderId: target.senderId,
-            text: body,
-            workspaceRoot: target.workspaceRoot,
-          },
-          text: [
-            "reminder dry-run",
-            "delivery: hermes_proactive_checkin",
-            `dueAt: ${dueAtIso}`,
-            `sender: ${target.senderId}`,
-            `workspace: ${target.workspaceRoot}`,
-          ].join("\n"),
-        },
-        execute: async () => {
-          const seeded = seedProactiveCheckin(config, target, {
-            followupContext: body,
-            nextWakeAt: dueAtIso,
-            provider: "hermes",
-          });
-          await rememberCompanionMemory(config, {
-            options: {
-              delivery: "proactive",
-              dueAtIso,
-            },
-            refreshBoard: false,
-            source: "reminder_proactive",
-            text: body,
-            userId: target.senderId,
-            workspaceRoot: target.workspaceRoot,
-          });
-          return {
-            data: {
-              deliveryMode: "hermes_proactive_checkin",
-              dueAtMs,
-              nextWakeAt: seeded.nextWakeAt,
-              removedJobIds: seeded.sync?.removedJobIds || [],
-              status: seeded.status,
-              syncJobs: (seeded.sync?.jobs || []).map((job) => ({
-                created: job.created,
-                jobId: job.jobId,
-                nextRunAt: job.nextRunAt,
-                role: job.role,
-              })),
-              text: body,
-              workspaceRoot: target.workspaceRoot,
-            },
-            text: `reminder scheduled as proactive wake: ${seeded.nextWakeAt}`,
-          };
-        },
-        idempotencyKey: normalizeText(options.idempotencyKey),
-        request: {
-          at: options.at,
-          delay: options.delay,
-          deliveryMode: "hermes_proactive_checkin",
-          dueAtIso,
-          senderId: target.senderId,
-          text: body,
-          workspaceRoot: target.workspaceRoot,
-        },
-        resolvedTargets: {
-          jobsFile,
-          senderId: target.senderId,
-          workspaceRoot: target.workspaceRoot,
-        },
-        sideEffects: [
-          {
-            kind: "seed_proactive_wake",
-            target: jobsFile,
-          },
-        ],
-      });
-    }
-
     return runCliMutation<
       HostedReminderWriteDryRunData | HostedReminderWriteDirectResultData
     >({
@@ -520,17 +369,6 @@ function normalizeBody(value: unknown): string {
   return String(value || "").replace(/\r\n/g, "\n").trim();
 }
 
-function resolveDeliveryMode(value: unknown): ReminderDeliveryMode {
-  const normalized = normalizeText(value).toLowerCase();
-  if (!normalized || normalized === "direct") {
-    return "direct";
-  }
-  if (normalized === "proactive") {
-    return "proactive";
-  }
-  throw new Error(`不支持的 reminder delivery: ${String(value || "")}`);
-}
-
 function buildAbsoluteTimeExample(timezone: string = LEGACY_TIMELINE_TIMEZONE): string {
   const explicit = normalizeAbsoluteTimeString("2026-04-07 21:30", timezone);
   return `${explicit || "2026-04-07T21:30+08:00"} 或 2026-04-07 21:30（后者按当前 timezone 解释）`;
@@ -546,8 +384,8 @@ function buildReminderWriteHelp(timezone: string): string {
     "  或: codeksei reminder write --at 2026-04-07 21:30 --text \"提醒内容\"",
     "",
     "说明：",
-    "  默认 --delivery direct：创建用户可见提醒。",
-    "  Hosted Mode 下可用 --delivery proactive，把这条提醒改写成一次未来 proactive 唤醒，而不是直接给用户发消息。",
+    "  这条命令只负责创建提醒，不再兼做 proactive 调度入口。",
+    "  Hosted Mode 下会通过当前 Hermes session 把提醒绑定回 origin chat。",
     `  不带 offset 的本地时间按 ${timezone} 解释。`,
     "  默认会解析唯一稳定 sender；若不唯一会直接返回 target_resolution_required。",
   ].join("\n");

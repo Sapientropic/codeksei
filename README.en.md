@@ -47,7 +47,7 @@ Recommended order:
 
 ```bash
 npx -y codeksei@latest host manifest
-npx -y codeksei@latest host bootstrap --provider hermes --ensure-daemon
+npx -y codeksei@latest host bootstrap --provider hermes
 npx -y codeksei@latest host doctor --provider hermes
 npx -y codeksei@latest host smoke --provider hermes
 ```
@@ -157,7 +157,7 @@ Use this when you already have Hermes runtime / gateway / official Weixin and wa
 
 ```bash
 codeksei host manifest
-codeksei host bootstrap --provider hermes --ensure-daemon
+codeksei host bootstrap --provider hermes
 codeksei host doctor --provider hermes
 codeksei host smoke --provider hermes
 ```
@@ -194,7 +194,7 @@ Boundaries:
 - `Onboarding`: first activation can happen as a conversational interview instead of a form. Long-term truth lands in the companion note and is then projected through the context board; when there is no Obsidian/workspace schema, Codeksei can fall back to a local companion profile under the state dir
 - `Companion memory`: the system keeps updating after first activation. When a user's new self-description, correction, support preference, boundary, or near-term task should change future companionship judgement, route it through `companion remember` instead of leaving it only in host chat memory
 - `Context board`: the controlled context layer for proactive judgement. It turns checkin state, today's facts, active threads, cautions, and re-entry handles into a prompt-ready briefing; Hosted Mode refreshes and injects that board at cron runtime instead of scanning raw vault files
-- `Reminders`: reminder write and scheduling support for rhythm and follow-through. In Hosted Mode the default is a user-visible reminder; use `reminder write --delivery proactive` when the text should become a future proactive wake instead of a direct message
+- `Reminders`: reminder write and scheduling support for rhythm and follow-through. In Hosted Mode user-visible reminders are delivered back to the current origin chat; future proactive wakes now go through the hosted check-in contract instead of a reminder flag
 - `Review`: nightly / weekly / monthly review, with hybrid semantic extraction by default
 - `Project support`: workspace bootstrap, project radar, and shared-thread recovery by workspace so re-entry does not always start from scratch; local git remains the first truth and GitHub activity is only a fallback continuity signal
 - `WeChat bridge`: owned by Codeksei in Codex Mode; Hosted Mode should use the host's own bridge
@@ -345,7 +345,7 @@ codeksei doctor
 codeksei help
 codeksei schema
 codeksei host manifest
-codeksei host bootstrap --provider hermes --ensure-daemon
+codeksei host bootstrap --provider hermes
 codeksei host doctor
 codeksei host smoke --provider hermes
 codeksei companion remember --user <wechat_user_id> --workspace /absolute/workspace --source host_user_turn --stdin
@@ -400,7 +400,6 @@ codeksei system checkin-trigger --user <wechat_user_id> --workspace /absolute/wo
 codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace
 codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace --ack <triggerId>
 codeksei system checkin-complete --user <wechat_user_id> --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for <duration>
-codeksei operator hermes sync-checkin --user <wechat_user_id> --workspace /absolute/workspace
 codeksei context briefing --user <wechat_user_id> --workspace /absolute/workspace --mode review
 ```
 
