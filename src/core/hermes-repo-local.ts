@@ -5,7 +5,11 @@ import { spawnSync } from "node:child_process";
 import * as dotenv from "dotenv";
 
 import { resolvePackageRoot } from "../contracts/path-utils";
-import { ensureHermesContextBriefingScript } from "../context/briefing-script";
+import {
+  ensureHermesContextBriefingScript,
+  ensureHermesHostedCheckinScript,
+  resolveHermesHostedCheckinScriptPath,
+} from "../context/briefing-script";
 import { captureSubprocess, resolveCommandOnPath } from "./subprocess-capture";
 import { normalizeText } from "./text-normalization";
 
@@ -76,7 +80,7 @@ export interface HermesRepoLocalSyncCheckinCronJobResult {
   jobId: string;
   name: string;
   nextRunAt: string;
-  role: "recovery" | "wake";
+  role: "guard" | "recovery" | "wake";
 }
 
 interface HermesRepoLocalEnvelope<TData> {
@@ -105,7 +109,7 @@ interface HermesRepoLocalSyncCheckinCronPlanPayload {
   env?: Record<string, string>;
   name: string;
   prompt: string;
-  role: "recovery" | "wake";
+  role: "guard" | "recovery" | "wake";
   script?: string;
   sender_id: string;
   target_key: string;
@@ -118,7 +122,7 @@ interface HermesRepoLocalSyncCheckinCronPayload {
   env?: Record<string, string>;
   name?: string;
   prompt?: string;
-  role?: "recovery" | "wake";
+  role?: "guard" | "recovery" | "wake";
   script?: string;
   sender_id: string;
   target_key: string;
@@ -338,19 +342,50 @@ function ensureContextScriptForSyncPayload(
   payload: HermesRepoLocalSyncCheckinCronPayload,
 ): HermesRepoLocalSyncCheckinCronPayload {
   const scriptPath = ensureHermesContextBriefingScript(config);
+  const hostedCheckinScriptPath = resolveHermesHostedCheckinScriptPath(config);
   if (Array.isArray(payload.plans) && payload.plans.length > 0) {
     return {
       ...payload,
       plans: payload.plans.map((plan) => ({
         ...plan,
-        script: normalizeText(plan.script) || scriptPath,
+        script: resolveManagedScriptPath({
+          fallbackScriptPath: scriptPath,
+          hostedCheckinScriptPath,
+          planScriptPath: normalizeText(plan.script),
+          config,
+        }),
       })),
     };
   }
   return {
     ...payload,
-    script: normalizeText(payload.script) || scriptPath,
+    script: resolveManagedScriptPath({
+      fallbackScriptPath: scriptPath,
+      hostedCheckinScriptPath,
+      planScriptPath: normalizeText(payload.script),
+      config,
+    }),
   };
+}
+
+function resolveManagedScriptPath({
+  config,
+  fallbackScriptPath,
+  hostedCheckinScriptPath,
+  planScriptPath,
+}: {
+  config: HermesRepoLocalConfigInput;
+  fallbackScriptPath: string;
+  hostedCheckinScriptPath: string;
+  planScriptPath: string;
+}): string {
+  if (planScriptPath) {
+    if (normalizeText(planScriptPath) === normalizeText(hostedCheckinScriptPath)) {
+      return ensureHermesHostedCheckinScript(config);
+    }
+    return planScriptPath;
+  }
+  return fallbackScriptPath;
 }
 
 function invokeHermesRepoLocalBridge<TData>(
@@ -552,9 +587,9 @@ function normalizeSyncCheckinCronJob(value: unknown): HermesRepoLocalSyncCheckin
   };
 }
 
-function normalizeSyncCheckinCronRole(value: unknown): "recovery" | "wake" | "" {
+function normalizeSyncCheckinCronRole(value: unknown): "guard" | "recovery" | "wake" | "" {
   const normalized = normalizeText(value).toLowerCase();
-  if (normalized === "wake" || normalized === "recovery") {
+  if (normalized === "wake" || normalized === "recovery" || normalized === "guard") {
     return normalized;
   }
   return "";

@@ -187,6 +187,7 @@ export async function runHermesStatusCommand(
         `managed_checkin_target: ${managedCheckin.targetKey}`,
         `managed_checkin_wake_jobs: ${managedCheckin.wakeJobs.length}`,
         `managed_checkin_recovery_jobs: ${managedCheckin.recoveryJobs.length}`,
+        `managed_checkin_guard_jobs: ${managedCheckin.guardJobs.length}`,
         `managed_checkin_next_wake: ${managedCheckin.nextPlannedWakeAt || "(none)"}`,
         `managed_checkin_drifted: ${managedCheckin.drifted ? "yes" : "no"}`,
       ] : []),

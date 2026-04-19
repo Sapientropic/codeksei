@@ -39,6 +39,7 @@ export function buildHostEntrypointManifest({
     seedProactive: ["codeksei", "host", "seed-proactive", ...providerArgs, "--format", "json"],
     claimCheckin: ["codeksei", "host", "claim-checkin", ...providerArgs, "--format", "json"],
     settleCheckin: ["codeksei", "host", "settle-checkin", ...providerArgs, "--format", "json"],
+    finalizeCheckin: ["codeksei", "host", "finalize-checkin", ...providerArgs, "--format", "json"],
     render: ["codeksei", "host", "render", ...providerArgs, "--target", "skill", "--format", "json"],
     companionRemember: ["codeksei", "companion", "remember", "--format", "json"],
     onboardingStart: ["codeksei", "onboarding", "start", "--format", "json"],
@@ -181,7 +182,29 @@ function buildRecommendedHostWorkflows(): HostWorkflowHint[] {
         },
         {
           commandRef: "settleCheckin",
-          reason: "Report the true completion outcome so Codeksei can keep scheduling and recovery state coherent.",
+          reason: "Let the cron child record a structured proactive handoff instead of improvising final schedule ownership.",
+        },
+        {
+          commandRef: "finalizeCheckin",
+          reason: "Have the main session consume the handoff, decide the true next wake, and keep scheduling/recovery coherent.",
+        },
+      ],
+    },
+    {
+      id: "proactive_continuity",
+      trigger: "A proactive wake already learned something meaningful about the user's current state and the host should preserve continuity instead of leaving it only in chat.",
+      steps: [
+        {
+          commandRef: "contextBriefing",
+          reason: "Read the current controlled handoff surface, including any pending proactive handoff the main session should absorb.",
+        },
+        {
+          commandRef: "companionRemember",
+          reason: "Persist corrected support style, boundaries, or current-state understanding that should affect future accompaniment.",
+        },
+        {
+          commandRef: "finalizeCheckin",
+          reason: "Finalize the proactive handoff only after the main session has decided whether continuity writing or follow-up changed the real next wake.",
         },
       ],
     },

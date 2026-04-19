@@ -38,6 +38,7 @@ function assertSharedReadmeCliContract(doc: string, name: string) {
   assert.ok(doc.includes(buildTerminalEntryUsage("host.seed_proactive", "public")), `${name} should mention host seed-proactive`);
   assert.ok(doc.includes(buildTerminalEntryUsage("host.claim_checkin", "public")), `${name} should mention host claim-checkin`);
   assert.ok(doc.includes(buildTerminalEntryUsage("host.settle_checkin", "public")), `${name} should mention host settle-checkin`);
+  assert.ok(doc.includes(buildTerminalEntryUsage("host.finalize_checkin", "public")), `${name} should mention host finalize-checkin`);
   assert.ok(doc.includes("codeksei system checkin-trigger"), `${name} should mention checkin-trigger`);
   assert.ok(doc.includes("codeksei system checkin-complete"), `${name} should mention checkin-complete`);
   assert.ok(doc.includes(buildTerminalEntryUsage("app.shared_start", "repo")), `${name} should keep repo shared:start`);
@@ -74,6 +75,7 @@ test("docs/commands keeps public CLI examples aligned with the terminal usage so
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("companion.remember", "public")));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("context.briefing", "public")));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("host.claim_checkin", "public")));
+  assert.ok(commandsDoc.includes(buildTerminalEntryUsage("host.finalize_checkin", "public")));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("host.settle_checkin", "public")));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("timeline.event", "public")));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("system.checkin_trigger", "public")));

@@ -113,6 +113,20 @@ test("repo-local sync_checkin_cron degrades gracefully when Hermes create_job ha
         target_key: "wx-user::/tmp/workspace",
         workspace_root: "/tmp/workspace",
       },
+      {
+        due_at_iso: new Date(Date.now() + 70 * 60_000).toISOString(),
+        env: {
+          CODEKSEI_RUNTIME: "hermes",
+          CODEKSEI_STATE_DIR: "/tmp/codeksei-state",
+        },
+        name: "ck-checkin-guard",
+        prompt: "run hosted checkin guard",
+        role: "guard",
+        script: "/tmp/.hermes/scripts/codeksei_context_briefing.py",
+        sender_id: "wx-user",
+        target_key: "wx-user::/tmp/workspace",
+        workspace_root: "/tmp/workspace",
+      },
     ],
     sender_id: "wx-user",
     target_key: "wx-user::/tmp/workspace",
@@ -123,14 +137,15 @@ test("repo-local sync_checkin_cron degrades gracefully when Hermes create_job ha
   const payload = JSON.parse(result.stdout || "{}");
   assert.equal(payload.ok, true);
   assert.equal(Array.isArray(payload.data.jobs), true);
-  assert.deepEqual(payload.data.jobs.map((job: { role: string }) => job.role), ["wake", "recovery"]);
+  assert.deepEqual(payload.data.jobs.map((job: { role: string }) => job.role), ["wake", "recovery", "guard"]);
   assert.equal(payload.data.jobs.find((job: { role: string }) => job.role === "wake").job_id.startsWith("cron-created-"), true);
   assert.equal(payload.data.jobs.find((job: { role: string }) => job.role === "recovery").job_id, "cron-recovery-1");
+  assert.equal(payload.data.jobs.find((job: { role: string }) => job.role === "guard").job_id.startsWith("cron-created-"), true);
   assert.deepEqual(payload.data.removed_job_ids, []);
 
   const jobsState = JSON.parse(fs.readFileSync(fixture.jobsFile, "utf8"));
-  assert.equal(jobsState.jobs.length, 2);
-  assert.deepEqual(jobsState.jobs.map((job: { codeksei_checkin_role: string }) => job.codeksei_checkin_role).sort(), ["recovery", "wake"]);
+  assert.equal(jobsState.jobs.length, 3);
+  assert.deepEqual(jobsState.jobs.map((job: { codeksei_checkin_role: string }) => job.codeksei_checkin_role).sort(), ["guard", "recovery", "wake"]);
 });
 
 test("repo-local create_reminder stores a rephrasing prompt instead of verbatim echo instructions", () => {

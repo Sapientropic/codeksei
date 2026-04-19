@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://codeksei.dev/schemas/host-settle-checkin-v1.json",
+  "$id": "https://codeksei.dev/schemas/host-finalize-checkin-v1.json",
   "type": "object",
   "required": ["nextWakeAt"],
   "properties": {

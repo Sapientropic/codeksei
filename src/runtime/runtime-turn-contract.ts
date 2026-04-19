@@ -1,4 +1,6 @@
 import type {
+  CheckinRuntimeConfig,
+  IdentityAndTimeConfig,
   RuntimeHostConfig,
   WeixinBridgeConfig,
   WorkspacePathsConfig,
@@ -25,7 +27,9 @@ export type PersistedAttachmentResult = PersistIncomingWeixinAttachmentsResult;
 export type RuntimeTurnConfig =
   & Pick<WorkspacePathsConfig, "stateDir" | "workspaceId" | "workspaceRoot">
   & Pick<RuntimeHostConfig, "runtimeAccessMode">
-  & Pick<WeixinBridgeConfig, "weixinCdnBaseUrl">;
+  & Pick<WeixinBridgeConfig, "weixinCdnBaseUrl">
+  & Partial<Pick<CheckinRuntimeConfig, "checkinScheduleStateFile">>
+  & Partial<Pick<IdentityAndTimeConfig, "timezone" | "userName">>;
 
 export type FormatErrorMessage = (error: unknown) => string;
 export type MaybeDispatchCommand = (normalized: NormalizedIncomingMessage) => Promise<boolean>;

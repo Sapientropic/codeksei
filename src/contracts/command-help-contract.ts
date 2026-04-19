@@ -91,7 +91,7 @@ const TOPIC_HELP = {
   host: () => ({
     usage: [
       `${buildTerminalEntryUsage("host.manifest", "public")} / ${buildTerminalActionExample("host.bootstrap", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("host.doctor", { audience: "public", includeArgs: true })}`,
-      `${buildTerminalActionExample("host.smoke", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("host.seed_proactive", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("host.claim_checkin", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("host.settle_checkin", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("host.render", { audience: "public", includeArgs: true })}`,
+      `${buildTerminalActionExample("host.smoke", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("host.seed_proactive", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("host.claim_checkin", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("host.settle_checkin", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("host.finalize_checkin", { audience: "public", includeArgs: true })} / ${buildTerminalActionExample("host.render", { audience: "public", includeArgs: true })}`,
     ],
     bodyLabel: "补充：",
     body: [
@@ -202,7 +202,7 @@ const LEAF_HELP = {
     body: [
       "  安装后为 delegated proactive checkin 种下或修复第一条 future wake。",
       "  public host 命令默认 provider=hermes；只有显式传 --provider generic-shell，或已有 canonical config 已锁定 provider 时，才会改走 generic-shell。",
-      "  这条命令不会改写 scheduler 真相，只会在当前 truth 上补第一条可执行 wake/recovery attach。",
+      "  这条命令不会改写 scheduler 真相，只会在当前 truth 上补第一条可执行 wake/recovery/guard attach。",
     ],
     includeFlagBlock: true,
   }),
@@ -220,9 +220,19 @@ const LEAF_HELP = {
     usage: [buildTerminalActionExample("host.settle_checkin", { audience: "public", includeArgs: true })],
     bodyLabel: "说明：",
     body: [
-      "  回写 delegated proactive checkin 的完成结果。",
+      "  回写 delegated proactive checkin 的完成结果；传 --create-handoff 时只记录子 agent 观察结果，不直接 finalize。",
       "  public host 命令默认 provider=hermes；generic-shell 只保留给显式 opt-in 的 attach 方案。",
       "  result=failed 只会返回 partial 并保留 daemon recovery；不会偷偷扩写内部 completion enum。",
+    ],
+    includeFlagBlock: true,
+  }),
+  "host.finalize_checkin": () => ({
+    usage: [buildTerminalActionExample("host.finalize_checkin", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  由主会话消费 pending proactive handoff，并写回最终 completion 与下一次唤醒。",
+      "  若省略 --result，会沿用 handoff 自带的 sent_message|silent|backstage_only。",
+      "  public host 命令默认 provider=hermes；generic-shell 只保留给显式 opt-in 的 attach 方案。",
     ],
     includeFlagBlock: true,
   }),
@@ -254,7 +264,7 @@ const LEAF_HELP = {
     bodyLabel: "说明：",
     body: [
       "  查看 Hermes 命令、repo-local sibling checkout、Weixin 账号、skill 同步状态、skills catalog 和 hosted semantic review 可用性。",
-      "  若能解析当前唯一 target，还会附带当前 target 的托管 checkin wake/recovery one-shot job 摘要。",
+      "  若能解析当前唯一 target，还会附带当前 target 的托管 checkin wake/recovery/guard one-shot job 摘要。",
       "  这是只读检查，不会修改本机 Hermes 状态。",
     ],
     examples: [
@@ -518,7 +528,7 @@ const LEAF_HELP = {
       "  --trigger / --result 必填；--next-wake-at 与 --sleep-for 二选一。",
       `  ${CHECKIN_COMPLETION_CONTEXT_GUIDANCE}`,
       "  agent 给出过长时间会被 clamp 到 24h guardrail；缺失或无效时间会回退 fallback window。",
-      "  Hosted Mode 下，写回 state 后还会自动把下一组 wake/recovery jobs 重新 arm 给 Hermes，并清理多余的未来 job。",
+      "  Hosted Mode 下，写回 state 后还会自动把下一组 wake/recovery/guard jobs 重新 arm 给 Hermes，并清理多余的未来 job。",
     ],
     examples: [
       `  codeksei system checkin-complete --user wxid_xxx --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for ${CHECKIN_COMPLETION_SLEEP_FOR_PLACEHOLDER}`,

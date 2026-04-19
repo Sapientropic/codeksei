@@ -6,6 +6,7 @@ const path: typeof import("node:path") = require("node:path");
 
 const { normalizeText } = require("../src/core/text-normalization");
 const { RuntimeTurnLifecycle } = require("../src/runtime/runtime-turn-lifecycle");
+const { CheckinScheduleStateStore } = require("../src/state/checkin-schedule-state-store");
 
 function buildTestChannelDescriptor(overrides: Partial<{
   visibleTextDelivery: boolean;
@@ -72,6 +73,7 @@ function createLifecycle({
   channelOperations = {},
   knownContextTokens = { "user-1": "ctx-1" },
   runtimeOperations = {},
+  checkinScheduleStateFile = "",
 }: {
   codexParams?: { model?: string; effort?: string };
   defaultTerminalUser?: string;
@@ -87,6 +89,7 @@ function createLifecycle({
   runtimeOperations?: Partial<{
     interactiveTurn: boolean;
   }>;
+  checkinScheduleStateFile?: string;
 } = {}) {
   const sendFileCalls: Array<{ filePath: string }> = [];
   const sendTextCalls: Array<{ text: string }> = [];
@@ -137,8 +140,11 @@ function createLifecycle({
       stateDir: "E:/state",
       workspaceId: "workspace-1",
       workspaceRoot: "E:/repo/current",
+      checkinScheduleStateFile,
       sessionsFile: "E:/state/sessions.json",
       runtimeAccessMode: "workspace-write",
+      timezone: "Asia/Shanghai",
+      userName: "Tester",
       weixinCdnBaseUrl: "https://cdn.example.com",
     },
     formatErrorMessage(error: unknown) {
@@ -196,6 +202,50 @@ test("prepareIncomingMessageForRuntime notifies the user when attachment-only in
   assert.equal(harness.sendTextCalls.length, 1);
   assert.ok(harness.sendTextCalls[0]);
   assert.match(harness.sendTextCalls[0].text, /附件接收失败|download failed/u);
+});
+
+test("prepareIncomingMessageForRuntime prepends pending proactive handoff context when the main session should take over", async (t) => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-runtime-turn-handoff-"));
+  t.after(() => {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+  const checkinScheduleStateFile = path.join(tempRoot, "checkin-schedule-state.json");
+  new CheckinScheduleStateStore({ filePath: checkinScheduleStateFile }).setState({
+    activeWake: null,
+    lastCompletion: null,
+    nextWakeAt: "",
+    pendingHandoff: {
+      bookkeepingActions: [{
+        kind: "timeline",
+        status: "suggested",
+        summary: "确认这段工作块后补一条 timeline。",
+      }],
+      followupContext: "先确认是不是还在同一条线，再决定今晚要不要 nightly closeout。",
+      handoffCreatedAt: "2026-04-20T12:00:00.000Z",
+      handoffExpiresAt: "2026-04-20T18:00:00.000Z",
+      observedCurrentState: "最近还在这条线，但当前是否切走需要再确认。",
+      outcome: "sent_message",
+      triggerId: "lease-77",
+      userVisibleMessage: "你现在还在继续这条线吗？",
+    },
+    pendingTrigger: null,
+    scheduleSource: "agent",
+    senderId: "user-1",
+    targetKey: "user-1::E:/repo/current",
+    updatedAt: "2026-04-20T12:00:00.000Z",
+    workspaceRoot: "E:/repo/current",
+  });
+  const harness = createLifecycle({
+    checkinScheduleStateFile,
+  });
+
+  const prepared = await harness.lifecycle.prepareIncomingMessageForRuntime(buildIncomingMessage({
+    text: "还在继续。",
+  }), "E:/repo/current");
+
+  assert.equal(prepared?.pendingProactiveHandoff?.triggerId, "lease-77");
+  assert.match(String(prepared?.text || ""), /\[Codeksei pending proactive handoff\]/u);
+  assert.match(String(prepared?.text || ""), /host finalize-checkin/u);
 });
 
 test("sendLocalFileToCurrentChat sends the resolved file path to the active chat", async (t) => {
@@ -328,6 +378,50 @@ test("sendPreparedMessageToRuntime forwards structured system metadata for check
       kind: "checkin",
       messageId: "msg-1",
       checkinTriggerId: "trigger-77",
+    },
+  });
+});
+
+test("sendPreparedMessageToRuntime forwards pending proactive handoff metadata for main-session takeover", async () => {
+  const harness = createLifecycle();
+
+  await harness.lifecycle.sendPreparedMessageToRuntime({
+    bindingKey: "workspace-1:acct-1:user-1",
+    workspaceRoot: "E:/repo/current",
+    normalized: buildIncomingMessage(),
+    prepared: {
+      ...buildIncomingMessage(),
+      originalText: "hello",
+      text: "prepared message",
+      attachments: [],
+      attachmentFailures: [],
+      pendingProactiveHandoff: {
+        bookkeepingActions: ["timeline:suggested:补一条当前工作块。"],
+        followupContext: "先确认这条线有没有继续。",
+        handoffCreatedAt: "2026-04-20T12:00:00.000Z",
+        handoffExpiresAt: "2026-04-20T18:00:00.000Z",
+        observedCurrentState: "最近还在 codeksei 这条线上。",
+        outcome: "sent_message",
+        triggerId: "lease-88",
+        userVisibleMessage: "你现在还在这条线上吗？",
+      },
+      workspaceRoot: "E:/repo/current",
+    },
+  });
+
+  assert.deepEqual(harness.sendTextTurnCalls[0]?.metadata, {
+    workspaceId: "workspace-1",
+    accountId: "acct-1",
+    senderId: "user-1",
+    pendingProactiveHandoff: {
+      bookkeepingActions: ["timeline:suggested:补一条当前工作块。"],
+      followupContext: "先确认这条线有没有继续。",
+      handoffCreatedAt: "2026-04-20T12:00:00.000Z",
+      handoffExpiresAt: "2026-04-20T18:00:00.000Z",
+      observedCurrentState: "最近还在 codeksei 这条线上。",
+      outcome: "sent_message",
+      triggerId: "lease-88",
+      userVisibleMessage: "你现在还在这条线上吗？",
     },
   });
 });

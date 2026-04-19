@@ -198,6 +198,55 @@ test("context board preserves follow-up context across refresh and clears it on 
   assert.doesNotMatch(cleared.boardText, /下午一点提醒继续写测试/u);
 });
 
+test("context board surfaces pending proactive handoff for the main session", () => {
+  const fixture = createContextFixture();
+  new CheckinScheduleStateStore({ filePath: fixture.checkinScheduleStateFile }).setState({
+    activeWake: {
+      createdAt: new Date().toISOString(),
+      dueAt: new Date().toISOString(),
+      kind: "checkin",
+      senderId: fixture.target.senderId,
+      source: "checkin_trigger",
+      startedAt: new Date().toISOString(),
+      text: "observer prompt",
+      triggerId: "lease-handoff",
+      workspaceRoot: fixture.target.workspaceRoot,
+    },
+    lastCompletion: null,
+    nextWakeAt: "",
+    pendingHandoff: {
+      bookkeepingActions: [
+        {
+          kind: "timeline",
+          status: "suggested",
+          summary: "确认这段工作块后补到 timeline。",
+        },
+      ],
+      followupContext: "主会话回来时先确认这条线有没有继续。",
+      handoffCreatedAt: new Date().toISOString(),
+      handoffExpiresAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      observedCurrentState: "最近还在 codeksei 这条线上，但是否切走需要再问一句。",
+      outcome: "silent",
+      triggerId: "lease-handoff",
+      userVisibleMessage: "",
+    },
+    pendingTrigger: null,
+    scheduleSource: "agent",
+    senderId: fixture.target.senderId,
+    targetKey: buildCheckinTargetKey(fixture.target),
+    updatedAt: new Date().toISOString(),
+    workspaceRoot: fixture.target.workspaceRoot,
+  });
+
+  const result = refreshContextBoard(fixture.config, fixture.target, {
+    mode: "proactive",
+  });
+
+  assert.equal(result.checkin.pendingHandoff.exists, true);
+  assert.match(result.briefingText, /待主会话收尾的 proactive handoff/u);
+  assert.match(result.briefingText, /子 agent 当前观察/u);
+});
+
 test("context briefing command refreshes board and returns prompt-ready text", async () => {
   const fixture = createContextFixture();
   const result = await runContextBriefingCommand(fixture.config, [
@@ -211,4 +260,3 @@ test("context briefing command refreshes board and returns prompt-ready text", a
   assert.match(String(result.text || ""), /Codeksei context board \(review framing\)/u);
   assert.match(String(result.data.boardText || ""), /## 当前状态/u);
 });
-

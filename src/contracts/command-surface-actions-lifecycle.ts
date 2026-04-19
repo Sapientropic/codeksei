@@ -129,6 +129,26 @@ export const LIFECYCLE_COMMAND_ACTION_DEFINITIONS = [
     ],
   },
   {
+    action: "host.finalize_checkin",
+    groupId: "lifecycle",
+    summary: "由主会话消费 pending handoff 并 finalize proactive checkin",
+    terminal: ["host finalize-checkin"],
+    weixin: [],
+    status: "active",
+    entrypointType: "cli",
+    command: "host",
+    subcommand: "finalize-checkin",
+    runner: "host.finalize_checkin",
+    argsSchemaKey: "hostFinalizeCheckin",
+    help: { topic: "host", leafKey: "host.finalize_checkin", detail: "leaf" },
+    sideEffects: [
+      {
+        kind: "finalize_delegated_checkin_handoff",
+        target: "checkin schedule state / hosted wake job",
+      },
+    ],
+  },
+  {
     action: "host.render",
     groupId: "lifecycle",
     summary: "从 command truth 渲染 provider-facing host asset",

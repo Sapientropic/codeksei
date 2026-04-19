@@ -24,6 +24,7 @@ test("Hermes companion skill template stays generated from the renderer truth", 
   assert.equal(normalizeLineEndings(tracked), normalizeLineEndings(rendered));
   assert.match(rendered, /host claim-checkin/u);
   assert.match(rendered, /host settle-checkin/u);
+  assert.match(rendered, /host finalize-checkin/u);
   assert.match(rendered, /companion remember/u);
   assert.match(rendered, /context briefing/u);
   assert.match(rendered, /## Default Routing/u);
@@ -52,8 +53,10 @@ test("hostkit static asset stays round-tripped from the hosted-first renderer tr
   assert.equal(hostkit.hostIdentity.deliveryRecipe, "hermes-origin");
   assert.deepEqual(hostkit.entrypoints.bootstrap, ["codeksei", "host", "bootstrap", "--provider", "hermes", "--format", "json"]);
   assert.deepEqual(hostkit.entrypoints.claimCheckin, ["codeksei", "host", "claim-checkin", "--provider", "hermes", "--format", "json"]);
+  assert.deepEqual(hostkit.entrypoints.finalizeCheckin, ["codeksei", "host", "finalize-checkin", "--provider", "hermes", "--format", "json"]);
   assert.deepEqual(hostkit.entrypoints.settleCheckin, ["codeksei", "host", "settle-checkin", "--provider", "hermes", "--format", "json"]);
   assert.equal(hostkit.recommendedWorkflows.some((entry: { id: string }) => entry.id === "first_activation_onboarding"), true);
   assert.equal(hostkit.recommendedWorkflows.some((entry: { id: string }) => entry.id === "ongoing_companion_memory"), true);
   assert.equal(hostkit.recommendedWorkflows.some((entry: { id: string }) => entry.id === "proactive_checkin"), true);
+  assert.equal(hostkit.recommendedWorkflows.some((entry: { id: string }) => entry.id === "proactive_continuity"), true);
 });

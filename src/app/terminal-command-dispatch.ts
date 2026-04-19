@@ -9,6 +9,9 @@ import {
   runHostClaimCheckinCommand,
 } from "./host-claim-checkin-cli";
 import {
+  runHostFinalizeCheckinCommand,
+} from "./host-finalize-checkin-cli";
+import {
   runHostDoctorCommand,
 } from "./host-doctor-cli";
 import {
@@ -142,6 +145,9 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
   },
   "host.claim_checkin": async (_manifest, context) => {
     return runHostClaimCheckinCommand(context.config, context.leafArgs);
+  },
+  "host.finalize_checkin": async (_manifest, context) => {
+    return runHostFinalizeCheckinCommand(context.config, context.leafArgs);
   },
   "host.settle_checkin": async (_manifest, context) => {
     return runHostSettleCheckinCommand(context.config, context.leafArgs);

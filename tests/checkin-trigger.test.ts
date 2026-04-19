@@ -276,12 +276,12 @@ test("hosted checkin-complete re-arms the next wake and clears future recovery j
       removedJobIds: string[];
     };
   };
-  assert.deepEqual(data.hostedWakeSync.jobs.map((job) => job.role), ["wake", "recovery"]);
+  assert.deepEqual(data.hostedWakeSync.jobs.map((job) => job.role), ["wake", "recovery", "guard"]);
   assert.equal(data.hostedWakeSync.jobs.every((job) => job.jobId.startsWith("cron-")), true);
   assert.deepEqual(data.hostedWakeSync.removedJobIds, []);
   const jobsState = JSON.parse(fs.readFileSync(repoLocal.jobsFile, "utf8"));
-  assert.equal(jobsState.jobs.length, 2);
-  assert.deepEqual(jobsState.jobs.map((job: { codeksei_checkin_role: string }) => job.codeksei_checkin_role).sort(), ["recovery", "wake"]);
+  assert.equal(jobsState.jobs.length, 3);
+  assert.deepEqual(jobsState.jobs.map((job: { codeksei_checkin_role: string }) => job.codeksei_checkin_role).sort(), ["guard", "recovery", "wake"]);
   for (const job of jobsState.jobs) {
     assert.equal(job.deliver, "origin");
     assert.equal(job.env.CODEKSEI_RUNTIME, "hermes");

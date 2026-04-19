@@ -66,7 +66,7 @@ Codeksei 现在把自己定义成 **daemon-first / host-attachable / companion e
 - `主动性判断上下文层`
   Hosted proactive wake 默认读 Codeksei 自己维护的 context board。它由 checkin state、当日日记、companion note、project radar 和 workspace continuity 聚合而成，再由 Hermes cron `script` 在运行前注入，不要求用户必须维护 Obsidian/vault
 - 外部宿主默认通过 `host attachment contract` 接入：
-  `codeksei host manifest`、`codeksei host bootstrap`、`codeksei host doctor`、`codeksei host smoke`、`codeksei host seed-proactive`、`codeksei host claim-checkin`、`codeksei host settle-checkin`
+  `codeksei host manifest`、`codeksei host bootstrap`、`codeksei host doctor`、`codeksei host smoke`、`codeksei host seed-proactive`、`codeksei host claim-checkin`、`codeksei host settle-checkin`、`codeksei host finalize-checkin`
 
 <a id="setup"></a>
 
@@ -194,7 +194,7 @@ codeksei host smoke --provider hermes
 
 - `Timeline`：把已经发生过的时间块、切换点和生活事实钉成时间感与记忆锚点，不让一天只剩模糊印象
 - `Diary`：Todo、碎片、补充记录、总结，以及和 timeline 紧密联动的时间线事实，帮你把零散日常慢慢收成可用痕迹
-- `Check-ins`：主动唤醒与主动分忧。发一句消息只是其中一种；它也会先回看上下文、整理后台、补一条 diary / timeline、留一个提醒，再决定是不是该主动露个面。Codeksei 负责生成 proactive trigger、维护 `tick -> ack -> complete` 的调度真相，并在 `checkin-complete` 时写回下一次唤醒；Codex Mode 下由本地 poller 包装 heartbeat 与入队，Hosted Mode 下由 Hermes 只执行受控 wake/recovery job set，真正的下一次唤醒仍由 Codeksei 在 `checkin-complete` 里决定
+- `Check-ins`：主动唤醒与主动分忧。发一句消息只是其中一种；它也会先回看上下文、整理后台、补一条 diary / timeline、留一个提醒，再决定是不是该主动露个面。Codeksei 负责生成 proactive trigger、维护 `tick -> ack -> complete` 的调度真相，并在 `checkin-complete` 时写回下一次唤醒；Codex Mode 下由本地 poller 包装 heartbeat 与入队，Hosted Mode 下由 Hermes 只执行受控 wake/recovery/guard job set，真正的下一次唤醒仍由 Codeksei 在 `checkin-complete` 里决定
 - `Onboarding`：首次激活不走表单，而是走聊天式访谈。长期真相写进 companion note，再由 context board 投影给宿主；没有 Obsidian / workspace schema 时也能自动回退到本地 state-dir 下的 companion profile
 - `Companion memory`：首访之后也会继续更新。只要用户新的自述、纠正、支持偏好、边界或近线任务会影响后续陪伴判断，就可以走 `companion remember` 这条 ongoing memory 主链，而不是把变化只留在宿主聊天记忆里
 - `Context board`：主动判断用的受控上下文层。它把 checkin state、今天事实、活跃线头、注意事项和重入入口收口到一份 prompt-ready briefing；Hosted Mode 下每次 cron 运行前都会现读最新 board，而不是盲扫原始 vault 文件
@@ -404,7 +404,8 @@ codeksei system checkin --range 3-60
 codeksei system checkin --reset
 codeksei host seed-proactive --provider hermes --user <wechat_user_id> --workspace /absolute/workspace
 codeksei host claim-checkin --provider hermes --user <wechat_user_id> --workspace /absolute/workspace
-codeksei host settle-checkin --provider hermes --user <wechat_user_id> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for <duration>
+codeksei host settle-checkin --provider hermes --user <wechat_user_id> --workspace /absolute/workspace --lease <leaseId> --result silent --create-handoff --observed-state "..." --followup-context "..."
+codeksei host finalize-checkin --provider hermes --user <wechat_user_id> --workspace /absolute/workspace --lease <leaseId> --sleep-for <duration>
 codeksei system checkin-trigger --user <wechat_user_id> --workspace /absolute/workspace
 codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace
 codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace --ack <triggerId>

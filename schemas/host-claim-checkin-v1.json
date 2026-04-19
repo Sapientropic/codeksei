@@ -22,8 +22,43 @@
       "properties": {
         "kind": { "const": "proactive_checkin" },
         "format": { "const": "plain_text" },
+        "decisionOrder": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "bookkeepingPriorities": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "observerContract": { "type": "string" },
         "text": { "type": "string" }
       }
+    },
+    "contextBriefing": {
+      "type": ["object", "null"],
+      "properties": {
+        "briefingText": { "type": "string" },
+        "followupContext": { "type": "string" },
+        "stale": { "type": "boolean" },
+        "staleReasons": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "bookkeepingExpectations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string" },
+          "route": { "type": "string" },
+          "when": { "type": "string" }
+        }
+      }
+    },
+    "pendingHandoff": {
+      "type": ["object", "null"]
     },
     "origin": {
       "type": ["object", "null"]

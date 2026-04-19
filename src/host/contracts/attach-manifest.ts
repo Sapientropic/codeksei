@@ -30,6 +30,7 @@ export interface HostEntrypointManifest {
   seedProactive: string[];
   claimCheckin: string[];
   settleCheckin: string[];
+  finalizeCheckin: string[];
   render: string[];
   companionRemember: string[];
   onboardingStart: string[];
@@ -48,6 +49,7 @@ export interface HostWorkflowStep {
     | "seedProactive"
     | "claimCheckin"
     | "settleCheckin"
+    | "finalizeCheckin"
     | "onboardingStart"
     | "onboardingStep"
     | "onboardingStatus"
@@ -62,6 +64,7 @@ export interface HostWorkflowHint {
     | "first_activation_onboarding"
     | "ongoing_companion_memory"
     | "proactive_checkin"
+    | "proactive_continuity"
     | "context_handoff_refresh"
     | "user_correction_persistence";
   trigger: string;

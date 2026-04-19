@@ -76,9 +76,22 @@ interface CheckinSnapshot {
   lastCompletionAt: string;
   lastCompletionResult: string;
   nextWakeAt: string;
+  pendingHandoff: PendingHandoffSnapshot;
   pendingTriggerCreatedAt: string;
   scheduleSource: string;
   stateFound: boolean;
+}
+
+interface PendingHandoffSnapshot {
+  bookkeepingActions: string[];
+  exists: boolean;
+  followupContext: string;
+  handoffCreatedAt: string;
+  handoffExpiresAt: string;
+  observedCurrentState: string;
+  outcome: string;
+  triggerId: string;
+  userVisibleMessage: string;
 }
 
 interface OnboardingSnapshot {
@@ -428,6 +441,22 @@ function buildCurrentStatusSection({
   if (checkin.nextWakeAt) {
     lines.push(`下次计划唤醒：${checkin.nextWakeAt}${checkin.scheduleSource ? `（${checkin.scheduleSource}）` : ""}`);
   }
+  if (checkin.pendingHandoff.exists) {
+    lines.push(
+      `待主会话收尾的 proactive handoff：${checkin.pendingHandoff.handoffCreatedAt || "unknown"}`
+      + `${checkin.pendingHandoff.outcome ? `（${checkin.pendingHandoff.outcome}）` : ""}`
+    );
+    if (checkin.pendingHandoff.triggerId) {
+      lines.push(`待吸收的 lease：${checkin.pendingHandoff.triggerId}`);
+    }
+    if (checkin.pendingHandoff.observedCurrentState) {
+      lines.push(`子 agent 当前观察：${checkin.pendingHandoff.observedCurrentState}`);
+    }
+    if (checkin.pendingHandoff.userVisibleMessage) {
+      lines.push(`子 agent 对外消息：${checkin.pendingHandoff.userVisibleMessage}`);
+    }
+    lines.push("主会话默认应先吸收这份 handoff，再决定 continuity 写入与真正的下一次唤醒，并在收尾时执行 host finalize-checkin。");
+  }
   if (checkin.activeWakeStartedAt) {
     lines.push(`当前有进行中的 active wake：${checkin.activeWakeStartedAt}`);
   } else if (checkin.pendingTriggerCreatedAt) {
@@ -544,6 +573,7 @@ function buildSourceStatusSection({
     `companion memory：${companionMemory.lastUpdatedAt ? `${companionMemory.lastUpdatedAt}` : "missing"}${companionMemory.lastSource ? ` | source ${companionMemory.lastSource}` : ""}${companionMemory.recentWriteCount ? ` | recent writes ${companionMemory.recentWriteCount}` : ""}`,
     `onboarding：${onboarding.status}${onboarding.updatedAt ? ` | updated ${onboarding.updatedAt}` : ""}${onboarding.missingSlots.length ? ` | missing ${onboarding.missingSlots.join(", ")}` : ""}`,
     `checkin completion：${checkin.lastCompletionAt ? checkin.lastCompletionAt : "missing"}`,
+    `pending proactive handoff：${checkin.pendingHandoff.exists ? `${checkin.pendingHandoff.handoffCreatedAt || "present"}${checkin.pendingHandoff.handoffExpiresAt ? ` -> ${checkin.pendingHandoff.handoffExpiresAt}` : ""}${checkin.pendingHandoff.triggerId ? ` | lease ${checkin.pendingHandoff.triggerId}` : ""}` : "missing"}`,
     `project radar：${projectRadar.available ? "available" : `unavailable${projectRadar.reason ? ` (${projectRadar.reason})` : ""}`}`,
     `workspace bootstrap files：${workspaceBootstrap.primaryFiles.length + workspaceBootstrap.recentFiles.length}`,
     ...(staleReasons.length ? [`stale reasons：${staleReasons.map((reason) => formatStaleReason(reason)).join("；")}`] : []),
@@ -653,6 +683,20 @@ function collectCheckinSnapshot(
     lastCompletionAt: formatMaybeZonedDate(state.lastCompletion?.completedAt, config.timezone),
     lastCompletionResult: normalizeText(state.lastCompletion?.result),
     nextWakeAt: formatMaybeZonedDate(state.nextWakeAt, config.timezone),
+    pendingHandoff: state.pendingHandoff
+      ? {
+        bookkeepingActions: state.pendingHandoff.bookkeepingActions
+          .map((entry) => `${entry.kind}:${entry.status}:${entry.summary}`),
+        exists: true,
+        followupContext: normalizeText(state.pendingHandoff.followupContext),
+        handoffCreatedAt: formatMaybeZonedDate(state.pendingHandoff.handoffCreatedAt, config.timezone),
+        handoffExpiresAt: formatMaybeZonedDate(state.pendingHandoff.handoffExpiresAt, config.timezone),
+        observedCurrentState: normalizeText(state.pendingHandoff.observedCurrentState),
+        outcome: normalizeText(state.pendingHandoff.outcome),
+        triggerId: normalizeText(state.pendingHandoff.triggerId),
+        userVisibleMessage: normalizeText(state.pendingHandoff.userVisibleMessage),
+      }
+      : emptyPendingHandoffSnapshot(),
     pendingTriggerCreatedAt: formatMaybeZonedDate(state.pendingTrigger?.createdAt, config.timezone),
     scheduleSource: normalizeText(state.scheduleSource),
     stateFound: true,
@@ -890,9 +934,24 @@ function emptyCheckinSnapshot(): CheckinSnapshot {
     lastCompletionAt: "",
     lastCompletionResult: "",
     nextWakeAt: "",
+    pendingHandoff: emptyPendingHandoffSnapshot(),
     pendingTriggerCreatedAt: "",
     scheduleSource: "",
     stateFound: false,
+  };
+}
+
+function emptyPendingHandoffSnapshot(): PendingHandoffSnapshot {
+  return {
+    bookkeepingActions: [],
+    exists: false,
+    followupContext: "",
+    handoffCreatedAt: "",
+    handoffExpiresAt: "",
+    observedCurrentState: "",
+    outcome: "",
+    triggerId: "",
+    userVisibleMessage: "",
   };
 }
 

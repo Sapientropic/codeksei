@@ -65,6 +65,9 @@ export function createRuntimeTurnSend(
             accountId: prepared.accountId,
             senderId: prepared.senderId,
           };
+          if (prepared.pendingProactiveHandoff?.triggerId) {
+            metadata.pendingProactiveHandoff = prepared.pendingProactiveHandoff;
+          }
           if (prepared.provider === "system") {
             metadata.systemMessage = {
               kind: dependencies.normalizeText(prepared.systemMessageKind) || "manual",

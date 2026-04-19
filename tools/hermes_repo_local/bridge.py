@@ -326,7 +326,7 @@ def _is_future_job(job: Dict[str, Any], now: datetime) -> bool:
 
 def _normalize_checkin_role(value: Any) -> str:
     text = str(value or "").strip().lower()
-    return text if text in {"wake", "recovery"} else ""
+    return text if text in {"wake", "recovery", "guard"} else ""
 
 
 def _normalize_job_env(value: Any) -> Dict[str, str]:
@@ -364,7 +364,7 @@ def _normalize_sync_checkin_plan(value: Any) -> Dict[str, Any]:
     if not script:
         raise RuntimeError("sync_checkin_cron plan is missing script")
     if not role:
-        raise RuntimeError("sync_checkin_cron plan role must be wake or recovery")
+        raise RuntimeError("sync_checkin_cron plan role must be wake, recovery, or guard")
     if not target_key:
         raise RuntimeError("sync_checkin_cron plan is missing target_key")
     if not workspace_root:

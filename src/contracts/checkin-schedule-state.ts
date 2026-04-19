@@ -4,6 +4,14 @@ type PlainObject = Record<string, unknown>;
 
 export type CheckinCompletionResult = "backstage_only" | "sent_message" | "silent";
 export type CheckinScheduleSource = "agent" | "fallback" | "guardrail_clamped" | "recovery";
+export type CheckinBookkeepingActionKind =
+  | "companion_memory"
+  | "diary"
+  | "note"
+  | "project_note"
+  | "review"
+  | "timeline";
+export type CheckinBookkeepingActionStatus = "done" | "suggested";
 
 export interface CheckinPendingTrigger {
   createdAt: string;
@@ -28,12 +36,30 @@ export interface CheckinLastCompletion {
   triggerId: string;
 }
 
+export interface CheckinBookkeepingAction {
+  kind: CheckinBookkeepingActionKind;
+  status: CheckinBookkeepingActionStatus;
+  summary: string;
+}
+
+export interface CheckinPendingHandoff {
+  bookkeepingActions: CheckinBookkeepingAction[];
+  followupContext: string;
+  handoffCreatedAt: string;
+  handoffExpiresAt: string;
+  observedCurrentState: string;
+  outcome: CheckinCompletionResult;
+  triggerId: string;
+  userVisibleMessage: string;
+}
+
 export interface RawCheckinScheduleState extends PlainObject {
   activeWake?: unknown;
   lastCompletion?: unknown;
   lastConfirmedAt?: unknown;
   nextDueAt?: unknown;
   nextWakeAt?: unknown;
+  pendingHandoff?: unknown;
   pendingTrigger?: unknown;
   scheduleSource?: unknown;
   senderId?: unknown;
@@ -46,6 +72,7 @@ export interface CheckinScheduleState {
   activeWake: CheckinActiveWake | null;
   lastCompletion: CheckinLastCompletion | null;
   nextWakeAt: string;
+  pendingHandoff: CheckinPendingHandoff | null;
   pendingTrigger: CheckinPendingTrigger | null;
   scheduleSource: CheckinScheduleSource;
   senderId: string;
@@ -113,10 +140,54 @@ export function normalizeCheckinLastCompletion(value: unknown): CheckinLastCompl
   };
 }
 
+export function normalizeCheckinBookkeepingAction(value: unknown): CheckinBookkeepingAction | null {
+  const source = asPlainObject(value);
+  const kind = normalizeCheckinBookkeepingActionKind(source.kind);
+  const status = normalizeCheckinBookkeepingActionStatus(source.status);
+  const summary = normalizeNonEmptyString(source.summary);
+  if (!kind || !status || !summary) {
+    return null;
+  }
+  return {
+    kind,
+    status,
+    summary,
+  };
+}
+
+export function normalizeCheckinPendingHandoff(value: unknown): CheckinPendingHandoff | null {
+  const source = asPlainObject(value);
+  const triggerId = normalizeNonEmptyString(source.triggerId);
+  const outcome = normalizeCheckinCompletionResult(source.outcome);
+  const userVisibleMessage = normalizeMaybeString(source.userVisibleMessage);
+  const observedCurrentState = normalizeMaybeString(source.observedCurrentState);
+  const followupContext = normalizeMaybeString(source.followupContext);
+  const handoffCreatedAt = normalizeIsoTimestamp(source.handoffCreatedAt);
+  const handoffExpiresAt = normalizeIsoTimestamp(source.handoffExpiresAt);
+  const rawActions = Array.isArray(source.bookkeepingActions) ? source.bookkeepingActions : [];
+  const bookkeepingActions = rawActions
+    .map((entry) => normalizeCheckinBookkeepingAction(entry))
+    .filter((entry): entry is CheckinBookkeepingAction => Boolean(entry));
+  if (!triggerId || !outcome || !handoffCreatedAt || !handoffExpiresAt || bookkeepingActions.length !== rawActions.length) {
+    return null;
+  }
+  return {
+    bookkeepingActions,
+    followupContext,
+    handoffCreatedAt,
+    handoffExpiresAt,
+    observedCurrentState,
+    outcome,
+    triggerId,
+    userVisibleMessage,
+  };
+}
+
 export function normalizeCheckinScheduleState(value: unknown): CheckinScheduleState {
   const source = asRawCheckinScheduleState(value);
   const nextWakeAt = normalizeIsoTimestamp(source.nextWakeAt) || normalizeIsoTimestamp(source.nextDueAt);
   const pendingTrigger = normalizeCheckinPendingTrigger(source.pendingTrigger);
+  const pendingHandoff = normalizeCheckinPendingHandoff(source.pendingHandoff);
   const activeWake = normalizeCheckinActiveWake(source.activeWake);
   const lastCompletion = normalizeCheckinLastCompletion(source.lastCompletion);
   const scheduleSource = normalizeCheckinScheduleSource(source.scheduleSource)
@@ -124,12 +195,14 @@ export function normalizeCheckinScheduleState(value: unknown): CheckinScheduleSt
       activeWake,
       lastCompletion,
       nextWakeAt,
+      pendingHandoff,
       pendingTrigger,
     });
   return {
     activeWake,
     lastCompletion,
     nextWakeAt,
+    pendingHandoff,
     pendingTrigger,
     scheduleSource,
     senderId: normalizeNonEmptyString(source.senderId),
@@ -164,6 +237,9 @@ export function validateCheckinScheduleState(value: unknown): true | string {
   }
   if ("pendingTrigger" in source && source.pendingTrigger != null && !normalizeCheckinPendingTrigger(source.pendingTrigger)) {
     return "checkin schedule state pendingTrigger is invalid";
+  }
+  if ("pendingHandoff" in source && source.pendingHandoff != null && !normalizeCheckinPendingHandoff(source.pendingHandoff)) {
+    return "checkin schedule state pendingHandoff is invalid";
   }
   if ("activeWake" in source && source.activeWake != null && !normalizeCheckinActiveWake(source.activeWake)) {
     return "checkin schedule state activeWake is invalid";
@@ -209,17 +285,19 @@ function inferLegacyScheduleSource({
   activeWake,
   lastCompletion,
   nextWakeAt,
+  pendingHandoff,
   pendingTrigger,
 }: {
   activeWake: CheckinActiveWake | null;
   lastCompletion: CheckinLastCompletion | null;
   nextWakeAt: string;
+  pendingHandoff: CheckinPendingHandoff | null;
   pendingTrigger: CheckinPendingTrigger | null;
 }): CheckinScheduleSource {
   if (lastCompletion?.scheduleSource) {
     return lastCompletion.scheduleSource;
   }
-  if (activeWake || pendingTrigger || nextWakeAt) {
+  if (activeWake || pendingHandoff || pendingTrigger || nextWakeAt) {
     return "fallback";
   }
   return "fallback";
@@ -236,6 +314,33 @@ function normalizeIsoTimestamp(value: unknown): string {
 
 function normalizeNonEmptyString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeMaybeString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeCheckinBookkeepingActionKind(value: unknown): CheckinBookkeepingActionKind | "" {
+  const normalized = normalizeNonEmptyString(value).toLowerCase();
+  if (
+    normalized === "companion_memory"
+    || normalized === "diary"
+    || normalized === "note"
+    || normalized === "project_note"
+    || normalized === "review"
+    || normalized === "timeline"
+  ) {
+    return normalized;
+  }
+  return "";
+}
+
+function normalizeCheckinBookkeepingActionStatus(value: unknown): CheckinBookkeepingActionStatus | "" {
+  const normalized = normalizeNonEmptyString(value).toLowerCase();
+  if (normalized === "done" || normalized === "suggested") {
+    return normalized;
+  }
+  return "";
 }
 
 function isPlainObject(value: unknown): value is PlainObject {

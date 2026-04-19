@@ -9,6 +9,10 @@ import type { IncomingWeixinAttachment } from "../contracts/weixin-media";
 import type {
   RuntimeTurnPreparationDependencies,
 } from "./runtime-turn-contract";
+import {
+  buildPendingProactiveHandoffPrelude,
+  readPendingProactiveHandoff,
+} from "./pending-proactive-handoff";
 
 export interface RuntimeTurnPreparation {
   prepareIncomingMessageForRuntime(
@@ -25,16 +29,27 @@ export function createRuntimeTurnPreparation(
       normalized: NormalizedIncomingMessage,
       workspaceRoot: string,
     ): Promise<PreparedRuntimeMessage | null> {
+      const pendingProactiveHandoff = readPendingProactiveHandoff({
+        checkinScheduleStateFile: dependencies.config.checkinScheduleStateFile || "",
+      }, {
+        senderId: normalized.senderId,
+        workspaceRoot,
+      });
       const attachments = Array.isArray(normalized.attachments)
         ? normalized.attachments as IncomingWeixinAttachment[]
         : [];
       if (!attachments.length) {
+        const runtimeInboundText = decorateRuntimeInboundText(
+          dependencies.buildRuntimeInboundText(normalized, { saved: [], failed: [] }, dependencies.config),
+          pendingProactiveHandoff,
+        );
         return {
           ...normalized,
           originalText: normalized.text,
-          text: dependencies.buildRuntimeInboundText(normalized, { saved: [], failed: [] }, dependencies.config),
+          text: runtimeInboundText,
           attachments: [],
           attachmentFailures: [],
+          pendingProactiveHandoff,
           workspaceRoot,
         };
       }
@@ -63,7 +78,10 @@ export function createRuntimeTurnPreparation(
         return null;
       }
 
-      const runtimeInboundText = dependencies.buildRuntimeInboundText(normalized, persisted, dependencies.config);
+      const runtimeInboundText = decorateRuntimeInboundText(
+        dependencies.buildRuntimeInboundText(normalized, persisted, dependencies.config),
+        pendingProactiveHandoff,
+      );
       if (!runtimeInboundText) {
         if (canUseChannelOperation(dependencies.channelAdapter, "visibleTextDelivery")) {
           await ignoreBestEffortError(dependencies.channelAdapter.sendText({
@@ -85,8 +103,21 @@ export function createRuntimeTurnPreparation(
         text: runtimeInboundText,
         attachments: persisted.saved,
         attachmentFailures: persisted.failed,
+        pendingProactiveHandoff,
         workspaceRoot,
       };
     },
   };
+}
+
+function decorateRuntimeInboundText(
+  runtimeInboundText: string,
+  pendingProactiveHandoff: PreparedRuntimeMessage["pendingProactiveHandoff"],
+): string {
+  const normalizedText = String(runtimeInboundText || "").trim();
+  if (!pendingProactiveHandoff) {
+    return normalizedText;
+  }
+  const prelude = buildPendingProactiveHandoffPrelude(pendingProactiveHandoff);
+  return [prelude, normalizedText].filter(Boolean).join("\n\n").trim();
 }

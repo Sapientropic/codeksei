@@ -66,7 +66,7 @@ Codeksei is now positioned as a **daemon-first / host-attachable / companion eng
 - `Proactive context layer`
   Hosted proactive wakes read a Codeksei-managed context board by default. It is aggregated from checkin state, today's diary, companion notes, project radar, and workspace continuity, then injected by a Hermes cron `script` right before runtime instead of requiring raw vault scans
 - External hosts should attach through the `host attachment contract`:
-  `codeksei host manifest`, `codeksei host bootstrap`, `codeksei host doctor`, `codeksei host smoke`, `codeksei host seed-proactive`, `codeksei host claim-checkin`, `codeksei host settle-checkin`
+  `codeksei host manifest`, `codeksei host bootstrap`, `codeksei host doctor`, `codeksei host smoke`, `codeksei host seed-proactive`, `codeksei host claim-checkin`, `codeksei host settle-checkin`, `codeksei host finalize-checkin`
 
 <a id="setup"></a>
 
@@ -190,7 +190,7 @@ Boundaries:
 
 - `Timeline`: time blocks, switches, and lived facts become anchors for memory and time sense instead of fading into a blur
 - `Diary`: todos, fragments, supplements, summaries, and timeline-linked facts for daily traces that want to stay
-- `Check-ins`: proactive wake-ups and background care. Messaging is only one output path; Codeksei can also reread context, clean up backstage state, update diary/timeline, or leave a reminder before deciding whether it should surface. It owns proactive trigger generation, the `tick -> ack -> complete` schedule truth, and the next wake decision written in `checkin-complete`; Codex Mode wraps that truth with a local poller, while Hosted Mode only executes a managed wake/recovery job set and still defers the true next wake to Codeksei
+- `Check-ins`: proactive wake-ups and background care. Messaging is only one output path; Codeksei can also reread context, clean up backstage state, update diary/timeline, or leave a reminder before deciding whether it should surface. It owns proactive trigger generation, the `tick -> ack -> complete` schedule truth, and the next wake decision written in `checkin-complete`; Codex Mode wraps that truth with a local poller, while Hosted Mode only executes a managed wake/recovery/guard job set and still defers the true next wake to Codeksei
 - `Onboarding`: first activation can happen as a conversational interview instead of a form. Long-term truth lands in the companion note and is then projected through the context board; when there is no Obsidian/workspace schema, Codeksei can fall back to a local companion profile under the state dir
 - `Companion memory`: the system keeps updating after first activation. When a user's new self-description, correction, support preference, boundary, or near-term task should change future companionship judgement, route it through `companion remember` instead of leaving it only in host chat memory
 - `Context board`: the controlled context layer for proactive judgement. It turns checkin state, today's facts, active threads, cautions, and re-entry handles into a prompt-ready briefing; Hosted Mode refreshes and injects that board at cron runtime instead of scanning raw vault files
@@ -395,7 +395,8 @@ codeksei system checkin --range 3-60
 codeksei system checkin --reset
 codeksei host seed-proactive --provider hermes --user <wechat_user_id> --workspace /absolute/workspace
 codeksei host claim-checkin --provider hermes --user <wechat_user_id> --workspace /absolute/workspace
-codeksei host settle-checkin --provider hermes --user <wechat_user_id> --workspace /absolute/workspace --lease <leaseId> --result silent --sleep-for <duration>
+codeksei host settle-checkin --provider hermes --user <wechat_user_id> --workspace /absolute/workspace --lease <leaseId> --result silent --create-handoff --observed-state "..." --followup-context "..."
+codeksei host finalize-checkin --provider hermes --user <wechat_user_id> --workspace /absolute/workspace --lease <leaseId> --sleep-for <duration>
 codeksei system checkin-trigger --user <wechat_user_id> --workspace /absolute/workspace
 codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace
 codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace --ack <triggerId>

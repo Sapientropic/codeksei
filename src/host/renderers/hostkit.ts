@@ -59,6 +59,7 @@ interface RepoHostkitDocument extends Pick<
     attachmentCapabilities: "./schemas/host-capabilities-v1.json";
     commandEnvelope: "./schemas/command-envelope-v1.json";
     claimCheckin: "./schemas/host-claim-checkin-v1.json";
+    finalizeCheckin: "./schemas/host-finalize-checkin-v1.json";
     settleCheckin: "./schemas/host-settle-checkin-v1.json";
   };
   attachmentPolicy: {
@@ -111,6 +112,7 @@ export function buildRepoHostkitDocument(): RepoHostkitDocument {
       attachmentCapabilities: "./schemas/host-capabilities-v1.json",
       commandEnvelope: "./schemas/command-envelope-v1.json",
       claimCheckin: "./schemas/host-claim-checkin-v1.json",
+      finalizeCheckin: "./schemas/host-finalize-checkin-v1.json",
       settleCheckin: "./schemas/host-settle-checkin-v1.json",
     },
     attachmentPolicy: {

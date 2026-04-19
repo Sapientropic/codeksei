@@ -6,7 +6,10 @@ const assert: typeof import("node:assert/strict") = require("node:assert/strict"
 
 const { CheckinConfigStore }: typeof import("../src/state/checkin-config-store") = require("../src/state/checkin-config-store");
 const {
+  CHECKIN_ACTIVE_WAKE_TIMEOUT_MS,
+  CHECKIN_HANDOFF_TIMEOUT_MS,
   runCheckinComplete,
+  runCheckinCreateHandoff,
   runCheckinTick,
 }: typeof import("../src/checkin") = require("../src/checkin");
 const {
@@ -146,6 +149,109 @@ test("checkin tick recovers timed-out active wake with a fallback schedule", () 
   assert.equal(recovered.state.scheduleSource, "recovery");
   assert.equal(recovered.activeWake, null);
   assert.equal(recovered.nextWakeAt, "2026-04-14T10:33:01.000Z");
+});
+
+test("checkin tick auto-finalizes an expired pending handoff through recovery", () => {
+  const fixture = createTickFixture();
+  const target = createTarget();
+  const startMs = Date.parse("2026-04-14T10:00:00Z");
+
+  runCheckinTick({
+    config: fixture.config,
+    nowMs: startMs,
+    target,
+  });
+  const due = runCheckinTick({
+    config: fixture.config,
+    nowMs: startMs + 60_000,
+    target,
+  });
+  runCheckinTick({
+    ack: String(due.payload?.triggerId || ""),
+    config: fixture.config,
+    nowMs: startMs + 61_000,
+    target,
+  });
+  const store = new CheckinScheduleStateStore({ filePath: fixture.config.checkinScheduleStateFile });
+  const current = store.getState();
+  assert.ok(current);
+  store.setState({
+    ...current,
+    pendingHandoff: {
+      bookkeepingActions: [],
+      followupContext: "回主会话后确认是否继续。",
+      handoffCreatedAt: new Date(startMs + 62_000).toISOString(),
+      handoffExpiresAt: new Date(startMs + 63_000).toISOString(),
+      observedCurrentState: "最近在改 hosted proactive。",
+      outcome: "silent",
+      triggerId: String(due.payload?.triggerId || ""),
+      userVisibleMessage: "",
+    },
+  });
+
+  const recovered = runCheckinTick({
+    config: fixture.config,
+    nowMs: startMs + 64_000,
+    target,
+  });
+  assert.equal(recovered.status, "scheduled");
+  assert.equal(recovered.state.pendingHandoff, null);
+  assert.equal(recovered.state.lastCompletion?.result, "silent");
+  assert.equal(recovered.state.lastCompletion?.scheduleSource, "recovery");
+});
+
+test("checkin handoff survives active-wake timeout and only auto-finalizes after handoff expiry", () => {
+  const fixture = createTickFixture();
+  const target = createTarget();
+  const startMs = Date.parse("2026-04-14T10:00:00Z");
+
+  runCheckinTick({
+    config: fixture.config,
+    nowMs: startMs,
+    target,
+  });
+  const due = runCheckinTick({
+    config: fixture.config,
+    nowMs: startMs + 60_000,
+    target,
+  });
+  const acked = runCheckinTick({
+    ack: String(due.payload?.triggerId || ""),
+    config: fixture.config,
+    nowMs: startMs + 61_000,
+    target,
+  });
+  const handoff = runCheckinCreateHandoff({
+    config: fixture.config,
+    followupContext: "主会话回来后先确认这条线是否还在继续。",
+    nowMs: startMs + 62_000,
+    observedCurrentState: "最近还在改 hosted proactive。",
+    result: "silent",
+    target,
+    triggerId: String(acked.activeWake?.triggerId || ""),
+  });
+  assert.equal(handoff.state.activeWake, null);
+  assert.equal(handoff.state.pendingHandoff?.triggerId, due.payload?.triggerId);
+
+  const beforeExpiry = runCheckinTick({
+    config: fixture.config,
+    nowMs: startMs + 62_000 + CHECKIN_ACTIVE_WAKE_TIMEOUT_MS + 1_000,
+    target,
+  });
+  assert.equal(beforeExpiry.status, "scheduled");
+  assert.equal(beforeExpiry.state.activeWake, null);
+  assert.equal(beforeExpiry.state.pendingHandoff?.triggerId, due.payload?.triggerId);
+  assert.equal(beforeExpiry.state.lastCompletion, null);
+
+  const recovered = runCheckinTick({
+    config: fixture.config,
+    nowMs: startMs + 62_000 + CHECKIN_HANDOFF_TIMEOUT_MS + 1_000,
+    target,
+  });
+  assert.equal(recovered.status, "scheduled");
+  assert.equal(recovered.state.pendingHandoff, null);
+  assert.equal(recovered.state.lastCompletion?.result, "silent");
+  assert.equal(recovered.state.lastCompletion?.scheduleSource, "recovery");
 });
 
 test("checkin complete clamps overlong next wake to the 24h guardrail", () => {

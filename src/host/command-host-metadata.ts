@@ -198,6 +198,18 @@ const COMMAND_HOST_ACCESS_OVERRIDES = Object.freeze<Record<string, CommandHostAc
     supportTier: "host_neutral",
     enforceCurrentProfile: false,
   }),
+  "host.finalize_checkin": Object.freeze({
+    modeClasses: Object.freeze(["cli-only"] satisfies HostModeClass[]),
+    capabilities: Object.freeze([
+      "upsertOneShotWake",
+      "cancelOneShotWake",
+      "persistedOriginRouting",
+      "resolveHostedSession",
+    ] satisfies HostCapabilityId[]),
+    providerRecipes: Object.freeze(["hermes"] satisfies HostRecipeId[]),
+    supportTier: "host_neutral",
+    enforceCurrentProfile: false,
+  }),
   "host.render": Object.freeze({
     modeClasses: Object.freeze(["cli-only"] satisfies HostModeClass[]),
     capabilities: Object.freeze(["installCompanionSkill"] satisfies HostCapabilityId[]),

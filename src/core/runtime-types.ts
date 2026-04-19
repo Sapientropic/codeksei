@@ -14,6 +14,17 @@ export interface AttachmentFailure {
   reason: string;
 }
 
+export interface PendingProactiveHandoffRuntimePayload {
+  bookkeepingActions: string[];
+  followupContext: string;
+  handoffCreatedAt: string;
+  handoffExpiresAt: string;
+  observedCurrentState: string;
+  outcome: string;
+  triggerId: string;
+  userVisibleMessage: string;
+}
+
 export interface NormalizedIncomingMessage extends UnknownRecord {
   provider: string;
   workspaceId: string;
@@ -36,6 +47,7 @@ export interface PreparedRuntimeMessage extends NormalizedIncomingMessage {
   originalText: string;
   attachments: unknown[];
   attachmentFailures: AttachmentFailure[];
+  pendingProactiveHandoff?: PendingProactiveHandoffRuntimePayload | null;
   workspaceRoot: string;
 }
 

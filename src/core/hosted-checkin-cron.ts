@@ -4,7 +4,7 @@ import * as path from "node:path";
 
 import { resolveRuntimeEntrypointAbsolute } from "../contracts/runtime-entrypoints";
 import type { AppRuntimeConfig } from "./app-service-contract";
-import { buildContextBriefingJobEnv, resolveHermesContextBriefingScriptPath } from "../context/briefing-script";
+import { buildContextBriefingJobEnv, resolveHermesHostedCheckinScriptPath } from "../context/briefing-script";
 import {
   CHECKIN_ACTIVE_WAKE_TIMEOUT_MS,
   buildCheckinTargetKey,
@@ -14,14 +14,10 @@ import {
 import { resolveHostMode } from "./host-mode";
 import { resolveHermesHomePath } from "./hermes-repo-local";
 import { resolvePackageRoot } from "./path-utils";
+import { DEFAULT_CHECKIN_MAX_INTERVAL_MS, resolveCheckinConfig } from "../state/checkin-config";
 import { normalizeText } from "./text-normalization";
-import {
-  buildCheckinCompletionDurationGuidanceLines,
-  CHECKIN_COMPLETION_CONTEXT_GUIDANCE,
-  CHECKIN_COMPLETION_SLEEP_FOR_PLACEHOLDER,
-} from "../checkin/completion-guidance";
 
-export type HostedCheckinCronRole = "recovery" | "wake";
+export type HostedCheckinCronRole = "guard" | "recovery" | "wake";
 
 export interface HostedCheckinCronSyncJobPlan {
   env: Record<string, string>;
@@ -57,6 +53,7 @@ export interface HostedCheckinCronSummary {
   duplicateCount: number;
   drifted: boolean;
   futureJobs: HostedCheckinManagedJob[];
+  guardJobs: HostedCheckinManagedJob[];
   nextPlannedWakeAt: string;
   recoveryJobs: HostedCheckinManagedJob[];
   targetKey: string;
@@ -105,15 +102,19 @@ export function collectHostedCheckinCronSummary(
     && job.nextRunAt
     && Date.parse(job.nextRunAt) >= nowMs - toleranceMs
   ));
+  const guardJobs = futureJobs.filter((job) => job.role === "guard");
   const wakeJobs = futureJobs.filter((job) => job.role === "wake");
   const recoveryJobs = futureJobs.filter((job) => job.role === "recovery");
   const nextPlannedWakeAt = [...futureJobs]
     .sort((left, right) => Date.parse(left.nextRunAt) - Date.parse(right.nextRunAt))[0]?.nextRunAt || "";
-  const duplicateCount = Math.max(0, wakeJobs.length - 1) + Math.max(0, recoveryJobs.length - 1);
+  const duplicateCount = Math.max(0, wakeJobs.length - 1)
+    + Math.max(0, recoveryJobs.length - 1)
+    + Math.max(0, guardJobs.length - 1);
   return {
     duplicateCount,
     drifted: duplicateCount > 0,
     futureJobs,
+    guardJobs,
     nextPlannedWakeAt,
     recoveryJobs,
     targetKey,
@@ -133,6 +134,14 @@ export function createHostedCheckinCronPlanSetFromTick(
     nowMs?: number;
   } = {},
 ): HostedCheckinCronSyncPlanSet {
+  const guardDelayMs = resolveHostedCheckinGuardDelayMs(config);
+  const pendingHandoffWakeAt = normalizeText(tick.state.pendingHandoff?.handoffExpiresAt);
+  if (pendingHandoffWakeAt) {
+    return createHostedCheckinWakePlanSet(config, target, {
+      followupContext: followupContext || normalizeText(tick.state.pendingHandoff?.followupContext),
+      plannedWakeAt: pendingHandoffWakeAt,
+    });
+  }
   switch (tick.status) {
     case "due":
       return createHostedCheckinWakePlanSet(config, target, {
@@ -149,6 +158,10 @@ export function createHostedCheckinCronPlanSetFromTick(
           {
             plannedWakeAt: new Date(startedAtMs + CHECKIN_ACTIVE_WAKE_TIMEOUT_MS).toISOString(),
             role: "recovery",
+          },
+          {
+            plannedWakeAt: new Date(startedAtMs + guardDelayMs).toISOString(),
+            role: "guard",
           },
         ],
       });
@@ -183,6 +196,7 @@ export function createHostedCheckinWakePlanSet(
     throw new Error("缺少 nextWakeAt，无法创建 hosted wake one-shot job");
   }
   const recoveryWakeAt = buildRecoveryWakeAtIso(normalizedWakeAt);
+  const guardWakeAt = buildGuardWakeAtIso(config, normalizedWakeAt);
   return createHostedCheckinPlanSet(config, target, {
     jobs: [
       {
@@ -194,6 +208,11 @@ export function createHostedCheckinWakePlanSet(
         followupContext,
         plannedWakeAt: recoveryWakeAt,
         role: "recovery",
+      },
+      {
+        followupContext,
+        plannedWakeAt: guardWakeAt,
+        role: "guard",
       },
     ],
   });
@@ -242,7 +261,7 @@ function createHostedCheckinCronPlan(
   if (!normalizedWakeAt) {
     throw new Error(`非法的 hosted checkin wake 时间：${plannedWakeAt}`);
   }
-  // Codeksei decides which hosted wake/recovery job set should exist. Hermes
+  // Codeksei decides which hosted wake/recovery/guard job set should exist. Hermes
   // only persists that schedule plus origin metadata so runtime delivery can
   // use the stored job.origin target without re-discovering a live session
   // later.
@@ -253,7 +272,7 @@ function createHostedCheckinCronPlan(
     prompt: buildHostedCheckinCronPrompt(config, target, { followupContext }),
     role,
     schedule: normalizedWakeAt,
-    script: resolveHermesContextBriefingScriptPath(config),
+    script: resolveHermesHostedCheckinScriptPath(config),
     senderId: target.senderId,
     targetKey,
     workspaceRoot: target.workspaceRoot,
@@ -269,20 +288,7 @@ function buildHostedCheckinCronPrompt(
     followupContext?: string;
   } = {},
 ): string {
-  // The prompt teaches Hermes to claim and settle delegated proactive passes,
-  // while actual delivery routing comes from the persisted cron job origin
-  // metadata written by the hosted wake sync helper.
-  const claimCommand = buildHostedCheckinCliCommand(target.workspaceRoot, [
-    "host",
-    "claim-checkin",
-    "--provider",
-    "hermes",
-    "--user",
-    target.senderId,
-    "--workspace",
-    target.workspaceRoot,
-  ]);
-  const settleSilent = buildHostedCheckinCliCommand(target.workspaceRoot, [
+  const createHandoff = buildHostedCheckinCliCommand(target.workspaceRoot, [
     "host",
     "settle-checkin",
     "--provider",
@@ -293,45 +299,15 @@ function buildHostedCheckinCronPrompt(
     target.workspaceRoot,
     "--lease",
     "<leaseId>",
+    "--create-handoff",
     "--result",
-    "silent",
-    "--sleep-for",
-    CHECKIN_COMPLETION_SLEEP_FOR_PLACEHOLDER,
-  ]);
-  const settleSent = buildHostedCheckinCliCommand(target.workspaceRoot, [
-    "host",
-    "settle-checkin",
-    "--provider",
-    "hermes",
-    "--user",
-    target.senderId,
-    "--workspace",
-    target.workspaceRoot,
-    "--lease",
-    "<leaseId>",
-    "--result",
-    "sent_message",
-    "--sleep-for",
-    CHECKIN_COMPLETION_SLEEP_FOR_PLACEHOLDER,
-  ]);
-  const settleFailed = buildHostedCheckinCliCommand(target.workspaceRoot, [
-    "host",
-    "settle-checkin",
-    "--provider",
-    "hermes",
-    "--user",
-    target.senderId,
-    "--workspace",
-    target.workspaceRoot,
-    "--lease",
-    "<leaseId>",
-    "--result",
-    "failed",
+    "<sent_message|silent|backstage_only>",
   ]);
   return [
-    "[SYSTEM: You are running one Codeksei hosted proactive checkin on Hermes. Hermes only executes the managed wake/recovery job set; Codeksei remains the schedule source of truth.]",
+    "[SYSTEM: You are running one Codeksei hosted proactive child pass on Hermes.]",
+    "[SYSTEM: Your job is not to own the long-term schedule. Your job is to recover the user's current state, decide whether one short message is appropriate, and leave a structured handoff for the main session.]",
     "[SYSTEM: Do not create cron jobs yourself. Do not call codeksei start/shared:start/shared:watchdog. The attached codeksei-companion skill is the only companion workflow surface you should rely on.]",
-    "[SYSTEM: Hermes injects a fresh Codeksei context board via the job script right before this run. Treat that Script Output block as your current-state handoff, and use followupContext only as one-shot internal carry-forward.]",
+    "[SYSTEM: The Script Output block already contains the claimed lease, current context board, and default bookkeeping priorities. Treat it as the current-state handoff.]",
     ...(followupContext
       ? [
         "[SYSTEM: Additional internal follow-up context is provided below. Use it only as internal context for this proactive pass. Do not quote it verbatim to the user or expose internal planning.]",
@@ -341,20 +317,23 @@ function buildHostedCheckinCronPrompt(
       ]
       : []),
     "",
-    `1. Run this command first and inspect its JSON result: ${claimCommand}`,
-    "2. Branch by claim status:",
-    "   - idle: no proactive pass is due right now. Respond with exactly [SILENT].",
-    "   - in_progress: another proactive pass already owns the lease. Respond with exactly [SILENT].",
-    "   - claimed: extract lease.id and payload.text, then continue with this proactive pass.",
-    "3. Execute exactly one proactive pass using payload.text as the task instruction. Keep it stateful and lightweight. You may stay silent, produce one short final message, or only do backstage work.",
-    "4. Before ending the run, you must execute exactly one settle command.",
-    `   - ${CHECKIN_COMPLETION_CONTEXT_GUIDANCE.replaceAll("checkin-complete", "host settle-checkin")}`,
-    ...buildCheckinCompletionDurationGuidanceLines().map((line) => `   - ${line}`),
-    `   - If your final response is the actual user-visible message, use a command like: ${settleSent}`,
-    `   - If you intentionally stay silent, use a command like: ${settleSilent} and make your final response exactly [SILENT].`,
-    "   - Use result=backstage_only only when you only did backstage work; in that case your final response must also be exactly [SILENT].",
-    `   - If Hermes cannot complete this delegated pass truthfully after claim, use: ${settleFailed}`,
-    "5. Never skip host settle-checkin after a claimed lease. Never execute more than one settle command in the same run.",
+    "1. Read the Script Output block first.",
+    "   - If it says claim_status: idle or in_progress, respond with exactly SILENT.",
+    "   - If it says claim_status: claimed, continue with this proactive pass.",
+    "2. Your default goal is to avoid losing track of the user.",
+    "   - If you do not know whether they are still on the same line, prefer one short check-in question over guessing.",
+    "   - SILENT is only for clearly bad moments to interrupt, not as a default escape hatch.",
+    "3. Keep the user-visible part short and natural, like one WeChat line, not a mini-essay.",
+    "4. Even if you stay silent, decide whether this round still deserves continuity work.",
+    "   - If you already know the current time block / cutover / project state / support correction, default to recording it through timeline / diary / project note / companion memory / review instead of leaving it only in chat.",
+    "5. Before you finish, you must execute exactly one handoff command to persist what you learned for the main session.",
+    `   - Base command: ${createHandoff}`,
+    "   - Add --message only when you actually sent a user-visible message.",
+    "   - Add --observed-state with the best short summary of what the user is doing now.",
+    "   - Add --followup-context with the internal carry-forward the main session should remember next.",
+    "   - Repeat --bookkeeping-action with kind|done|summary or kind|suggested|summary for each continuity action you already took or think the main session should take next.",
+    "6. After the handoff command succeeds, your final text response must be either SILENT or one short natural WeChat message.",
+    "7. Never expose lease ids, schedule decisions, commands, job ids, or internal reasoning in the user-visible reply.",
   ].join("\n");
 }
 
@@ -364,6 +343,17 @@ function buildRecoveryWakeAtIso(plannedWakeAt: string): string {
     throw new Error(`非法的 hosted checkin wake 时间：${plannedWakeAt}`);
   }
   return new Date(plannedWakeAtMs + CHECKIN_ACTIVE_WAKE_TIMEOUT_MS).toISOString();
+}
+
+function buildGuardWakeAtIso(
+  config: Partial<HostedCheckinConfig>,
+  plannedWakeAt: string,
+): string {
+  const plannedWakeAtMs = Date.parse(plannedWakeAt);
+  if (!Number.isFinite(plannedWakeAtMs)) {
+    throw new Error(`非法的 hosted checkin wake 时间：${plannedWakeAt}`);
+  }
+  return new Date(plannedWakeAtMs + resolveHostedCheckinGuardDelayMs(config)).toISOString();
 }
 
 function buildHostedCheckinCronEnv(
@@ -484,10 +474,26 @@ function normalizeManagedCheckinJob(value: unknown): HostedCheckinManagedJob | n
 
 function normalizeManagedRole(value: unknown): HostedCheckinCronRole | "" {
   const normalized = normalizeText(value).toLowerCase();
-  if (normalized === "wake" || normalized === "recovery") {
+  if (normalized === "wake" || normalized === "recovery" || normalized === "guard") {
     return normalized;
   }
   return "";
+}
+
+function resolveHostedCheckinGuardDelayMs(config: Partial<HostedCheckinConfig>): number {
+  const checkinConfigFile = normalizeText(config.checkinConfigFile);
+  const configuredMaxIntervalMs = checkinConfigFile
+    ? resolveCheckinConfig({ filePath: checkinConfigFile }).maxIntervalMs
+    : DEFAULT_CHECKIN_MAX_INTERVAL_MS;
+  // Hermes cron sessions can fail before the child even reaches claim-checkin
+  // (for example 429 / connection errors). In that case the currently firing
+  // wake/recovery run cannot seed its own successor, so we always keep one
+  // later guard job alive as a liveness backstop.
+  return Math.max(
+    CHECKIN_ACTIVE_WAKE_TIMEOUT_MS * 2,
+    DEFAULT_CHECKIN_MAX_INTERVAL_MS,
+    configuredMaxIntervalMs,
+  );
 }
 
 export function isHostedHermesCheckinEnabled(config: Partial<HostedCheckinConfig>): boolean {

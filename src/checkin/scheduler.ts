@@ -4,8 +4,10 @@ import type { AppRuntimeConfig } from "../core/app-service-contract";
 import { parseCompactDurationMs } from "../core/duration";
 import type {
   CheckinActiveWake,
+  CheckinBookkeepingAction,
   CheckinCompletionResult,
   CheckinLastCompletion,
+  CheckinPendingHandoff,
   CheckinPendingTrigger,
   CheckinScheduleSource,
   CheckinScheduleState,
@@ -41,6 +43,7 @@ import { normalizeCompanionProfileLanguage } from "../companion-memory/profile-s
 const INTERNAL_CHECKIN_TRIGGER_TEMPLATE = "Take a quiet look at whether now is a good moment to reach out to %PERSON%. You may stay silent, send one short WeChat message, update diary/timeline, or take another useful backstage action. If no user-visible message should be sent, output exactly SILENT. If you do send a message, output only the message text.";
 const CHECKIN_MAX_SILENCE_MS = 24 * 60 * 60_000;
 export const CHECKIN_ACTIVE_WAKE_TIMEOUT_MS = 30 * 60_000;
+export const CHECKIN_HANDOFF_TIMEOUT_MS = 12 * 60 * 60_000;
 
 type CheckinTickConfig = Pick<AppRuntimeConfig, "checkinConfigFile" | "checkinScheduleStateFile"> & Partial<Pick<AppRuntimeConfig, "stateDir" | "userName">>;
 
@@ -56,6 +59,29 @@ interface CheckinCompleteArgs {
   nextWakeAt?: string;
   nowMs?: number;
   result: CheckinCompletionResult;
+  sleepFor?: string;
+  target: CheckinResolvedTarget;
+  triggerId: string;
+}
+
+interface CheckinCreateHandoffArgs {
+  bookkeepingActions?: CheckinBookkeepingAction[];
+  config: CheckinTickConfig;
+  followupContext?: string;
+  handoffTimeoutMs?: number;
+  nowMs?: number;
+  observedCurrentState?: string;
+  result: CheckinCompletionResult;
+  target: CheckinResolvedTarget;
+  triggerId: string;
+  userVisibleMessage?: string;
+}
+
+interface CheckinFinalizeHandoffArgs {
+  config: CheckinTickConfig;
+  nextWakeAt?: string;
+  nowMs?: number;
+  result?: CheckinCompletionResult;
   sleepFor?: string;
   target: CheckinResolvedTarget;
   triggerId: string;
@@ -90,6 +116,13 @@ export interface CheckinCompleteResult {
   intervalConfig: ResolvedCheckinConfig;
   nextDueAt: string;
   nextWakeAt: string;
+  state: CheckinScheduleState;
+  target: CheckinResolvedTarget;
+}
+
+export interface CheckinCreateHandoffResult {
+  handoff: CheckinPendingHandoff;
+  intervalConfig: ResolvedCheckinConfig;
   state: CheckinScheduleState;
   target: CheckinResolvedTarget;
 }
@@ -183,6 +216,18 @@ export function runCheckinTick({
       payload: null,
       state: currentState,
       status: "in_progress",
+      target,
+    });
+  }
+
+  if (currentState.pendingHandoff) {
+    return buildTickResult({
+      acknowledged: false,
+      due: false,
+      intervalConfig,
+      payload: null,
+      state: currentState,
+      status: "scheduled",
       target,
     });
   }
@@ -282,34 +327,118 @@ export function runCheckinComplete({
     nowMs,
     sleepFor,
   });
-  const completion = resolveNextWakeForCompletion({
+  return persistCheckinCompletion({
     currentState,
     intervalConfig,
     nowMs,
     requestedNextWakeAt,
     result,
+    stateStore,
+    target,
     triggerId: activeWake.triggerId,
+  });
+}
+
+export function runCheckinCreateHandoff({
+  bookkeepingActions = [],
+  config,
+  followupContext = "",
+  handoffTimeoutMs = CHECKIN_HANDOFF_TIMEOUT_MS,
+  nowMs = Date.now(),
+  observedCurrentState = "",
+  result,
+  target,
+  triggerId,
+  userVisibleMessage = "",
+}: CheckinCreateHandoffArgs): CheckinCreateHandoffResult {
+  const intervalConfig = resolveCheckinIntervalConfig(config);
+  const stateStore = new CheckinScheduleStateStore({
+    filePath: resolveCheckinScheduleStateFile(config),
+  });
+  const currentState = resolveOperationalCheckinStateForTarget({
+    intervalConfig,
+    nowMs,
+    stateStore,
+    target,
+  });
+  const activeWake = currentState.activeWake;
+  if (!activeWake) {
+    throw new Error("checkin handoff 当前没有处于进行中的 active wake");
+  }
+  if (activeWake.triggerId !== normalizeText(triggerId)) {
+    throw new Error(`checkin handoff trigger 不匹配当前 active wake: ${normalizeText(triggerId)}`);
+  }
+  const handoff = buildPendingHandoff({
+    bookkeepingActions,
+    followupContext,
+    handoffTimeoutMs,
+    nowMs,
+    observedCurrentState,
+    result,
+    triggerId: activeWake.triggerId,
+    userVisibleMessage,
   });
   const nextState = stateStore.setState({
     activeWake: null,
-    lastCompletion: completion,
-    nextWakeAt: completion.nextWakeAt,
+    lastCompletion: currentState.lastCompletion,
+    nextWakeAt: "",
+    pendingHandoff: handoff,
     pendingTrigger: null,
-    scheduleSource: completion.scheduleSource,
+    scheduleSource: currentState.scheduleSource,
     senderId: target.senderId,
     targetKey: buildCheckinTargetKey(target),
     updatedAt: new Date(nowMs).toISOString(),
     workspaceRoot: target.workspaceRoot,
   });
-
   return {
-    completion,
+    handoff,
     intervalConfig,
-    nextDueAt: completion.nextWakeAt,
-    nextWakeAt: completion.nextWakeAt,
     state: nextState,
     target,
   };
+}
+
+export function runCheckinFinalizeHandoff({
+  config,
+  nextWakeAt = "",
+  nowMs = Date.now(),
+  result,
+  sleepFor = "",
+  target,
+  triggerId,
+}: CheckinFinalizeHandoffArgs): CheckinCompleteResult {
+  const intervalConfig = resolveCheckinIntervalConfig(config);
+  const stateStore = new CheckinScheduleStateStore({
+    filePath: resolveCheckinScheduleStateFile(config),
+  });
+  const currentState = resolveOperationalCheckinStateForTarget({
+    intervalConfig,
+    nowMs,
+    stateStore,
+    target,
+  });
+  const pendingHandoff = currentState.pendingHandoff;
+  if (!pendingHandoff) {
+    throw new Error("checkin finalize 当前没有待主会话接管的 proactive handoff");
+  }
+  if (pendingHandoff.triggerId !== normalizeText(triggerId)) {
+    throw new Error(`checkin finalize trigger 不匹配当前 pending handoff: ${normalizeText(triggerId)}`);
+  }
+  const requestedNextWakeAt = resolveRequestedNextWakeAt({
+    nextWakeAt,
+    nowMs,
+    sleepFor,
+  });
+  return persistCheckinCompletion({
+    currentState,
+    intervalConfig,
+    nowMs,
+    requestedNextWakeAt,
+    result: result || pendingHandoff.outcome,
+    stateStore,
+    target,
+    triggerId: pendingHandoff.triggerId,
+  });
 }
 
 export function runCheckinScheduleNextWake({
@@ -356,6 +485,7 @@ export function runCheckinScheduleNextWake({
     activeWake: null,
     lastCompletion: currentState.lastCompletion,
     nextWakeAt: recordedNextWakeAt,
+    pendingHandoff: null,
     pendingTrigger: null,
     scheduleSource,
     senderId: target.senderId,
@@ -410,6 +540,31 @@ function resolveOperationalCheckinStateForTarget({
     stateStore,
     target,
   });
+  const pendingHandoff = state.pendingHandoff;
+  if (pendingHandoff) {
+    const handoffExpiresAtMs = Date.parse(pendingHandoff.handoffExpiresAt);
+    if (Number.isFinite(handoffExpiresAtMs) && handoffExpiresAtMs <= nowMs) {
+      return persistCheckinCompletion({
+        currentState: state,
+        intervalConfig,
+        nowMs,
+        requestedNextWakeAt: "",
+        result: pendingHandoff.outcome,
+        scheduleSourceOverride: "recovery",
+        stateStore,
+        target,
+        triggerId: pendingHandoff.triggerId,
+      }).state;
+    }
+    if (state.activeWake) {
+      return stateStore.setState({
+        ...state,
+        activeWake: null,
+        updatedAt: new Date(nowMs).toISOString(),
+      });
+    }
+    return state;
+  }
   const activeWake = state.activeWake;
   if (activeWake) {
     const startedAtMs = Date.parse(activeWake.startedAt);
@@ -472,6 +627,7 @@ function resolveCheckinScheduleStateForTarget({
     activeWake: null,
     lastCompletion: null,
     nextWakeAt: "",
+    pendingHandoff: null,
     pendingTrigger: null,
     scheduleSource: "fallback",
     senderId: target.senderId,
@@ -502,6 +658,7 @@ function scheduleFallbackCheckin({
     activeWake: null,
     lastCompletion: currentState.lastCompletion,
     nextWakeAt,
+    pendingHandoff: null,
     pendingTrigger: null,
     scheduleSource,
     senderId: target.senderId,
@@ -509,6 +666,96 @@ function scheduleFallbackCheckin({
     updatedAt: new Date(nowMs).toISOString(),
     workspaceRoot: target.workspaceRoot,
   });
+}
+
+function persistCheckinCompletion({
+  currentState,
+  intervalConfig,
+  nowMs,
+  requestedNextWakeAt,
+  result,
+  scheduleSourceOverride,
+  stateStore,
+  target,
+  triggerId,
+}: {
+  currentState: CheckinScheduleState;
+  intervalConfig: ResolvedCheckinConfig;
+  nowMs: number;
+  requestedNextWakeAt: string;
+  result: CheckinCompletionResult;
+  scheduleSourceOverride?: CheckinScheduleSource;
+  stateStore: CheckinScheduleStateStore;
+  target: CheckinResolvedTarget;
+  triggerId: string;
+}): CheckinCompleteResult {
+  const completion = resolveNextWakeForCompletion({
+    currentState,
+    intervalConfig,
+    nowMs,
+    requestedNextWakeAt,
+    result,
+    triggerId,
+    ...(scheduleSourceOverride ? { scheduleSourceOverride } : {}),
+  });
+  const nextState = stateStore.setState({
+    activeWake: null,
+    lastCompletion: completion,
+    nextWakeAt: completion.nextWakeAt,
+    pendingHandoff: null,
+    pendingTrigger: null,
+    scheduleSource: completion.scheduleSource,
+    senderId: target.senderId,
+    targetKey: buildCheckinTargetKey(target),
+    updatedAt: new Date(nowMs).toISOString(),
+    workspaceRoot: target.workspaceRoot,
+  });
+  return {
+    completion,
+    intervalConfig,
+    nextDueAt: completion.nextWakeAt,
+    nextWakeAt: completion.nextWakeAt,
+    state: nextState,
+    target,
+  };
+}
+
+function buildPendingHandoff({
+  bookkeepingActions,
+  followupContext,
+  handoffTimeoutMs,
+  nowMs,
+  observedCurrentState,
+  result,
+  triggerId,
+  userVisibleMessage,
+}: {
+  bookkeepingActions: CheckinBookkeepingAction[];
+  followupContext: string;
+  handoffTimeoutMs: number;
+  nowMs: number;
+  observedCurrentState: string;
+  result: CheckinCompletionResult;
+  triggerId: string;
+  userVisibleMessage: string;
+}): CheckinPendingHandoff {
+  const handoffCreatedAt = new Date(nowMs).toISOString();
+  return {
+    bookkeepingActions: bookkeepingActions
+      .map((entry) => ({
+        kind: entry.kind,
+        status: entry.status,
+        summary: normalizeText(entry.summary),
+      }))
+      .filter((entry) => entry.summary),
+    followupContext: normalizeText(followupContext),
+    handoffCreatedAt,
+    handoffExpiresAt: new Date(nowMs + Math.max(handoffTimeoutMs, 60_000)).toISOString(),
+    observedCurrentState: normalizeText(observedCurrentState),
+    outcome: result,
+    triggerId,
+    userVisibleMessage: normalizeText(userVisibleMessage),
+  };
 }
 
 function setPendingTrigger({
@@ -532,6 +779,7 @@ function setPendingTrigger({
     activeWake: null,
     lastCompletion: currentState.lastCompletion,
     nextWakeAt: "",
+    pendingHandoff: null,
     pendingTrigger: {
       ...payload,
       dueAt,
@@ -567,6 +815,7 @@ function activatePendingTrigger({
     },
     lastCompletion: currentState.lastCompletion,
     nextWakeAt: "",
+    pendingHandoff: null,
     pendingTrigger: null,
     scheduleSource: currentState.scheduleSource,
     senderId: target.senderId,
@@ -610,6 +859,7 @@ function resolveNextWakeForCompletion({
   nowMs,
   requestedNextWakeAt,
   result,
+  scheduleSourceOverride,
   triggerId,
 }: {
   currentState: CheckinScheduleState;
@@ -617,6 +867,7 @@ function resolveNextWakeForCompletion({
   nowMs: number;
   requestedNextWakeAt: string;
   result: CheckinCompletionResult;
+  scheduleSourceOverride?: CheckinScheduleSource;
   triggerId: string;
 }): CheckinLastCompletion {
   const requestedNextWakeAtMs = Date.parse(requestedNextWakeAt);
@@ -626,7 +877,7 @@ function resolveNextWakeForCompletion({
       completedAt,
       nextWakeAt: new Date(nowMs + pickRandomDelayMs(intervalConfig.minIntervalMs, intervalConfig.maxIntervalMs)).toISOString(),
       result,
-      scheduleSource: "fallback",
+      scheduleSource: scheduleSourceOverride || "fallback",
       triggerId,
     };
   }
@@ -635,7 +886,7 @@ function resolveNextWakeForCompletion({
       completedAt,
       nextWakeAt: new Date(nowMs + CHECKIN_MAX_SILENCE_MS).toISOString(),
       result,
-      scheduleSource: "guardrail_clamped",
+      scheduleSource: scheduleSourceOverride || "guardrail_clamped",
       triggerId,
     };
   }
@@ -643,7 +894,7 @@ function resolveNextWakeForCompletion({
     completedAt,
     nextWakeAt: requestedNextWakeAt,
     result,
-    scheduleSource: "agent",
+    scheduleSource: scheduleSourceOverride || "agent",
     triggerId,
   };
 }
@@ -651,6 +902,7 @@ function resolveNextWakeForCompletion({
 function resolveLastWakeAnchorMs(state: CheckinScheduleState): number {
   const candidates = [
     state.lastCompletion?.completedAt,
+    state.pendingHandoff?.handoffCreatedAt,
     state.activeWake?.startedAt,
     state.pendingTrigger?.createdAt,
     state.updatedAt,
