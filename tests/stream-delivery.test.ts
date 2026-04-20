@@ -591,6 +591,41 @@ test("settled mode waits for turn completion and only sends the latest visible r
   ]);
 });
 
+test("reply mode setter only affects future turns", async (t) => {
+  enableMockTimers(t);
+  const { delivery, sent, attach } = createDelivery({
+    weixinReplyMode: "stream",
+    streamIdleFlushMs: 5,
+    streamForceFlushChars: 100,
+    streamBoundaryFlushChars: 1,
+  });
+
+  attach("thread-mode");
+  await startTurn(delivery, "thread-mode", "turn-before");
+  delivery.setWeixinReplyMode("settled");
+  await sendDelta(delivery, {
+    threadId: "thread-mode",
+    turnId: "turn-before",
+    itemId: "item-before",
+    text: "第一句。",
+  });
+  await advanceDelivery(t, delivery, sent, { expectedLength: 1 });
+
+  attach("thread-mode");
+  await startTurn(delivery, "thread-mode", "turn-after");
+  await sendDelta(delivery, {
+    threadId: "thread-mode",
+    turnId: "turn-after",
+    itemId: "item-after",
+    text: "第二句。",
+  });
+  await advanceDelivery(t, delivery, sent, { expectedLength: 1 });
+  await completeTurn(delivery, "thread-mode", "turn-after");
+  await advanceDelivery(t, delivery, sent, { expectedLength: 2 });
+
+  assert.deepEqual(sent.map((item) => item.text), ["第一句。", "第二句。"]);
+});
+
 test("stream mode waits for a natural boundary before sending a final sentence", async (t) => {
   enableMockTimers(t);
   const { delivery, sent, attach } = createDelivery({

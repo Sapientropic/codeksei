@@ -8,6 +8,7 @@ import { RuntimeTurnLifecycle } from "../runtime/runtime-turn-lifecycle";
 import { RuntimeWatchdogLifecycle } from "../runtime/runtime-watchdog-lifecycle";
 import { ReminderQueueStore } from "../state/reminder-queue-store";
 import { SystemMessageQueueStore } from "../state/system-message-queue-store";
+import { resolveWeixinDeliveryConfig } from "../state/weixin-delivery-config";
 import { persistIncomingWeixinAttachments } from "../adapters/channel/weixin/media-receive";
 import type {
   AppRuntimeConfig,
@@ -99,10 +100,14 @@ function createAppInfrastructure({
   const replyFailureHandlerRef: ReplyFailureHandlerRef = {
     current: async () => undefined,
   };
+  const weixinDeliveryConfig = resolveWeixinDeliveryConfig({
+    filePath: config.weixinDeliveryConfigFile,
+    defaultReplyMode: config.weixinReplyMode,
+  });
   const streamDelivery = new StreamDelivery({
     channelAdapter,
     sessionStore: runtimeAdapter.getSessionStore(),
-    weixinReplyMode: config.weixinReplyMode,
+    weixinReplyMode: weixinDeliveryConfig.replyMode,
     deliveryTraceEnabled: Boolean(config.weixinDeliveryTrace),
     onDeliveryFailure: (payload: DeliveryFailurePayload) => replyFailureHandlerRef.current(payload),
   });
@@ -197,6 +202,7 @@ function createRuntimeWorkflowServices({
       resolveWorkspaceRoot,
       runtimeAdapter,
       sessionWriter,
+      streamDelivery,
       threadStateStore,
     }),
   }) as ChannelCommandRouterLike;

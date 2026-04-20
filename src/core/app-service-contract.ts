@@ -194,7 +194,7 @@ export interface RuntimeAdapterLike {
     accessMode?: string;
   }): Promise<unknown>;
   respondApproval(args: { requestId: string; decision: "accept" | "decline" }): Promise<unknown>;
-  resumeThread(args: { threadId: string }): Promise<unknown>;
+  resumeThread(args: { threadId: string; workspaceRoot?: string }): Promise<unknown>;
   sendTextTurn(args: {
     bindingKey: string;
     workspaceRoot: string;
@@ -365,6 +365,7 @@ export interface StreamDeliveryLike {
   handleRuntimeEvent(event: RuntimeEvent<UnknownRecord>): Promise<void>;
   queueReplyTargetForThread(threadId: string, target: ReplyTarget): void;
   setReplyTarget(bindingKey: string, target: ReplyTarget): void;
+  setWeixinReplyMode(mode: unknown): void;
 }
 
 export interface CreateAppServicesArgs {

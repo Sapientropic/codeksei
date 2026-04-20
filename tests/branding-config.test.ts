@@ -39,6 +39,7 @@ test("readConfig uses CODEKSEI_* values", () => {
     assert.equal(config.userLanguage, "en");
     assert.equal(config.workspaceRoot, "E:/new-workspace");
     assert.equal(config.weixinReplyMode, "settled");
+    assert.match(config.weixinDeliveryConfigFile.replace(/\\/g, "/"), /\/\.codeksei\/weixin-delivery-config\.json$/u);
   } finally {
     process.argv = originalArgv;
   }

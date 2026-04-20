@@ -37,6 +37,7 @@ test("config slices compose into the legacy-compatible app runtime surface", () 
       accountsDir: "E:/state/accounts",
       weixinBaseUrl: "http://127.0.0.1",
       weixinCdnBaseUrl: "https://cdn.example.com",
+      weixinDeliveryConfigFile: "E:/state/weixin-delivery-config.json",
       weixinReplyMode: "stream",
       weixinDeliveryTrace: false,
       weixinQrBotType: "3",
@@ -132,5 +133,6 @@ test("parseEnvConfig keeps workspace schema refs and state-backed checkin files 
   assert.equal(config.proactiveObservationModel, "gemma-4-E2B-it");
   assert.equal(config.proactiveObservationMinConfidence, 0.55);
   assert.equal(config.checkinConfigFile.replace(/\\/g, "/"), "E:/state/checkin-config.json");
+  assert.equal(config.weixinDeliveryConfigFile.replace(/\\/g, "/"), "E:/state/weixin-delivery-config.json");
   assert.equal(config.systemMessageQueueFile.replace(/\\/g, "/"), "E:/state/system-message-queue.json");
 });

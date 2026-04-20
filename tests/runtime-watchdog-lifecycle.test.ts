@@ -114,7 +114,7 @@ function createLifecycleHarness({
           },
         };
       },
-      async resumeThread(payload: { threadId: string }) {
+      async resumeThread(payload: { threadId: string; workspaceRoot?: string }) {
         resumedThreads.push(payload.threadId);
       },
     } as never,

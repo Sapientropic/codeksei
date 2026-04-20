@@ -195,6 +195,41 @@ test("command classification helpers cover representative explicit and default b
   assert.deepEqual(resolveCommandHostProfileIdsDefinition("timeline.screenshot"), ["codex-mode", "hosted-mode"]);
 });
 
+test("mutating weixin control commands are write-scoped and bridge-only", () => {
+  const mutatingWeixinActions = listCommandActions().filter((action: {
+    action: string;
+    entrypointType: string;
+    weixin: string[];
+  }) => (
+    action.entrypointType === "weixin"
+    && action.weixin.length > 0
+    && (
+      action.action.startsWith("approval.")
+      || action.action.endsWith(".select")
+      || action.action.endsWith(".configure")
+    )
+  ));
+
+  assert.deepEqual(
+    mutatingWeixinActions.map((action: { action: string }) => action.action).sort(),
+    [
+      "approval.accept_once",
+      "approval.accept_workspace",
+      "approval.reject_once",
+      "checkin.select",
+      "effort.select",
+      "model.select",
+      "reply.configure",
+    ],
+  );
+  for (const action of mutatingWeixinActions) {
+    assert.equal(action.mutability, "write", `${action.action} should not look read-only`);
+    assert.equal(action.safetyTier, "warned", `${action.action} should not look open`);
+    assert.equal(action.hostSupportTier, "bridge_only", `${action.action} should not look host-neutral`);
+    assert.deepEqual(action.hostProfileIds, ["codex-mode"], `${action.action} should stay scoped to Codex bridge mode`);
+  }
+});
+
 test("every command action resolves through either an explicit classification override or the documented default", () => {
   const audienceOverrideIds = new Set(Object.keys(COMMAND_AUDIENCE_OVERRIDES));
   const authOverrideIds = new Set(Object.keys(COMMAND_AUTH_OVERRIDES));

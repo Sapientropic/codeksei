@@ -458,6 +458,23 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "port", keys: ["--port"], type: "string", defaultValue: "", description: "显式指定本地开发服务端口" },
     ],
   }),
+  frameBuild: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+    ],
+  }),
+  frameServe: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "port", keys: ["--port"], type: "string", defaultValue: "", description: "显式指定本地服务端口" },
+    ],
+  }),
+  frameDev: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "port", keys: ["--port"], type: "string", defaultValue: "", description: "显式指定本地开发服务端口" },
+    ],
+  }),
 });
 
 export function getCommandArgsSchema(name: string): CommandArgSchema | null {

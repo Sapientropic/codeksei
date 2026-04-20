@@ -1,4 +1,5 @@
 import { normalizeText } from "../../../core/text-normalization";
+import { resolveWeixinDeliveryConfig, DEFAULT_WEIXIN_MIN_CHUNK_CHARS } from "../../../state/weixin-delivery-config";
 import * as crypto from "node:crypto";
 import {
   getConfigV2,
@@ -30,6 +31,7 @@ const WEIXIN_SEND_CHUNK_LIMIT = 80;
 const WEIXIN_MAX_DELIVERY_MESSAGES = 10;
 
 interface DeliveryConfig {
+  weixinDeliveryConfigFile?: string;
   weixinDeliveryTrace?: boolean;
   weixinProtocolClientVersion?: string;
 }
@@ -93,9 +95,10 @@ export function createWeixinDeliveryFacade({
       return Promise.resolve();
     }
     const normalizedContent = normalizePlainTextForWeixin(content) || "已完成。";
+    const minChunkChars = normalizeMinChunkChars(resolveDeliveryMinChunkChars(config));
     const chunkCandidates = preserveBlock
       ? chunkReplyText(normalizedContent, MAX_WEIXIN_CHUNK)
-      : chunkReplyTextForWeixin(normalizedContent, WEIXIN_SEND_CHUNK_LIMIT);
+      : chunkReplyTextForWeixin(normalizedContent, minChunkChars);
     const sendChunks = packChunksForWeixinDelivery(
       chunkCandidates.length ? chunkCandidates : [normalizedContent],
       WEIXIN_MAX_DELIVERY_MESSAGES,
@@ -188,6 +191,21 @@ export function createWeixinDeliveryFacade({
     sendText: sendTextChunks,
     sendTyping,
   };
+}
+
+function resolveDeliveryMinChunkChars(config: DeliveryConfig): number {
+  const configFile = normalizeText(config.weixinDeliveryConfigFile);
+  if (!configFile) {
+    return WEIXIN_SEND_CHUNK_LIMIT;
+  }
+  return resolveWeixinDeliveryConfig({ filePath: configFile }).minChunkChars;
+}
+
+function normalizeMinChunkChars(value: unknown): number {
+  const numeric = Number(value);
+  return Number.isInteger(numeric) && numeric > 0 && numeric <= MAX_WEIXIN_CHUNK
+    ? numeric
+    : DEFAULT_WEIXIN_MIN_CHUNK_CHARS;
 }
 
 export function sendV2TextChunk({

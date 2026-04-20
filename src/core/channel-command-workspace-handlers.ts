@@ -312,7 +312,7 @@ function createWorkspaceCommandHandlers({
       // redirect context.
       const knownTarget = sessionStore.findBindingForThreadId(targetThreadId);
       const workspaceRoot = knownTarget?.workspaceRoot || currentWorkspaceRoot;
-      await runtimeAdapter.resumeThread({ threadId: targetThreadId });
+      await runtimeAdapter.resumeThread({ threadId: targetThreadId, workspaceRoot });
       await sessionWriter.setThreadIdForWorkspace(bindingKey, workspaceRoot, targetThreadId);
       const switchedWorkspaceNotice = workspaceRoot !== currentWorkspaceRoot
         ? "\n已跟随这条 thread 的已知 workspace。"

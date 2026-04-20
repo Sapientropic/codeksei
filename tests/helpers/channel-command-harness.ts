@@ -47,6 +47,7 @@ interface ControlHarness {
     params: { effort?: string; model?: string };
     workspaceRoot: string;
   }>;
+  setReplyModeCalls: unknown[];
   textCalls: TextCall[];
 }
 
@@ -74,7 +75,7 @@ interface WorkspaceHarness {
     threadId: string;
     workspaceRoot: string;
   }>;
-  resumeCalls: Array<{ threadId: string }>;
+  resumeCalls: Array<{ threadId: string; workspaceRoot?: string }>;
   setThreadCalls: Array<{ key: string; threadId: string; workspaceRoot: string }>;
   setWorkspaceCalls: Array<{ key: string; workspaceRoot: string }>;
   textCalls: TextCall[];
@@ -151,6 +152,7 @@ function createControlCommandHarness({
   const rememberPrefixCalls: Array<{ commandTokens: string[]; workspaceRoot: string }> = [];
   const resolveApprovalCalls: Array<{ status?: string; threadId: string }> = [];
   const setModelCalls: Array<{ bindingKey: string; params: { effort?: string; model?: string }; workspaceRoot: string }> = [];
+  const setReplyModeCalls: unknown[] = [];
 
   const sessionStore = {
     buildBindingKey() {
@@ -218,18 +220,26 @@ function createControlCommandHarness({
       channelAdapter,
       config: {
         checkinConfigFile: path.join(fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-checkin-harness-")), "checkin-config.json"),
+        weixinDeliveryConfigFile: path.join(fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-delivery-harness-")), "weixin-delivery-config.json"),
+        weixinReplyMode: "stream",
       },
       resolveWorkspaceRoot() {
         return workspaceRoot;
       },
       runtimeAdapter,
       sessionWriter,
+      streamDelivery: {
+        setWeixinReplyMode(mode: unknown) {
+          setReplyModeCalls.push(mode);
+        },
+      },
       threadStateStore,
     }),
     rememberPrefixCalls,
     resolveApprovalCalls,
     respondApprovalCalls,
     setModelCalls,
+    setReplyModeCalls,
     textCalls,
   };
 }
@@ -305,7 +315,7 @@ function createWorkspaceCommandHarness({
     async refreshThreadInstructions(payload: WorkspaceHarness["refreshCalls"][number]) {
       refreshCalls.push(payload);
     },
-    async resumeThread(payload: { threadId: string }) {
+    async resumeThread(payload: { threadId: string; workspaceRoot?: string }) {
       resumeCalls.push(payload);
     },
   };

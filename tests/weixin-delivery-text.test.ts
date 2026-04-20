@@ -36,16 +36,23 @@ test("collectStreamingBoundaries tracks Chinese punctuation, quotes, paragraph a
   );
 });
 
-test("chunkReplyTextForWeixin splits along semantic Chinese boundaries before falling back", () => {
+test("chunkReplyTextForWeixin keeps tiny semantic units together until the merge threshold", () => {
   assert.deepEqual(
-    chunkReplyTextForWeixin("第一句。第二句。第三句。", 4),
+    chunkReplyTextForWeixin("第一句。第二句。第三句。", 20),
+    ["第一句。第二句。第三句。"],
+  );
+});
+
+test("chunkReplyTextForWeixin still splits when the merge threshold is already met", () => {
+  assert.deepEqual(
+    chunkReplyTextForWeixin("第一句。第二句。第三句。", 4, 3800),
     ["第一句。", "第二句。", "第三句。"],
   );
 });
 
 test("chunkReplyTextForWeixin falls back to generic chunking for long units", () => {
   assert.deepEqual(
-    chunkReplyTextForWeixin("abcdefghij", 4),
+    chunkReplyTextForWeixin("abcdefghij", 4, 4),
     ["abcd", "efgh", "ij"],
   );
 });

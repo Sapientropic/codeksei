@@ -88,6 +88,8 @@ test("approval commands still resolve persisted pending approval after a restart
     },
     config: {
       checkinConfigFile: path.join(os.tmpdir(), "codeksei-approval-checkin.json"),
+      weixinDeliveryConfigFile: path.join(os.tmpdir(), "codeksei-approval-delivery.json"),
+      weixinReplyMode: "stream",
     },
     resolveWorkspaceRoot() {
       return "E:/repo/current";
@@ -101,6 +103,9 @@ test("approval commands still resolve persisted pending approval after a restart
       },
     },
     sessionWriter,
+    streamDelivery: {
+      setWeixinReplyMode() {},
+    },
     threadStateStore,
   });
 
@@ -129,7 +134,7 @@ test("approval commands still resolve persisted pending approval after a restart
 test("restoreBoundThreadSubscriptions rehydrates persisted approval into thread runtime state", async () => {
   const { bindingKey, sessionStore, sessionWriter } = await createSessionStoreFixture();
   const threadStateStore = new ThreadStateStore();
-  const resumedThreads: string[] = [];
+  const resumedThreads: Array<{ threadId: string; workspaceRoot?: string }> = [];
   const streamTargets: Array<{ bindingKey: string; target: unknown }> = [];
   const channelAdapter: ChannelAdapterLike = {
     describe() {
@@ -193,8 +198,8 @@ test("restoreBoundThreadSubscriptions rehydrates persisted approval into thread 
     async respondApproval() {
       return {};
     },
-    async resumeThread({ threadId }: { threadId: string }) {
-      resumedThreads.push(threadId);
+    async resumeThread(payload: { threadId: string; workspaceRoot?: string }) {
+      resumedThreads.push(payload);
     },
     async sendTextTurn() {
       throw new Error("sendTextTurn should not be called in this test");
@@ -209,6 +214,7 @@ test("restoreBoundThreadSubscriptions rehydrates persisted approval into thread 
     setReplyTarget(bindingKeyValue: string, target: unknown) {
       streamTargets.push({ bindingKey: bindingKeyValue, target });
     },
+    setWeixinReplyMode() {},
   };
   const lifecycle = new RuntimeWatchdogLifecycle({
     buildApprovalPromptSignature() {
@@ -249,8 +255,19 @@ test("restoreBoundThreadSubscriptions rehydrates persisted approval into thread 
 
   await lifecycle.restoreBoundThreadSubscriptions();
 
-  assert.deepEqual(resumedThreads, ["thread-current"]);
+  assert.deepEqual(resumedThreads, [{
+    threadId: "thread-current",
+    workspaceRoot: "E:/repo/current",
+  }]);
   assert.equal(streamTargets.length, 1);
+  assert.deepEqual(streamTargets[0], {
+    bindingKey,
+    target: {
+      userId: "user-1",
+      contextToken: "ctx-1",
+      provider: "weixin",
+    },
+  });
   assert.deepEqual(threadStateStore.getThreadState("thread-current")?.pendingApproval, {
     threadId: "thread-current",
     requestId: "approval-1",

@@ -18,6 +18,7 @@ const {
       effort(normalized: NormalizedIncomingMessage, command: { name: string; args: string }): Promise<void>;
       help(normalized: NormalizedIncomingMessage): Promise<void>;
       model(normalized: NormalizedIncomingMessage, command: { name: string; args: string }): Promise<void>;
+      reply(normalized: NormalizedIncomingMessage, command: { name: string; args: string }): Promise<void>;
     };
     rememberPrefixCalls: Array<{ commandTokens: string[]; workspaceRoot: string }>;
     respondApprovalCalls: Array<{ decision: "accept" | "decline"; requestId: string }>;
@@ -26,6 +27,7 @@ const {
       params: { effort?: string; model?: string };
       workspaceRoot: string;
     }>;
+    setReplyModeCalls: unknown[];
     textCalls: Array<{ text: string }>;
   };
 };
@@ -177,6 +179,50 @@ test("checkin handler shows and updates persisted interval config", async () => 
   assert.ok(secondText);
   assert.match(firstText.text, /当前 checkin: 3m-60m/);
   assert.match(secondText.text, /当前 checkin: 5m-30m/);
+});
+
+test("reply handler inspects updates and resets delivery config", async () => {
+  const harness = createControlCommandHarness();
+
+  await harness.handlers.reply(buildNormalizedCommandMessage("/reply"), {
+    name: "reply",
+    args: "",
+  });
+  await harness.handlers.reply(buildNormalizedCommandMessage("/reply mode settled"), {
+    name: "reply",
+    args: "mode settled",
+  });
+  await harness.handlers.reply(buildNormalizedCommandMessage("/reply merge 140"), {
+    name: "reply",
+    args: "merge 140",
+  });
+  await harness.handlers.reply(buildNormalizedCommandMessage("/reply reset"), {
+    name: "reply",
+    args: "reset",
+  });
+
+  assert.equal(harness.textCalls.length, 4);
+  assert.match(harness.textCalls[0]?.text || "", /replyMode: stream \[default\]/u);
+  assert.match(harness.textCalls[1]?.text || "", /replyMode: settled \[stored\]/u);
+  assert.match(harness.textCalls[2]?.text || "", /merge: 140 chars \[stored\]/u);
+  assert.match(harness.textCalls[3]?.text || "", /replyMode: stream \[default\]/u);
+  assert.deepEqual(harness.setReplyModeCalls, ["settled", "stream"]);
+});
+
+test("reply handler rejects invalid mode and merge values", async () => {
+  const modeHarness = createControlCommandHarness();
+  await modeHarness.handlers.reply(buildNormalizedCommandMessage("/reply mode weird"), {
+    name: "reply",
+    args: "mode weird",
+  });
+  assert.match(modeHarness.textCalls[0]?.text || "", /\/reply mode stream\|settled/u);
+
+  const mergeHarness = createControlCommandHarness();
+  await mergeHarness.handlers.reply(buildNormalizedCommandMessage("/reply merge 9999"), {
+    name: "reply",
+    args: "merge 9999",
+  });
+  assert.match(mergeHarness.textCalls[0]?.text || "", /\/reply merge <1-3800>/u);
 });
 
 test("help handler uses the shared weixin help text", async () => {

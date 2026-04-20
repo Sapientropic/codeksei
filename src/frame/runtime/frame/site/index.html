@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-layout="wide">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Codeksei Frame</title>
+<style>
+/* ================================================================
+   Codeksei Frame — Dual Layout V6
+   Layouts: "wide" (header + grid) | "sidebar" (sidebar + main)
+   ================================================================ */
+
+/* ─── Typography Assets ─── */
+/* Frame must run without external font domains. Keep the Latin display/body
+   faces self-hosted, and keep CJK on a deliberate local calligraphic stack
+   instead of shipping a 20MB+ full Chinese webfont in the public package. */
+@font-face { font-family: 'Codeksei Cormorant'; font-style: normal; font-weight: 300; font-display: swap; src: url('../assets/fonts/cormorant-latin-300-normal.woff2') format('woff2'); unicode-range: U+0000-024F, U+2000-206F, U+20A0-20CF, U+2100-214F, U+2190-21FF; }
+@font-face { font-family: 'Codeksei Cormorant'; font-style: normal; font-weight: 400; font-display: swap; src: url('../assets/fonts/cormorant-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-024F, U+2000-206F, U+20A0-20CF, U+2100-214F, U+2190-21FF; }
+@font-face { font-family: 'Codeksei Cormorant'; font-style: normal; font-weight: 500; font-display: swap; src: url('../assets/fonts/cormorant-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-024F, U+2000-206F, U+20A0-20CF, U+2100-214F, U+2190-21FF; }
+@font-face { font-family: 'Codeksei Cormorant'; font-style: normal; font-weight: 600; font-display: swap; src: url('../assets/fonts/cormorant-latin-600-normal.woff2') format('woff2'); unicode-range: U+0000-024F, U+2000-206F, U+20A0-20CF, U+2100-214F, U+2190-21FF; }
+@font-face { font-family: 'Codeksei Cormorant'; font-style: italic; font-weight: 300; font-display: swap; src: url('../assets/fonts/cormorant-latin-300-italic.woff2') format('woff2'); unicode-range: U+0000-024F, U+2000-206F, U+20A0-20CF, U+2100-214F, U+2190-21FF; }
+@font-face { font-family: 'Codeksei Cormorant'; font-style: italic; font-weight: 400; font-display: swap; src: url('../assets/fonts/cormorant-latin-400-italic.woff2') format('woff2'); unicode-range: U+0000-024F, U+2000-206F, U+20A0-20CF, U+2100-214F, U+2190-21FF; }
+@font-face { font-family: 'Codeksei Cormorant'; font-style: italic; font-weight: 500; font-display: swap; src: url('../assets/fonts/cormorant-latin-500-italic.woff2') format('woff2'); unicode-range: U+0000-024F, U+2000-206F, U+20A0-20CF, U+2100-214F, U+2190-21FF; }
+@font-face { font-family: 'Codeksei Cormorant'; font-style: italic; font-weight: 600; font-display: swap; src: url('../assets/fonts/cormorant-latin-600-italic.woff2') format('woff2'); unicode-range: U+0000-024F, U+2000-206F, U+20A0-20CF, U+2100-214F, U+2190-21FF; }
+@font-face { font-family: 'Codeksei Inter'; font-style: normal; font-weight: 300; font-display: swap; src: url('../assets/fonts/inter-latin-300-normal.woff2') format('woff2'); unicode-range: U+0000-024F, U+2000-206F, U+20A0-20CF, U+2100-214F, U+2190-21FF; }
+@font-face { font-family: 'Codeksei Inter'; font-style: normal; font-weight: 400; font-display: swap; src: url('../assets/fonts/inter-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-024F, U+2000-206F, U+20A0-20CF, U+2100-214F, U+2190-21FF; }
+@font-face { font-family: 'Codeksei Inter'; font-style: normal; font-weight: 500; font-display: swap; src: url('../assets/fonts/inter-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-024F, U+2000-206F, U+20A0-20CF, U+2100-214F, U+2190-21FF; }
+@font-face { font-family: 'Codeksei Inter'; font-style: normal; font-weight: 600; font-display: swap; src: url('../assets/fonts/inter-latin-600-normal.woff2') format('woff2'); unicode-range: U+0000-024F, U+2000-206F, U+20A0-20CF, U+2100-214F, U+2190-21FF; }
+@font-face { font-family: 'Codeksei Inter'; font-style: italic; font-weight: 400; font-display: swap; src: url('../assets/fonts/inter-latin-400-italic.woff2') format('woff2'); unicode-range: U+0000-024F, U+2000-206F, U+20A0-20CF, U+2100-214F, U+2190-21FF; }
+@font-face { font-family: 'Codeksei CJK Display'; font-style: normal; font-weight: 300 700; font-display: swap; src: local('LXGW WenKai'), local('LXGWWenKai'), local('Kaiti SC'), local('STKaiti'), local('KaiTi'), local('Songti SC'); unicode-range: U+2E80-9FFF, U+F900-FAFF, U+3000-303F, U+FF00-FFEF; }
+
+/* ─── Design Tokens ─── */
+:root {
+  --bg: #100F0F; --bg-2: #161513; --bg-3: #1E1D1B;
+  --ui: #252320; --ui-2: #322F2C; --ui-3: #403D39;
+  --tx: #FFFCF0; --tx-2: #ADA9A2; --tx-3: #7A7771; --tx-4: #55534F;
+  --ye: #D0A215;
+  --accent-ghost: oklch(0.75 0.12 80 / 0.06);
+  --accent-faint: oklch(0.70 0.10 80 / 0.14);
+  --accent-soft: oklch(0.60 0.09 80 / 0.30);
+  --accent-medium: oklch(0.52 0.07 80 / 0.50);
+  --accent-glow: oklch(0.55 0.08 80 / 0.40);
+  --surface: #1A1918; --surface-hover: #232220;
+  --border-ghost: oklch(0.22 0.004 60 / 0.22);
+  --border-subtle: oklch(0.26 0.006 60 / 0.38);
+  --border-default: oklch(0.34 0.010 60 / 0.55);
+  --border-strong: oklch(0.42 0.014 60 / 0.70);
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+  --space-12: 48px; --space-16: 64px; --space-20: 80px;
+  --font-display: "Codeksei Cormorant", "Codeksei CJK Display", "LXGW WenKai", "Kaiti SC", "KaiTi", "Songti SC", serif;
+  --font-body: "Codeksei Inter", "MiSans", "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  --text-2xs: 0.6875rem; --text-xs: 0.75rem; --text-sm: 0.875rem;
+  --text-base: 1rem; --text-md: 1.125rem; --text-lg: 1.5rem; --text-xl: 2.25rem;
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 14px; --radius-xl: 20px; --radius-full: 999px;
+  --content-max-w: 1100px;
+  --frame-pad-x: var(--space-10);
+}
+
+/* ─── Sidebar Layout Tokens ─── */
+[data-layout="sidebar"] {
+  --content-max-w: none;
+  --font-display: "Codeksei Cormorant", "Codeksei CJK Display", Georgia, "Iowan Old Style", "Songti SC", "STSong", serif;
+}
+
+/* ─── Light Mode ─── */
+[data-theme="light"] {
+  --bg: #F7F5F0; --bg-2: #EFEDE8; --bg-3: #FFFFFF;
+  --ui: #E8E6E1; --ui-2: #DDDAD4; --ui-3: #D0CDC7;
+  --tx: #1A1A1A; --tx-2: #55534F; --tx-3: #8A8882; --tx-4: #B0ADA6;
+  --surface: #F2F0EB; --surface-hover: #ECEAE4;
+  --border-ghost: rgba(0,0,0,0.06); --border-subtle: rgba(0,0,0,0.11);
+  --border-default: rgba(0,0,0,0.18); --border-strong: rgba(0,0,0,0.28);
+  --accent-ghost: rgba(208,162,21,0.05); --accent-faint: rgba(208,162,21,0.12);
+  --accent-soft: rgba(208,162,21,0.26); --accent-medium: rgba(208,162,21,0.44);
+  --accent-glow: rgba(208,162,21,0.28);
+}
+
+/* ─── Reset ─── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { font-size: 16px; -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased; }
+body { background: var(--bg); color: var(--tx); font-family: var(--font-body); font-size: var(--text-sm); line-height: 1.7; min-height: 100dvh; overflow-x: hidden; }
+
+/* ─── Ambient & Noise ─── */
+.ambient { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+.ambient::before { content: ''; position: absolute; top: -15%; right: -10%; width: 70vw; height: 55vh; background: radial-gradient(circle at 70% 30%, oklch(0.32 0.030 75 / 0.35) 0%, transparent 55%); animation: breathe 20s ease-in-out infinite; filter: blur(70px); }
+.ambient::after { content: ''; position: absolute; bottom: -15%; left: -10%; width: 55vw; height: 50vh; background: radial-gradient(circle at 30% 70%, oklch(0.28 0.025 280 / 0.28) 0%, transparent 55%); animation: breathe 24s ease-in-out infinite reverse; filter: blur(80px); }
+@keyframes breathe { 0%, 100% { opacity: 0.4; transform: scale(1); } 50% { opacity: 0.85; transform: scale(1.08); } }
+.noise-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: 0.025; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); background-repeat: repeat; background-size: 200px 200px; }
+[data-theme="light"] .noise-overlay { opacity: 0.015; }
+
+/* ================================================================
+   LAYOUT: Frame Shell
+   ================================================================ */
+
+/* ─── Wide (default) ─── */
+[data-layout="wide"] .frame-shell { display: block; max-width: var(--content-max-w); margin: 0 auto; }
+
+/* ─── Sidebar ─── */
+[data-layout="sidebar"] .frame-shell { display: grid; grid-template-columns: 260px 1fr; min-height: 100dvh; }
+
+/* ================================================================
+   LAYOUT: Panel Identity
+   ================================================================ */
+
+/* ─── Wide: horizontal header row ─── */
+[data-layout="wide"] .panel-identity {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--space-12) var(--frame-pad-x) var(--space-8); gap: var(--space-8);
+  animation: fadeSlideUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+}
+[data-layout="wide"] .panel-left { display: flex; align-items: center; gap: var(--space-6); flex: 1; min-width: 0; animation: fadeSlideUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.1s backwards; }
+[data-layout="wide"] .panel-right { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-3); padding-bottom: var(--space-1); animation: fadeSlideUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.25s backwards; }
+[data-layout="wide"] .panel-meta, [data-layout="wide"] .panel-input-area { display: none !important; }
+
+/* ─── Sidebar: vertical left column ─── */
+[data-layout="sidebar"] .panel-identity {
+  display: flex; flex-direction: column; align-items: center;
+  padding: var(--space-16) var(--space-6) var(--space-12); gap: var(--space-6);
+  background: var(--bg-2);
+  position: relative;
+}
+[data-layout="sidebar"] .panel-identity::after {
+  content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 1px;
+  background: linear-gradient(to bottom, transparent 0%, var(--border-subtle) 15%, var(--border-subtle) 85%, transparent 100%);
+}
+[data-layout="sidebar"] .panel-left { display: flex; flex-direction: column; align-items: center; gap: var(--space-6); width: 100%; }
+[data-layout="sidebar"] .panel-right { margin-top: auto; text-align: center; display: flex; flex-direction: column; align-items: center; gap: var(--space-3); width: 100%; }
+[data-layout="sidebar"] .panel-greeting { text-align: center; font-style: italic; max-width: 200px; font-size: var(--text-base); }
+
+/* ─── Avatar (shared base + mode overrides) ─── */
+.panel-avatar {
+  overflow: hidden; position: relative; flex-shrink: 0;
+  box-shadow: 0 0 0 2px var(--accent-faint), 0 8px 32px oklch(0.08 0.01 60 / 0.40), inset 0 0 0 1px oklch(0.5 0.01 60 / 0.08);
+  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: characterEnter 1s cubic-bezier(0.4, 0, 0.2, 1) 0.15s backwards;
+}
+[data-layout="wide"] .panel-avatar { width: 96px; height: 120px; border-radius: var(--radius-lg); }
+[data-layout="sidebar"] .panel-avatar { width: 130px; height: 130px; border-radius: 50%; animation: avatarBreathe 4s ease-in-out infinite; }
+[data-layout="sidebar"] .panel-identity:hover .panel-avatar { box-shadow: 0 0 0 3px var(--accent-soft), 0 0 50px oklch(0.28 0.03 60 / 0.35); }
+[data-layout="sidebar"] .panel-identity:hover .panel-avatar img { filter: grayscale(0%) contrast(1.08) saturate(1.0); }
+@keyframes avatarBreathe { 0%, 100% { box-shadow: 0 0 0 2px var(--accent-faint), 0 0 30px oklch(0.20 0.015 60 / 0.18); } 50% { box-shadow: 0 0 0 2px var(--accent-soft), 0 0 45px oklch(0.25 0.025 60 / 0.28); } }
+.panel-avatar img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(10%) contrast(1.04) saturate(0.94); transition: all 1.5s ease; }
+.panel-avatar:hover { box-shadow: 0 0 0 3px var(--accent-soft), 0 12px 40px oklch(0.10 0.015 60 / 0.50); transform: rotate(0.5deg) scale(1.02); }
+.panel-avatar:hover img { filter: grayscale(0%) contrast(1.08) saturate(1.0); }
+.avatar-fallback { display: none; width: 100%; height: 100%; align-items: center; justify-content: center; background: var(--bg-3); color: var(--tx-3); font-family: var(--font-display); font-size: 2rem; }
+.panel-avatar.image-missing img { display: none; }
+.panel-avatar.image-missing .avatar-fallback { display: flex; }
+[data-theme="light"] .panel-avatar { box-shadow: 0 0 0 2px var(--accent-faint), 0 4px 16px rgba(0,0,0,0.08); }
+
+/* ─── Panel text (greeting + checkin) ─── */
+.panel-text { display: flex; flex-direction: column; gap: var(--space-3); padding-bottom: var(--space-1); min-width: 0; }
+.panel-greeting { font-family: var(--font-display); font-size: var(--text-md); color: var(--tx-2); line-height: 1.5; max-width: 380px; }
+.checkin-pill {
+  display: inline-flex; font-family: var(--font-display); font-size: var(--text-xs); color: var(--tx-4);
+  padding: 4px 14px; border-radius: var(--radius-full); border: 1px solid var(--border-ghost);
+  background: var(--accent-ghost); cursor: pointer; transition: all 0.3s ease;
+  width: fit-content; white-space: nowrap; letter-spacing: 0.04em;
+}
+.checkin-pill:hover { color: var(--tx-3); border-color: var(--border-subtle); background: var(--accent-faint); }
+
+/* ─── Clock ─── */
+.panel-clock .time-display { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 300; letter-spacing: 0.02em; color: var(--tx); line-height: 1; opacity: 0.88; }
+[data-layout="sidebar"] .panel-clock .time-display { font-size: 2.5rem; font-weight: 200; }
+.panel-clock .date-display { font-family: var(--font-display); font-size: var(--text-xs); font-weight: 500; text-transform: uppercase; letter-spacing: 0.15em; color: var(--tx-4); }
+
+/* ─── Actions ─── */
+.panel-actions { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
+.action-btn {
+  font-family: var(--font-body); font-size: var(--text-xs); padding: 5px 12px;
+  border-radius: var(--radius-sm); border: 1px solid var(--border-ghost);
+  background: transparent; color: var(--tx-4); cursor: pointer; transition: all 0.25s ease;
+}
+.action-btn:hover { color: var(--tx-2); border-color: var(--border-subtle); background: var(--surface); }
+
+/* ─── Sidebar Meta (context pills, sidebar-only) ─── */
+.panel-meta { display: flex; flex-direction: column; gap: var(--space-1); width: 100%; }
+.timeline-pill {
+  display: inline-flex; align-items: center; min-height: 24px; max-width: 100%;
+  padding: 2px 10px; border-radius: 999px; background: var(--ui); color: var(--tx-3);
+  font-size: var(--text-2xs); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.timeline-pill.focus { color: var(--tx-2); }
+.timeline-pill.sleep { background: oklch(0.18 0.025 285 / 0.42); color: var(--tx-2); }
+
+/* ─── Sidebar Input (expandable trigger, sidebar-only) ─── */
+.panel-input-area { width: 100%; display: flex; align-items: center; justify-content: center; margin: var(--space-4) 0; }
+.input-trigger {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 14px; border-radius: var(--radius-full);
+  border: 1px solid oklch(0.25 0.008 60 / 0.35);
+  background: oklch(0.16 0.008 60 / 0.25); color: var(--tx-3); cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: var(--text-xs); font-family: var(--font-display); font-style: italic;
+  box-shadow: 0 0 12px oklch(0.2 0.01 60 / 0.15);
+}
+.input-trigger:hover { border-color: oklch(0.3 0.01 60 / 0.5); color: var(--tx-2); }
+.input-expand { display: none; gap: var(--space-2); align-items: center; width: 100%; }
+.input-expand.visible { display: flex; }
+.input-expand input {
+  flex: 1; min-width: 0; font-family: var(--font-body); font-size: var(--text-sm);
+  padding: 6px 12px; border-radius: 18px; border: 1px solid oklch(0.22 0.006 60 / 0.35);
+  background: transparent; color: var(--tx); outline: none; transition: border-color 0.3s ease;
+}
+.input-expand input::placeholder { color: var(--tx-3); font-style: italic; }
+.input-expand input:focus { border-color: oklch(0.3 0.01 60 / 0.5); }
+.input-expand .input-send-btn {
+  width: 28px; height: 28px; border-radius: 50%; border: 1px solid oklch(0.25 0.008 60 / 0.35);
+  background: transparent; color: var(--tx-3); cursor: pointer; display: flex; align-items: center;
+  justify-content: center; transition: all 0.25s ease; font-size: 12px; flex-shrink: 0;
+}
+.input-expand .input-send-btn:hover { color: var(--tx-2); border-color: oklch(0.3 0.01 60 / 0.5); }
+
+/* ================================================================
+   LAYOUT: Panel Content
+   ================================================================ */
+
+[data-layout="wide"] .panel-content { padding: 0 var(--frame-pad-x) calc(var(--space-20) + 80px); }
+[data-layout="sidebar"] .panel-content { display: flex; flex-direction: column; padding: var(--space-8) var(--space-12); padding-bottom: calc(var(--space-8) + 72px); gap: var(--space-6); overflow-y: auto; }
+
+/* ================================================================
+   TIMELINE
+   ================================================================ */
+
+.timeline-area { position: relative; z-index: 2; animation: fadeSlideUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.35s backwards; }
+
+/* ─── Wide: standalone strip ─── */
+[data-layout="wide"] .timeline-area { padding: 0 var(--frame-pad-x) var(--space-10); max-width: var(--content-max-w); margin: 0 auto; }
+[data-layout="wide"] .timeline-card-inner { background: none; border: none; padding: 0; box-shadow: none; }
+[data-layout="wide"] .timeline-card-title, [data-layout="wide"] .timeline-bar,
+[data-layout="wide"] .timeline-hours, [data-layout="wide"] .timeline-context,
+[data-layout="wide"] .timeline-now { display: none !important; }
+
+/* ─── Sidebar: card-wrapped ─── */
+[data-layout="sidebar"] .timeline-card-inner {
+  background: var(--surface); border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg); padding: var(--space-6) var(--space-8);
+  box-shadow: 0 4px 24px oklch(0.05 0.01 60 / 0.18), inset 0 1px 0 oklch(0.3 0.01 60 / 0.06);
+}
+[data-layout="sidebar"] .timeline-card-title {
+  font-family: var(--font-display); font-size: var(--text-md); color: var(--tx); margin-bottom: var(--space-4);
+}
+[data-layout="sidebar"] .timeline-track { display: none !important; }
+
+/* ─── Shared timeline track (wide) ─── */
+.timeline-track {
+  position: relative; height: 48px; border-radius: var(--radius-md);
+  background: var(--surface); overflow: hidden;
+  box-shadow: inset 0 1px 4px oklch(0.05 0.01 60 / 0.30); transition: box-shadow 0.4s ease;
+}
+.timeline-track:hover { box-shadow: inset 0 1px 4px oklch(0.05 0.01 60 / 0.30), 0 0 0 1px var(--border-ghost); }
+
+/* ─── Shared timeline bar (sidebar) ─── */
+.timeline-bar {
+  position: relative; height: 60px; min-width: 0;
+  background: var(--surface); border-radius: 10px; overflow: hidden;
+  margin-top: var(--space-2); box-shadow: inset 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* ─── Timeline slots (shared base) ─── */
+.timeline-slot {
+  position: absolute; top: 0; bottom: 0; min-width: 2px;
+  display: flex; align-items: center; font-size: var(--text-xs); font-weight: 500;
+  color: var(--tx); overflow: hidden; white-space: nowrap; transition: filter 0.5s ease; background: transparent;
+}
+.timeline-slot .slot-label { padding: 0 var(--space-3); text-overflow: ellipsis; overflow: hidden; font-weight: 400; letter-spacing: 0.03em; opacity: 0.90; }
+
+/* Wide-mode slot states */
+[data-layout="wide"] .timeline-slot.past { filter: saturate(0.72) brightness(0.92); }
+[data-layout="wide"] .timeline-slot.current { filter: brightness(1.10) saturate(1.12); }
+[data-layout="wide"] .timeline-slot.current::after {
+  content: ''; position: absolute; top: 0; bottom: 0; left: -50px; right: -50px;
+  background: radial-gradient(ellipse 55% 95% at 50% 50%, oklch(0.78 0.09 var(--slot-hue, 75) / 0.28) 0%, oklch(0.68 0.05 var(--slot-hue, 75) / 0.08) 55%, transparent 88%);
+  animation: slotGlow 3.5s ease-in-out infinite; pointer-events: none;
+}
+[data-layout="wide"] .timeline-slot.future { filter: saturate(0.55) brightness(0.88); color: var(--tx-3); }
+
+/* Sidebar-mode slot states */
+[data-layout="sidebar"] .timeline-slot.future { opacity: 0.4; }
+
+@keyframes slotGlow { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.95; } }
+@keyframes sidebarShimmer { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.15); } }
+[data-layout="sidebar"] .timeline-slot.current { animation: sidebarShimmer 3s ease-in-out infinite; }
+
+/* ─── Now marker (sidebar) ─── */
+.timeline-now {
+  position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--tx);
+  opacity: 0.7; z-index: 10; transition: left 60s linear;
+  box-shadow: 0 0 8px oklch(0.85 0.05 60 / 0.3);
+}
+.timeline-now::before {
+  content: ''; position: absolute; top: -4px; left: -4px; width: 10px; height: 10px;
+  background: var(--tx); border-radius: 50%; opacity: 0.9; box-shadow: 0 0 12px oklch(0.85 0.05 60 / 0.4);
+}
+
+/* ─── Hour labels (sidebar) ─── */
+.timeline-hours { display: flex; justify-content: space-between; margin-top: var(--space-1); padding: 0 2px; }
+.timeline-hours span { font-family: var(--font-mono); font-size: 10px; color: oklch(0.5 0.015 70); }
+
+/* ─── Context pills (sidebar, below timeline) ─── */
+.timeline-context { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; margin-top: var(--space-2); min-height: 24px; }
+
+/* ================================================================
+   CONTENT GRID
+   ================================================================ */
+
+/* ─── Wide: asymmetric 1.45fr 1fr ─── */
+[data-layout="wide"] .content-grid {
+  display: grid; grid-template-columns: 1.45fr 1fr;
+  gap: var(--space-8); max-width: var(--content-max-w); margin: 0 auto;
+}
+[data-layout="wide"] .diary-card { grid-row: 1 / 3; }
+
+/* ─── Sidebar: 1fr 1fr, project spans full ─── */
+[data-layout="sidebar"] .content-grid { display: grid; grid-template-columns: 1fr; gap: var(--space-5); }
+[data-layout="sidebar"] .project-card { grid-column: 1 / -1; }
+
+/* ================================================================
+   CARDS (shared)
+   ================================================================ */
+
+.card {
+  min-width: 0; background: var(--bg-2); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg); padding: var(--space-6) var(--space-8);
+  transition: border-color 0.5s ease, background 0.5s ease, transform 0.5s ease, box-shadow 0.5s ease;
+  animation: cardFadeIn 0.7s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+}
+@keyframes cardFadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+[data-layout="sidebar"] .content-grid .card:nth-child(1) { animation-delay: 0.08s; }
+[data-layout="sidebar"] .content-grid .card:nth-child(2) { animation-delay: 0.16s; }
+[data-layout="sidebar"] .content-grid .card:nth-child(3) { animation-delay: 0.24s; }
+.card:hover { border-color: var(--border-default); background: var(--bg-3); transform: translateY(-1px); box-shadow: 0 4px 20px oklch(0.06 0.01 60 / 0.20); }
+.card-title { font-family: var(--font-display); font-size: var(--text-md); font-weight: 400; color: var(--tx); margin-bottom: var(--space-5); line-height: 1.3; letter-spacing: 0.01em; position: relative; }
+.card-title::after { content: ''; display: block; width: 48px; height: 2px; background: var(--tx); opacity: 0.10; border-radius: 1px; margin-top: var(--space-2); filter: blur(0.3px); }
+
+/* Diary card (primary in wide, normal in sidebar) */
+.diary-card { background: var(--bg-3); border-color: var(--border-default); }
+.diary-card:hover { border-color: var(--border-strong); box-shadow: 0 6px 28px oklch(0.06 0.01 60 / 0.26); }
+
+/* Reminder card */
+.reminder-card { padding: var(--space-5) var(--space-6); }
+.reminder-primary {
+  background: linear-gradient(135deg, var(--accent-ghost) 0%, transparent 70%);
+  border-left: 3px solid var(--accent-soft); border-radius: var(--radius-sm);
+  padding: var(--space-4) var(--space-5); margin-bottom: var(--space-4);
+  transition: border-color 0.3s ease;
+}
+.reminder-card:hover .reminder-primary { border-left-color: var(--accent-medium); }
+.reminder-primary .reminder-text { font-family: var(--font-display); font-size: var(--text-md); color: var(--tx); line-height: 1.45; }
+.reminder-primary .reminder-due { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--tx-4); margin-top: var(--space-2); letter-spacing: 0.02em; }
+.reminder-primary .reminder-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
+.reminder-primary .reminder-actions button {
+  font-family: var(--font-body); font-size: var(--text-xs); font-weight: 500;
+  color: var(--tx-2); background: var(--ui);
+  border: 1px solid oklch(0.25 0.008 60 / 0.45);
+  cursor: pointer; padding: 5px 14px; border-radius: var(--radius-full);
+  transition: all 0.25s ease;
+}
+.reminder-primary .reminder-actions button:hover { color: var(--tx); border-color: oklch(0.32 0.01 60 / 0.55); background: var(--ui-2); box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+.reminder-primary .reminder-actions button:first-child { color: var(--tx); background: oklch(0.2 0.03 150 / 0.35); border-color: oklch(0.3 0.04 150 / 0.45); }
+.reminder-primary .reminder-actions button:first-child:hover { background: oklch(0.22 0.04 150 / 0.50); border-color: oklch(0.35 0.05 150 / 0.55); }
+
+.reminder-minor-list { display: flex; flex-direction: column; gap: 0; }
+.reminder-minor { display: flex; justify-content: space-between; align-items: baseline; padding: var(--space-2) 0; transition: opacity 0.2s ease; }
+.reminder-minor:hover { opacity: 1; }
+.reminder-minor + .reminder-minor { border-top: 1px solid var(--border-ghost); }
+.reminder-minor .reminder-text { min-width: 0; font-size: var(--text-xs); color: var(--tx-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reminder-minor .reminder-due { flex-shrink: 0; font-size: var(--text-2xs); color: var(--tx-4); font-family: var(--font-mono); letter-spacing: 0.02em; }
+.reminder-toggle { font-family: var(--font-body); font-size: var(--text-xs); color: var(--tx-4); cursor: pointer; padding: var(--space-2) 0; background: none; border: none; text-align: left; transition: color 0.2s ease; }
+.reminder-toggle:hover { color: var(--tx-2); }
+
+/* Project card */
+.project-card { padding: var(--space-5) var(--space-6); }
+.projects { display: flex; flex-direction: column; gap: var(--space-2); }
+.project-line { background: transparent; border-radius: var(--radius-md); overflow: hidden; transition: all 0.3s ease; border: 1px solid transparent; }
+.project-line:hover { background: var(--surface); border-color: var(--border-ghost); transform: translateX(2px); }
+.project-line.open { background: var(--surface); border-color: var(--border-subtle); }
+.project-name { display: flex; align-items: center; justify-content: space-between; padding: var(--space-3) var(--space-4); cursor: pointer; user-select: none; font-family: var(--font-display); font-size: var(--text-sm); color: var(--tx); }
+.project-name .drawer-arrow { font-size: var(--text-xs); color: var(--tx-4); transition: transform 0.3s ease; flex-shrink: 0; margin-left: var(--space-2); }
+.project-line.open .project-name .drawer-arrow { transform: rotate(90deg); color: var(--tx-3); }
+.project-fields { max-height: 0; overflow: hidden; transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), padding 0.4s ease; padding: 0 var(--space-4); }
+.project-line.open .project-fields { max-height: 260px; padding: 0 var(--space-4) var(--space-3); }
+.project-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: var(--space-3); }
+.project-field:last-child { margin-bottom: 0; }
+.project-field-label { font-size: var(--text-2xs); color: var(--tx-4); letter-spacing: 0.06em; text-transform: uppercase; font-weight: 500; }
+.project-field-value { font-family: var(--font-display); font-size: var(--text-sm); color: var(--tx-2); line-height: 1.6; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+/* ================================================================
+   DIARY
+   ================================================================ */
+
+.diary-fragments { display: flex; flex-direction: column; gap: 0; }
+.fragment { display: flex; gap: var(--space-4); align-items: flex-start; padding: var(--space-3) 0; border-bottom: 1px solid var(--border-ghost); transition: opacity 0.3s ease; }
+.fragment:first-child { padding-top: 0; }
+.fragment:last-of-type { border-bottom: none; }
+.fragment:nth-child(n+4) { opacity: 0.85; }
+.fragment:nth-child(n+6) { opacity: 0.70; }
+.fragment:hover { opacity: 1; }
+.fragment-time { font-family: var(--font-display); font-size: var(--text-2xs); color: var(--tx-4); flex-shrink: 0; padding-top: 3px; min-width: 38px; text-align: right; letter-spacing: 0.04em; }
+.fragment-text { font-size: var(--text-sm); color: var(--tx-2); line-height: 1.7; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; transition: color 0.3s ease; }
+.fragment:hover .fragment-text { color: var(--tx); }
+.diary-summary {
+  margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--border-ghost);
+  font-family: var(--font-display); font-style: italic; font-size: var(--text-xs); color: var(--tx-3);
+  line-height: 1.7; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; transition: color 0.4s ease;
+}
+.diary-card:hover .diary-summary { color: var(--tx-2); }
+.diary-input-row { display: flex; gap: var(--space-2); margin-top: var(--space-5); }
+.diary-input-row input {
+  flex: 1; font-family: var(--font-body); font-size: var(--text-sm); padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full); border: 1px solid var(--border-ghost); background: transparent;
+  color: var(--tx); outline: none; transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.diary-input-row input::placeholder { color: var(--tx-4); font-style: italic; }
+.diary-input-row input:focus { border-color: var(--border-default); box-shadow: 0 0 0 3px var(--accent-ghost); }
+.expand-link { display: inline-block; font-family: var(--font-body); font-size: var(--text-xs); color: var(--tx-4); cursor: pointer; padding-top: var(--space-3); transition: color 0.25s ease; border: none; background: none; text-align: left; }
+.expand-link:hover { color: var(--tx-2); }
+.expand-link::before { content: '+ '; opacity: 0.5; }
+
+/* ─── Empty States ─── */
+.empty-state { text-align: center; padding: var(--space-8) var(--space-4); color: var(--tx-4); font-family: var(--font-display); font-style: italic; font-size: var(--text-sm); line-height: 1.7; opacity: 0.60; }
+.empty-state::before { content: '—'; display: block; font-family: var(--font-mono); font-size: var(--text-xl); color: var(--tx-4); margin-bottom: var(--space-3); opacity: 0.3; letter-spacing: 0.2em; }
+
+/* ================================================================
+   INPUTS
+   ================================================================ */
+
+/* ─── Floating capsule (wide mode) ─── */
+.input-float {
+  position: fixed; bottom: var(--space-6); left: 0; right: 0; z-index: 40;
+  display: flex; justify-content: center; padding: 0 var(--frame-pad-x); pointer-events: none;
+  animation: fadeSlideUp 0.7s cubic-bezier(0.4, 0, 0.2, 1) 0.7s backwards;
+}
+.input-capsule {
+  display: flex; align-items: center; gap: var(--space-2); width: 100%; max-width: 560px;
+  background: var(--bg-3); border: 1px solid var(--border-default); border-radius: var(--radius-full);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-5); pointer-events: auto;
+  box-shadow: 0 8px 32px oklch(0.05 0.01 60 / 0.25); transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+}
+.input-capsule:hover { transform: translateY(-1px); box-shadow: 0 10px 36px oklch(0.05 0.01 60 / 0.30); }
+.input-capsule:focus-within { border-color: var(--border-strong); box-shadow: 0 8px 32px oklch(0.05 0.01 60 / 0.28), 0 0 0 3px var(--accent-ghost); }
+.input-capsule input { flex: 1; min-width: 0; font-family: var(--font-body); font-size: var(--text-sm); padding: var(--space-2) 0; background: transparent; border: none; color: var(--tx); outline: none; }
+.input-capsule input::placeholder { color: var(--tx-4); font-style: italic; }
+.input-capsule button {
+  width: 44px; height: 44px; border-radius: var(--radius-full);
+  border: 1px solid var(--border-ghost); background: var(--surface); color: var(--tx-3);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: var(--text-base); transition: all 0.25s ease; flex-shrink: 0;
+}
+.input-capsule button:hover { color: var(--tx); border-color: var(--border-subtle); background: var(--surface-hover); transform: scale(1.05); }
+
+[data-layout="sidebar"] .input-float { display: none !important; }
+
+/* ─── Portrait input bar (sidebar mode, ≤899px) ─── */
+.input-bar-portrait {
+  display: none; grid-template-columns: minmax(0, 1fr) minmax(88px, auto); gap: var(--space-2);
+  align-items: center; position: sticky; bottom: var(--space-8); z-index: 40; padding: var(--space-4) 0;
+}
+.input-bar-portrait input {
+  flex: 1; font-family: var(--font-body); font-size: var(--text-sm); padding: var(--space-2) var(--space-4);
+  border-radius: 28px; border: 1px solid oklch(0.22 0.006 60 / 0.35); background: transparent;
+  color: var(--tx); outline: none; transition: border-color 0.3s ease;
+}
+.input-bar-portrait input::placeholder { color: var(--tx-3); font-style: italic; }
+.input-bar-portrait input:focus { border-color: oklch(0.3 0.01 60 / 0.5); }
+.input-bar-portrait button {
+  font-family: var(--font-body); font-size: var(--text-sm); font-weight: 500;
+  padding: var(--space-2) var(--space-4); border-radius: 28px;
+  border: 1px solid oklch(0.25 0.008 60 / 0.35); background: transparent;
+  color: var(--tx-3); cursor: pointer; transition: all 0.25s ease; min-width: 88px;
+}
+.input-bar-portrait button:hover { border-color: oklch(0.3 0.01 60 / 0.5); color: var(--tx-2); }
+[data-layout="wide"] .input-bar-portrait { display: none !important; }
+
+/* ================================================================
+   CHECK-IN
+   ================================================================ */
+
+.checkin-overlay {
+  position: fixed; inset: 0; z-index: 100; background: oklch(0.04 0.005 60 / 0.55);
+  display: none; align-items: flex-end; justify-content: center;
+  backdrop-filter: blur(10px); animation: fadeIn 0.35s ease;
+}
+[data-layout="sidebar"] .checkin-overlay { align-items: center; }
+.checkin-overlay.visible { display: flex; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.checkin-sheet {
+  background: var(--bg-3); border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: var(--space-8) var(--space-8) calc(var(--space-8) + env(safe-area-inset-bottom, 0px));
+  max-width: 520px; width: 100%;
+  box-shadow: 0 -8px 40px oklch(0.05 0.01 60 / 0.35);
+  animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+[data-layout="sidebar"] .checkin-sheet { border-radius: var(--radius-lg); }
+@keyframes slideUp { from { transform: translateY(40px); opacity: 0.7; } to { transform: translateY(0); opacity: 1; } }
+.checkin-title { font-family: var(--font-display); font-size: var(--text-lg); color: var(--tx); margin-bottom: var(--space-6); line-height: 1.3; }
+.checkin-buttons { display: flex; flex-direction: column; gap: var(--space-2); }
+.checkin-buttons button {
+  font-family: var(--font-body); font-size: var(--text-base); font-weight: 500;
+  padding: var(--space-3) var(--space-5); border-radius: var(--radius-md);
+  border: 1px solid var(--ui-2); background: var(--ui); color: var(--tx-2); cursor: pointer; transition: all 0.2s ease;
+}
+.checkin-buttons button:hover { border-color: var(--ui-3); color: var(--tx); background: var(--ui-2); }
+.checkin-buttons button:first-child { border-color: var(--accent-soft); color: var(--ye); background: linear-gradient(90deg, var(--accent-ghost) 0%, transparent 100%); }
+.checkin-buttons button:first-child:hover { background: linear-gradient(90deg, var(--accent-faint) 0%, transparent 100%); border-color: var(--accent-medium); }
+
+/* ─── Toast ─── */
+.toast {
+  position: fixed; bottom: calc(110px + env(safe-area-inset-bottom, 0px));
+  left: 50%; transform: translateX(-50%) translateY(12px);
+  background: var(--bg-3); border: 1px solid var(--ui-2); border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-5); font-size: var(--text-sm); color: var(--tx-2);
+  z-index: 200; opacity: 0; transition: all 0.35s ease; pointer-events: none;
+  box-shadow: 0 4px 16px oklch(0.05 0.01 60 / 0.20);
+}
+.toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ================================================================
+   RESPONSIVE
+   ================================================================ */
+
+/* ─── Wide responsive ─── */
+@media (max-width: 899px) {
+  [data-layout="wide"] :root { --frame-pad-x: var(--space-5); }
+  [data-layout="wide"] .content-grid { grid-template-columns: 1fr; gap: var(--space-5); }
+  [data-layout="wide"] .diary-card { grid-row: auto; }
+  [data-layout="wide"] .panel-identity { flex-wrap: wrap; gap: var(--space-5); padding-top: var(--space-6); padding-bottom: var(--space-5); }
+  [data-layout="wide"] .panel-left { width: 100%; }
+  [data-layout="wide"] .panel-right { flex-direction: row; align-items: center; gap: var(--space-3); width: 100%; justify-content: space-between; }
+  [data-layout="wide"] .panel-actions { margin-top: 0; }
+  [data-layout="wide"] .panel-clock .time-display { font-size: var(--text-lg); }
+  [data-layout="wide"] .panel-greeting { font-size: var(--text-sm); max-width: none; }
+  [data-layout="wide"] .panel-avatar { width: 72px; height: 90px; }
+  [data-layout="wide"] .diary-card { padding: var(--space-5) var(--space-6); }
+  [data-layout="wide"] .input-capsule { max-width: 100%; }
+  [data-layout="wide"] .diary-input-row { display: none; }
+}
+@media (max-width: 560px) {
+  [data-layout="wide"] .panel-identity { flex-direction: column; align-items: flex-start; gap: var(--space-3); padding: var(--space-4); }
+  [data-layout="wide"] .panel-right { width: 100%; justify-content: space-between; }
+  [data-layout="wide"] .panel-avatar { width: 56px; height: 70px; }
+  [data-layout="wide"] .panel-greeting { font-size: var(--text-xs); max-width: none; }
+  [data-layout="wide"] .panel-clock .time-display { font-size: var(--text-md); }
+  [data-layout="wide"] .card { padding: var(--space-5); }
+  [data-layout="wide"] .card-title { font-size: var(--text-sm); margin-bottom: var(--space-3); }
+  [data-layout="wide"] .timeline-track { height: 40px; }
+  [data-layout="wide"] .timeline-slot .slot-label { display: none; }
+  [data-layout="wide"] .input-capsule { border-radius: var(--radius-lg); }
+}
+
+/* ─── Sidebar responsive ─── */
+@media (min-width: 900px) {
+  [data-layout="sidebar"] .input-bar-portrait { display: none !important; }
+  [data-layout="sidebar"] .timeline-context { display: none !important; }
+}
+@media (max-width: 899px) {
+  [data-layout="sidebar"] .frame-shell { grid-template-columns: 1fr; }
+  [data-layout="sidebar"] .panel-identity {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas: "avatar greeting clock actions";
+    padding: var(--space-4) var(--space-8); column-gap: var(--space-6); align-items: center;
+  }
+  [data-layout="sidebar"] .panel-left { flex-direction: row; grid-area: avatar; gap: var(--space-4); }
+  [data-layout="sidebar"] .panel-avatar { width: 44px; height: 44px; border-radius: 50%; }
+  [data-layout="sidebar"] .panel-text { grid-area: greeting; }
+  [data-layout="sidebar"] .panel-greeting { text-align: left; max-width: none; font-size: var(--text-sm); }
+  [data-layout="sidebar"] .panel-clock { grid-area: clock; margin-top: 0; }
+  [data-layout="sidebar"] .panel-clock .time-display { font-size: var(--text-xl); }
+  [data-layout="sidebar"] .panel-actions { grid-area: actions; flex-direction: row; margin-top: 0; }
+  [data-layout="sidebar"] .panel-meta, [data-layout="sidebar"] .panel-input-area { display: none !important; }
+  [data-layout="sidebar"] .content-grid { grid-template-columns: 1fr; }
+  [data-layout="sidebar"] .panel-content { padding: var(--space-4) var(--space-6); padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px)); }
+  [data-layout="sidebar"] .input-bar-portrait { display: grid !important; }
+}
+@media (max-width: 560px) {
+  [data-layout="sidebar"] .panel-identity { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "avatar greeting clock"; padding: var(--space-3) var(--space-4); }
+  [data-layout="sidebar"] .panel-actions { display: none; }
+  [data-layout="sidebar"] .panel-avatar { width: 40px; height: 40px; }
+  [data-layout="sidebar"] .panel-greeting { font-size: var(--text-xs); }
+  [data-layout="sidebar"] .panel-clock .time-display { font-size: 1.75rem; }
+}
+
+/* ================================================================
+   NIGHT MODE
+   ================================================================ */
+
+[data-night="true"] .ambient::before { background: radial-gradient(circle at 70% 30%, oklch(0.22 0.03 260 / 0.22) 0%, transparent 60%); }
+[data-night="true"] .ambient::after { background: radial-gradient(circle at 30% 70%, oklch(0.18 0.02 260 / 0.16) 0%, transparent 60%); }
+[data-night="true"] .time-display { text-shadow: 0 0 20px oklch(0.75 0.04 80 / 0.18); }
+[data-night="true"] .card:not(.diary-card):not(.timeline-card-inner) { opacity: 0.85; transition: border-color 0.5s ease, background 0.5s ease, transform 0.5s ease, box-shadow 0.5s ease, opacity 0.5s ease; }
+[data-night="true"] .card:not(.diary-card):not(.timeline-card-inner):hover { opacity: 1; }
+[data-night="true"] .input-float { opacity: 0.85; }
+[data-night="true"] [data-layout="sidebar"] .panel-identity { background: oklch(0.12 0.015 260 / 0.45); }
+[data-night="true"] [data-layout="sidebar"] .panel-identity::after { background: linear-gradient(to bottom, transparent 0%, oklch(0.25 0.02 260 / 0.35) 15%, oklch(0.25 0.02 260 / 0.35) 85%, transparent 100%); }
+[data-night="true"] [data-layout="sidebar"] .panel-clock .time-display { text-shadow: 0 0 28px oklch(0.65 0.04 260 / 0.25); }
+
+/* ─── Reduced Motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  .ambient::before, .ambient::after { animation: none; opacity: 0.35; }
+  .card, .panel-identity, .panel-left, .panel-right, .timeline-area, .input-float { animation: none; }
+  .timeline-slot.current::after { animation: none; }
+}
+
+/* ─── Keyframes ─── */
+@keyframes fadeSlideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes characterEnter { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--ui-3); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--tx-4); }
+</style>
+</head>
+<body>
+
+<div class="ambient"></div>
+<div class="noise-overlay"></div>
+
+<div class="frame-shell">
+  <!-- Panel Identity: wide=header row, sidebar=left column -->
+  <aside class="panel-identity">
+    <div class="panel-left">
+      <div class="panel-avatar" id="headerAvatar">
+        <img src="../assets/character.png" alt="Codeksei" id="characterImg">
+        <div class="avatar-fallback">C</div>
+      </div>
+      <div class="panel-text">
+        <p class="panel-greeting" id="greeting" data-i18n="greeting_afternoon">下午好，今天过得很稳</p>
+        <span class="checkin-pill" id="checkinStatus">下次 check-in 21:00</span>
+      </div>
+    </div>
+    <div class="panel-meta" id="sidebarMeta"></div>
+    <div class="panel-input-area" id="sidebarInputArea">
+      <button class="input-trigger" id="inputTrigger" aria-label="快速输入" data-i18n="input_trigger">✎ 写点什么</button>
+      <div class="input-expand" id="inputExpand">
+        <input type="text" data-i18n-placeholder="input_placeholder" placeholder="想到了什么..." id="sidebarQuickInput" aria-label="快速输入">
+        <button class="input-send-btn" id="sidebarSend" aria-label="发送">↵</button>
+      </div>
+    </div>
+    <div class="panel-right">
+      <div class="panel-clock">
+        <div class="time-display" id="clock">17:40</div>
+        <div class="date-display" id="date">4月21日 · 周一</div>
+      </div>
+      <div class="panel-actions">
+        <button class="action-btn" id="layoutToggle" title="切换布局">◧</button>
+        <button class="action-btn" id="langToggle">EN</button>
+        <button class="action-btn" id="themeToggle">☀</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Panel Content -->
+  <div class="panel-content">
+    <!-- Timeline -->
+    <section class="timeline-area">
+      <div class="timeline-card-inner">
+        <div class="card-title timeline-card-title" data-i18n="timeline_title">今天的时间节奏</div>
+        <div class="timeline-bar" id="timelineBar">
+          <div class="timeline-now" id="timelineNow"></div>
+        </div>
+        <div class="timeline-track" id="timelineTrack"></div>
+        <div class="timeline-context" id="timelineContext"></div>
+        <div class="timeline-hours" id="timelineHours"></div>
+      </div>
+    </section>
+
+    <!-- Content Grid -->
+    <div class="content-grid">
+      <section class="card diary-card">
+        <div class="card-title" data-i18n="diary_title">今日碎片</div>
+        <div class="diary-fragments" id="diaryFragments"></div>
+        <div class="diary-summary" id="diarySummary"></div>
+        <div class="diary-input-row">
+          <input type="text" data-i18n-placeholder="diary_placeholder" placeholder="记一句日记..." id="diaryInput" aria-label="写一句日记">
+        </div>
+      </section>
+      <section class="card reminder-card">
+        <div class="card-title" data-i18n="reminders_title">今日思绪</div>
+        <div id="reminders"></div>
+      </section>
+      <section class="card project-card">
+        <div class="card-title" data-i18n="projects_title">正在生长的事</div>
+        <div class="projects" id="projects"></div>
+      </section>
+    </div>
+
+    <!-- Portrait input bar (sidebar mode fallback) -->
+    <div class="input-bar-portrait">
+      <input type="text" data-i18n-placeholder="input_placeholder" placeholder="想到了什么..." id="portraitQuickInput" aria-label="快速输入">
+      <button id="portraitSend" data-i18n="send">发送</button>
+    </div>
+  </div>
+</div>
+
+<!-- Floating input (wide mode) -->
+<footer class="input-float">
+  <div class="input-capsule">
+    <input type="text" data-i18n-placeholder="input_placeholder" placeholder="想到了什么..." id="quickInput" aria-label="快速输入">
+    <button id="quickSend" aria-label="发送">→</button>
+  </div>
+</footer>
+
+<!-- Check-in Overlay -->
+<div class="checkin-overlay" id="checkinOverlay">
+  <div class="checkin-sheet">
+    <div class="checkin-title" data-i18n="checkin_title">准备好了吗？</div>
+    <div class="checkin-buttons">
+      <button data-action="here" data-i18n="checkin_here">在的</button>
+      <button data-action="later" data-i18n="checkin_later">晚点</button>
+      <button data-action="settle" data-i18n="checkin_settle">先收起来</button>
+      <button data-action="quiet_today" data-i18n="checkin_quiet">今天剩下的时间留给你</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ─── i18n ─── */
+const LANG = {
+  zh: {
+    greeting_late: '深夜了，早点休息吧', greeting_morning: '早上好，慢慢来',
+    greeting_forenoon: '上午好，状态不错', greeting_noon: '中午了，喘口气',
+    greeting_afternoon: '下午好，今天过得稳', greeting_evening: '晚上好，该慢下来了',
+    weekday_0: '周日', weekday_1: '周一', weekday_2: '周二', weekday_3: '周三', weekday_4: '周四', weekday_5: '周五', weekday_6: '周六',
+    date_format: '${M}月${D}日 · ${W}',
+    timeline_title: '今天的时间节奏', timeline_empty: '今天还没有记录',
+    diary_title: '今日碎片', diary_empty: '今天还没有留下痕迹，写一句？',
+    diary_placeholder: '记一笔...',
+    reminders_title: '今日思绪', reminders_empty: '当下很轻盈，没有需要记挂的事',
+    reminder_here: '收到', reminder_later: '晚些再说', reminder_settle: '存起来',
+    projects_title: '正在生长的事', projects_empty: '没有正在生长的事，去种一颗？',
+    project_stopped: '停在哪', project_next: '下一步', project_action: '最小动作',
+    input_placeholder: '想到了什么...', input_trigger: '✎ 写点什么', send: '发送',
+    checkin_title: '准备好了吗？', checkin_here: '在的', checkin_later: '晚点',
+    checkin_settle: '先收起来', checkin_quiet: '今天剩下的时间留给你',
+    checkin_due: 'check-in 时间到了', checkin_progress: 'check-in 处理中',
+    checkin_next: '下次 check-in ${time}', checkin_pending: 'check-in 待调度',
+    toast_write_fail: '没连上，内容还在', toast_written: '已同步到 Codeksei',
+    toast_diary_saved: '记下了', toast_reminder_fail: '没连上，状态未更新',
+    toast_ok: '好的', toast_checkin_fail: '没连上，状态未更新', toast_connection_fail: '还没连上相框',
+    msg_here: '在的', msg_later: '好的，晚点再来', msg_settle: '已收好', msg_quiet: '今天不会再打扰了',
+    awake_label: '醒着', sleep_label: '睡眠 ${duration}（休息中）',
+    awake_tooltip: '时间轴聚焦醒着的时段，长睡眠不按实际时长显示。',
+    cluster_fallback: '时段', cluster_multi: '${fallback} 等 ${count} 项',
+    cluster_wechat: '微信 / 发送', cluster_wake: '醒来 / 上下文',
+    cluster_memory: '记忆 / 上下文', cluster_life: '生活 / 新闻',
+    cluster_rest: '休息', cluster_skill: 'skill 清理', cluster_voice: '语音 / 微信',
+    lang_toggle: 'EN', layout_wide: '◧', layout_sidebar: '◫',
+    diary_more: '还有 ${count} 条痕迹...', reminder_more: '还有 ${count} 条...', diary_collapse: '收起',
+  },
+  en: {
+    greeting_late: "It's late, rest well", greeting_morning: 'Morning, start at your own pace',
+    greeting_forenoon: 'Morning, doing great', greeting_noon: 'Noon, time for a breather',
+    greeting_afternoon: 'Afternoon, steady flow', greeting_evening: 'Evening, time to unwind',
+    weekday_0: 'Sun', weekday_1: 'Mon', weekday_2: 'Tue', weekday_3: 'Wed', weekday_4: 'Thu', weekday_5: 'Fri', weekday_6: 'Sat',
+    date_format: '${W}, ${M}/${D}',
+    timeline_title: "Today's rhythm", timeline_empty: "A blank canvas so far",
+    diary_title: "Today's fragments", diary_empty: "No traces yet. Leave one?",
+    diary_placeholder: 'Leave a trace...',
+    reminders_title: "Today's thoughts", reminders_empty: "Light and clear. Nothing pending.",
+    input_trigger: '✎ Jot something',
+    reminder_here: 'Got it', reminder_later: 'Not now', reminder_settle: 'Tuck away',
+    projects_title: 'Things taking shape', projects_empty: "No threads growing. Plant one?",
+    project_stopped: 'Where I left off', project_next: 'Next step', project_action: 'Smallest step',
+    input_placeholder: 'Something on your mind...', send: 'Send',
+    checkin_title: 'Ready when you are?', checkin_here: 'Here', checkin_later: 'Later',
+    checkin_settle: 'Tuck away', checkin_quiet: 'Peace for the rest of the day',
+    checkin_due: 'Check-in time', checkin_progress: 'Check-in in progress',
+    checkin_next: 'Next check-in ${time}', checkin_pending: 'Check-in pending',
+    toast_write_fail: 'Not synced, content kept', toast_written: 'Synced to Codeksei',
+    toast_diary_saved: 'Noted', toast_reminder_fail: 'Not synced, state unchanged',
+    toast_ok: 'OK', toast_checkin_fail: 'Not synced, state unchanged', toast_connection_fail: 'Not connected to Frame',
+    msg_here: 'Here', msg_later: "OK, I'll come back later", msg_settle: 'Tucked away', msg_quiet: 'Peace for the rest of the day',
+    awake_label: 'Awake', sleep_label: 'Sleep ${duration} (resting)',
+    awake_tooltip: 'Timeline focuses on awake hours. Long sleep is shown compactly.',
+    cluster_fallback: 'Slot', cluster_multi: '${fallback} + ${count}',
+    cluster_wechat: 'WeChat / Send', cluster_wake: 'Wake / Context',
+    cluster_memory: 'Memory / Context', cluster_life: 'Life / News',
+    cluster_rest: 'Rest', cluster_skill: 'Skill cleanup', cluster_voice: 'Voice / WeChat',
+    lang_toggle: '中文', layout_wide: '◧', layout_sidebar: '◫',
+    diary_more: '${count} more whispers...', reminder_more: '${count} more...', diary_collapse: 'Show less',
+  }
+};
+
+let currentLang = 'zh';
+function t(key, vars) {
+  let str = LANG[currentLang][key] || LANG.zh[key] || key;
+  if (vars) Object.entries(vars).forEach(([k, v]) => { str = str.replace('${' + k + '}', v); });
+  return str;
+}
+function applyLang() {
+  document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : 'en';
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
+  const btn = document.getElementById('langToggle');
+  if (btn) btn.textContent = t('lang_toggle');
+}
+
+const SLEEP_PATTERNS = {
+  zh: /夜间睡眠|睡眠|入睡|睡觉|夜|休息/u,
+  en: /night sleep|sleep|rest|bedtime|nap/i
+};
+
+/* ─── Mock Data ─── */
+const MOCK = {
+  now: "2026-04-21T14:04:00+08:00",
+  timeline: { slots: [
+    { id: "t1", start: "00:00", end: "07:30", title: "夜间睡眠", category: "rest", color: "#8B7EC8" },
+    { id: "t2", start: "07:30", end: "08:30", title: "晨间例行", category: "life", color: "#DA702C" },
+    { id: "t3", start: "08:30", end: "12:00", title: "深度工作", category: "work", color: "#4385BE" },
+    { id: "t4", start: "12:00", end: "13:30", title: "午间休息", category: "life", color: "#DA702C" },
+    { id: "t5", start: "13:30", end: "17:00", title: "研究与写作", category: "work", color: "#4385BE" },
+    { id: "t6", start: "17:00", end: "18:00", title: "散步", category: "exercise", color: "#879A39" },
+    { id: "t7", start: "18:00", end: "19:30", title: "播客录制", category: "work", color: "#4385BE" },
+    { id: "t8", start: "19:30", end: "22:00", title: "晚间自由", category: "entertainment", color: "#CE5D97" }
+  ]},
+  diary: {
+    fragments: [
+      { id: "d1", text: "今天下午的散步很舒服，在想 dashboard 的事", time: "17:20" },
+      { id: "d2", text: "发现 Flexoki 配色真的很适合这个项目", time: "15:45" },
+      { id: "d3", text: "早上工作效率不错，连续写了两个小时", time: "11:30" }
+    ], todaySummary: "一个安静的工作日，在设计和代码之间来回切换"
+  },
+  reminders: [
+    { id: "r1", text: "晚上 9 点和 Alex 通话", due: "21:00", priority: "primary" },
+    { id: "r2", text: "记得把播客草稿发给编辑", due: "明天", priority: "minor" },
+    { id: "r3", text: "体检预约确认", due: "本周", priority: "minor" }
+  ],
+  projects: [
+    { id: "p1", name: "Codeksei Frame", stopped: "Frame Dashboard 视觉设计", next: "完成 V0 布局", action: "先出静态页面看效果" },
+    { id: "p2", name: "俄罗斯肽研究", stopped: "Sydnocarb 文献整理", next: "写综述初稿", action: "把笔记导出成大纲" }
+  ],
+  checkIn: { isPending: false, scheduledAt: "21:00" }, character: { greeting: "" }
+};
+
+const MOCK_EN = {
+  now: "2026-04-21T14:04:00+08:00",
+  timeline: { slots: [
+    { id: "t1", start: "00:00", end: "07:30", title: "Night sleep", category: "rest", color: "#8B7EC8" },
+    { id: "t2", start: "07:30", end: "08:30", title: "Morning routine", category: "life", color: "#DA702C" },
+    { id: "t3", start: "08:30", end: "12:00", title: "Deep work", category: "work", color: "#4385BE" },
+    { id: "t4", start: "12:00", end: "13:30", title: "Lunch break", category: "life", color: "#DA702C" },
+    { id: "t5", start: "13:30", end: "17:00", title: "Research & writing", category: "work", color: "#4385BE" },
+    { id: "t6", start: "17:00", end: "18:00", title: "Walk", category: "exercise", color: "#879A39" },
+    { id: "t7", start: "18:00", end: "19:30", title: "Podcast recording", category: "work", color: "#4385BE" },
+    { id: "t8", start: "19:30", end: "22:00", title: "Free evening", category: "entertainment", color: "#CE5D97" }
+  ]},
+  diary: {
+    fragments: [
+      { id: "d1", text: "The afternoon walk was lovely, thinking about the dashboard", time: "17:20" },
+      { id: "d2", text: "Flexoki palette really suits this project", time: "15:45" },
+      { id: "d3", text: "Good morning focus, wrote for two hours straight", time: "11:30" }
+    ], todaySummary: "A quiet workday, switching between design and code"
+  },
+  reminders: [
+    { id: "r1", text: "Call with Alex at 9pm", due: "21:00", priority: "primary" },
+    { id: "r2", text: "Send podcast draft to editor", due: "Tomorrow", priority: "minor" },
+    { id: "r3", text: "Confirm health checkup appointment", due: "This week", priority: "minor" }
+  ],
+  projects: [
+    { id: "p1", name: "Codeksei Frame", stopped: "Dashboard visual design", next: "Complete V0 layout", action: "Ship static page first" },
+    { id: "p2", name: "Peptide Research", stopped: "Literature review", next: "Draft outline", action: "Export notes to outline" }
+  ],
+  checkIn: { isPending: false, scheduledAt: "21:00" }, character: { greeting: "" }
+};
+
+const EMPTY_STATE = {
+  now: new Date().toISOString(),
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai",
+  timeline: { slots: [] }, diary: { fragments: [], todaySummary: "" },
+  reminders: [], projects: [],
+  checkIn: { status: "scheduled" }, character: { greeting: "" },
+  freshness: { updatedAt: "", stale: true, warnings: ["frame_state_unavailable"] }
+};
+
+const MOCK_DENSE = {
+  now: "2026-04-21T01:34:00+08:00",
+  timeline: { slots: [
+    {id:"dd0",start:"00:00",end:"03:00",title:"夜间活动",category:"work",color:"#4385BE"},
+    {id:"dd1",start:"03:00",end:"07:00",title:"夜间睡眠",category:"rest",color:"#8B7EC8"},
+    {id:"dd2",start:"07:00",end:"07:02",title:"Cron 巡检",category:"system",color:"#78756F"},
+    {id:"dd3",start:"07:02",end:"08:30",title:"继续睡眠",category:"rest",color:"#8B7EC8"},
+    {id:"dd4",start:"08:30",end:"10:00",title:"休息",category:"life",color:"#DA702C"},
+    {id:"dd5",start:"10:00",end:"12:04",title:"Cron 巡检",category:"system",color:"#78756F"},
+    {id:"dd6",start:"12:04",end:"12:43",title:"WSL keepalive",category:"work",color:"#4385BE"},
+    {id:"dd7",start:"12:43",end:"12:58",title:"Mac runtime",category:"work",color:"#4385BE"},
+    {id:"dd8",start:"12:58",end:"13:30",title:"微信",category:"wechat",color:"#879A39"},
+    {id:"dd9",start:"13:30",end:"13:52",title:"LAN fallback",category:"work",color:"#4385BE"},
+    {id:"dd10",start:"13:52",end:"15:12",title:"Mac bridge",category:"work",color:"#4385BE"},
+    {id:"dd11",start:"15:12",end:"15:14",title:"Graphify",category:"work",color:"#4385BE"},
+    {id:"dd12",start:"15:14",end:"15:54",title:"TTS PR",category:"work",color:"#D14D41"},
+    {id:"dd13",start:"15:54",end:"16:49",title:"PR review",category:"work",color:"#4385BE"},
+    {id:"dd14",start:"16:49",end:"17:00",title:"PR merge",category:"work",color:"#D14D41"},
+    {id:"dd15",start:"17:00",end:"18:43",title:"runtime env",category:"work",color:"#4385BE"},
+    {id:"dd16",start:"18:43",end:"19:59",title:"VoxCPM2 params",category:"work",color:"#4385BE"},
+    {id:"dd17",start:"19:59",end:"23:10",title:"晚间休息",category:"life",color:"#DA702C"},
+    {id:"dd18",start:"23:10",end:"23:27",title:"TTS fix",category:"work",color:"#D14D41"},
+    {id:"dd19",start:"23:27",end:"23:30",title:"v1 test",category:"work",color:"#879A39"},
+    {id:"dd20",start:"23:30",end:"23:33",title:"Gemini eval",category:"work",color:"#CE5D97"},
+    {id:"dd21",start:"23:33",end:"23:37",title:"Gemini Sense",category:"work",color:"#CE5D97"},
+    {id:"dd22",start:"23:37",end:"23:39",title:"v2 gen",category:"work",color:"#879A39"},
+    {id:"dd23",start:"23:39",end:"23:43",title:"v2 feedback",category:"work",color:"#879A39"},
+    {id:"dd24",start:"23:43",end:"23:45",title:"v3 gen",category:"work",color:"#879A39"},
+    {id:"dd25",start:"23:45",end:"00:04",title:"v3 eval",category:"work",color:"#CE5D97"},
+    {id:"dd26",start:"00:04",end:"00:13",title:"v4 gen",category:"work",color:"#879A39"},
+    {id:"dd27",start:"00:13",end:"00:47",title:"win4090",category:"work",color:"#4385BE"},
+    {id:"dd28",start:"00:47",end:"00:53",title:"v5 gen",category:"work",color:"#879A39"},
+    {id:"dd29",start:"00:53",end:"01:05",title:"用户确认",category:"wechat",color:"#879A39"},
+    {id:"dd30",start:"01:05",end:"01:18",title:"Hermes commit",category:"work",color:"#4385BE"},
+    {id:"dd31",start:"01:18",end:"01:29",title:"Codeksei update",category:"work",color:"#D14D41"},
+    {id:"dd32",start:"01:29",end:"01:34",title:"bootstrap",category:"system",color:"#78756F"}
+  ]},
+  diary: {
+    fragments: [
+      { id: "df1", text: "凌晨语音信号：疲惫、低能量", time: "03:03" },
+      { id: "df2", text: "新增 4 个 admin API（Tailscale 远程管理 voice 全生命周期）", time: "04:07" },
+      { id: "df3", text: "修复 WSL keepalive 启动问题", time: "12:43" },
+      { id: "df4", text: "创建 PR #1：修复 cfg_value 和 inference_timesteps 未传递到 VoxCPM2 generation", time: "15:54" },
+      { id: "df5", text: "PR #1 合并，关键修复", time: "16:49" },
+      { id: "df6", text: "命名新工具「Gemini Sense」（音视频分析脚本）", time: "23:37" },
+      { id: "df7", text: "用户确认「好很多！折腾2天终于打通了」", time: "01:05" },
+      { id: "df8", text: "Codeksei v0.5.0 发布（hosted proactive handoff finalize flow）", time: "01:29" }
+    ], todaySummary: "Windows 4090 TTS 推理栈从搭建到打通的关键日，engineering-issues 仓库 12 次提交，PR #1 合并，多轮音频测试（v1-v5+），最终凌晨 1 点用户确认「好很多，2天终于打通」。"
+  },
+  reminders: [
+    { id: "dr1", text: "记录 TTS 推理栈搭建经验到文档", due: "明天", priority: "primary" },
+    { id: "dr2", text: "梳理技能防重复/冲突", due: "本周", priority: "minor" },
+    { id: "dr3", text: "Windows 端 VoxCPM2 生成控制参数保留", due: "明天", priority: "minor" },
+    { id: "dr4", text: "Gemini Sense 工具完善：支持批量分析", due: "本周", priority: "minor" },
+    { id: "dr5", text: "Hermes agent 本地整合分支测试", due: "明天", priority: "minor" }
+  ],
+  projects: [
+    { id: "dp1", name: "TTS 推理栈", stopped: "Windows 4090 全链路打通", next: "记录经验文档", action: "打开工程笔记" },
+    { id: "dp2", name: "Codeksei Frame", stopped: "视觉设计锁定 V3", next: "双语 + 日间模式", action: "实现 i18n 基础" },
+    { id: "dp3", name: "Gemini Sense", stopped: "工具已创建", next: "批量分析 + 评分", action: "写脚本" },
+    { id: "dp4", name: "俄罗斯肽研究", stopped: "Sydnocarb 文献整理", next: "写综述初稿", action: "导出笔记到大纲" }
+  ],
+  checkIn: { isPending: false, scheduledAt: "09:00" }, character: { greeting: "" }
+};
+
+let currentFrameState = EMPTY_STATE;
+
+/* ─── Layout Helper ─── */
+function getCurrentLayout() { return document.documentElement.getAttribute('data-layout') || 'wide'; }
+
+/* ─── Time Helpers (shared) ─── */
+const MINUTES_PER_DAY = 24 * 60;
+function timeToMinutes(s) { const [h,m] = String(s||'').split(':').map(Number); return (!Number.isFinite(h)||!Number.isFinite(m)) ? 0 : Math.max(0, Math.min(MINUTES_PER_DAY, h*60+m)); }
+function minutesToTime(t) { const s = Math.max(0, Math.min(MINUTES_PER_DAY, Math.round(t))); return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); }
+function minuteToPercent(m, ws=0, we=MINUTES_PER_DAY) { return ((m-ws)/Math.max(1,we-ws))*100; }
+function isPast(s) { const [h,m]=String(s||'').split(':').map(Number); const n=new Date(); return (h*60+m)<=(n.getHours()*60+n.getMinutes()); }
+function formatDuration(t) { const h=Math.floor(t/60), m=Math.round(t%60); return h&&m?`${h}h${String(m).padStart(2,'0')}`:h?`${h}h`:`${m}m`; }
+
+/* ─── Timeline: Shared Data Pipeline ─── */
+function buildTimelineView(slots) {
+  const normalized = slots.map(normalizeTimelineSlot).filter(Boolean).sort((a,b)=>a.startMinute-b.startMinute);
+  if (!normalized.length) return { slots:[], sleep:null, windowStart:0, windowEnd:MINUTES_PER_DAY };
+  const sleepSlots = normalized.filter(isSleepSlot), activeSlots = normalized.filter(s=>!isSleepSlot(s));
+  const focusSlots = selectTimelineFocusSlots(activeSlots, normalized, sleepSlots);
+  const clustered = clusterTimelineSlots(focusSlots);
+  let ws = Math.max(0, Math.min(...focusSlots.map(s=>s.startMinute))-20);
+  let we = Math.max(...focusSlots.map(s=>s.endMinute))+20;
+  if (we<=ws) we = MINUTES_PER_DAY;
+  const expanded = expandTimelineWindow(ws, we);
+  return { slots:clustered, sleep:summarizeSleepSlots(sleepSlots), windowStart:expanded.start, windowEnd:expanded.end };
+}
+function selectTimelineFocusSlots(active, all, sleep) {
+  if (!active.length) return all;
+  const longest = sleep.slice().sort((a,b)=>(b.endMinute-b.startMinute)-(a.endMinute-a.startMinute))[0];
+  if (!longest) return active;
+  const after = active.filter(s=>s.startMinute>=longest.endMinute-15);
+  if (!after.length) return active;
+  const span = Math.max(...after.map(s=>s.endMinute))-Math.min(...after.map(s=>s.startMinute));
+  return after.length>=2 && span>=120 ? after : active;
+}
+function normalizeTimelineSlot(s) {
+  let sm=timeToMinutes(s.start), em=timeToMinutes(s.end);
+  if (em<sm) em+=MINUTES_PER_DAY; // midnight crossing
+  if (!Number.isFinite(sm)||!Number.isFinite(em)) return null;
+  em=Math.max(sm+5,Math.min(MINUTES_PER_DAY*2,em));
+  return {...s, startMinute:sm, endMinute:em, title:String(s.title||''), category:String(s.category||''), color:String(s.color||'#4385BE')};
+}
+function isSleepSlot(s) { const dur=Math.max(0,s.endMinute-s.startMinute); return dur>=240 && (/rest|sleep/u.test(String(s.category||'').toLowerCase()) || SLEEP_PATTERNS[currentLang].test(String(s.title||''))); }
+function clusterTimelineSlots(slots) {
+  const groups=[];
+  for (const s of slots) {
+    const prev=groups[groups.length-1], gap=prev?s.startMinute-prev.endMinute:Infinity;
+    const span=prev?Math.max(prev.endMinute,s.endMinute)-prev.startMinute:0;
+    if (prev && gap<=20 && span<=150) { prev.items.push(s); prev.endMinute=Math.max(prev.endMinute,s.endMinute); continue; }
+    groups.push({startMinute:s.startMinute, endMinute:s.endMinute, items:[s]});
+  }
+  return groups.map((g,i)=>buildTimelineClusterSlot(g,i));
+}
+function buildTimelineClusterSlot(g,i) {
+  const longest=g.items.slice().sort((a,b)=>(b.endMinute-b.startMinute)-(a.endMinute-a.startMinute))[0]||g.items[0];
+  return { id:`c-${i}`, start:minutesToTime(g.startMinute), end:minutesToTime(g.endMinute),
+    startMinute:g.startMinute, endMinute:g.endMinute,
+    title:summarizeClusterTitle(g.items,longest?.title||''),
+    fullTitle:g.items.map(it=>`${it.start}-${it.end} ${it.title}`).join('\n'),
+    category:longest?.category||'life', color:longest?.color||'#4385BE',
+    state:g.items.some(it=>it.state==='current')?'current':g.items.every(it=>it.state==='future')?'future':'confirmed' };
+}
+function summarizeClusterTitle(items, fb) {
+  const text=items.map(i=>i.title).join(' / ');
+  if (/微信|ret=-?2|发送/u.test(text)) return t('cluster_wechat');
+  if (/醒来/u.test(text)) return t('cluster_wake');
+  if (/checkin|proactive|wake|recovery/u.test(text)) return 'check-in';
+  if (/memory|Context Board|上下文|索引/u.test(text)) return t('cluster_memory');
+  if (/遛狗|Jack|吃饭|朋友|新闻/u.test(text)) return t('cluster_life');
+  if (/头痛|能量|休息/u.test(text)) return t('cluster_rest');
+  if (/MLOps|Minecraft|宝可梦|清理/u.test(text)) return t('cluster_skill');
+  if (/SOUL/u.test(text)) return 'SOUL.md';
+  if (/Codeksei|bootstrap|npm|git|bug|配置|代码|commit|模型/u.test(text)) return 'Codeksei';
+  if (/语音|微信|播报|发送/u.test(text)) return t('cluster_voice');
+  if (items.length>1) return t('cluster_multi',{fallback:fb,count:items.length});
+  return fb||t('cluster_fallback');
+}
+function expandTimelineWindow(start,end) {
+  const min=8*60; let s=start, e=end;
+  if (e-s<min) { const m=min-(e-s); s=Math.max(0,s-m/2); e=Math.min(MINUTES_PER_DAY,e+m/2); }
+  if (e-s<min) { if(s===0) e=Math.min(MINUTES_PER_DAY,min); if(e===MINUTES_PER_DAY) s=Math.max(0,MINUTES_PER_DAY-min); }
+  return {start:s,end:e};
+}
+function summarizeSleepSlots(slots) {
+  if(!slots.length) return null;
+  const total=slots.reduce((s,sl)=>s+Math.max(0,sl.endMinute-sl.startMinute),0);
+  const longest=slots.slice().sort((a,b)=>(b.endMinute-b.startMinute)-(a.endMinute-a.startMinute))[0];
+  return {label:t('sleep_label',{duration:formatDuration(total)}), title:`${minutesToTime(longest.startMinute)}-${minutesToTime(longest.endMinute)} ${longest.title}`};
+}
+
+/* ─── Timeline: Wide Renderer (oklch gradient → #timelineTrack) ─── */
+function renderTimelineWide(slots) {
+  const track = document.getElementById('timelineTrack');
+  [...track.querySelectorAll('.timeline-slot')].forEach(el=>el.remove());
+  if (!Array.isArray(slots)||!slots.length) return;
+  const view = buildTimelineView(slots);
+  window._timelineView = view;
+  const CAT_COLOR = {
+    rest:{l:0.52,c:0.065,hue:285,alpha:0.55}, life:{l:0.58,c:0.080,hue:55,alpha:0.52},
+    work:{l:0.54,c:0.075,hue:235,alpha:0.55}, exercise:{l:0.56,c:0.060,hue:115,alpha:0.50},
+    entertainment:{l:0.55,c:0.070,hue:335,alpha:0.52}, system:{l:0.48,c:0.055,hue:175,alpha:0.48},
+    wechat:{l:0.56,c:0.060,hue:115,alpha:0.50}
+  };
+  function hexToOkLCH(hex) {
+    const h=hex.replace('#',''); const r=parseInt(h.substring(0,2),16)/255, g=parseInt(h.substring(2,4),16)/255, b=parseInt(h.substring(4,6),16)/255;
+    const max=Math.max(r,g,b),min=Math.min(r,g,b); let hue=0;
+    if(max!==min){if(max===r)hue=((g-b)/(max-min))%6;else if(max===g)hue=(b-r)/(max-min)+2;else hue=(r-g)/(max-min)+4; hue=Math.round(hue*60); if(hue<0)hue+=360;}
+    return {l:0.54,c:0.065,hue,alpha:0.52,str:`oklch(0.54 0.065 ${hue} / 0.52)`};
+  }
+  const colors = view.slots.map(s=>{
+    const cat=(s.category||'').toLowerCase();
+    if(CAT_COLOR[cat]){const c=CAT_COLOR[cat];return{...c,str:`oklch(${c.l} ${c.c} ${c.hue} / ${c.alpha})`};}
+    if(s.color) return hexToOkLCH(s.color);
+    return {l:0.55,c:0.060,hue:75,alpha:0.50,str:'oklch(0.55 0.060 75 / 0.50)'};
+  });
+  const stops=[];
+  view.slots.forEach((s,i)=>{ const sp=minuteToPercent(s.startMinute,view.windowStart,view.windowEnd), ep=minuteToPercent(s.endMinute,view.windowStart,view.windowEnd);
+    stops.push(`${colors[i].str} ${sp}%`); stops.push(`${colors[i].str} ${ep}%`); });
+  if(stops.length) track.style.background=`linear-gradient(90deg, ${stops.join(', ')})`;
+  view.slots.forEach((s,i)=>{
+    const sp=minuteToPercent(s.startMinute,view.windowStart,view.windowEnd), ep=minuteToPercent(s.endMinute,view.windowStart,view.windowEnd);
+    const wp=Math.max(0.5,ep-sp); const el=document.createElement('div');
+    let sc=''; if(s.state==='current')sc=' current'; else if(s.state==='future')sc=' future';
+    else if(!isPast(s.end))sc=isPast(s.start)?' current':' future'; else sc=' past';
+    el.className='timeline-slot'+sc; el.style.left=sp+'%'; el.style.width=wp+'%'; el.title=s.fullTitle||s.title||'';
+    if(sc===' current') el.style.setProperty('--slot-hue',colors[i].hue);
+    if(wp>6){const lb=document.createElement('span');lb.className='slot-label';
+      lb.textContent=wp>16?s.title:(currentLang==='zh'?s.title.slice(0,4):s.title.slice(0,8));el.appendChild(lb);}
+    track.appendChild(el);
+  });
+}
+
+/* ─── Timeline: Sidebar Renderer (slot-per-color → #timelineBar + hours + context) ─── */
+function renderTimelineSidebar(slots) {
+  const bar=document.getElementById('timelineBar'), nowM=document.getElementById('timelineNow'), hoursEl=document.getElementById('timelineHours');
+  [...bar.querySelectorAll('.timeline-slot')].forEach(el=>el.remove()); hoursEl.replaceChildren();
+  if(!Array.isArray(slots)||!slots.length){
+    const empty=document.createElement('div');empty.className='timeline-slot future';empty.style.cssText='left:0%;width:100%;background:oklch(0.2 0.005 60 / 0.45)';
+    const lb=document.createElement('span');lb.className='slot-label';lb.textContent=t('timeline_empty');empty.appendChild(lb);bar.appendChild(empty);
+    nowM.style.display='block';nowM.style.left=((new Date().getHours()+new Date().getMinutes()/60)/24*100)+'%';
+    renderTimelineHourLabels(hoursEl,0,MINUTES_PER_DAY); return;
+  }
+  const view=buildTimelineView(slots);
+  renderTimelineContext(view);
+  view.slots.forEach(s=>{
+    const sp=minuteToPercent(s.startMinute,view.windowStart,view.windowEnd), ep=minuteToPercent(s.endMinute,view.windowStart,view.windowEnd);
+    const wp=Math.max(0.4,ep-sp); const el=document.createElement('div');
+    const sc=s.state==='current'?' current':s.state==='future'?' future':'';
+    el.className='timeline-slot'+(s.state?sc:(isPast(s.end)?'':isPast(s.start)?' current':' future'));
+    el.style.left=sp+'%'; el.style.width=wp+'%';
+    el.style.background=s.color+(isPast(s.end)?'55':isPast(s.start)?'70':'30');
+    el.title=s.fullTitle||s.title||'';
+    const lb=document.createElement('span');lb.className='slot-label';lb.textContent=wp>9?s.title:'';
+    el.appendChild(lb); bar.appendChild(el);
+  });
+  const now=new Date(), nowPct=minuteToPercent(now.getHours()*60+now.getMinutes(),view.windowStart,view.windowEnd);
+  nowM.style.display=nowPct>=0&&nowPct<=100?'block':'none'; nowM.style.left=Math.max(0,Math.min(100,nowPct))+'%';
+  renderTimelineHourLabels(hoursEl,view.windowStart,view.windowEnd);
+}
+function renderTimelineContext(view) {
+  [document.getElementById('sidebarMeta'),document.getElementById('timelineContext')].forEach(c=>{
+    if(!c)return; c.replaceChildren();
+    if(view.sleep) c.appendChild(buildTimelinePill(view.sleep.label,'sleep',view.sleep.title));
+    c.appendChild(buildTimelinePill(`${t('awake_label')} ${minutesToTime(view.windowStart)}-${minutesToTime(view.windowEnd)}`,'focus',t('awake_tooltip')));
+  });
+}
+function buildTimelinePill(text,cls,title) {
+  const p=document.createElement('span');p.className=`timeline-pill ${cls}`;p.textContent=text;p.title=title||text;return p;
+}
+function renderTimelineHourLabels(container,start,end) {
+  for(let i=0;i<5;i++){const m=start+((end-start)*i/4);const s=document.createElement('span');s.textContent=minutesToTime(m);container.appendChild(s);}
+}
+
+/* ─── Timeline: Dispatch ─── */
+function renderTimeline(slots) {
+  if(getCurrentLayout()==='wide') renderTimelineWide(slots); else renderTimelineSidebar(slots);
+}
+
+/* ─── Diary Renderer (shared) ─── */
+const DIARY_SHOW_COUNT=6; let diaryExpanded=false;
+function buildFragment(f){const r=document.createElement('div');r.className='fragment';const tm=document.createElement('span');tm.className='fragment-time';tm.textContent=String(f.time||'');const tx=document.createElement('span');tx.className='fragment-text';tx.textContent=String(f.text||'');tx.title=String(f.text||'');r.append(tm,tx);return r;}
+function renderDiary(fragments,summary){
+  const c=document.getElementById('diaryFragments');c.replaceChildren();const sf=Array.isArray(fragments)?fragments:[];
+  if(!sf.length){const e=document.createElement('div');e.className='empty-state';e.textContent=t('diary_empty');c.appendChild(e);}
+  else{const vis=diaryExpanded?sf:sf.slice(0,DIARY_SHOW_COUNT);vis.forEach(f=>c.appendChild(buildFragment(f)));
+    if(!diaryExpanded&&sf.length>DIARY_SHOW_COUNT){const l=document.createElement('button');l.className='expand-link';l.textContent=t('diary_more',{count:sf.length-DIARY_SHOW_COUNT});l.addEventListener('click',()=>{diaryExpanded=true;renderDiary(fragments,summary);});c.appendChild(l);}
+    if(diaryExpanded&&sf.length>DIARY_SHOW_COUNT){const l=document.createElement('button');l.className='expand-link';l.textContent=t('diary_collapse');l.addEventListener('click',()=>{diaryExpanded=false;renderDiary(fragments,summary);});c.appendChild(l);}}
+  const se=document.getElementById('diarySummary');if(se){se.textContent=summary||'';se.style.display=summary?'-webkit-box':'none';}
+}
+
+/* ─── Reminder Renderer (shared) ─── */
+const MINOR_SHOW=3; let reminderExpanded=false;
+function renderReminders(reminders){
+  const c=document.getElementById('reminders');c.replaceChildren();const sr=Array.isArray(reminders)?reminders:[];
+  const primary=sr.filter(r=>r.priority==='primary'), minor=sr.filter(r=>r.priority==='minor');
+  if(primary.length>0){const p=primary[0],d=document.createElement('div');d.className='reminder-primary';
+    const tx=document.createElement('div');tx.className='reminder-text';tx.textContent=String(p.text||'');tx.title=String(p.text||'');
+    const du=document.createElement('div');du.className='reminder-due';du.textContent=String(p.due||'');
+    const ac=document.createElement('div');ac.className='reminder-actions';
+    ac.append(buildActionBtn(t('reminder_here'),'present',p.id),buildActionBtn(t('reminder_later'),'snooze',p.id),buildActionBtn(t('reminder_settle'),'settle',p.id));
+    d.append(tx,du,ac);c.appendChild(d);}
+  if(minor.length>0){const ls=document.createElement('div');ls.className='reminder-minor-list';
+    const vis=reminderExpanded?minor:minor.slice(0,MINOR_SHOW);
+    vis.forEach(m=>{const r=document.createElement('div');r.className='reminder-minor';const tx=document.createElement('span');tx.className='reminder-text';tx.textContent=String(m.text||'');tx.title=String(m.text||'');const du=document.createElement('span');du.className='reminder-due';du.textContent=String(m.due||'');r.append(tx,du);ls.appendChild(r);});
+    if(!reminderExpanded&&minor.length>MINOR_SHOW){const l=document.createElement('button');l.className='reminder-toggle';l.textContent=t('reminder_more',{count:minor.length-MINOR_SHOW});l.addEventListener('click',()=>{reminderExpanded=true;renderReminders(reminders);});ls.appendChild(l);}
+    c.appendChild(ls);}
+  if(!sr.length){const e=document.createElement('div');e.className='empty-state';e.textContent=t('reminders_empty');e.style.padding='var(--space-4) 0';c.appendChild(e);}
+}
+function buildActionBtn(label,action,id){const b=document.createElement('button');b.textContent=label;b.dataset.action=action;b.dataset.id=String(id||'');return b;}
+
+/* ─── Project Renderer (shared) ─── */
+function renderProjects(projects){
+  const c=document.getElementById('projects');c.replaceChildren();const sp=Array.isArray(projects)?projects:[];
+  if(!sp.length){const e=document.createElement('div');e.className='empty-state';e.textContent=t('projects_empty');e.style.textAlign='left';c.appendChild(e);return;}
+  sp.forEach(p=>{const d=document.createElement('div');d.className='project-line';
+    const h=document.createElement('div');h.className='project-name';const n=document.createElement('span');n.textContent=String(p.name||'');
+    const a=document.createElement('span');a.className='drawer-arrow';a.textContent='→';h.append(n,a);
+    const f=document.createElement('div');f.className='project-fields';
+    f.append(buildProjectField(t('project_stopped'),p.stopped),buildProjectField(t('project_next'),p.next),buildProjectField(t('project_action'),p.action));
+    h.addEventListener('click',()=>d.classList.toggle('open'));d.append(h,f);c.appendChild(d);});
+}
+function buildProjectField(label,value){const f=document.createElement('div');f.className='project-field';const l=document.createElement('span');l.className='project-field-label';l.textContent=label;const v=document.createElement('span');v.className='project-field-value';v.textContent=String(value||'');v.title=String(value||'');f.append(l,v);return f;}
+
+/* ─── Clock ─── */
+let lastMinute=-1;
+function updateClock(){
+  const now=new Date(),h=String(now.getHours()).padStart(2,'0'),m=String(now.getMinutes()).padStart(2,'0');
+  const ce=document.getElementById('clock');
+  if(lastMinute!==-1&&lastMinute!==now.getMinutes()){ce.style.transition='opacity 0.2s ease';ce.style.opacity='0.7';setTimeout(()=>ce.style.opacity='0.88',200);}
+  lastMinute=now.getMinutes(); ce.textContent=h+':'+m;
+  const wd=[t('weekday_0'),t('weekday_1'),t('weekday_2'),t('weekday_3'),t('weekday_4'),t('weekday_5'),t('weekday_6')];
+  document.getElementById('date').textContent=t('date_format',{M:now.getMonth()+1,D:now.getDate(),W:wd[now.getDay()]});
+  const hr=now.getHours(); let gk='greeting_late';
+  if(hr>=5&&hr<9)gk='greeting_morning';else if(hr>=9&&hr<12)gk='greeting_forenoon';else if(hr>=12&&hr<14)gk='greeting_noon';else if(hr>=14&&hr<18)gk='greeting_afternoon';else if(hr>=18&&hr<22)gk='greeting_evening';
+  const ge=document.getElementById('greeting');if(ge){const cg=currentFrameState.character?.greeting;ge.textContent=cg||t(gk);ge.dataset.i18n=cg?'':gk;}
+  updateNightMode();
+}
+function updateNightMode(){const h=new Date().getHours();document.body.setAttribute('data-night',String(h>=22||h<6));}
+
+/* ─── Toast ─── */
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('visible');setTimeout(()=>t.classList.remove('visible'),2500);}
+
+/* ─── Interactions ─── */
+function setupInteractions(){
+  const charImg=document.getElementById('characterImg');
+  if(charImg) charImg.addEventListener('error',()=>charImg.closest('.panel-avatar')?.classList.add('image-missing'),{once:true});
+
+  // Send helper
+  async function sendQuick(inputEl){const text=inputEl.value.trim();if(!text)return;const r=await postFrameJson('/frame/input',{text});if(!r.ok){showToast(t('toast_write_fail'));return;}showToast(t('toast_written'));inputEl.value='';}
+
+  // Wide: floating capsule
+  const qi=document.getElementById('quickInput'), qs=document.getElementById('quickSend');
+  if(qs) qs.addEventListener('click',()=>sendQuick(qi));
+  if(qi) qi.addEventListener('keydown',e=>{if(e.key==='Enter')sendQuick(qi);});
+
+  // Sidebar: expandable input
+  const it=document.getElementById('inputTrigger'), ie=document.getElementById('inputExpand'), si=document.getElementById('sidebarQuickInput'), ss=document.getElementById('sidebarSend');
+  if(it) it.addEventListener('click',()=>{ie.classList.add('visible');it.style.display='none';si.focus();});
+  if(ss) ss.addEventListener('click',()=>{sendQuick(si);ie.classList.remove('visible');it.style.display='';});
+  if(si) si.addEventListener('keydown',e=>{if(e.key==='Enter'){sendQuick(si);ie.classList.remove('visible');it.style.display='';}if(e.key==='Escape'){si.value='';ie.classList.remove('visible');it.style.display='';}});
+  if(si) si.addEventListener('blur',()=>{setTimeout(()=>{if(!si.value.trim()){ie.classList.remove('visible');it.style.display='';}},200);});
+
+  // Portrait: input bar
+  const pi=document.getElementById('portraitQuickInput'), ps=document.getElementById('portraitSend');
+  if(ps) ps.addEventListener('click',()=>{if(pi)sendQuick(pi);});
+  if(pi) pi.addEventListener('keydown',e=>{if(e.key==='Enter')sendQuick(pi);});
+
+  // Diary input
+  const di=document.getElementById('diaryInput');
+  if(di) di.addEventListener('keydown',async e=>{if(e.key==='Enter'&&di.value.trim()){const r=await postFrameJson('/frame/diary/quick',{text:di.value.trim()});if(!r.ok){showToast(t('toast_write_fail'));return;}showToast(t('toast_diary_saved'));di.value='';}});
+
+  // Reminder actions
+  document.getElementById('reminders')?.addEventListener('click',async e=>{
+    const btn=e.target.closest('button[data-action]');if(!btn)return;
+    const r=await postFrameJson('/frame/reminder/action',{id:btn.dataset.id,action:btn.dataset.action});
+    if(!r.ok){showToast(t('toast_reminder_fail'));return;}showToast(t('toast_ok'));
+    const pr=btn.closest('.reminder-primary');if(pr){pr.style.opacity='0.35';pr.style.pointerEvents='none';}
+  });
+
+  // Check-in overlay
+  const ov=document.getElementById('checkinOverlay');
+  ov.querySelectorAll('button').forEach(b=>b.addEventListener('click',async()=>{
+    const r=await postFrameJson('/frame/checkin/action',{action:b.dataset.action,triggerId:currentFrameState.checkIn?.triggerId||''});
+    if(!r.ok){showToast(t('toast_checkin_fail'));return;}ov.classList.remove('visible');
+    showToast({here:t('msg_here'),later:t('msg_later'),settle:t('msg_settle'),quiet_today:t('msg_quiet')}[b.dataset.action]||t('toast_ok'));
+  }));
+  ov.addEventListener('click',e=>{if(e.target===ov)ov.classList.remove('visible');});
+  document.getElementById('checkinStatus')?.addEventListener('click',()=>ov.classList.add('visible'));
+
+  // Theme toggle
+  document.getElementById('themeToggle')?.addEventListener('click',()=>{
+    const cur=document.documentElement.getAttribute('data-theme')||'dark',next=cur==='dark'?'light':'dark';
+    document.documentElement.setAttribute('data-theme',next);localStorage.setItem('frame-theme',next);
+    const b=document.getElementById('themeToggle');if(b)b.textContent=next==='dark'?'☀':'☾';
+    const ci=document.getElementById('characterImg');if(ci)ci.src=next==='dark'?'../assets/character.png':'../assets/character_day.png';
+  });
+
+  // Language toggle
+  document.getElementById('langToggle')?.addEventListener('click',()=>{
+    currentLang=currentLang==='zh'?'en':'zh';localStorage.setItem('frame-lang',currentLang);applyLang();
+    const p=new URLSearchParams(window.location.search);
+    if(p.get('mode')==='mock') currentFrameState=currentLang==='en'?MOCK_EN:MOCK;
+    renderTimeline(currentFrameState.timeline?.slots||[]);renderDiary(currentFrameState.diary?.fragments||[],currentFrameState.diary?.todaySummary||'');
+    renderReminders(currentFrameState.reminders||[]);renderProjects(currentFrameState.projects||[]);renderCheckin(currentFrameState.checkIn||{});updateClock();
+  });
+
+  // Layout toggle
+  document.getElementById('layoutToggle')?.addEventListener('click',()=>{
+    const cur=getCurrentLayout(),next=cur==='wide'?'sidebar':'wide';
+    const shell=document.querySelector('.frame-shell');shell.style.opacity='0';
+    setTimeout(()=>{document.documentElement.setAttribute('data-layout',next);localStorage.setItem('frame-layout',next);
+      renderTimeline(currentFrameState.timeline?.slots||[]);shell.style.opacity='1';
+      const b=document.getElementById('layoutToggle');if(b)b.textContent=next==='wide'?t('layout_wide'):t('layout_sidebar');
+    },200);
+  });
+}
+
+async function postFrameJson(url,body){try{const r=await fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});const p=await r.json().catch(()=>({}));return{ok:r.ok&&p.ok!==false,payload:p};}catch(e){console.warn('[frame] POST failed:',e);return{ok:false,payload:null};}}
+
+/* ─── Data Loader ─── */
+async function loadData(){
+  const p=new URLSearchParams(window.location.search),mode=p.get('mode');
+  if(mode==='mock') return currentLang==='en'?MOCK_EN:MOCK;
+  if(mode==='dense') return MOCK_DENSE;
+  try{const r=await fetch('/frame/state',{cache:'no-store'});if(!r.ok)throw new Error(r.statusText);return await r.json();}
+  catch(e){console.warn('[frame] API fetch failed:',e);showToast(t('toast_connection_fail'));}
+  return EMPTY_STATE;
+}
+
+function renderCheckin(ci){
+  const s=document.getElementById('checkinStatus'),ov=document.getElementById('checkinOverlay');if(!s)return;
+  if(ci?.status==='due'){s.textContent=t('checkin_due');ov?.classList.add('visible');return;}
+  if(ci?.status==='in_progress'){s.textContent=t('checkin_progress');return;}
+  s.textContent=ci?.scheduledAt?t('checkin_next',{time:ci.scheduledAt}):t('checkin_pending');
+}
+
+/* ─── Init ─── */
+async function init(){
+  const p=new URLSearchParams(window.location.search);
+  currentLang=p.get('lang')||localStorage.getItem('frame-lang')||'zh';
+  const theme=p.get('theme')||localStorage.getItem('frame-theme')||'dark';
+  const layout=p.get('layout')||localStorage.getItem('frame-layout')||'wide';
+  document.documentElement.setAttribute('data-theme',theme);
+  document.documentElement.setAttribute('data-layout',layout);
+  applyLang();
+  const tb=document.getElementById('themeToggle');if(tb)tb.textContent=theme==='dark'?'☀':'☾';
+  const ci=document.getElementById('characterImg');if(ci)ci.src=theme==='dark'?'../assets/character.png':'../assets/character_day.png';
+  const lb=document.getElementById('layoutToggle');if(lb)lb.textContent=layout==='wide'?t('layout_wide'):t('layout_sidebar');
+  const data=await loadData();currentFrameState=data||EMPTY_STATE;
+  renderTimeline(currentFrameState.timeline?.slots||[]);
+  renderDiary(currentFrameState.diary?.fragments||[],currentFrameState.diary?.todaySummary||'');
+  renderReminders(currentFrameState.reminders||[]);renderProjects(currentFrameState.projects||[]);
+  renderCheckin(currentFrameState.checkIn||{});updateClock();setupInteractions();
+  setInterval(updateClock,30000);
+  setInterval(()=>{if(getCurrentLayout()==='sidebar'){const n=new Date();document.getElementById('timelineNow').style.left=((n.getHours()+n.getMinutes()/60)/24*100)+'%';}},60000);
+  window.__CODEKSEI_FRAME_READY__=true;
+}
+init();
+</script>
+</body>
+</html>

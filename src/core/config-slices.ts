@@ -40,6 +40,7 @@ export interface WeixinBridgeConfig {
   accountsDir: string;
   weixinBaseUrl: string;
   weixinCdnBaseUrl: string;
+  weixinDeliveryConfigFile: string;
   weixinReplyMode: WeixinReplyMode;
   weixinDeliveryTrace: boolean;
   weixinQrBotType: string;

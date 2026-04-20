@@ -33,7 +33,7 @@ export function chunkReplyText(text: unknown, limit = 3500): string[] {
   return chunks.filter(Boolean);
 }
 
-export function chunkReplyTextForWeixin(text: unknown, limit = 80): string[] {
+export function chunkReplyTextForWeixin(text: unknown, minChunkChars = 80, maxChunkChars = 3800): string[] {
   const normalized = trimOuterBlankLines(String(text || "").replace(/\r\n/g, "\n"));
   if (!normalized.trim()) {
     return [];
@@ -41,7 +41,7 @@ export function chunkReplyTextForWeixin(text: unknown, limit = 80): string[] {
 
   const boundaries = collectStreamingBoundaries(normalized);
   if (!boundaries.length) {
-    return chunkReplyText(normalized, limit);
+    return chunkReplyText(normalized, maxChunkChars);
   }
 
   const units: string[] = [];
@@ -50,31 +50,53 @@ export function chunkReplyTextForWeixin(text: unknown, limit = 80): string[] {
     if (boundary <= start) {
       continue;
     }
-    const unit = trimOuterBlankLines(normalized.slice(start, boundary));
-    if (unit) {
+    const unit = normalized.slice(start, boundary);
+    if (trimOuterBlankLines(unit)) {
       units.push(unit);
     }
     start = boundary;
   }
 
-  const tail = trimOuterBlankLines(normalized.slice(start));
-  if (tail) {
+  const tail = normalized.slice(start);
+  if (trimOuterBlankLines(tail)) {
     units.push(tail);
   }
 
   if (!units.length) {
-    return chunkReplyText(normalized, limit);
+    return chunkReplyText(normalized, maxChunkChars);
   }
 
   const chunks: string[] = [];
+  let pending = "";
   for (const unit of units) {
-    if (unit.length <= limit) {
-      chunks.push(unit);
+    const trimmedUnit = trimOuterBlankLines(unit);
+    if (trimmedUnit.length > maxChunkChars) {
+      flushPendingChunk(chunks, pending);
+      pending = "";
+      chunks.push(...chunkReplyText(trimmedUnit, maxChunkChars));
       continue;
     }
-    chunks.push(...chunkReplyText(unit, limit));
+    const candidate = pending ? `${pending}${unit}` : unit;
+    if (trimOuterBlankLines(candidate).length > maxChunkChars) {
+      flushPendingChunk(chunks, pending);
+      pending = unit;
+    } else {
+      pending = candidate;
+    }
+    if (trimOuterBlankLines(pending).length >= minChunkChars) {
+      flushPendingChunk(chunks, pending);
+      pending = "";
+    }
   }
+  flushPendingChunk(chunks, pending);
   return chunks.filter(Boolean);
+}
+
+function flushPendingChunk(chunks: string[], value: unknown): void {
+  const normalized = trimOuterBlankLines(value);
+  if (normalized) {
+    chunks.push(normalized);
+  }
 }
 
 export function packChunksForWeixinDelivery(

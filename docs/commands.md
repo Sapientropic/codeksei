@@ -235,7 +235,13 @@ operator / bootstrap：
 - `/checkin`
 - `/checkin <min>-<max>`
 - `/checkin reset`
+- `/reply`
+- `/reply mode stream|settled`
+- `/reply merge <chars>`
+- `/reply reset`
 - `/help`
+
+`/reply` 只调整 Codeksei 自带微信桥的回复投递策略：`mode` 会影响后续 turn 的 stream / settled 行为，`merge` 会调整短片段合并阈值，`reset` 会回到 `CODEKSEI_WEIXIN_REPLY_MODE`、`CODEKSEI_WEIXIN_MIN_CHUNK_CHARS` 或默认值。它不提供旧分片命令的兼容别名，也不会改变 Hosted Mode 下 Hermes 自己的控制命令。
 
 ## Timeline
 
@@ -252,6 +258,17 @@ operator / bootstrap：
 - `codeksei timeline screenshot`
 
 平台前提、agent / MCP 接入顺序、结构化截图合同统一见 [timeline-integration.md](./timeline-integration.md)。
+
+## Frame
+
+这一组负责本地平板常驻 Web 前台。页面默认读 `/frame/state`，只有 URL 显式带 `?mode=mock` 时才显示设计样张。
+
+- `codeksei frame build`
+- `codeksei frame serve`
+- `codeksei frame serve --port 4327`
+- `codeksei frame dev`
+
+`frame serve` 会先刷新本地站点资产，再启动 `http://127.0.0.1:<port>/frame`。V0 继续用轮询和薄 HTTP API，不引入第二套长期状态。
 
 支持速记：
 
@@ -387,6 +404,7 @@ Project radar 用于回答“项目现在在哪、应该从哪里重新进去”
 - 模拟一次 runtime child close / reconnect
 - 验证 approval continuity after restart
 - 仓库内自动化基线现在还会跑 `tests/shared-mode-long-chain.test.ts`
+- `/reply mode` 与 `/reply merge` 的单元测试覆盖持久配置、运行中切换和短片段合并
 
 自动化 smoke 覆盖：
 

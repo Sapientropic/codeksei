@@ -71,6 +71,10 @@ import { runTimelineReadCommand } from "../timeline/runtime/app/timeline-read-cl
 import { runTimelineServeCommand } from "../timeline/runtime/app/timeline-serve-cli";
 import { runTimelineWriteCommand } from "../timeline/runtime/app/timeline-write-cli";
 import { resolveTimelineRuntimeConfig } from "../timeline/runtime-config";
+import { runFrameBuildCommand } from "../frame/runtime/app/frame-build-cli";
+import { runFrameDevCommand } from "../frame/runtime/app/frame-dev-cli";
+import { runFrameServeCommand } from "../frame/runtime/app/frame-serve-cli";
+import { resolveFrameRuntimeConfig } from "../frame/runtime-config";
 
 type ReviewKind = Parameters<typeof runReviewCommand>[1];
 type ChannelSendFileApp = Parameters<typeof runChannelSendFileCommand>[0];
@@ -311,6 +315,35 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
       default:
         await context.getTimelineIntegration().runSubcommand(manifest.timelineSubcommand, context.leafArgs);
         return undefined;
+    }
+  },
+  "frame.subcommand": async (manifest, context) => {
+    const frameConfig = {
+      ...context.config,
+      ...resolveFrameRuntimeConfig(context.config),
+    };
+    switch (manifest.subcommand) {
+      case "build": {
+        const data = await runFrameBuildCommand(frameConfig);
+        return {
+          data,
+          text: `frame site built: ${String(data.siteDir || "")}`,
+        };
+      }
+      case "dev": {
+        const data = await runFrameDevCommand(frameConfig, context.leafArgs);
+        return data
+          ? { data, text: `frame dev: ${String(data.url || "")}` }
+          : undefined;
+      }
+      case "serve": {
+        const data = await runFrameServeCommand(frameConfig, context.leafArgs);
+        return data
+          ? { data, text: `frame dashboard: ${String(data.url || "")}` }
+          : undefined;
+      }
+      default:
+        throw new Error(`未知 frame 命令: ${manifest.subcommand}`);
     }
   },
 };

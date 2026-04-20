@@ -53,6 +53,7 @@ interface CancelTurnArgs {
 
 interface ResumeThreadArgs {
   threadId: string;
+  workspaceRoot?: string;
 }
 
 interface RefreshThreadInstructionsArgs {

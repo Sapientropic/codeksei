@@ -9,7 +9,15 @@
 
 ## [Unreleased]
 
-暂无。
+### Added
+
+- 新增 Codeksei-native 的微信回复投递控制：`/reply` 查看当前策略，`/reply mode stream|settled` 切换后续 turn 的投递模式，`/reply merge <chars>` 调整短片段合并阈值，`/reply reset` 回到 env / default。
+- 新增 `weixin-delivery-config.json` 状态 owner 和 schema，用于保存运行中 `/reply` 覆盖；默认仍可由 `CODEKSEI_WEIXIN_REPLY_MODE` 与 `CODEKSEI_WEIXIN_MIN_CHUNK_CHARS` 驱动。
+
+### Changed
+
+- 吸收原仓近期微信分片与 runtime thread 切换经验，但不引入旧品牌、旧分片 alias、其他旧命令、旧 JS runtime adapter 或旧 bin/docs。
+- runtime `resumeThread` seam 现在允许携带 `workspaceRoot`，`/switch` 与 watchdog subscription restore 会把 workspace 一并传给 runtime adapter，方便未来 host/runtime owner 正确恢复线程上下文。
 
 ## [0.5.0] - 2026-04-18
 

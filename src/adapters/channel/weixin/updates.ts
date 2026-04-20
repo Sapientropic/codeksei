@@ -15,6 +15,7 @@ export interface WeixinConfig {
   syncBufferDir?: string;
   weixinBaseUrl?: string;
   weixinCdnBaseUrl?: string;
+  weixinDeliveryConfigFile?: string;
   weixinDeliveryTrace?: boolean;
   weixinRouteTag?: string;
   weixinProtocolClientVersion?: string;

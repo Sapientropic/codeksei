@@ -148,6 +148,7 @@ function createTestAppHarness({
     accountId: "",
     weixinBaseUrl: "http://127.0.0.1",
     weixinCdnBaseUrl: "https://cdn.example.com",
+    weixinDeliveryConfigFile: path.join(tempRoot, "weixin-delivery-config.json"),
     weixinReplyMode: "stream",
     weixinDeliveryTrace: false,
     weixinQrBotType: "3",
@@ -358,6 +359,7 @@ function createTestAppHarness({
     async handleRuntimeEvent() {},
     queueReplyTargetForThread() {},
     setReplyTarget() {},
+    setWeixinReplyMode() {},
   };
 
   const threadStateStore: ThreadStateStoreLike = {

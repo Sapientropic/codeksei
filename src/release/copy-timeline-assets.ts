@@ -7,6 +7,8 @@ import { resolvePackageRoot } from "../core/path-utils";
 const repoRoot = resolvePackageRoot(__dirname);
 const sourceRoot = path.join(repoRoot, "src", "timeline");
 const distRoot = path.join(repoRoot, "dist", "src", "timeline");
+const frameSourceRoot = path.join(repoRoot, "src", "frame");
+const frameDistRoot = path.join(repoRoot, "dist", "src", "frame");
 const CODE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".d.ts"]);
 
 export function copyTimelineAssets(): void {
@@ -14,7 +16,8 @@ export function copyTimelineAssets(): void {
     shouldCopyFile: (sourcePath) => !isCodeAsset(sourcePath),
   });
   copyTree(path.join(sourceRoot, "examples"), path.join(distRoot, "examples"));
-  console.log("[codeksei] copied timeline non-code assets into dist");
+  copyFrameRuntimeAssets();
+  console.log("[codeksei] copied timeline/frame non-code assets into dist");
 }
 
 interface CopyTreeOptions {
@@ -39,6 +42,28 @@ function copyTree(sourceDir: string, targetDir: string, options: CopyTreeOptions
     fs.mkdirSync(path.dirname(targetPath), { recursive: true });
     fs.copyFileSync(sourcePath, targetPath);
   }
+}
+
+function copyFrameRuntimeAssets(): void {
+  const sourceFrameRoot = path.join(frameSourceRoot, "runtime", "frame");
+  const targetFrameRoot = path.join(frameDistRoot, "runtime", "frame");
+  const targetSiteDir = path.join(targetFrameRoot, "site");
+  const targetAssetsDir = path.join(targetFrameRoot, "assets");
+
+  fs.rmSync(targetSiteDir, { recursive: true, force: true });
+  fs.rmSync(targetAssetsDir, { recursive: true, force: true });
+  copyOptionalFile(path.join(sourceFrameRoot, "site", "index.html"), path.join(targetSiteDir, "index.html"));
+  copyTree(path.join(sourceFrameRoot, "assets"), targetAssetsDir, {
+    shouldCopyFile: (sourcePath) => !isCodeAsset(sourcePath),
+  });
+}
+
+function copyOptionalFile(sourcePath: string, targetPath: string): void {
+  if (!fs.existsSync(sourcePath)) {
+    return;
+  }
+  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+  fs.copyFileSync(sourcePath, targetPath);
 }
 
 function isCodeAsset(sourcePath: string): boolean {

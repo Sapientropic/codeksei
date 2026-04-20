@@ -294,6 +294,7 @@ CODEKSEI_PROACTIVE_OBSERVATION_TIMEOUT_MS=8000
 CODEKSEI_PROACTIVE_OBSERVATION_MIN_CONFIDENCE=0.55
 CODEKSEI_CODEX_ENDPOINT=ws://127.0.0.1:8765
 CODEKSEI_WEIXIN_REPLY_MODE=stream
+CODEKSEI_WEIXIN_MIN_CHUNK_CHARS=80
 CODEKSEI_WEIXIN_ROUTE_TAG=
 CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION=2.1.8
 CODEKSEI_TIMEZONE=Asia/Shanghai
@@ -313,9 +314,9 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 
 说明：
 
-- `CODEKSEI_WEIXIN_REPLY_MODE=stream` 现在表示“半实时增量流”：会按小窗口持续发送用户可见增量，保留段落结构，可读性优先于减少气泡数量
 - `CODEKSEI_WEIXIN_REPLY_MODE=stream` 现在更接近 hybrid stream：优先在自然句边界或已完成块发送，避免把半句 final 提前裂成多个微信气泡
 - `CODEKSEI_WEIXIN_REPLY_MODE=settled` 仍表示“等整轮收口后再发”：只发送最新的可见最终回复
+- `CODEKSEI_WEIXIN_MIN_CHUNK_CHARS` 控制微信短片段合并阈值；运行中也可以用 `/reply mode ...` 和 `/reply merge ...` 写入持久覆盖，`/reply reset` 会回到 env / default
 - 微信桥的正式 adapter 现在只保留 `v2`；issue #4 对应的媒体上传缺口只作为内部 legacy media fallback 处理，不再通过第二个 public adapter 暴露
 - `CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION` 默认跟随腾讯官方包 `@tencent-weixin/openclaw-weixin@2.1.8`；只有在有 source-backed 上游变更或兼容性回退证据时才建议手动覆盖
 - 国际版 / 海外 WeChat 扫码登录当前仍可能受官方地域灰度限制；腾讯公开资料提到香港地域已支持，其它地域仍在逐步开放
@@ -385,6 +386,7 @@ codeksei companion remember --user <wechat_user_id> --workspace /absolute/worksp
 codeksei onboarding start --user <wechat_user_id>
 codeksei onboarding status --user <wechat_user_id>
 codeksei context briefing --user <wechat_user_id> --workspace /absolute/workspace --mode proactive
+codeksei frame serve --port 4327
 codeksei review weekly --help
 ```
 
@@ -417,6 +419,10 @@ npm run shared:status
 /checkin
 /checkin <min>-<max>
 /checkin reset
+/reply
+/reply mode stream|settled
+/reply merge <chars>
+/reply reset
 /help
 ```
 

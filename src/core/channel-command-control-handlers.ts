@@ -11,7 +11,24 @@ import {
   parseCheckinRangeArgument,
   resolveCheckinConfig,
 } from "../state/checkin-config";
-import type { AppRuntimeConfig, ChannelAdapterLike, RuntimeAdapterLike, SessionStoreWriterLike } from "./app-service-contract";
+import { WeixinDeliveryConfigStore } from "../state/weixin-delivery-config-store";
+import {
+  formatWeixinDeliveryConfig,
+  MAX_WEIXIN_MIN_CHUNK_CHARS,
+  parseWeixinMinChunkChars,
+  resolveWeixinDeliveryConfig,
+} from "../state/weixin-delivery-config";
+import {
+  normalizeOptionalWeixinDeliveryReplyMode,
+  type WeixinDeliveryReplyMode,
+} from "../contracts/weixin-delivery-config";
+import type {
+  AppRuntimeConfig,
+  ChannelAdapterLike,
+  RuntimeAdapterLike,
+  SessionStoreWriterLike,
+  StreamDeliveryLike,
+} from "./app-service-contract";
 import type {
   ChannelCommandRuntimeAdapter,
   ChannelCommandSessionStore,
@@ -47,6 +64,7 @@ type ControlCommandMessage = Pick<
 >;
 
 type ControlCommandChannelAdapter = Pick<ChannelAdapterLike, "sendText">;
+type ControlCommandStreamDelivery = Pick<StreamDeliveryLike, "setWeixinReplyMode">;
 
 interface ControlCommandHandlers {
   approval(normalized: ControlCommandMessage, command: ParsedChannelCommand): Promise<void>;
@@ -54,6 +72,7 @@ interface ControlCommandHandlers {
   effort(normalized: ControlCommandMessage, command: ParsedChannelCommand): Promise<void>;
   help(normalized: ControlCommandMessage, command?: ParsedChannelCommand): Promise<void>;
   model(normalized: ControlCommandMessage, command: ParsedChannelCommand): Promise<void>;
+  reply(normalized: ControlCommandMessage, command: ParsedChannelCommand): Promise<void>;
 }
 
 function createControlCommandHandlers({
@@ -62,13 +81,15 @@ function createControlCommandHandlers({
   resolveWorkspaceRoot,
   runtimeAdapter,
   sessionWriter,
+  streamDelivery,
   threadStateStore,
 }: {
   channelAdapter: ControlCommandChannelAdapter;
-  config: Pick<AppRuntimeConfig, "checkinConfigFile">;
+  config: Pick<AppRuntimeConfig, "checkinConfigFile" | "weixinDeliveryConfigFile" | "weixinReplyMode">;
   resolveWorkspaceRoot(bindingKey: string): string;
   runtimeAdapter: ControlCommandRuntimeAdapter;
   sessionWriter: ControlCommandSessionWriter;
+  streamDelivery: ControlCommandStreamDelivery;
   threadStateStore: ControlCommandThreadStateStore;
 }): ControlCommandHandlers {
   return {
@@ -269,6 +290,57 @@ function createControlCommandHandlers({
       await sendText(channelAdapter, normalized, `已更新 checkin 区间。\n\n${buildCheckinInspectText(configFile)}`);
     },
 
+    async reply(normalized: ControlCommandMessage, command: ParsedChannelCommand): Promise<void> {
+      const configFile = normalizeCommandArgument(config.weixinDeliveryConfigFile);
+      if (!configFile) {
+        await sendText(channelAdapter, normalized, "当前未配置 weixin delivery config file。");
+        return;
+      }
+      const [action = "", value = "", ...rest] = splitCommandArgs(command.args);
+      const normalizedAction = normalizeCommandArgument(action).toLowerCase();
+      if (!normalizedAction && !value && !rest.length) {
+        await sendText(channelAdapter, normalized, buildReplyInspectText(configFile, config.weixinReplyMode));
+        return;
+      }
+
+      const store = new WeixinDeliveryConfigStore({ filePath: configFile });
+      if (normalizedAction === "reset" && !value && !rest.length) {
+        store.reset();
+        const resolved = resolveWeixinDeliveryConfig({
+          filePath: configFile,
+          defaultReplyMode: config.weixinReplyMode,
+        });
+        streamDelivery.setWeixinReplyMode(resolved.replyMode);
+        await sendText(channelAdapter, normalized, `已重置回复投递设置。\n\n${formatWeixinDeliveryConfig(resolved)}`);
+        return;
+      }
+
+      if (normalizedAction === "mode" && value && !rest.length) {
+        const replyMode = normalizeOptionalWeixinDeliveryReplyMode(value);
+        if (!replyMode) {
+          await sendText(channelAdapter, normalized, "用法：/reply mode stream|settled");
+          return;
+        }
+        store.setConfig({ replyMode });
+        streamDelivery.setWeixinReplyMode(replyMode);
+        await sendText(channelAdapter, normalized, `已更新回复投递模式。\n\n${buildReplyInspectText(configFile, config.weixinReplyMode)}`);
+        return;
+      }
+
+      if (normalizedAction === "merge" && value && !rest.length) {
+        const minChunkChars = parseWeixinMinChunkChars(value);
+        if (!minChunkChars) {
+          await sendText(channelAdapter, normalized, `用法：/reply merge <1-${MAX_WEIXIN_MIN_CHUNK_CHARS}>`);
+          return;
+        }
+        store.setConfig({ minChunkChars });
+        await sendText(channelAdapter, normalized, `已更新回复分片合并阈值。\n\n${buildReplyInspectText(configFile, config.weixinReplyMode)}`);
+        return;
+      }
+
+      await sendText(channelAdapter, normalized, buildReplyUsageText());
+    },
+
     async help(normalized: ControlCommandMessage): Promise<void> {
       await sendText(channelAdapter, normalized, buildWeixinHelpText());
     },
@@ -289,6 +361,22 @@ function buildCheckinInspectText(filePath: string): string {
     `当前 checkin: ${formatCheckinRange(resolved)}`,
     `source: ${mapCheckinSourceLabel(resolved.source)}`,
     "用法：/checkin 3-60 或 /checkin reset",
+  ].join("\n");
+}
+
+function buildReplyInspectText(filePath: string, defaultReplyMode: WeixinDeliveryReplyMode): string {
+  return formatWeixinDeliveryConfig(resolveWeixinDeliveryConfig({
+    filePath,
+    defaultReplyMode,
+  }));
+}
+
+function buildReplyUsageText(): string {
+  return [
+    "用法：/reply",
+    "/reply mode stream|settled",
+    `/reply merge <1-${MAX_WEIXIN_MIN_CHUNK_CHARS}>`,
+    "/reply reset",
   ].join("\n");
 }
 

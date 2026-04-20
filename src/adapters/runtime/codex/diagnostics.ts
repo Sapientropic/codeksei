@@ -36,7 +36,7 @@ export interface RuntimeClientLike {
   onMessage(listener: (message: RpcMessage) => void): () => void;
   sendResponse(id: string | number, result: Record<string, unknown>): Promise<void>;
   cancelTurn(args: { threadId: string; turnId: string }): Promise<void>;
-  resumeThread(args: { threadId: string }): Promise<unknown>;
+  resumeThread(args: { threadId: string; workspaceRoot?: string }): Promise<unknown>;
   sendUserMessage(params: Record<string, unknown>): Promise<unknown>;
   startThread(args: { cwd?: string }): Promise<unknown>;
 }

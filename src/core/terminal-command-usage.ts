@@ -57,6 +57,8 @@ const ACTION_USAGE_ARGS: Readonly<Partial<Record<CommandActionId, string>>> = Ob
   "timeline.serve": "[--port 4317]",
   "timeline.dev": "[--port 4317]",
   "timeline.screenshot": "[--output /绝对路径] [其他 timeline screenshot 参数]",
+  "frame.serve": "[--port 4327]",
+  "frame.dev": "[--port 4327]",
 });
 
 export function buildTerminalEntryUsage(action: CommandActionLike | CommandActionId | string, audience: TerminalAudience): string {

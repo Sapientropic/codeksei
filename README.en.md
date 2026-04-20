@@ -279,6 +279,7 @@ CODEKSEI_PROACTIVE_OBSERVATION_TIMEOUT_MS=8000
 CODEKSEI_PROACTIVE_OBSERVATION_MIN_CONFIDENCE=0.55
 CODEKSEI_CODEX_ENDPOINT=ws://127.0.0.1:8765
 CODEKSEI_WEIXIN_REPLY_MODE=stream
+CODEKSEI_WEIXIN_MIN_CHUNK_CHARS=80
 CODEKSEI_WEIXIN_ROUTE_TAG=
 CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION=2.1.8
 CODEKSEI_TIMEZONE=Asia/Shanghai
@@ -300,6 +301,7 @@ Notes:
 
 - `CODEKSEI_WEIXIN_REPLY_MODE=stream` now behaves more like a hybrid stream: it prefers natural sentence boundaries or completed blocks so unfinished final sentences are not split into multiple WeChat bubbles
 - `CODEKSEI_WEIXIN_REPLY_MODE=settled` still means “wait until the whole turn settles”: only the latest visible final reply is sent
+- `CODEKSEI_WEIXIN_MIN_CHUNK_CHARS` controls how aggressively short WeChat reply fragments are merged. During a running bridge session, `/reply mode ...` and `/reply merge ...` persist overrides, and `/reply reset` returns to env / default
 - The Weixin bridge now exposes only one official `v2` adapter; the issue #4 media gap is handled as an internal legacy media fallback instead of a second public adapter
 - `CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION` now defaults to Tencent's official `@tencent-weixin/openclaw-weixin@2.1.8`; only override it when you have source-backed upstream evidence to do so
 - International / overseas WeChat login can still be gated by Tencent's regional rollout; Tencent's public docs say Hong Kong is supported while other regions are still rolling out
@@ -362,6 +364,7 @@ codeksei companion remember --user <wechat_user_id> --workspace /absolute/worksp
 codeksei onboarding start --user <wechat_user_id>
 codeksei onboarding status --user <wechat_user_id>
 codeksei context briefing --user <wechat_user_id> --workspace /absolute/workspace --mode proactive
+codeksei frame serve --port 4327
 codeksei review weekly --help
 ```
 
@@ -394,6 +397,10 @@ WeChat:
 /checkin
 /checkin <min>-<max>
 /checkin reset
+/reply
+/reply mode stream|settled
+/reply merge <chars>
+/reply reset
 /help
 ```
 

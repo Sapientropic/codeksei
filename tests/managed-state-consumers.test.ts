@@ -8,8 +8,10 @@ const { SessionStore }: typeof import("../src/adapters/runtime/codex/session-sto
 const { loadWeixinAccount, saveWeixinAccount }: typeof import("../src/adapters/channel/weixin/account-store") = require("../src/adapters/channel/weixin/account-store");
 const { checkinConfigSchema }: typeof import("../src/contracts/checkin-config") = require("../src/contracts/checkin-config");
 const { checkinScheduleStateSchema }: typeof import("../src/contracts/checkin-schedule-state") = require("../src/contracts/checkin-schedule-state");
+const { weixinDeliveryConfigSchema }: typeof import("../src/contracts/weixin-delivery-config") = require("../src/contracts/weixin-delivery-config");
 const { CheckinConfigStore }: typeof import("../src/state/checkin-config-store") = require("../src/state/checkin-config-store");
 const { CheckinScheduleStateStore }: typeof import("../src/state/checkin-schedule-state-store") = require("../src/state/checkin-schedule-state-store");
+const { WeixinDeliveryConfigStore }: typeof import("../src/state/weixin-delivery-config-store") = require("../src/state/weixin-delivery-config-store");
 const {
   loadPersistedContextTokens,
   persistContextToken,
@@ -47,6 +49,11 @@ test("managed state ownership matrix stays single-owner and executable", () => {
       file: "checkin-config.json",
       schemaExports: [checkinConfigSchema],
       storeExports: [CheckinConfigStore],
+    },
+    {
+      file: "weixin-delivery-config.json",
+      schemaExports: [weixinDeliveryConfigSchema],
+      storeExports: [WeixinDeliveryConfigStore],
     },
     {
       file: "checkin-schedule-state.json",

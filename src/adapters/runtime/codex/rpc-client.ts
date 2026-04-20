@@ -40,6 +40,7 @@ interface StartThreadArgs {
 
 interface ResumeThreadArgs {
   threadId?: string;
+  workspaceRoot?: string;
 }
 
 interface ListThreadsArgs {

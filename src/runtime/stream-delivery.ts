@@ -97,6 +97,13 @@ export class StreamDelivery {
     this.replyTargetRegistry.setReplyTarget(bindingKey, target);
   }
 
+  setWeixinReplyMode(mode: unknown): void {
+    // Existing RunState instances keep the mode captured at turn creation.
+    // Only future turns should see this change; rewriting in-flight state can
+    // duplicate or lose visible WeChat delivery when a user toggles /reply mid-turn.
+    this.weixinReplyMode = normalizeWeixinReplyMode(mode);
+  }
+
   queueReplyTargetForThread(threadId: string, target: ReplyTarget): void {
     this.replyTargetRegistry.queueReplyTargetForThread(threadId, target);
   }

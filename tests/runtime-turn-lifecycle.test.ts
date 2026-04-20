@@ -169,6 +169,7 @@ function createLifecycle({
     streamDelivery: {
       queueReplyTargetForThread() {},
       setReplyTarget() {},
+      setWeixinReplyMode() {},
     },
     buildRuntimeInboundText: buildRuntimeInboundTextImpl,
   });

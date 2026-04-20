@@ -90,6 +90,59 @@ test("app poll loop keeps flush ordering around successful getUpdates cycles", a
   assert.equal(secondHeartbeat.lastError, "");
 });
 
+test("app poll loop handles inbound messages serially in received order", async () => {
+  const handledOrder: string[] = [];
+  const shutdown = { stopped: false };
+
+  await runAppPollLoop({
+    account: { accountId: "acct-1" },
+    runtimeState: { endpoint: "ws://runtime", workspaceRoot: "E:/repo/current" },
+    shutdown,
+    channelAdapter: {
+      loadSyncBuffer() {
+        return "sync-1";
+      },
+      async getUpdates() {
+        return {
+          ret: 0,
+          msgs: [
+            { id: "msg-1" },
+            { id: "msg-2" },
+            { id: "msg-3" },
+          ],
+        };
+      },
+    },
+    flushDueReminders: async () => {},
+    flushPendingSystemMessages: async () => {},
+    resolveLongPollTimeoutMs: () => 35_000,
+    handleIncomingMessage: async (message) => {
+      const id = typeof message === "object" && message !== null && "id" in message
+        ? String((message as { id?: unknown }).id || "")
+        : "";
+      handledOrder.push(`start:${id}`);
+      await Promise.resolve();
+      handledOrder.push(`end:${id}`);
+      if (id === "msg-3") {
+        shutdown.stopped = true;
+      }
+    },
+    updateBridgeHeartbeat: () => {},
+    retryDelayMs: 2_000,
+    backoffDelayMs: 30_000,
+    maxConsecutiveFailures: 3,
+  });
+
+  assert.deepEqual(handledOrder, [
+    "start:msg-1",
+    "end:msg-1",
+    "start:msg-2",
+    "end:msg-2",
+    "start:msg-3",
+    "end:msg-3",
+  ]);
+});
+
 test("app poll loop turns session-expired transport failures into the login hint", async () => {
   await assert.rejects(
     () => runAppPollLoop({

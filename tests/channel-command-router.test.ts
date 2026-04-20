@@ -59,6 +59,9 @@ function createRouterHarness() {
     async model(normalized: ChannelCommandMessage, command: ParsedChannelCommand) {
       calls.push({ type: "model", normalized, command });
     },
+    async reply(normalized: ChannelCommandMessage, command: ParsedChannelCommand) {
+      calls.push({ type: "reply", normalized, command });
+    },
     async help(normalized: ChannelCommandMessage, command: ParsedChannelCommand) {
       calls.push({ type: "help", normalized, command });
     },
@@ -111,6 +114,19 @@ test("ChannelCommandRouter routes effort commands through the effort handler", a
   assert.ok(firstCall);
   assert.equal(firstCall.type, "effort");
   assert.equal(firstCall.command.args, "high");
+});
+
+test("ChannelCommandRouter routes reply commands through the reply handler", async () => {
+  const { calls, router } = createRouterHarness();
+
+  const handled = await router.maybeDispatchCommand(buildNormalizedCommandMessage("/reply merge 120"));
+
+  assert.equal(handled, true);
+  assert.equal(calls.length, 1);
+  const firstCall = calls[0];
+  assert.ok(firstCall);
+  assert.equal(firstCall.type, "reply");
+  assert.equal(firstCall.command.args, "merge 120");
 });
 
 test("ChannelCommandRouter falls back unknown commands to help", async () => {

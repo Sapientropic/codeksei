@@ -85,6 +85,16 @@ test("timeline build leaf help clarifies that browser binaries are only needed f
   assert.match(help, /只在 screenshot 链路里才需要/u);
 });
 
+test("frame serve and dev leaf help expose the local frame URL contract", () => {
+  const serveHelp = buildTerminalLeafHelp("frame.serve");
+  const devHelp = buildTerminalLeafHelp("frame.dev");
+
+  assert.match(serveHelp, /codeksei frame serve \[--port 4327\]/u);
+  assert.match(serveHelp, /\/frame\/state/u);
+  assert.match(devHelp, /codeksei frame dev \[--port 4327\]/u);
+  assert.match(devHelp, /\?mode=mock/u);
+});
+
 test("diary topic help explains captured Todo start time for later timeline accuracy", () => {
   const help = buildTerminalTopicHelp("diary");
 

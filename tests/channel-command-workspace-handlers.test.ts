@@ -46,7 +46,7 @@ const {
     };
     queueReplyCalls: Array<{ threadId: string }>;
     refreshCalls: Array<{ threadId: string }>;
-    resumeCalls: Array<{ threadId: string }>;
+    resumeCalls: Array<{ threadId: string; workspaceRoot?: string }>;
     setThreadCalls: Array<{ key: string; threadId: string; workspaceRoot: string }>;
     setWorkspaceCalls: Array<{ key: string; workspaceRoot: string }>;
     textCalls: Array<{ text: string }>;
@@ -159,7 +159,7 @@ test("switch follows the known target thread workspace", async () => {
     args: "thread-old",
   });
 
-  assert.deepEqual(harness.resumeCalls, [{ threadId: "thread-old" }]);
+  assert.deepEqual(harness.resumeCalls, [{ threadId: "thread-old", workspaceRoot: "E:/repo/other" }]);
   assert.deepEqual(harness.setThreadCalls, [{
     key: "workspace-1:acct-1:user-1",
     workspaceRoot: "E:/repo/other",

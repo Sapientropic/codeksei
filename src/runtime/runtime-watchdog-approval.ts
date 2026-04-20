@@ -203,14 +203,17 @@ export async function restoreBoundThreadSubscriptions(
     const threadIdByWorkspaceRoot = binding?.threadIdByWorkspaceRoot && typeof binding.threadIdByWorkspaceRoot === "object"
       ? binding.threadIdByWorkspaceRoot
       : {};
-    for (const threadId of Object.values(threadIdByWorkspaceRoot)) {
+    for (const [workspaceRoot, threadId] of Object.entries(threadIdByWorkspaceRoot)) {
       const normalizedThreadId = dependencies.normalizeCommandArgument(threadId);
       if (!normalizedThreadId || seenThreadIds.has(normalizedThreadId)) {
         continue;
       }
       seenThreadIds.add(normalizedThreadId);
       if (supportsRuntimeOperation(dependencies.runtimeAdapter, "resumeThread")) {
-        await ignoreBestEffortError(dependencies.runtimeAdapter.resumeThread({ threadId: normalizedThreadId }), {
+        await ignoreBestEffortError(dependencies.runtimeAdapter.resumeThread({
+          threadId: normalizedThreadId,
+          workspaceRoot: dependencies.normalizeText(workspaceRoot),
+        }), {
           label: "watchdog thread resume",
           reason: "subscription restore should keep hydrating later bindings even if one resume fails",
         });

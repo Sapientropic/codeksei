@@ -85,6 +85,16 @@ export const COMMAND_SAFETY_OVERRIDES = {
   "timeline.screenshot": "warned",
   "timeline.serve": "open",
   "timeline.write": "warned",
+  "frame.build": "open",
+  "frame.dev": "open",
+  "frame.serve": "open",
+  "approval.accept_once": "warned",
+  "approval.accept_workspace": "warned",
+  "approval.reject_once": "warned",
+  "checkin.select": "warned",
+  "effort.select": "warned",
+  "model.select": "warned",
+  "reply.configure": "warned",
 } as const satisfies Record<string, CommandSafetyTierDefinition>;
 
 export const COMMAND_MUTABILITY_OVERRIDES = {
@@ -144,6 +154,16 @@ export const COMMAND_MUTABILITY_OVERRIDES = {
   "timeline.screenshot": "write",
   "timeline.serve": "long_running",
   "timeline.write": "write",
+  "frame.build": "read",
+  "frame.dev": "long_running",
+  "frame.serve": "long_running",
+  "approval.accept_once": "write",
+  "approval.accept_workspace": "write",
+  "approval.reject_once": "write",
+  "checkin.select": "write",
+  "effort.select": "write",
+  "model.select": "write",
+  "reply.configure": "write",
 } as const satisfies Record<string, CommandMutabilityDefinition>;
 
 export const COMMAND_AUTH_OVERRIDES = {

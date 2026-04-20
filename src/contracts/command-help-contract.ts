@@ -126,6 +126,17 @@ const TOPIC_HELP = {
       `  timeline 截图只生成本地文件；需要回传当前聊天时，再配合 ${buildTerminalActionExample("channel.send_file", { audience: "public", includeArgs: true })}`,
     ],
   }),
+  frame: () => ({
+    usage: [
+      `${buildTerminalEntryUsage("frame.build", "public")} / ${buildTerminalEntryUsage("frame.serve", "public")} / ${buildTerminalEntryUsage("frame.dev", "public")}`,
+    ],
+    bodyLabel: "补充：",
+    body: [
+      "  Frame 是平板常驻的本地 Web 前台，默认读取 /frame/state，并把输入写回 Codeksei。",
+      "  mock 样张只在页面 URL 显式带 ?mode=mock 时启用；默认运行态不使用假数据。",
+      "  V0 先用轮询和薄 HTTP API，不引入第二套长期状态。",
+    ],
+  }),
   project: () => ({
     usage: [buildExample("project.radar", true)],
     bodyLabel: "补充：",
@@ -638,6 +649,9 @@ const LEAF_HELP = {
   "timeline.build": () => buildTimelineLeafHelpDocument("timeline.build"),
   "timeline.serve": () => buildTimelineLeafHelpDocument("timeline.serve"),
   "timeline.dev": () => buildTimelineLeafHelpDocument("timeline.dev"),
+  "frame.build": () => buildFrameLeafHelpDocument("frame.build"),
+  "frame.serve": () => buildFrameLeafHelpDocument("frame.serve"),
+  "frame.dev": () => buildFrameLeafHelpDocument("frame.dev"),
   "timeline.screenshot": () => ({
     usage: [buildExample("timeline.screenshot", true)],
     bodyLabel: "说明：",
@@ -801,6 +815,52 @@ function buildTimelineLeafHelpDocument(
       examples: [
         "  codeksei timeline dev",
         "  codeksei timeline dev --port 4317",
+      ],
+    },
+  }[actionId];
+
+  return {
+    usage: [variant.usage],
+    bodyLabel: "说明：",
+    body: variant.body,
+    examples: variant.examples,
+  };
+}
+
+function buildFrameLeafHelpDocument(
+  actionId: "frame.build" | "frame.serve" | "frame.dev",
+): CommandHelpDocument {
+  const variant = {
+    "frame.build": {
+      usage: buildTerminalActionExample("frame.build", { audience: "public", includeArgs: true }),
+      body: [
+        "  把当前 Frame 静态前台复制到本地 stateDir/frame/site，并同步人物等静态资产。",
+        "  这条命令不启动服务，也不写入 diary / reminder / check-in 状态。",
+      ],
+      examples: [
+        "  codeksei frame build",
+      ],
+    },
+    "frame.serve": {
+      usage: buildTerminalActionExample("frame.serve", { audience: "public", includeArgs: true }),
+      body: [
+        "  构建并启动 Frame 本地 HTTP 服务；页面入口是 /frame，状态投影是 /frame/state。",
+        "  写入动作通过 /frame/input 与 /frame/diary/quick 回到 Codeksei，失败时页面不会清空输入。",
+      ],
+      examples: [
+        "  codeksei frame serve",
+        "  codeksei frame serve --port 4327",
+      ],
+    },
+    "frame.dev": {
+      usage: buildTerminalActionExample("frame.dev", { audience: "public", includeArgs: true }),
+      body: [
+        "  启动 Frame 开发服务。V0 与 serve 使用同一条薄服务链路，后续可再加 hot reload。",
+        "  页面 URL 带 ?mode=mock 时会显示设计样张；默认读取真实 /frame/state。",
+      ],
+      examples: [
+        "  codeksei frame dev",
+        "  codeksei frame dev --port 4327",
       ],
     },
   }[actionId];
