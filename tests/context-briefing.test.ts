@@ -148,6 +148,10 @@ test("context board refresh builds a deterministic handoff with fresh diary and 
   assert.match(result.briefingText, /Codeksei context board \(proactive\)/u);
   assert.match(result.briefingText, /10:20 起床/u);
   assert.match(result.briefingText, /提醒要短，不要催债/u);
+  assert.match(result.briefingText, /伴随状态卡/u);
+  assert.equal(result.stateCard.sourceThickness, "strong");
+  assert.match(result.stateCard.activeThread, /issue #9/u);
+  assert.match(result.stateCard.easiestReentryStep, /hosted checkin script/u);
   assert.match(result.boardText, /待带进下一次主动判断的内部后续：午饭后 30 分钟重新接这条线。/u);
   assert.match(result.boardText, /## 重入入口/u);
 });
@@ -180,6 +184,7 @@ test("context board marks stale when today diary and recent handoff are both thi
 
   assert.equal(result.stale, true);
   assert.deepEqual(result.staleReasons, ["missing_today_diary", "stale_companion_and_checkin_handoff"]);
+  assert.equal(result.stateCard.sourceThickness, "thin");
   assert.match(result.briefingText, /\[⚠️ 需确认\]/u);
 });
 

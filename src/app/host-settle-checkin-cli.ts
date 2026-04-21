@@ -13,6 +13,8 @@ interface HostSettleOptions {
   bookkeepingActions: string[];
   config: string;
   createHandoff: boolean;
+  decisionId: string;
+  feedbackText: string;
   followupContext: string;
   help: boolean;
   lease: string;
@@ -20,6 +22,7 @@ interface HostSettleOptions {
   nextWakeAt: string;
   observedState: string;
   provider: string;
+  responseOutcome: string;
   result: string;
   sleepFor: string;
   user: string;
@@ -41,6 +44,7 @@ type SettleCliConfig = Partial<Pick<
   | "hermesPythonCommand"
   | "hermesRepoLocalShimPath"
   | "hermesRepoRoot"
+  | "stateDir"
 >>;
 
 export async function runHostSettleCheckinCommand(
@@ -67,10 +71,13 @@ export async function runHostSettleCheckinCommand(
   const settled = settleDelegatedCheckin(config as Parameters<typeof settleDelegatedCheckin>[0], target, {
     bookkeepingActions: parseBookkeepingActions(options.bookkeepingActions),
     createHandoff: options.createHandoff,
+    decisionId: options.decisionId,
+    feedbackText: options.feedbackText,
     followupContext: options.followupContext,
     provider: resolvedProvider.provider,
     leaseId: options.lease,
     observedCurrentState: options.observedState,
+    responseOutcome: options.responseOutcome,
     result: options.result as Parameters<typeof settleDelegatedCheckin>[2]["result"],
     nextWakeAt: options.nextWakeAt,
     sleepFor: options.sleepFor,

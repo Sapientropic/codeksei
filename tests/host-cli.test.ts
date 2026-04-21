@@ -295,6 +295,9 @@ test("host claim-checkin and settle-checkin cover delegated proactive lease flow
   assert.equal(claim.data.status, "claimed");
   assert.equal(typeof claim.data.lease.id, "string");
   assert.equal(claim.data.payload.kind, "proactive_checkin");
+  assert.equal(claim.data.proactiveDecision.kind, "proactive_decision");
+  assert.equal(claim.data.proactiveDecision.model.used, false);
+  assert.equal(claim.data.proactiveDecision.model.host, "deterministic");
   assert.equal(Array.isArray(claim.data.payload.decisionOrder), true);
   assert.equal(Array.isArray(claim.data.payload.bookkeepingPriorities), true);
   assert.equal(typeof claim.data.contextBriefing?.briefingText, "string");
@@ -308,8 +311,12 @@ test("host claim-checkin and settle-checkin cover delegated proactive lease flow
     "--lease", claim.data.lease.id,
     "--result", "silent",
     "--sleep-for", "6h",
+    "--decision-id", claim.data.proactiveDecision.decisionId,
+    "--response-outcome", "ignored",
+    "--feedback-text", "No visible response yet.",
   ]);
   assert.equal(settle.ok, true);
+  assert.equal(settle.data.outcomeLogged, true);
   assert.match(String(settle.data.nextWakeAt || ""), /^\d{4}-\d{2}-\d{2}T/u);
   assert.deepEqual(settle.data.hostedWakeSync.jobs.map((job: { role: string }) => job.role), ["wake", "recovery", "guard"]);
 });

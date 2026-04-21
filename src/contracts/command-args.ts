@@ -263,6 +263,9 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "observedState", keys: ["--observed-state"], type: "string", defaultValue: "", description: "子 agent 观察到的当前状态摘要" },
       { name: "followupContext", keys: ["--followup-context"], type: "string", defaultValue: "", description: "传给主会话的内部 follow-up 摘要" },
       { name: "bookkeepingActions", keys: ["--bookkeeping-action"], type: "string[]", defaultValue: [], description: "可重复；格式 kind|done|summary 或 kind|suggested|summary" },
+      { name: "decisionId", keys: ["--decision-id"], type: "string", defaultValue: "", description: "可选；关联 host claim-checkin 返回的 proactiveDecision.decisionId" },
+      { name: "responseOutcome", keys: ["--response-outcome"], type: "string", defaultValue: "", description: "可选；engaged|ignored|dismissed|annoyed|corrected|continued" },
+      { name: "feedbackText", keys: ["--feedback-text"], type: "string", defaultValue: "", description: "可选；用户或宿主对这次主动判断的反馈摘要" },
     ],
   }),
   hostFinalizeCheckin: createCommandArgSchema({
@@ -276,6 +279,9 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "result", keys: ["--result"], type: "string", defaultValue: "", description: "可选；覆盖 handoff 自带的 sent_message|silent|backstage_only" },
       { name: "nextWakeAt", keys: ["--next-wake-at"], type: "string", defaultValue: "", description: "显式下次唤醒时间（ISO 8601）" },
       { name: "sleepFor", keys: ["--sleep-for"], type: "string", defaultValue: "", description: "相对延迟，如 90m / 4h / 1d" },
+      { name: "decisionId", keys: ["--decision-id"], type: "string", defaultValue: "", description: "可选；关联 host claim-checkin 返回的 proactiveDecision.decisionId" },
+      { name: "responseOutcome", keys: ["--response-outcome"], type: "string", defaultValue: "", description: "可选；engaged|ignored|dismissed|annoyed|corrected|continued" },
+      { name: "feedbackText", keys: ["--feedback-text"], type: "string", defaultValue: "", description: "可选；用户或宿主对这次主动判断的反馈摘要" },
     ],
   }),
   hostRender: createCommandArgSchema({

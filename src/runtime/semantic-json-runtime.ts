@@ -26,6 +26,8 @@ export interface RuntimeSemanticClient {
 
 export interface SemanticJsonRuntimeConfig {
   hermesCommand?: unknown;
+  proactiveJudgmentApiKey?: unknown;
+  proactiveJudgmentEndpoint?: unknown;
   runtimeCommand?: unknown;
   runtimeEndpoint?: unknown;
   stateDir?: unknown;
@@ -124,6 +126,55 @@ export function runHermesSemanticJson(
   return parseSemanticJson(output);
 }
 
+export async function runOpenAICompatibleSemanticJson(
+  config: SemanticJsonRuntimeConfig = {},
+  input: SemanticJsonRunInput,
+): Promise<JsonObject> {
+  const endpoint = normalizeText(config.proactiveJudgmentEndpoint);
+  if (!endpoint) {
+    throw new Error(`${input.label} missing OpenAI-compatible endpoint`);
+  }
+  const url = resolveChatCompletionsUrl(endpoint);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.max(1, input.timeoutMs));
+  try {
+    const response = await fetch(url, {
+      body: JSON.stringify({
+        messages: [
+          {
+            content: input.prompt,
+            role: "user",
+          },
+        ],
+        model: normalizeText(input.model),
+        response_format: { type: "json_object" },
+        stream: false,
+        temperature: 0,
+      }),
+      headers: buildOpenAICompatibleHeaders(config),
+      method: "POST",
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    if (!response.ok) {
+      throw new Error(`${input.label} failed: HTTP ${response.status} ${normalizeText(text)}`);
+    }
+    const body = parseSemanticJson(text);
+    const content = extractOpenAICompatibleContent(body);
+    if (!content) {
+      throw new Error(`${input.label} returned no message content`);
+    }
+    return parseSemanticJson(content);
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`${input.label} timed out after ${input.timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function waitForSemanticJsonTurnCompletion(
   client: RuntimeSemanticClient,
   threadId: string,
@@ -191,4 +242,27 @@ export function waitForSemanticJsonTurnCompletion(
       }
     });
   });
+}
+
+function buildOpenAICompatibleHeaders(config: SemanticJsonRuntimeConfig): Record<string, string> {
+  const apiKey = normalizeText(config.proactiveJudgmentApiKey);
+  return {
+    ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+    "Content-Type": "application/json",
+  };
+}
+
+function resolveChatCompletionsUrl(endpoint: string): string {
+  const trimmed = endpoint.replace(/\/+$/u, "");
+  if (/\/chat\/completions$/u.test(trimmed)) {
+    return trimmed;
+  }
+  return `${trimmed}/chat/completions`;
+}
+
+function extractOpenAICompatibleContent(body: JsonObject): string {
+  const choices = Array.isArray(body.choices) ? body.choices : [];
+  const first = asRecord(choices[0]);
+  const message = asRecord(first.message);
+  return normalizeText(message.content || first.text || body.output_text);
 }

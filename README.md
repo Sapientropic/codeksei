@@ -278,6 +278,13 @@ CODEKSEI_COMPANION_SEMANTIC_TIMEOUT_MS=15000
 CODEKSEI_ONBOARDING_SEMANTIC_HOST=
 CODEKSEI_ONBOARDING_SEMANTIC_MODEL=
 CODEKSEI_ONBOARDING_SEMANTIC_TIMEOUT_MS=15000
+CODEKSEI_PROACTIVE_JUDGMENT_MODE=hybrid
+CODEKSEI_PROACTIVE_JUDGMENT_HOST=auto
+CODEKSEI_PROACTIVE_JUDGMENT_ENDPOINT=http://127.0.0.1:11434/v1
+CODEKSEI_PROACTIVE_JUDGMENT_API_KEY=
+CODEKSEI_PROACTIVE_JUDGMENT_MODEL=qwen3.5:2b
+CODEKSEI_PROACTIVE_JUDGMENT_TIMEOUT_MS=2500
+CODEKSEI_PROACTIVE_JUDGMENT_MIN_CONFIDENCE=0.62
 CODEKSEI_CODEX_ENDPOINT=ws://127.0.0.1:8765
 CODEKSEI_WEIXIN_REPLY_MODE=stream
 CODEKSEI_WEIXIN_ROUTE_TAG=
@@ -314,6 +321,10 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - `CODEKSEI_ONBOARDING_SEMANTIC_HOST=auto|codex|hermes|deterministic` 可为 onboarding 隐藏抽取单独指定宿主；留空时沿用默认 host 决策
 - `CODEKSEI_ONBOARDING_SEMANTIC_MODEL` 可给 onboarding 隐藏抽取单独指定低成本模型
 - `CODEKSEI_ONBOARDING_SEMANTIC_TIMEOUT_MS` 默认 `15000`，超时会自动退回 deterministic 抽取，避免激活访谈把用户晾住
+- `CODEKSEI_PROACTIVE_JUDGMENT_HOST=auto|local|openai-compatible|codex|hermes|deterministic` 控制主动判断语义宿主；默认 `auto`，优先尝试 OpenAI-compatible 本地/云端 endpoint，失败退回 deterministic
+- `CODEKSEI_PROACTIVE_JUDGMENT_ENDPOINT` 默认 `http://127.0.0.1:11434/v1`，可接 Ollama / LM Studio / llama.cpp server / vLLM / SGLang 或云端 OpenAI-compatible API
+- `CODEKSEI_PROACTIVE_JUDGMENT_MODEL` 默认 `qwen3.5:2b`，只是推荐默认，不把 Codeksei 绑到具体模型
+- `CODEKSEI_PROACTIVE_JUDGMENT_TIMEOUT_MS` 默认 `2500`，`CODEKSEI_PROACTIVE_JUDGMENT_MIN_CONFIDENCE` 默认 `0.62`；超时、低置信或 JSON 非法都会回退 deterministic
 - `CODEKSEI_USER_NAME` 决定对话里怎么称呼你，不参与消息路由
 - `CODEKSEI_ALLOWED_USER_IDS` 必须填写微信桥实际观测到的 sender id；最简单的做法是先跑 `codeksei accounts`，如果你当前就在仓库工作树里，也可以直接用 `npm run accounts`
 - 微信 persona / continuity instructions 默认来自仓库里的 `templates/weixin-instructions.md`，如需本地覆盖可在状态目录放 `weixin-instructions.local.md`

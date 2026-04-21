@@ -2,6 +2,7 @@ import { CliError } from "../../core/cli-contract";
 import type { AppRuntimeConfig } from "../../core/app-service-contract";
 import { tryRefreshContextBoard, type ContextBoardConfig } from "../../context/board";
 import {
+  buildCheckinTargetKey,
   runCheckinCreateHandoff,
   normalizeCheckinCompleteResult,
   runCheckinComplete,
@@ -17,6 +18,7 @@ import {
   syncHostedCheckinPlanViaHermes,
 } from "../recipes/hermes/wake-forwarder";
 import type { HostSettleResult } from "../contracts/settle-result";
+import { writeProactiveOutcomeFeedback } from "../../proactive/outcome-log";
 
 type SettleConfig = ContextBoardConfig & Pick<
   AppRuntimeConfig,
@@ -27,6 +29,7 @@ type SettleConfig = ContextBoardConfig & Pick<
   | "hermesPythonCommand"
   | "hermesRepoLocalShimPath"
   | "hermesRepoRoot"
+  | "stateDir"
 >>;
 
 export function settleDelegatedCheckin(
@@ -41,6 +44,9 @@ export function settleDelegatedCheckin(
     observedCurrentState = "",
     result,
     nextWakeAt,
+    decisionId = "",
+    feedbackText = "",
+    responseOutcome = "",
     sleepFor,
     userVisibleMessage = "",
   }: {
@@ -51,7 +57,10 @@ export function settleDelegatedCheckin(
     leaseId: string;
     observedCurrentState?: string;
     result: HostSettleResult;
+    decisionId?: string;
+    feedbackText?: string;
     nextWakeAt?: string;
+    responseOutcome?: string;
     sleepFor?: string;
     userVisibleMessage?: string;
   },
@@ -119,6 +128,12 @@ export function settleDelegatedCheckin(
         followupContext,
       })
       : null;
+    const outcomeLogged = writeProactiveOutcome(config, target, {
+      actualResult: normalizedResult,
+      decisionId,
+      feedbackText,
+      responseOutcome,
+    });
     return {
       ok: true as const,
       completion: null,
@@ -128,6 +143,7 @@ export function settleDelegatedCheckin(
         sync: hostedSync.sync,
       } : null,
       nextWakeAt: hostedSync?.plan.jobs[0]?.plannedWakeAt || "",
+      outcomeLogged,
       target,
     };
   }
@@ -136,6 +152,12 @@ export function settleDelegatedCheckin(
     const hostedSync = provider === "hermes"
       ? syncHostedCheckinPlanViaHermes(config as Partial<HostedCheckinConfig>, target, current)
       : null;
+    const outcomeLogged = writeProactiveOutcome(config, target, {
+      actualResult: result,
+      decisionId,
+      feedbackText,
+      responseOutcome,
+    });
     return {
       ok: "partial" as const,
       completion: null,
@@ -144,6 +166,7 @@ export function settleDelegatedCheckin(
         sync: hostedSync.sync,
       } : null,
       nextWakeAt: hostedSync?.plan.jobs[0]?.plannedWakeAt || "",
+      outcomeLogged,
       target,
     };
   }
@@ -173,11 +196,18 @@ export function settleDelegatedCheckin(
   const hostedWakeSync = provider === "hermes"
     ? syncNextWakeViaHermes(config, target, completion.nextWakeAt)
     : null;
+  const outcomeLogged = writeProactiveOutcome(config, target, {
+    actualResult: normalizedResult,
+    decisionId,
+    feedbackText,
+    responseOutcome,
+  });
   return {
     ok: hostedWakeSync?.ok === "partial" ? "partial" as const : true,
     completion: completion.completion,
     hostedWakeSync: hostedWakeSync?.data || null,
     nextWakeAt: completion.nextWakeAt,
+    outcomeLogged,
     target,
   };
 }
@@ -212,13 +242,19 @@ export function finalizeDelegatedCheckin(
     nextWakeAt,
     provider,
     leaseId,
+    decisionId = "",
+    feedbackText = "",
     result,
+    responseOutcome = "",
     sleepFor,
   }: {
+    decisionId?: string;
+    feedbackText?: string;
     nextWakeAt?: string;
     provider: string;
     leaseId: string;
     result?: HostSettleResult;
+    responseOutcome?: string;
     sleepFor?: string;
   },
 ) {
@@ -254,14 +290,46 @@ export function finalizeDelegatedCheckin(
   const hostedWakeSync = provider === "hermes"
     ? syncNextWakeViaHermes(config, target, completion.nextWakeAt)
     : null;
+  const outcomeLogged = writeProactiveOutcome(config, target, {
+    actualResult: normalizedResult || completion.completion.result,
+    decisionId,
+    feedbackText,
+    responseOutcome,
+  });
   return {
     ok: hostedWakeSync?.ok === "partial" ? "partial" as const : true,
     completion: completion.completion,
     handoff: null,
     hostedWakeSync: hostedWakeSync?.data || null,
     nextWakeAt: completion.nextWakeAt,
+    outcomeLogged,
     target,
   };
+}
+
+function writeProactiveOutcome(
+  config: SettleConfig,
+  target: CheckinResolvedTarget,
+  {
+    actualResult,
+    decisionId,
+    feedbackText,
+    responseOutcome,
+  }: {
+    actualResult: string;
+    decisionId: string;
+    feedbackText: string;
+    responseOutcome: string;
+  },
+): boolean {
+  return writeProactiveOutcomeFeedback(config, {
+    targetKey: buildCheckinTargetKey(target),
+  }, {
+    actualResult,
+    decisionId,
+    feedbackText,
+    responseOutcome,
+  });
 }
 
 export function syncNextWakeViaHermes(

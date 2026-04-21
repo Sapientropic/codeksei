@@ -78,6 +78,13 @@ test("config slices compose into the legacy-compatible app runtime surface", () 
       onboardingSemanticHost: "",
       onboardingSemanticModel: "",
       onboardingSemanticTimeoutMs: 15000,
+      proactiveJudgmentApiKey: "",
+      proactiveJudgmentEndpoint: "http://127.0.0.1:11434/v1",
+      proactiveJudgmentHost: "auto",
+      proactiveJudgmentMinConfidence: 0.62,
+      proactiveJudgmentMode: "hybrid",
+      proactiveJudgmentModel: "qwen3.5:2b",
+      proactiveJudgmentTimeoutMs: 2500,
     },
     checkinRuntime: {
       workspaceId: "workspace-1",
@@ -110,6 +117,9 @@ test("parseEnvConfig keeps workspace schema refs and state-backed checkin files 
   assert.equal(config.reviewSchemaConfigFile.replace(/\\/g, "/"), "E:/workspace/current/.codeksei/review-schema.json");
   assert.equal(config.companionSemanticTimeoutMs, 15000);
   assert.equal(config.onboardingSemanticTimeoutMs, 15000);
+  assert.equal(config.proactiveJudgmentHost, "auto");
+  assert.equal(config.proactiveJudgmentEndpoint, "http://127.0.0.1:11434/v1");
+  assert.equal(config.proactiveJudgmentMinConfidence, 0.62);
   assert.equal(config.checkinConfigFile.replace(/\\/g, "/"), "E:/state/checkin-config.json");
   assert.equal(config.systemMessageQueueFile.replace(/\\/g, "/"), "E:/state/system-message-queue.json");
 });

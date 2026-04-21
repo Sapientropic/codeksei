@@ -13,6 +13,7 @@
     "hostedWakeSync": {
       "type": ["object", "null"]
     },
-    "nextWakeAt": { "type": "string" }
+    "nextWakeAt": { "type": "string" },
+    "outcomeLogged": { "type": "boolean" }
   }
 }

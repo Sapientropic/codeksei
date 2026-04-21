@@ -28,6 +28,8 @@ import { normalizeDisplayPath } from "../core/path-utils";
 import { createCompanionMemoryRuntimeStateStore } from "../companion-memory/runtime-state";
 import { createOnboardingStateStore } from "../onboarding/state";
 import { createSessionStore } from "../session/session-store-factory";
+import { buildProactiveStateCard } from "../proactive/state-card";
+import type { ProactiveStateCard } from "../proactive/contracts";
 
 export type ContextBriefingMode = "proactive" | "review";
 
@@ -147,6 +149,7 @@ export interface ContextBoardBriefing {
   stale: boolean;
   staleReasons: string[];
   sections: ContextBoardRenderedSections;
+  stateCard: ProactiveStateCard;
   target: {
     senderId: string;
     targetKey: string;
@@ -293,6 +296,11 @@ export function buildContextBoardBriefing(
     }),
     todayFacts: buildTodayFactsSection(todayDiaryEntry, todayDate),
   };
+  const stateCard = buildProactiveStateCard({
+    sections,
+    stale,
+    staleReasons,
+  });
 
   return {
     boardPath,
@@ -300,6 +308,7 @@ export function buildContextBoardBriefing(
     briefingText: renderBriefingText({
       mode,
       sections,
+      stateCard,
     }),
     checkin,
     companionNote,
@@ -312,6 +321,7 @@ export function buildContextBoardBriefing(
     sections,
     stale,
     staleReasons,
+    stateCard,
     target: {
       senderId: target.senderId,
       targetKey,
@@ -795,6 +805,7 @@ function collectStaleReasons(freshness: ContextBoardFreshness): string[] {
 function renderBriefingText({
   mode,
   sections,
+  stateCard,
 }: {
   mode: ContextBriefingMode;
   sections: {
@@ -805,6 +816,7 @@ function renderBriefingText({
     sourceStatus: string;
     todayFacts: string;
   };
+  stateCard: ProactiveStateCard;
 }): string {
   const prelude = mode === "review"
     ? [
@@ -823,6 +835,9 @@ function renderBriefingText({
     "## 当前状态",
     sections.currentStatus,
     "",
+    "## 伴随状态卡",
+    renderStateCardSection(stateCard),
+    "",
     "## 今天事实",
     sections.todayFacts,
     "",
@@ -838,6 +853,18 @@ function renderBriefingText({
     "## 上下文来源",
     sections.sourceStatus,
   ].join("\n").trim();
+}
+
+function renderStateCardSection(stateCard: ProactiveStateCard): string {
+  return [
+    `- 现在大概在哪：${stateCard.currentLikelyState || "[⚠️ 需确认] 不确定"}`,
+    `- 活跃线头：${stateCard.activeThread || "[⚠️ 需确认] 不确定"}`,
+    `- 最可能卡点：${stateCard.likelyBlocker || "[⚠️ 需确认] 不确定"}`,
+    `- 最容易接回的一步：${stateCard.easiestReentryStep || "[⚠️ 需确认] 不确定"}`,
+    `- 这次别做：${stateCard.doNotDo.join("；") || "不要催债"}`,
+    `- 适合语气：${stateCard.toneHint}`,
+    `- 上下文厚度：${stateCard.sourceThickness}`,
+  ].join("\n");
 }
 
 function ensureContextBoardFile(

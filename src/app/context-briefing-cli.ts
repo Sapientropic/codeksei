@@ -104,6 +104,7 @@ function buildBriefingData(briefing: ContextBoardBriefing): Record<string, unkno
     },
     stale: briefing.stale,
     staleReasons: briefing.staleReasons,
+    stateCard: briefing.stateCard,
     target: briefing.target,
     updatedAt: briefing.updatedAt,
   };

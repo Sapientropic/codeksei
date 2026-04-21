@@ -26,6 +26,7 @@ This skill is designed for **Hosted Mode / Hermes recipe**.
 
 - Hermes is the host/runtime/channel owner in this mode.
 - Codeksei is the companion/domain workflow layer.
+- Codeksei owns proactive judgment. Hosts should consume `proactiveDecision` from `host claim-checkin` instead of re-deciding the intervention level from raw context.
 - The proactive cron child only observes, nudges lightly, and leaves a structured handoff.
 - The main session remains the owner of final continuity judgment and next-wake judgment.
 - Do not use this skill for host controls that Hermes already owns: `/new`, `/model`, `/approve`, `/deny`, `/resume`, `/stop`.
@@ -74,6 +75,18 @@ Use this decision order unless the user explicitly asks for something narrower:
 - If you do not know whether they are still on the same line, prefer one short check-in question over long silent guessing.
 - `SILENT` is not the default safe answer. Use it only when you clearly know this is a bad moment to interrupt.
 - Even when you stay silent, ask whether this round should still leave continuity behind through timeline, diary, project note, companion memory, or review.
+- When `host claim-checkin` returns `proactiveDecision`, treat its `interventionLevel`, `suggestedMessage`, `outputModality`, `backstageActions`, and `nextWakePolicy` as the Codeksei core decision. You may adapt wording lightly for the channel, but do not invent a different schedule truth.
+
+## Proactive Decision Contract
+
+- `interventionLevel=silent`: do not send a user-visible message.
+- `interventionLevel=backstage_only`: prefer the listed `backstageActions`; leave a handoff and keep the user undisturbed.
+- `interventionLevel=state_check`: ask one short state-confirming question if surfacing is allowed.
+- `interventionLevel=light_nudge`: send at most one natural low-pressure line.
+- `interventionLevel=offer_next_step`: offer the smallest re-entry step, not a full plan.
+- `interventionLevel=push_forward`: only act firmly when Codeksei returned it with high confidence; never upgrade to this level yourself.
+- If `outputModality=voice`, the host may use its own voice/TTS path only when the channel and user preference allow it. Codeksei does not require voice delivery.
+- When settling/finalizing, pass `--decision-id` and optional `--response-outcome` / `--feedback-text` so Codeksei can learn from the result.
 
 ## Continuity First
 

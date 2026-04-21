@@ -8,10 +8,13 @@ import { assertResidentDaemonConfig, resolveHostCheckinTarget, resolveHostProvid
 
 interface HostFinalizeOptions {
   config: string;
+  decisionId: string;
+  feedbackText: string;
   help: boolean;
   lease: string;
   nextWakeAt: string;
   provider: string;
+  responseOutcome: string;
   result: string;
   sleepFor: string;
   user: string;
@@ -64,7 +67,10 @@ export async function runHostFinalizeCheckinCommand(
   const finalizeArgs: Parameters<typeof finalizeDelegatedCheckin>[2] = {
     provider: resolvedProvider.provider,
     leaseId: options.lease,
+    decisionId: options.decisionId,
+    feedbackText: options.feedbackText,
     nextWakeAt: options.nextWakeAt,
+    responseOutcome: options.responseOutcome,
     sleepFor: options.sleepFor,
   };
   if (options.result) {

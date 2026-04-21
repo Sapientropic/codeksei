@@ -6,6 +6,7 @@ import type {
   WeixinReplyMode,
 } from "./config-value-types";
 import type { ReviewSemanticHost } from "./review-semantic-host-policy";
+import type { ProactiveJudgmentHost } from "../proactive/contracts";
 
 export interface WorkspacePathsConfig {
   stateDir: string;
@@ -82,6 +83,13 @@ export interface SchemaAndTemplateConfig {
   onboardingSemanticHost: ReviewSemanticHost | "";
   onboardingSemanticModel: string;
   onboardingSemanticTimeoutMs: number;
+  proactiveJudgmentApiKey: string;
+  proactiveJudgmentEndpoint: string;
+  proactiveJudgmentHost: ProactiveJudgmentHost;
+  proactiveJudgmentMinConfidence: number;
+  proactiveJudgmentMode: string;
+  proactiveJudgmentModel: string;
+  proactiveJudgmentTimeoutMs: number;
 }
 
 export interface CheckinRuntimeConfig extends Pick<WorkspacePathsConfig, "workspaceId" | "workspaceRoot">, Pick<IdentityAndTimeConfig, "allowedUserIds" | "userName"> {

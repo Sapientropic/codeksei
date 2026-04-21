@@ -333,6 +333,9 @@ Durable note 负责把值得长期记住的判断、偏好和项目脉络，放�
 - `CODEKSEI_ONBOARDING_SEMANTIC_HOST=auto|codex|hermes|deterministic` 可为 onboarding 隐藏抽取单独指定宿主；留空时沿用默认 host 决策
 - `CODEKSEI_ONBOARDING_SEMANTIC_MODEL` 可给 onboarding 六域 persona 抽取单独指定模型
 - `CODEKSEI_ONBOARDING_SEMANTIC_TIMEOUT_MS` 默认 `15000`，超时自动退回 deterministic 抽取
+- `CODEKSEI_PROACTIVE_JUDGMENT_HOST=auto|local|openai-compatible|codex|hermes|deterministic` 可为主动判断层单独指定语义宿主；默认 `auto`
+- `CODEKSEI_PROACTIVE_JUDGMENT_ENDPOINT` 默认 `http://127.0.0.1:11434/v1`，支持本地或云端 OpenAI-compatible API；失败不阻断 check-in，会回退 deterministic
+- `CODEKSEI_PROACTIVE_JUDGMENT_MODEL` 默认 `qwen3.5:2b`，只是推荐默认值，实际模型由本地/云端 endpoint 决定
 - 不传 `--date/--week/--month` 时，当前日期按统一 timezone contract 推断
 - 失败或超时会回退 deterministic
 - nightly 是周/月复盘的前置压缩层

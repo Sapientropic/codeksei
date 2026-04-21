@@ -29,6 +29,13 @@ type ClaimCliConfig = Partial<Pick<
   | "hermesPythonCommand"
   | "hermesRepoLocalShimPath"
   | "hermesRepoRoot"
+  | "proactiveJudgmentApiKey"
+  | "proactiveJudgmentEndpoint"
+  | "proactiveJudgmentHost"
+  | "proactiveJudgmentMinConfidence"
+  | "proactiveJudgmentMode"
+  | "proactiveJudgmentModel"
+  | "proactiveJudgmentTimeoutMs"
 >>;
 
 export async function runHostClaimCheckinCommand(
@@ -52,7 +59,7 @@ export async function runHostClaimCheckinCommand(
     configFile: options.config,
     defaultProvider: "hermes",
   });
-  const claimed = claimDelegatedCheckin(
+  const claimed = await claimDelegatedCheckin(
     config as Parameters<typeof claimDelegatedCheckin>[0],
     target,
     resolvedProvider.provider,

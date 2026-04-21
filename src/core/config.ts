@@ -21,6 +21,7 @@ import {
   normalizeReviewSemanticHost,
   normalizeWeixinReplyMode,
 } from "./config-value-types";
+import { normalizeProactiveJudgmentHost } from "../proactive/contracts";
 import { resolveTimezoneConfig } from "./timezone";
 import { readPrefixedBoolEnv, readPrefixedEnv, readPrefixedIntEnv, readPrefixedListEnv, resolveAppHome, resolveStateDir } from "./branding";
 
@@ -155,6 +156,13 @@ function parseEnvConfig(env: EnvSource, options: ReadConfigOptions = {}): AppRun
       onboardingSemanticHost: normalizeOptionalReviewSemanticHost(readPrefixedEnv(env, "ONBOARDING_SEMANTIC_HOST")),
       onboardingSemanticModel: readPrefixedEnv(env, "ONBOARDING_SEMANTIC_MODEL") || "",
       onboardingSemanticTimeoutMs: readPrefixedIntEnv(env, "ONBOARDING_SEMANTIC_TIMEOUT_MS") || 15000,
+      proactiveJudgmentApiKey: readPrefixedEnv(env, "PROACTIVE_JUDGMENT_API_KEY") || "",
+      proactiveJudgmentEndpoint: readPrefixedEnv(env, "PROACTIVE_JUDGMENT_ENDPOINT") || "http://127.0.0.1:11434/v1",
+      proactiveJudgmentHost: normalizeProactiveJudgmentHost(readPrefixedEnv(env, "PROACTIVE_JUDGMENT_HOST")) || "auto",
+      proactiveJudgmentMinConfidence: readPrefixedFloatEnv(env, "PROACTIVE_JUDGMENT_MIN_CONFIDENCE") || 0.62,
+      proactiveJudgmentMode: readPrefixedEnv(env, "PROACTIVE_JUDGMENT_MODE") || "hybrid",
+      proactiveJudgmentModel: readPrefixedEnv(env, "PROACTIVE_JUDGMENT_MODEL") || "qwen3.5:2b",
+      proactiveJudgmentTimeoutMs: readPrefixedIntEnv(env, "PROACTIVE_JUDGMENT_TIMEOUT_MS") || 2500,
     },
     checkinRuntime: {
       workspaceId: readPrefixedEnv(env, "WORKSPACE_ID") || "default",
@@ -171,3 +179,8 @@ function parseEnvConfig(env: EnvSource, options: ReadConfigOptions = {}): AppRun
 }
 
 export { parseEnvConfig, readConfig };
+
+function readPrefixedFloatEnv(env: EnvSource, key: string): number {
+  const parsed = Number.parseFloat(readPrefixedEnv(env, key));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}

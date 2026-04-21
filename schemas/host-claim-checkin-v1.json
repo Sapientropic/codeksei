@@ -60,6 +60,27 @@
     "pendingHandoff": {
       "type": ["object", "null"]
     },
+    "proactiveDecision": {
+      "type": ["object", "null"],
+      "properties": {
+        "kind": { "const": "proactive_decision" },
+        "decisionVersion": { "const": 1 },
+        "decisionId": { "type": "string" },
+        "reasonCode": { "type": "string" },
+        "interventionLevel": { "type": "string" },
+        "confidence": { "type": "number" },
+        "shouldSurface": { "type": "boolean" },
+        "suggestedMessage": { "type": "string" },
+        "userVisibleReason": { "type": "string" },
+        "backstageActions": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "outputModality": { "type": "string" },
+        "nextWakePolicy": { "type": "object" },
+        "model": { "type": "object" }
+      }
+    },
     "origin": {
       "type": ["object", "null"]
     },

@@ -33,6 +33,7 @@ test("hosted Hermes doctor reports repo-local diagnostics and installed skill st
   const config = {
     runtime: "hermes",
     channelProvider: "hermes",
+    hermesCommand: path.join(hermesHome, "missing-hermes"),
     hermesHome,
     hermesRepoRoot: repoLocal.repoRoot,
     hermesRepoLocalShimPath: repoLocal.shimPath,
@@ -56,6 +57,7 @@ test("skill preview/install and smoke keep hosted Hermes readiness explicit", ()
   const config = {
     runtime: "hermes",
     channelProvider: "hermes",
+    hermesCommand: path.join(hermesHome, "missing-hermes"),
     hermesHome,
     hermesRepoRoot: repoLocal.repoRoot,
     hermesRepoLocalShimPath: repoLocal.shimPath,

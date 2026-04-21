@@ -1,4 +1,5 @@
 import type { HostRecipeId } from "./host-recipe";
+import type { ProactiveDecision } from "../../proactive/contracts";
 
 export type HostClaimStatus = "idle" | "claimed" | "in_progress";
 
@@ -26,6 +27,8 @@ export interface ClaimedPayload {
   observerContract: string;
   text: string;
 }
+
+export type HostProactiveDecision = ProactiveDecision;
 
 export interface HostCheckinBookkeepingExpectation {
   kind: "companion_memory" | "diary" | "project_note" | "review" | "timeline";

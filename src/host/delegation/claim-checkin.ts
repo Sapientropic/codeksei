@@ -1,12 +1,16 @@
 import { CliError } from "../../core/cli-contract";
 import type { AppRuntimeConfig } from "../../core/app-service-contract";
-import { tryRefreshContextBoard } from "../../context/board";
+import { tryRefreshContextBoard, type ContextBoardBriefing } from "../../context/board";
 import {
+  buildCheckinTargetKey,
   CHECKIN_ACTIVE_WAKE_TIMEOUT_MS,
   runCheckinTick,
   type CheckinResolvedTarget,
 } from "../../checkin";
 import { syncHostedCheckinPlanViaHermes } from "../recipes/hermes/wake-forwarder";
+import { buildProactiveDecision } from "../../proactive/decision";
+import { readRecentProactiveOutcomes } from "../../proactive/outcome-log";
+import type { ProactiveDecision, ProactiveJudgmentInput } from "../../proactive/contracts";
 import type {
   ClaimedPayload,
   DelegationLease,
@@ -33,6 +37,13 @@ type ClaimConfig = Pick<
   | "sessionsFile"
   | "stateDir"
   | "timezone"
+  | "proactiveJudgmentApiKey"
+  | "proactiveJudgmentEndpoint"
+  | "proactiveJudgmentHost"
+  | "proactiveJudgmentMinConfidence"
+  | "proactiveJudgmentMode"
+  | "proactiveJudgmentModel"
+  | "proactiveJudgmentTimeoutMs"
   | "workspaceBootstrapConfigFile"
   | "workspaceRoot"
 >>;
@@ -44,6 +55,7 @@ export interface HostClaimCheckinResult {
   lease: DelegationLease | null;
   pendingHandoff: HostPendingHandoffSummary | null;
   payload: ClaimedPayload | null;
+  proactiveDecision: ProactiveDecision | null;
   origin: PersistedOriginRef | null;
   nextWakeAt: string;
   hostedSync: Record<string, unknown> | null;
@@ -83,16 +95,19 @@ const HOSTED_CHECKIN_BOOKKEEPING_EXPECTATIONS = Object.freeze<HostCheckinBookkee
   },
 ]);
 
-export function claimDelegatedCheckin(
+export async function claimDelegatedCheckin(
   config: ClaimConfig,
   target: CheckinResolvedTarget,
   provider: string,
-): HostClaimCheckinResult {
+): Promise<HostClaimCheckinResult> {
   const firstTick = runCheckinTick({
     config,
     target,
   });
-  const contextBriefing = buildContextBriefingSnapshot(config, target);
+  const contextBoard = tryRefreshContextBoard(config, target, {
+    mode: "proactive",
+  });
+  const contextBriefing = buildContextBriefingSnapshot(contextBoard);
 
   if (firstTick.status === "scheduled") {
     const hostedSync = syncHostedCheckinIfNeeded(config, target, provider, firstTick);
@@ -103,6 +118,7 @@ export function claimDelegatedCheckin(
       lease: null,
       pendingHandoff: buildPendingHandoffSummary(firstTick.state),
       payload: null,
+      proactiveDecision: buildIdleProactiveDecision(config, target, contextBoard),
       origin: null,
       nextWakeAt: hostedSync?.plan.jobs[0]?.plannedWakeAt || firstTick.nextWakeAt,
       hostedSync: hostedSync ? {
@@ -121,6 +137,7 @@ export function claimDelegatedCheckin(
       lease: firstTick.activeWake ? buildDelegationLease(firstTick.activeWake.triggerId, firstTick.activeWake.startedAt) : null,
       pendingHandoff: buildPendingHandoffSummary(firstTick.state),
       payload: null,
+      proactiveDecision: buildIdleProactiveDecision(config, target, contextBoard),
       origin: buildOriginRef(target),
       nextWakeAt: hostedSync?.plan.jobs[0]?.plannedWakeAt || "",
       hostedSync: hostedSync ? {
@@ -158,6 +175,10 @@ export function claimDelegatedCheckin(
   const hostedSync = provider === "hermes"
     ? syncHostedCheckinPlanViaHermes(config, target, acknowledged)
     : null;
+  const proactiveDecision = await buildProactiveDecision(
+    config,
+    buildProactiveJudgmentInput(config, target, contextBoard, acknowledged),
+  );
   return {
     bookkeepingExpectations: [...HOSTED_CHECKIN_BOOKKEEPING_EXPECTATIONS],
     contextBriefing,
@@ -172,6 +193,7 @@ export function claimDelegatedCheckin(
       text: firstTick.payload.text,
     } : null,
     pendingHandoff: buildPendingHandoffSummary(acknowledged.state),
+    proactiveDecision,
     origin: buildOriginRef(target),
     nextWakeAt: hostedSync?.plan.jobs[0]?.plannedWakeAt || "",
     hostedSync: hostedSync ? {
@@ -222,12 +244,8 @@ function buildOriginRef(target: CheckinResolvedTarget): PersistedOriginRef {
 }
 
 function buildContextBriefingSnapshot(
-  config: ClaimConfig,
-  target: CheckinResolvedTarget,
+  briefing: ContextBoardBriefing | null,
 ): HostClaimContextBriefing | null {
-  const briefing = tryRefreshContextBoard(config, target, {
-    mode: "proactive",
-  });
   if (!briefing) {
     return null;
   }
@@ -236,6 +254,77 @@ function buildContextBriefingSnapshot(
     followupContext: briefing.followupContext,
     stale: briefing.stale,
     staleReasons: [...briefing.staleReasons],
+  };
+}
+
+function buildProactiveJudgmentInput(
+  config: ClaimConfig,
+  target: CheckinResolvedTarget,
+  briefing: ContextBoardBriefing | null,
+  tick: ReturnType<typeof runCheckinTick>,
+): ProactiveJudgmentInput {
+  const targetKey = buildCheckinTargetKey(target);
+  return {
+    checkin: {
+      lastCompletionAt: briefing?.checkin.lastCompletionAt || "",
+      lastCompletionResult: briefing?.checkin.lastCompletionResult || "",
+      nextWakeAt: tick.nextWakeAt || briefing?.checkin.nextWakeAt || "",
+      pendingHandoffExists: Boolean(briefing?.checkin.pendingHandoff.exists),
+    },
+    contextBriefing: {
+      followupContext: briefing?.followupContext || "",
+      stale: Boolean(briefing?.stale ?? true),
+      staleReasons: briefing?.staleReasons || ["missing_context_board"],
+    },
+    now: new Date().toISOString(),
+    recentOutcomes: readRecentProactiveOutcomes(config, { targetKey }),
+    stateCard: briefing?.stateCard || {
+      activeThread: "",
+      currentLikelyState: "当前判断上下文偏薄，需要先确认用户此刻状态。",
+      doNotDo: ["不要假装知道；先轻问确认。"],
+      easiestReentryStep: "",
+      likelyBlocker: "缺少 context board。",
+      sourceThickness: "thin",
+      toneHint: "短、自然、先确认。",
+    },
+    target: {
+      senderId: target.senderId,
+      targetKey,
+      workspaceRoot: target.workspaceRoot,
+    },
+    timezone: String(config.timezone || ""),
+  };
+}
+
+function buildIdleProactiveDecision(
+  config: ClaimConfig,
+  target: CheckinResolvedTarget,
+  briefing: ContextBoardBriefing | null,
+): ProactiveDecision {
+  const targetKey = buildCheckinTargetKey(target);
+  const now = new Date().toISOString();
+  return {
+    backstageActions: [],
+    confidence: 1,
+    decisionId: `pd_idle_${targetKey.replace(/[^a-zA-Z0-9]+/gu, "_").slice(0, 24)}_${Date.parse(now) || 0}`,
+    decisionVersion: 1,
+    interventionLevel: "silent",
+    kind: "proactive_decision",
+    model: {
+      fallbackReason: "claim status is not claimed",
+      host: "deterministic",
+      model: "",
+      used: false,
+    },
+    nextWakePolicy: {
+      mode: "keep_existing",
+      reason: "当前没有可执行的 proactive lease。",
+    },
+    outputModality: "silent",
+    reasonCode: "no_action",
+    shouldSurface: false,
+    suggestedMessage: "",
+    userVisibleReason: briefing?.stale ? "当前上下文偏薄且没有可执行唤醒。" : "当前没有可执行唤醒。",
   };
 }
 
