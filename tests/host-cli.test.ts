@@ -15,6 +15,7 @@ const { runHostSeedProactiveCommand } = require("../src/app/host-seed-proactive-
 const { runHostSettleCheckinCommand } = require("../src/app/host-settle-checkin-cli");
 const { runHostManifestCommand } = require("../src/app/host-manifest-cli");
 const { runHostRenderCommand } = require("../src/app/host-render-cli");
+const { getCurrentDateStringInTimezone } = require("../src/core/timezone");
 const { createFakeHermesRepoLocalFixture } = require("./helpers/fake-hermes-repo-local.ts");
 
 function createHostFixture(prefix: string) {
@@ -48,6 +49,23 @@ function createHostFixture(prefix: string) {
 
 function normalizePathSeparators(value: string) {
   return value.replace(/\\/gu, "/");
+}
+
+function writeFreshHostDiary(fixture: ReturnType<typeof createHostFixture>) {
+  const diaryDir = path.join(fixture.stateDir, "diary");
+  fs.mkdirSync(diaryDir, { recursive: true });
+  const today = getCurrentDateStringInTimezone("Asia/Shanghai");
+  fs.writeFileSync(path.join(diaryDir, `${today}.md`), [
+    "# Diary",
+    "",
+    "## 时间线事实",
+    "- 15:00 继续 Codeksei proactive observation layer",
+    "",
+    "## Todo",
+    "- [ ] 接入 claim-checkin",
+    "",
+  ].join("\n"), "utf8");
+  return diaryDir;
 }
 
 test("host manifest returns the hosted-first discovery contract plus compatibility invariant", async () => {
@@ -319,6 +337,123 @@ test("host claim-checkin and settle-checkin cover delegated proactive lease flow
   assert.equal(settle.data.outcomeLogged, true);
   assert.match(String(settle.data.nextWakeAt || ""), /^\d{4}-\d{2}-\d{2}T/u);
   assert.deepEqual(settle.data.hostedWakeSync.jobs.map((job: { role: string }) => job.role), ["wake", "recovery", "guard"]);
+});
+
+test("host claim-checkin uses proactive observation generator without taking over schedule truth", async () => {
+  const fixture = createHostFixture("codeksei-host-claim-observation-");
+  const diaryDir = writeFreshHostDiary(fixture);
+  const repoLocal = createFakeHermesRepoLocalFixture(
+    fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-host-claim-observation-repo-local-"))
+  );
+  new CheckinScheduleStateStore({ filePath: fixture.config.checkinScheduleStateFile }).setState({
+    activeWake: null,
+    lastCompletion: {
+      completedAt: new Date().toISOString(),
+      nextWakeAt: new Date(Date.now() - 60_000).toISOString(),
+      result: "silent",
+      scheduleSource: "agent",
+      triggerId: "previous-trigger",
+    },
+    nextWakeAt: new Date(Date.now() - 60_000).toISOString(),
+    pendingTrigger: null,
+    scheduleSource: "agent",
+    senderId: "wx-user",
+    targetKey: `wx-user::${fixture.workspaceRoot}`,
+    updatedAt: new Date().toISOString(),
+    workspaceRoot: fixture.workspaceRoot,
+  });
+  const runtimeConfig = {
+    ...fixture.config,
+    ...repoLocal.env,
+    runtime: "hermes",
+    channelProvider: "hermes",
+    diaryDir,
+    hermesHome: repoLocal.hermesHome,
+    hermesRepoRoot: repoLocal.repoRoot,
+    hermesRepoLocalShimPath: repoLocal.shimPath,
+    proactiveObservationGenerator: async () => ({
+      annoyanceRisk: "low",
+      confidence: 0.88,
+      currentStateHypothesis: "用户正在推进 observation layer。",
+      evidence: ["context board 提到 proactive checkin。"],
+      likelyBlocker: "需要一个低风险实现入口。",
+      modalityHints: ["text"],
+      reentryCandidate: "先把 observation 接入 claim-checkin。",
+      stateSignals: ["project_reentry"],
+      suggestedTone: "短、自然。",
+      surfaceRisk: "low",
+      userEnergy: "medium",
+    }),
+    proactiveObservationHost: "local",
+    proactiveObservationMinConfidence: 0.55,
+    proactiveObservationMode: "hybrid",
+    proactiveObservationModel: "gemma-4-E2B-it",
+    proactiveObservationTimeoutMs: 8000,
+  };
+
+  const claim = await runHostClaimCheckinCommand(runtimeConfig, [
+    "--provider", "hermes",
+    "--user", "wx-user",
+    "--workspace", fixture.workspaceRoot,
+  ]);
+
+  assert.equal(claim.data.status, "claimed");
+  assert.equal(claim.data.proactiveDecision.model.used, false);
+  assert.equal(claim.data.proactiveDecision.reasonCode, "project_reentry");
+  assert.equal(claim.data.proactiveDecision.interventionLevel, "offer_next_step");
+  assert.match(String(claim.data.contextBriefing?.briefingText || ""), /小模型观察/u);
+  assert.match(String(claim.data.contextBriefing?.briefingText || ""), /observation 接入 claim-checkin/u);
+  assert.deepEqual(claim.data.hostedSync.plan.jobs.map((job: { role: string }) => job.role), ["recovery", "guard"]);
+});
+
+test("generic-shell claim-checkin can use proactive observation without Hermes-specific fields", async () => {
+  const fixture = createHostFixture("codeksei-host-claim-generic-observation-");
+  const diaryDir = writeFreshHostDiary(fixture);
+  new CheckinScheduleStateStore({ filePath: fixture.config.checkinScheduleStateFile }).setState({
+    activeWake: null,
+    lastCompletion: {
+      completedAt: new Date().toISOString(),
+      nextWakeAt: new Date(Date.now() - 60_000).toISOString(),
+      result: "silent",
+      scheduleSource: "agent",
+      triggerId: "previous-trigger",
+    },
+    nextWakeAt: new Date(Date.now() - 60_000).toISOString(),
+    pendingTrigger: null,
+    scheduleSource: "agent",
+    senderId: "wx-user",
+    targetKey: `wx-user::${fixture.workspaceRoot}`,
+    updatedAt: new Date().toISOString(),
+    workspaceRoot: fixture.workspaceRoot,
+  });
+  const claim = await runHostClaimCheckinCommand({
+    ...fixture.config,
+    diaryDir,
+    proactiveObservationGenerator: async () => ({
+      annoyanceRisk: "low",
+      confidence: 0.8,
+      currentStateHypothesis: "generic shell host 也能消费 observation。",
+      evidence: ["generic-shell provider"],
+      reentryCandidate: "验证 host-neutral observation contract。",
+      stateSignals: ["project_reentry"],
+      surfaceRisk: "low",
+      userEnergy: "medium",
+    }),
+    proactiveObservationHost: "local",
+    proactiveObservationMinConfidence: 0.55,
+    proactiveObservationMode: "hybrid",
+    proactiveObservationModel: "gemma-4-E2B-it",
+    proactiveObservationTimeoutMs: 8000,
+  }, [
+    "--provider", "generic-shell",
+    "--user", "wx-user",
+    "--workspace", fixture.workspaceRoot,
+  ]);
+
+  assert.equal(claim.data.status, "claimed");
+  assert.equal(claim.data.hostedSync, null);
+  assert.equal(claim.data.proactiveDecision.reasonCode, "project_reentry");
+  assert.match(String(claim.data.contextBriefing?.briefingText || ""), /小模型观察/u);
 });
 
 test("host seed-proactive with explicit sleep-for repairs state and hosted job set together", async () => {

@@ -43,6 +43,8 @@ import {
   runOnboardingStepCommand,
 } from "./onboarding-cli";
 import { runProjectRadarCommand } from "./project-radar-cli";
+import { runProactiveEvalCommand } from "./proactive-eval-cli";
+import { runProactiveObserveCommand } from "./proactive-observe-cli";
 import { runReminderWriteCommand } from "./reminder-write-cli";
 import { runReviewCommand } from "./review-cli";
 import { runSystemCheckinConfigCommand } from "./system-checkin-config-cli";
@@ -200,6 +202,12 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
   },
   "context.briefing": async (_manifest, context) => {
     return runContextBriefingCommand(context.config, context.leafArgs);
+  },
+  "proactive.observe": async (_manifest, context) => {
+    return runProactiveObserveCommand(context.config, context.leafArgs);
+  },
+  "proactive.eval": async (_manifest, context) => {
+    return runProactiveEvalCommand(context.config, context.leafArgs);
   },
   "note.sync": async (_manifest, context) => {
     return runNoteSyncCommand(context.config, context.leafArgs);

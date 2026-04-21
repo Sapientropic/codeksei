@@ -143,3 +143,155 @@ test("proactive decision falls back when semantic confidence is too low", async 
   assert.match(decision.model.fallbackReason, /confidence/u);
   assert.notEqual(decision.interventionLevel, "push_forward");
 });
+
+test("proactive decision uses observation as signal without bypassing guardrails", async () => {
+  const decision = await buildProactiveDecision({
+    proactiveJudgmentHost: "deterministic",
+    proactiveJudgmentMode: "hybrid",
+  }, baseInput({
+    contextBriefing: {
+      followupContext: "",
+      stale: false,
+      staleReasons: [],
+    },
+    observation: {
+      annoyanceRisk: "low",
+      confidence: 0.82,
+      createdAt: "2026-04-21T07:20:00.000Z",
+      currentStateHypothesis: "用户正在评估小模型观察层是否值得做。",
+      discardReason: "",
+      evidence: ["用户要求先优化这层，为小模型发挥能力做准备。"],
+      id: "po_test_reentry",
+      kind: "proactive_observation",
+      likelyBlocker: "担心短 JSON 限制模型能力。",
+      memoryCandidates: [],
+      modalityHints: ["text"],
+      model: {
+        fallbackReason: "",
+        host: "local",
+        model: "gemma-4-E2B-it",
+        used: true,
+      },
+      reentryCandidate: "先把 ProactiveObservation 接入 context board 和 decision。",
+      sourceHash: "hash-reentry",
+      stateSignals: ["project_reentry"],
+      suggestedTone: "短、自然、给一个下一步。",
+      surfaceRisk: "low",
+      usable: true,
+      userEnergy: "medium",
+      version: 1,
+    },
+    stateCard: {
+      activeThread: "",
+      currentLikelyState: "当前上下文可用，但缺少具体重入入口。",
+      doNotDo: ["不要催促。"],
+      easiestReentryStep: "",
+      likelyBlocker: "",
+      sourceThickness: "usable",
+      toneHint: "短、自然。",
+    },
+  }));
+
+  assert.equal(decision.reasonCode, "project_reentry");
+  assert.equal(decision.interventionLevel, "offer_next_step");
+  assert.match(decision.suggestedMessage, /ProactiveObservation/u);
+  assert.match(decision.userVisibleReason, /小模型观察/u);
+
+  const guarded = await buildProactiveDecision({
+    proactiveJudgmentHost: "deterministic",
+    proactiveJudgmentMode: "hybrid",
+  }, baseInput({
+    observation: {
+      annoyanceRisk: "low",
+      confidence: 0.9,
+      createdAt: "2026-04-21T07:20:00.000Z",
+      currentStateHypothesis: "用户低能量。",
+      discardReason: "",
+      evidence: ["voice energy low"],
+      id: "po_test_low_energy",
+      kind: "proactive_observation",
+      likelyBlocker: "需要先休息。",
+      memoryCandidates: [],
+      modalityHints: ["voice"],
+      model: {
+        fallbackReason: "",
+        host: "local",
+        model: "gemma-4-E2B-it",
+        used: true,
+      },
+      reentryCandidate: "继续推动任务。",
+      sourceHash: "hash-low",
+      stateSignals: ["user_low_energy"],
+      suggestedTone: "轻一点。",
+      surfaceRisk: "low",
+      usable: true,
+      userEnergy: "low",
+      version: 1,
+    },
+    voiceSignal: {
+      confidence: 0.91,
+      durationMs: 8000,
+      emotion: "tired",
+      energy: "low",
+      source: "sensevoice",
+      transcript: "算了我等会再说吧",
+    },
+  }));
+
+  assert.equal(guarded.reasonCode, "voice_low_energy");
+  assert.equal(guarded.interventionLevel, "backstage_only");
+  assert.equal(guarded.shouldSurface, false);
+});
+
+test("proactive decision does not let overconfident observation invent reentry from thin context", async () => {
+  const decision = await buildProactiveDecision({
+    proactiveJudgmentHost: "deterministic",
+    proactiveJudgmentMode: "hybrid",
+  }, baseInput({
+    contextBriefing: {
+      followupContext: "",
+      stale: true,
+      staleReasons: ["missing_today_diary"],
+    },
+    observation: {
+      annoyanceRisk: "low",
+      confidence: 0.96,
+      createdAt: "2026-04-21T07:20:00.000Z",
+      currentStateHypothesis: "用户肯定要继续推进。",
+      discardReason: "",
+      evidence: ["thin context"],
+      id: "po_test_overconfident",
+      kind: "proactive_observation",
+      likelyBlocker: "需要继续。",
+      memoryCandidates: [],
+      modalityHints: ["text"],
+      model: {
+        fallbackReason: "",
+        host: "local",
+        model: "gemma-4-E2B-it",
+        used: true,
+      },
+      reentryCandidate: "直接继续实现下一步。",
+      sourceHash: "hash-thin",
+      stateSignals: ["project_reentry"],
+      suggestedTone: "直接推进。",
+      surfaceRisk: "low",
+      usable: true,
+      userEnergy: "medium",
+      version: 1,
+    },
+    stateCard: {
+      activeThread: "",
+      currentLikelyState: "当前判断上下文偏薄，需要先确认用户此刻状态。",
+      doNotDo: ["不要假装知道。"],
+      easiestReentryStep: "",
+      likelyBlocker: "缺少 context board。",
+      sourceThickness: "thin",
+      toneHint: "短、自然、先确认。",
+    },
+  }));
+
+  assert.equal(decision.reasonCode, "context_thin");
+  assert.equal(decision.interventionLevel, "state_check");
+  assert.doesNotMatch(decision.suggestedMessage, /直接继续/u);
+});

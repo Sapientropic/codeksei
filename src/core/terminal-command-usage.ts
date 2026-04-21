@@ -19,6 +19,8 @@ const ACTION_USAGE_ARGS: Readonly<Partial<Record<CommandActionId, string>>> = Ob
   "channel.send_file": "--path /绝对路径",
   "companion.remember": "--user <wechat_user_id> --workspace /绝对路径 --source host_user_turn [--text \"内容\" | --stdin]",
   "context.briefing": "--user <wechat_user_id> --workspace /绝对路径 [--mode proactive|review]",
+  "proactive.observe": "--user <wechat_user_id> --workspace /绝对路径 [--dry-run | --show]",
+  "proactive.eval": "--fixture /绝对路径/proactive-observation-cases.json [--model gemma-4-E2B-it] [--endpoint http://127.0.0.1:8080/v1]",
   "diary.append": "--section todo --state open --text \"内容\"",
   "host.bootstrap": "--provider hermes [--workspace /绝对路径]",
   "host.doctor": "--provider hermes",

@@ -1,5 +1,5 @@
 import type { HostRecipeId } from "./host-recipe";
-import type { ProactiveDecision } from "../../proactive/contracts";
+import type { ProactiveDecision, ProactiveObservation } from "../../proactive/contracts";
 
 export type HostClaimStatus = "idle" | "claimed" | "in_progress";
 
@@ -39,6 +39,7 @@ export interface HostCheckinBookkeepingExpectation {
 export interface HostClaimContextBriefing {
   briefingText: string;
   followupContext: string;
+  observation?: ProactiveObservation | null;
   stale: boolean;
   staleReasons: string[];
 }

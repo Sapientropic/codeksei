@@ -29,7 +29,7 @@ import { createCompanionMemoryRuntimeStateStore } from "../companion-memory/runt
 import { createOnboardingStateStore } from "../onboarding/state";
 import { createSessionStore } from "../session/session-store-factory";
 import { buildProactiveStateCard } from "../proactive/state-card";
-import type { ProactiveStateCard } from "../proactive/contracts";
+import type { ProactiveObservation, ProactiveStateCard } from "../proactive/contracts";
 
 export type ContextBriefingMode = "proactive" | "review";
 
@@ -129,6 +129,7 @@ interface ContextBoardRenderedSections {
   activeThreads: string;
   cautions: string;
   currentStatus: string;
+  observation: string;
   reentryPoints: string;
   sourceStatus: string;
   todayFacts: string;
@@ -143,6 +144,7 @@ export interface ContextBoardBriefing {
   followupContext: string;
   freshness: ContextBoardFreshness;
   mode: ContextBriefingMode;
+  observation: ProactiveObservation | null;
   onboarding: OnboardingSnapshot;
   companionMemory: CompanionMemorySnapshot;
   projectRadar: ProjectRadarSnapshot;
@@ -177,6 +179,7 @@ interface RefreshContextBoardOptions {
   followupContext?: string;
   mode?: ContextBriefingMode;
   now?: Date;
+  observation?: ProactiveObservation | null;
 }
 
 interface BestEffortRefreshOptions extends RefreshContextBoardOptions {
@@ -186,6 +189,7 @@ interface BestEffortRefreshOptions extends RefreshContextBoardOptions {
 
 const CONTEXT_BOARD_SECTIONS = Object.freeze([
   { slot: "current-status", title: "当前状态" },
+  { slot: "model-observation", title: "小模型观察" },
   { slot: "today-facts", title: "今天事实" },
   { slot: "active-threads", title: "活跃线头" },
   { slot: "cautions", title: "注意事项" },
@@ -233,6 +237,7 @@ export function buildContextBoardBriefing(
     followupContext = "",
     mode = "proactive",
     now = new Date(),
+    observation = null,
   }: RefreshContextBoardOptions = {},
 ): ContextBoardBriefing {
   const updatedAt = now.toISOString();
@@ -294,6 +299,7 @@ export function buildContextBoardBriefing(
       companionNote,
       projectRadar,
     }),
+    observation: buildObservationSection(observation),
     todayFacts: buildTodayFactsSection(todayDiaryEntry, todayDate),
   };
   const stateCard = buildProactiveStateCard({
@@ -315,6 +321,7 @@ export function buildContextBoardBriefing(
     followupContext: effectiveFollowupContext,
     freshness,
     mode,
+    observation,
     onboarding,
     companionMemory,
     projectRadar,
@@ -396,6 +403,11 @@ function buildManagedSections(briefing: ContextBoardBriefing): ContextBoardSecti
       title: "当前状态",
     },
     {
+      slot: "model-observation",
+      text: briefing.sections.observation,
+      title: "小模型观察",
+    },
+    {
       slot: "today-facts",
       text: briefing.sections.todayFacts,
       title: "今天事实",
@@ -420,7 +432,26 @@ function buildManagedSections(briefing: ContextBoardBriefing): ContextBoardSecti
       text: briefing.sections.sourceStatus,
       title: "上下文来源",
     },
-  ];
+  ].filter((section) => section.slot !== "model-observation" || normalizeText(section.text));
+}
+
+function buildObservationSection(observation: ProactiveObservation | null): string {
+  if (!observation) {
+    return "";
+  }
+  const lines = [
+    `模型：${observation.model.model || "(unknown)"} / ${observation.model.host}`,
+    `置信度：${observation.confidence.toFixed(2)} | 打扰风险：${observation.surfaceRisk} | 烦扰风险：${observation.annoyanceRisk} | 能量：${observation.userEnergy}`,
+    observation.currentStateHypothesis ? `状态假设：${observation.currentStateHypothesis}` : "",
+    observation.reentryCandidate ? `重入候选：${observation.reentryCandidate}` : "",
+    observation.likelyBlocker ? `可能卡点：${observation.likelyBlocker}` : "",
+    observation.suggestedTone ? `建议语气：${observation.suggestedTone}` : "",
+    observation.memoryCandidates.length
+      ? `记忆候选：${observation.memoryCandidates.slice(0, 3).map((item) => `${item.slotId}:${item.text}`).join("；")}`
+      : "",
+    observation.evidence.length ? `证据：${observation.evidence.slice(0, 3).join("；")}` : "",
+  ].filter(Boolean);
+  return renderBulletBlock(lines, "");
 }
 
 function buildCurrentStatusSection({
@@ -812,6 +843,7 @@ function renderBriefingText({
     activeThreads: string;
     cautions: string;
     currentStatus: string;
+    observation?: string;
     reentryPoints: string;
     sourceStatus: string;
     todayFacts: string;
@@ -837,6 +869,13 @@ function renderBriefingText({
     "",
     "## 伴随状态卡",
     renderStateCardSection(stateCard),
+    ...(normalizeText(sections.observation)
+      ? [
+        "",
+        "## 小模型观察",
+        sections.observation,
+      ]
+      : []),
     "",
     "## 今天事实",
     sections.todayFacts,

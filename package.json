@@ -70,6 +70,8 @@
     "onboarding:status": "node ./dist/src/index.js onboarding status",
     "onboarding:reset": "node ./dist/src/index.js onboarding reset",
     "context:briefing": "node ./dist/src/index.js context briefing",
+    "proactive:observe": "node ./dist/src/index.js proactive observe",
+    "proactive:eval": "node ./dist/src/index.js proactive eval",
     "project:radar": "node ./dist/src/index.js project radar",
     "review:nightly": "node ./dist/src/index.js review nightly",
     "review:weekly": "node ./dist/src/index.js review weekly",

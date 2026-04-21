@@ -84,6 +84,41 @@ export const PROACTIVE_RESPONSE_OUTCOMES = [
   "continued",
 ] as const;
 
+export const PROACTIVE_OBSERVATION_STATE_SIGNALS = [
+  "context_thin",
+  "project_reentry",
+  "memory_candidate",
+  "user_low_energy",
+  "quiet_hour",
+  "open_loop",
+  "life_record",
+  "media_signal",
+  "no_action",
+] as const;
+
+export const PROACTIVE_OBSERVATION_RISK_VALUES = [
+  "low",
+  "medium",
+  "high",
+  "unknown",
+] as const;
+
+export const PROACTIVE_OBSERVATION_USER_ENERGY_VALUES = [
+  "low",
+  "medium",
+  "high",
+  "unknown",
+] as const;
+
+export const PROACTIVE_OBSERVATION_MODALITY_HINTS = [
+  "text",
+  "voice",
+  "silent",
+  "backstage_only",
+  "image",
+  "audio",
+] as const;
+
 export type ProactiveJudgmentHost = typeof PROACTIVE_JUDGMENT_HOSTS[number];
 export type ProactiveInterventionLevel = typeof PROACTIVE_INTERVENTION_LEVELS[number];
 export type ProactiveReasonCode = typeof PROACTIVE_REASON_CODES[number];
@@ -95,6 +130,10 @@ export type ProactiveSourceThickness = typeof PROACTIVE_SOURCE_THICKNESS_VALUES[
 export type ProactiveVoiceEnergy = typeof PROACTIVE_VOICE_ENERGY_VALUES[number];
 export type ProactiveVoiceSignalSource = typeof PROACTIVE_VOICE_SIGNAL_SOURCES[number];
 export type ProactiveResponseOutcome = typeof PROACTIVE_RESPONSE_OUTCOMES[number];
+export type ProactiveObservationStateSignal = typeof PROACTIVE_OBSERVATION_STATE_SIGNALS[number];
+export type ProactiveObservationRisk = typeof PROACTIVE_OBSERVATION_RISK_VALUES[number];
+export type ProactiveObservationUserEnergy = typeof PROACTIVE_OBSERVATION_USER_ENERGY_VALUES[number];
+export type ProactiveObservationModalityHint = typeof PROACTIVE_OBSERVATION_MODALITY_HINTS[number];
 
 export interface ProactiveStateCard {
   activeThread: string;
@@ -122,6 +161,44 @@ export interface ProactiveRecentOutcome {
   responseOutcome: string;
 }
 
+export interface ProactiveObservationModelRef {
+  fallbackReason: string;
+  host: ProactiveJudgmentHost;
+  model: string;
+  used: boolean;
+}
+
+export interface ProactiveObservationMemoryCandidate {
+  confidence: number;
+  evidence: string;
+  kind: "boundary" | "next" | "pattern" | "preference" | "status";
+  slotId: "boundary" | "current_status" | "next" | "preference" | "rhythm";
+  text: string;
+}
+
+export interface ProactiveObservation {
+  annoyanceRisk: ProactiveObservationRisk;
+  confidence: number;
+  createdAt: string;
+  currentStateHypothesis: string;
+  discardReason: string;
+  evidence: string[];
+  id: string;
+  kind: "proactive_observation";
+  likelyBlocker: string;
+  memoryCandidates: ProactiveObservationMemoryCandidate[];
+  modalityHints: ProactiveObservationModalityHint[];
+  model: ProactiveObservationModelRef;
+  reentryCandidate: string;
+  sourceHash: string;
+  stateSignals: ProactiveObservationStateSignal[];
+  suggestedTone: string;
+  surfaceRisk: ProactiveObservationRisk;
+  usable: boolean;
+  userEnergy: ProactiveObservationUserEnergy;
+  version: 1;
+}
+
 export interface ProactiveJudgmentInput {
   checkin: {
     lastCompletionAt: string;
@@ -135,6 +212,7 @@ export interface ProactiveJudgmentInput {
     staleReasons: string[];
   };
   now: string;
+  observation?: ProactiveObservation | undefined;
   recentOutcomes: ProactiveRecentOutcome[];
   stateCard: ProactiveStateCard;
   target: {
@@ -195,6 +273,8 @@ export interface ProactiveOutcomeLogEntry {
 }
 
 export interface ProactiveJudgmentConfig {
+  stateDir?: unknown;
+  timezone?: unknown;
   proactiveJudgmentApiKey?: string;
   proactiveJudgmentEndpoint?: string;
   proactiveJudgmentGenerator?: ((input: ProactiveJudgmentInput) => Promise<Record<string, unknown>> | Record<string, unknown>) | null;
@@ -203,6 +283,14 @@ export interface ProactiveJudgmentConfig {
   proactiveJudgmentMode?: string;
   proactiveJudgmentModel?: string;
   proactiveJudgmentTimeoutMs?: number;
+  proactiveObservationApiKey?: string;
+  proactiveObservationEndpoint?: string;
+  proactiveObservationGenerator?: ((input: ProactiveJudgmentInput) => Promise<Record<string, unknown>> | Record<string, unknown>) | null;
+  proactiveObservationHost?: ProactiveJudgmentHost | string;
+  proactiveObservationMinConfidence?: number;
+  proactiveObservationMode?: string;
+  proactiveObservationModel?: string;
+  proactiveObservationTimeoutMs?: number;
 }
 
 export function normalizeProactiveJudgmentHost(value: unknown): ProactiveJudgmentHost | "" {

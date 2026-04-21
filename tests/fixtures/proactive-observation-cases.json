@@ -1,0 +1,247 @@
+{
+  "cases": [
+    {
+      "id": "thin-context-should-state-check",
+      "input": {
+        "checkin": {
+          "lastCompletionAt": "",
+          "lastCompletionResult": "",
+          "nextWakeAt": "",
+          "pendingHandoffExists": false
+        },
+        "contextBriefing": {
+          "followupContext": "",
+          "stale": true,
+          "staleReasons": ["missing_today_diary", "stale_companion_and_checkin_handoff"]
+        },
+        "now": "2026-04-21T08:00:00.000Z",
+        "recentOutcomes": [],
+        "stateCard": {
+          "activeThread": "",
+          "currentLikelyState": "当前判断上下文偏薄，需要先确认用户此刻状态。",
+          "doNotDo": ["不要假装知道；先轻问确认。"],
+          "easiestReentryStep": "",
+          "likelyBlocker": "缺少 context board。",
+          "sourceThickness": "thin",
+          "toneHint": "短、自然、先确认。"
+        },
+        "target": {
+          "senderId": "wx-user",
+          "targetKey": "wx-user::/workspace",
+          "workspaceRoot": "/workspace"
+        },
+        "timezone": "Asia/Shanghai"
+      },
+      "expected": {
+        "decisionReasonCode": "context_thin",
+        "observationStateSignal": "context_thin",
+        "shouldSurface": true
+      }
+    },
+    {
+      "id": "strong-project-reentry",
+      "input": {
+        "checkin": {
+          "lastCompletionAt": "2026-04-21T05:00:00.000Z",
+          "lastCompletionResult": "silent",
+          "nextWakeAt": "2026-04-21T10:00:00.000Z",
+          "pendingHandoffExists": false
+        },
+        "contextBriefing": {
+          "followupContext": "",
+          "stale": false,
+          "staleReasons": []
+        },
+        "now": "2026-04-21T08:00:00.000Z",
+        "recentOutcomes": [],
+        "stateCard": {
+          "activeThread": "Codeksei proactive observation layer",
+          "currentLikelyState": "用户正在收口本地小模型观察层。",
+          "doNotDo": ["不要像催债。"],
+          "easiestReentryStep": "把 observation 接入 claim-checkin。",
+          "likelyBlocker": "需要避免小模型接管 schedule truth。",
+          "sourceThickness": "strong",
+          "toneHint": "短、自然、带一个下一步。"
+        },
+        "target": {
+          "senderId": "wx-user",
+          "targetKey": "wx-user::/workspace",
+          "workspaceRoot": "/workspace"
+        },
+        "timezone": "Asia/Shanghai"
+      },
+      "expected": {
+        "decisionReasonCode": "project_reentry",
+        "observationStateSignal": "project_reentry",
+        "shouldSurface": true
+      }
+    },
+    {
+      "id": "recent-dismissed-raises-no-action",
+      "input": {
+        "checkin": {
+          "lastCompletionAt": "2026-04-21T05:00:00.000Z",
+          "lastCompletionResult": "sent_message",
+          "nextWakeAt": "2026-04-21T10:00:00.000Z",
+          "pendingHandoffExists": false
+        },
+        "contextBriefing": {
+          "followupContext": "继续看 proactive observation。",
+          "stale": false,
+          "staleReasons": []
+        },
+        "now": "2026-04-21T08:00:00.000Z",
+        "recentOutcomes": [
+          {
+            "createdAt": "2026-04-21T07:30:00.000Z",
+            "interventionLevel": "light_nudge",
+            "reasonCode": "scheduled_followup",
+            "responseOutcome": "dismissed"
+          }
+        ],
+        "stateCard": {
+          "activeThread": "Codeksei proactive observation layer",
+          "currentLikelyState": "用户刚拒绝一次提醒。",
+          "doNotDo": ["不要追太紧。"],
+          "easiestReentryStep": "等待用户回来。",
+          "likelyBlocker": "刚被拒绝。",
+          "sourceThickness": "strong",
+          "toneHint": "低打扰。"
+        },
+        "target": {
+          "senderId": "wx-user",
+          "targetKey": "wx-user::/workspace",
+          "workspaceRoot": "/workspace"
+        },
+        "timezone": "Asia/Shanghai"
+      },
+      "expected": {
+        "decisionReasonCode": "no_action",
+        "observationStateSignal": "no_action",
+        "shouldSurface": false
+      }
+    },
+    {
+      "id": "low-energy-voice-backstage",
+      "input": {
+        "checkin": {
+          "lastCompletionAt": "2026-04-21T05:00:00.000Z",
+          "lastCompletionResult": "silent",
+          "nextWakeAt": "2026-04-21T10:00:00.000Z",
+          "pendingHandoffExists": false
+        },
+        "contextBriefing": {
+          "followupContext": "",
+          "stale": false,
+          "staleReasons": []
+        },
+        "now": "2026-04-21T08:00:00.000Z",
+        "recentOutcomes": [],
+        "stateCard": {
+          "activeThread": "生活记录",
+          "currentLikelyState": "用户语音能量偏低。",
+          "doNotDo": ["不要强推。"],
+          "easiestReentryStep": "先后台保留线索。",
+          "likelyBlocker": "需要休息。",
+          "sourceThickness": "usable",
+          "toneHint": "轻一点。"
+        },
+        "target": {
+          "senderId": "wx-user",
+          "targetKey": "wx-user::/workspace",
+          "workspaceRoot": "/workspace"
+        },
+        "timezone": "Asia/Shanghai",
+        "voiceSignal": {
+          "confidence": 0.91,
+          "durationMs": 8000,
+          "emotion": "tired",
+          "energy": "low",
+          "source": "sensevoice",
+          "transcript": "算了我等会再说吧"
+        }
+      },
+      "expected": {
+        "decisionReasonCode": "voice_low_energy",
+        "observationStateSignal": "user_low_energy",
+        "shouldSurface": false
+      }
+    },
+    {
+      "id": "fleeting-life-record-memory-candidate",
+      "input": {
+        "checkin": {
+          "lastCompletionAt": "",
+          "lastCompletionResult": "",
+          "nextWakeAt": "",
+          "pendingHandoffExists": false
+        },
+        "contextBriefing": {
+          "followupContext": "",
+          "stale": false,
+          "staleReasons": []
+        },
+        "now": "2026-04-21T08:00:00.000Z",
+        "recentOutcomes": [],
+        "stateCard": {
+          "activeThread": "生活记录",
+          "currentLikelyState": "用户只表达了一次性低落。",
+          "doNotDo": ["不要把一次性情绪写成稳定人格事实。"],
+          "easiestReentryStep": "",
+          "likelyBlocker": "情绪表达可能只是当天状态。",
+          "sourceThickness": "usable",
+          "toneHint": "短、接住，不贴标签。"
+        },
+        "target": {
+          "senderId": "wx-user",
+          "targetKey": "wx-user::/workspace",
+          "workspaceRoot": "/workspace"
+        },
+        "timezone": "Asia/Shanghai"
+      },
+      "expected": {
+        "decisionReasonCode": "no_action",
+        "observationStateSignal": "life_record",
+        "shouldSurface": false
+      }
+    },
+    {
+      "id": "privacy-path-redaction-source-pack",
+      "input": {
+        "checkin": {
+          "lastCompletionAt": "",
+          "lastCompletionResult": "",
+          "nextWakeAt": "",
+          "pendingHandoffExists": false
+        },
+        "contextBriefing": {
+          "followupContext": "继续看 /Users/luciano/private/secret.md",
+          "stale": false,
+          "staleReasons": []
+        },
+        "now": "2026-04-21T08:00:00.000Z",
+        "recentOutcomes": [],
+        "stateCard": {
+          "activeThread": "隐私路径测试",
+          "currentLikelyState": "source pack 带有本机路径。",
+          "doNotDo": ["不要暴露 /Users/luciano/private/secret.md"],
+          "easiestReentryStep": "/Users/luciano/private/secret.md - read first",
+          "likelyBlocker": "需要脱敏。",
+          "sourceThickness": "usable",
+          "toneHint": "短、自然。"
+        },
+        "target": {
+          "senderId": "wx-user",
+          "targetKey": "wx-user::/Users/luciano/private/workspace",
+          "workspaceRoot": "/Users/luciano/private/workspace"
+        },
+        "timezone": "Asia/Shanghai"
+      },
+      "expected": {
+        "decisionReasonCode": "project_reentry",
+        "observationStateSignal": "project_reentry",
+        "shouldSurface": true
+      }
+    }
+  ]
+}

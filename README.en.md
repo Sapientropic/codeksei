@@ -270,6 +270,13 @@ CODEKSEI_COMPANION_SEMANTIC_TIMEOUT_MS=15000
 CODEKSEI_ONBOARDING_SEMANTIC_HOST=
 CODEKSEI_ONBOARDING_SEMANTIC_MODEL=
 CODEKSEI_ONBOARDING_SEMANTIC_TIMEOUT_MS=15000
+CODEKSEI_PROACTIVE_OBSERVATION_MODE=hybrid
+CODEKSEI_PROACTIVE_OBSERVATION_HOST=auto
+CODEKSEI_PROACTIVE_OBSERVATION_ENDPOINT=http://127.0.0.1:8080/v1
+CODEKSEI_PROACTIVE_OBSERVATION_API_KEY=
+CODEKSEI_PROACTIVE_OBSERVATION_MODEL=gemma-4-E2B-it
+CODEKSEI_PROACTIVE_OBSERVATION_TIMEOUT_MS=8000
+CODEKSEI_PROACTIVE_OBSERVATION_MIN_CONFIDENCE=0.55
 CODEKSEI_CODEX_ENDPOINT=ws://127.0.0.1:8765
 CODEKSEI_WEIXIN_REPLY_MODE=stream
 CODEKSEI_WEIXIN_ROUTE_TAG=
@@ -305,6 +312,9 @@ Notes:
 - `CODEKSEI_ONBOARDING_SEMANTIC_HOST=auto|codex|hermes|deterministic` lets onboarding extraction pick a dedicated semantic host; when left blank it follows the default host decision
 - `CODEKSEI_ONBOARDING_SEMANTIC_MODEL` can pin a cheaper model just for hidden onboarding extraction
 - `CODEKSEI_ONBOARDING_SEMANTIC_TIMEOUT_MS` defaults to `15000`; timeouts fall back to deterministic extraction so activation turns stay responsive
+- `CODEKSEI_PROACTIVE_OBSERVATION_*` configures the optional local observation layer before proactive decisions. It only produces `ProactiveObservation`; it does not own delivery, schedule truth, or automatic companion-memory writes
+- `codeksei proactive observe --user <id> --workspace <path>` generates and caches the latest observation; `--show` reads the latest observation/sourceHash/expired/usable status without calling a model. Use global `--format json|text` for output formatting
+- [⚠️ Needs confirmation] Gemma 4 E2B-it can be tried through llama.cpp server, for example `llama-server -hf ggml-org/gemma-4-E2B-it-GGUF:Q4_K_M --alias gemma-4-E2B-it --host 127.0.0.1 --port 8080 --jinja -c 8192 -ngl 99`. llama.cpp OpenAI-compatible behavior, `response_format`, multimodal `image_url`, and `chat_template_kwargs` support can vary by version/model/GGUF conversion. Codeksei does not hide incompatibility by auto-removing fields; endpoint failures fall back and surface the reason in diagnostics
 - `CODEKSEI_USER_NAME` is a display/persona field, not a routing id
 - `CODEKSEI_ALLOWED_USER_IDS` must use the exact sender ids observed by the bridge; the easiest path is `codeksei accounts`, or `npm run accounts` when you are already in a repo checkout
 - WeChat persona / continuity instructions default to `templates/weixin-instructions.md`; use `weixin-instructions.local.md` in the state directory only when you need a local overlay

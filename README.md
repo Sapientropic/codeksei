@@ -285,6 +285,13 @@ CODEKSEI_PROACTIVE_JUDGMENT_API_KEY=
 CODEKSEI_PROACTIVE_JUDGMENT_MODEL=qwen3.5:2b
 CODEKSEI_PROACTIVE_JUDGMENT_TIMEOUT_MS=2500
 CODEKSEI_PROACTIVE_JUDGMENT_MIN_CONFIDENCE=0.62
+CODEKSEI_PROACTIVE_OBSERVATION_MODE=hybrid
+CODEKSEI_PROACTIVE_OBSERVATION_HOST=auto
+CODEKSEI_PROACTIVE_OBSERVATION_ENDPOINT=http://127.0.0.1:8080/v1
+CODEKSEI_PROACTIVE_OBSERVATION_API_KEY=
+CODEKSEI_PROACTIVE_OBSERVATION_MODEL=gemma-4-E2B-it
+CODEKSEI_PROACTIVE_OBSERVATION_TIMEOUT_MS=8000
+CODEKSEI_PROACTIVE_OBSERVATION_MIN_CONFIDENCE=0.55
 CODEKSEI_CODEX_ENDPOINT=ws://127.0.0.1:8765
 CODEKSEI_WEIXIN_REPLY_MODE=stream
 CODEKSEI_WEIXIN_ROUTE_TAG=
@@ -325,6 +332,12 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - `CODEKSEI_PROACTIVE_JUDGMENT_ENDPOINT` 默认 `http://127.0.0.1:11434/v1`，可接 Ollama / LM Studio / llama.cpp server / vLLM / SGLang 或云端 OpenAI-compatible API
 - `CODEKSEI_PROACTIVE_JUDGMENT_MODEL` 默认 `qwen3.5:2b`，只是推荐默认，不把 Codeksei 绑到具体模型
 - `CODEKSEI_PROACTIVE_JUDGMENT_TIMEOUT_MS` 默认 `2500`，`CODEKSEI_PROACTIVE_JUDGMENT_MIN_CONFIDENCE` 默认 `0.62`；超时、低置信或 JSON 非法都会回退 deterministic
+- `CODEKSEI_PROACTIVE_OBSERVATION_*` 是主动判断前的小模型观察层。它只生成 `ProactiveObservation`，不接管投递、调度真相，也不自动写 companion memory
+- observation 的 `sourceHash` 来自脱敏后的 observation source pack：checkin 摘要、context briefing、recent outcomes、deterministic stateCard、timezone、voice signal 和 target hash；不包含模型输出，也不包含 observation 回写后的 board，避免 stateCard / observation 循环依赖
+- observation 同时记录 `confidence` 与 `usable/discardReason`：低置信或缺证据的 observation 可以留在 eval/diagnostics 里，但不会进入 `ProactiveDecision`
+- `codeksei proactive observe --user <id> --workspace <path>` 会生成并缓存 latest observation；`--dry-run` 不写 observation store；`--show` 只读 latest、sourceHash、expired、usable 状态，不触发模型调用。输出格式继续用全局 `--format json|text`
+- `codeksei proactive eval --fixture tests/fixtures/proactive-observation-cases.json` 只读评测 fixture，不写本地状态
+- [⚠️ 需确认] Gemma 4 E2B-it 的推荐本机入口是 `llama-server -hf ggml-org/gemma-4-E2B-it-GGUF:Q4_K_M --alias gemma-4-E2B-it --host 127.0.0.1 --port 8080 --jinja -c 8192 -ngl 99`；`--alias`、OpenAI-compatible `/v1/chat/completions`、`response_format`、多模态 `image_url`、`chat_template_kwargs` 等能力会随 llama.cpp 版本、模型架构和 GGUF 转换而变。endpoint 返回 400/不兼容时，Codeksei 不重试删字段隐藏问题，直接 fallback，并在 observation reason/diagnostics 里暴露不兼容原因
 - `CODEKSEI_USER_NAME` 决定对话里怎么称呼你，不参与消息路由
 - `CODEKSEI_ALLOWED_USER_IDS` 必须填写微信桥实际观测到的 sender id；最简单的做法是先跑 `codeksei accounts`，如果你当前就在仓库工作树里，也可以直接用 `npm run accounts`
 - 微信 persona / continuity instructions 默认来自仓库里的 `templates/weixin-instructions.md`，如需本地覆盖可在状态目录放 `weixin-instructions.local.md`

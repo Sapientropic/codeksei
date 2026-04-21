@@ -83,6 +83,23 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "mode", keys: ["--mode"], type: "string", defaultValue: "proactive", description: "proactive|review" },
     ],
   }),
+  proactiveObserve: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      COMMON_DRY_RUN_FLAG,
+      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id" },
+      { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "显式绝对 workspace 路径" },
+      { name: "show", keys: ["--show"], type: "boolean", defaultValue: false, description: "只显示当前 latest observation 状态，不触发模型调用" },
+    ],
+  }),
+  proactiveEval: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "fixture", keys: ["--fixture"], type: "string", defaultValue: "", description: "proactive observation eval fixture JSON 路径" },
+      { name: "model", keys: ["--model"], type: "string", defaultValue: "", description: "覆盖 proactive observation 模型 id" },
+      { name: "endpoint", keys: ["--endpoint"], type: "string", defaultValue: "", description: "覆盖 OpenAI-compatible endpoint" },
+    ],
+  }),
   companionRemember: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,

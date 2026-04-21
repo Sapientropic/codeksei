@@ -133,6 +133,16 @@ function normalizeModelDecision(
 }
 
 function applyHardGuardrails(decision: ProactiveDecision, input: ProactiveJudgmentInput): ProactiveDecision {
+  if (isUsableObservation(input) && input.observation?.surfaceRisk === "high" && decision.shouldSurface) {
+    return {
+      ...decision,
+      interventionLevel: "backstage_only",
+      outputModality: "backstage_only",
+      shouldSurface: false,
+      suggestedMessage: "",
+      userVisibleReason: "小模型观察认为当前打扰风险偏高，先降到后台整理。",
+    };
+  }
   if (input.voiceSignal?.energy === "low" && (decision.interventionLevel === "push_forward" || decision.outputModality === "voice")) {
     return {
       ...decision,
@@ -165,11 +175,17 @@ function resolveDeterministicReasonCode(input: ProactiveJudgmentInput): Proactiv
   if (input.voiceSignal?.energy === "low") {
     return "voice_low_energy";
   }
+  if (hasRecentOutcome(input, "annoyed") || hasRecentOutcome(input, "dismissed")) {
+    return "no_action";
+  }
+  if (isUsableObservation(input) && (input.observation?.surfaceRisk === "high" || input.observation?.userEnergy === "low")) {
+    return input.observation?.userEnergy === "low" ? "voice_low_energy" : "no_action";
+  }
   if (input.contextBriefing.stale || input.stateCard.sourceThickness === "thin") {
     return "context_thin";
   }
-  if (hasRecentOutcome(input, "annoyed") || hasRecentOutcome(input, "dismissed")) {
-    return "no_action";
+  if (hasObservationReentryCandidate(input)) {
+    return "project_reentry";
   }
   if (normalizeText(input.contextBriefing.followupContext)) {
     return "scheduled_followup";
@@ -202,6 +218,9 @@ function resolveDeterministicInterventionLevel(
   if (reasonCode === "project_reentry") {
     return "offer_next_step";
   }
+  if (isUsableObservation(input) && input.observation?.memoryCandidates.length) {
+    return "backstage_only";
+  }
   return "silent";
 }
 
@@ -210,28 +229,35 @@ function resolveDeterministicBackstageActions(
   reasonCode: ProactiveReasonCode,
   interventionLevel: ProactiveInterventionLevel,
 ): ProactiveBackstageAction[] {
+  const observationMemoryActions = isUsableObservation(input) && input.observation?.memoryCandidates.length
+    ? [{
+      kind: "companion_memory",
+      status: "suggested",
+      summary: input.observation.memoryCandidates[0]?.text || "小模型观察到候选长期记忆，需主会话确认后再写入。",
+    }] satisfies ProactiveBackstageAction[]
+    : [];
   if (reasonCode === "closeout_window") {
-    return [{
+    return [...observationMemoryActions, {
       kind: "review",
       status: "suggested",
       summary: "如果用户正在收尾，优先生成 nightly closeout。",
     }];
   }
   if (reasonCode === "project_reentry" || interventionLevel === "offer_next_step") {
-    return [{
+    return [...observationMemoryActions, {
       kind: "project_note",
       status: "suggested",
-      summary: input.stateCard.easiestReentryStep || input.stateCard.activeThread || "记录当前项目重入入口。",
+      summary: resolveObservationReentryCandidate(input) || input.stateCard.easiestReentryStep || input.stateCard.activeThread || "记录当前项目重入入口。",
     }];
   }
   if (reasonCode === "voice_low_energy") {
-    return [{
+    return [...observationMemoryActions, {
       kind: "diary",
       status: "suggested",
       summary: "语音状态偏低能量，先保留当前线索，避免强提醒。",
     }];
   }
-  return [];
+  return observationMemoryActions;
 }
 
 function resolveDeterministicNextWakePolicy(
@@ -264,7 +290,7 @@ function buildDeterministicSuggestedMessage(
   if (reasonCode === "scheduled_followup") {
     return truncate(`我把这条线还留着：${input.contextBriefing.followupContext} 要不要从这里继续？`, MAX_MESSAGE_LENGTH);
   }
-  const step = normalizeText(input.stateCard.easiestReentryStep || input.stateCard.activeThread);
+  const step = normalizeText(resolveObservationReentryCandidate(input) || input.stateCard.easiestReentryStep || input.stateCard.activeThread);
   if (step) {
     return truncate(`我看这条线可以从这里接：${step}`, MAX_MESSAGE_LENGTH);
   }
@@ -279,6 +305,9 @@ function buildUserVisibleReason(input: ProactiveJudgmentInput, reasonCode: Proac
     return "上下文偏薄，适合先确认当前状态。";
   }
   if (reasonCode === "project_reentry") {
+    if (resolveObservationReentryCandidate(input)) {
+      return "小模型观察到当前有可接回的项目线索。";
+    }
     return "当前有可接回的项目线索。";
   }
   if (normalizeText(input.contextBriefing.followupContext)) {
@@ -386,6 +415,25 @@ function buildDecisionId(input: ProactiveJudgmentInput): string {
 
 function hasRecentOutcome(input: ProactiveJudgmentInput, outcome: string): boolean {
   return input.recentOutcomes.slice(-3).some((entry) => normalizeText(entry.responseOutcome) === outcome);
+}
+
+function hasObservationReentryCandidate(input: ProactiveJudgmentInput): boolean {
+  return isUsableObservation(input)
+    && Boolean(resolveObservationReentryCandidate(input))
+    && input.observation?.annoyanceRisk !== "high"
+    && input.observation?.surfaceRisk !== "high";
+}
+
+function resolveObservationReentryCandidate(input: ProactiveJudgmentInput): string {
+  const observation = input.observation;
+  if (!observation || !observation.usable || observation.annoyanceRisk === "high" || observation.surfaceRisk === "high") {
+    return "";
+  }
+  return normalizeText(observation.reentryCandidate);
+}
+
+function isUsableObservation(input: ProactiveJudgmentInput): boolean {
+  return Boolean(input.observation?.usable);
 }
 
 function isCloseoutWindow(input: ProactiveJudgmentInput): boolean {

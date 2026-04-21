@@ -3,6 +3,7 @@ import { getCommandArgsSchema } from "../contracts/command-args";
 import { parseCliArgs } from "../core/cli-args";
 import { buildTerminalLeafHelp } from "../core/command-registry";
 import type { AppRuntimeConfig } from "../core/app-service-contract";
+import type { ProactiveJudgmentConfig } from "../proactive/contracts";
 import { claimDelegatedCheckin } from "../host/delegation/claim-checkin";
 import { assertResidentDaemonConfig, resolveHostCheckinTarget, resolveHostProviderWithConfig } from "./host-cli-shared";
 
@@ -36,7 +37,14 @@ type ClaimCliConfig = Partial<Pick<
   | "proactiveJudgmentMode"
   | "proactiveJudgmentModel"
   | "proactiveJudgmentTimeoutMs"
->>;
+  | "proactiveObservationApiKey"
+  | "proactiveObservationEndpoint"
+  | "proactiveObservationHost"
+  | "proactiveObservationMinConfidence"
+  | "proactiveObservationMode"
+  | "proactiveObservationModel"
+  | "proactiveObservationTimeoutMs"
+>> & Partial<Pick<ProactiveJudgmentConfig, "proactiveObservationGenerator">>;
 
 export async function runHostClaimCheckinCommand(
   config: ClaimCliConfig,

@@ -11,6 +11,9 @@ const {
   refreshContextBoard,
   resolveContextBoardPath,
 } = require("../src/context/board");
+const {
+  normalizeProactiveObservation,
+} = require("../src/proactive/observation-normalize");
 const { runContextBriefingCommand } = require("../src/app/context-briefing-cli");
 
 function createContextFixture() {
@@ -154,6 +157,51 @@ test("context board refresh builds a deterministic handoff with fresh diary and 
   assert.match(result.stateCard.easiestReentryStep, /hosted checkin script/u);
   assert.match(result.boardText, /待带进下一次主动判断的内部后续：午饭后 30 分钟重新接这条线。/u);
   assert.match(result.boardText, /## 重入入口/u);
+});
+
+test("context board renders proactive observation without mutating deterministic state card", () => {
+  const fixture = createContextFixture();
+  const observation = normalizeProactiveObservation({
+    annoyanceRisk: "low",
+    confidence: 0.86,
+    currentStateHypothesis: "用户正在把本地小模型观察层接进 Codeksei。",
+    evidence: ["用户明确要求先优化这层，为后续小模型发挥能力做准备。"],
+    likelyBlocker: "担心直接让小模型决定投递会污染调度真相。",
+    memoryCandidates: [
+      {
+        confidence: 0.72,
+        evidence: "用户希望小模型以后接照片、音频、生活记录。",
+        kind: "next",
+        slotId: "next",
+        text: "后续希望小模型把照片、音频、生活记录结构化为主 agent 记忆层。",
+      },
+    ],
+    modalityHints: ["text"],
+    reentryCandidate: "先实现 ProactiveObservation，再设计 Gemma 4 E2B-it eval。",
+    stateSignals: ["project_reentry", "memory_candidate"],
+    suggestedTone: "短、自然，给一个下一步。",
+    surfaceRisk: "low",
+    userEnergy: "medium",
+  }, {
+    host: "local",
+    minConfidence: 0.55,
+    model: "gemma-4-E2B-it",
+    now: new Date("2026-04-21T08:00:00.000Z"),
+    sourceHash: "context-hash",
+  });
+  assert.ok(observation);
+
+  const result = refreshContextBoard(fixture.config, fixture.target, {
+    mode: "proactive",
+    observation,
+  });
+
+  assert.equal(result.observation?.id, observation.id);
+  assert.match(result.briefingText, /小模型观察/u);
+  assert.match(result.boardText, /先实现 ProactiveObservation/u);
+  assert.doesNotMatch(result.stateCard.easiestReentryStep, /ProactiveObservation/u);
+  assert.match(result.stateCard.easiestReentryStep, /hosted checkin script/u);
+  assert.doesNotMatch(result.stateCard.toneHint, /给一个下一步/u);
 });
 
 test("context board marks stale when today diary and recent handoff are both thin", () => {

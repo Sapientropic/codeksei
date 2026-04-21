@@ -138,6 +138,24 @@ operator / bootstrap：
 - 来源固定为受控输入集：checkin state、当日日记、最近 companion note、proactive follow-up context、project radar、workspace continuity 入口
 - 缺源时显式标 `[⚠️ 需确认]`，不会编造
 - Hosted Mode 下的 proactive wake 会在 cron 运行前现读这份 board；原始 `AGENTS.md / Home.md / diary` 是输入源，不再是 cron prompt 的直接 surface
+- context board 不会默认触发模型调用；小模型 observation 只能由 `proactive observe` 或 host claim-checkin 的 observation pass 显式生成
+
+## Proactive Observation
+
+这一组入口负责本地小模型观察层：先把 context board / voice signal / recent outcomes 压成 `ProactiveObservation`，再交给 deterministic decision core 判断是否应该主动出现。
+
+- `codeksei proactive observe --user <senderId> --workspace /absolute/workspace`
+- `codeksei proactive observe --show --user <senderId> --workspace /absolute/workspace`
+- `codeksei proactive observe --dry-run --user <senderId> --workspace /absolute/workspace`
+- `codeksei proactive eval --fixture tests/fixtures/proactive-observation-cases.json`
+
+说明：
+
+- observation 只做观察，不决定 schedule truth，不直接发送消息，也不自动写 companion memory
+- `sourceHash` 固定基于脱敏 observation source pack：checkin 摘要、context briefing、recent outcomes、deterministic stateCard、timezone、voice signal、target hash；不包含 observation 本身，避免循环依赖
+- `confidence` 只描述模型自评；是否能进入决策看 `usable/discardReason`
+- `--show` 只读 latest observation、当前 sourceHash、是否 expired、是否 usable，不触发模型调用
+- [⚠️ 需确认] llama.cpp server 的 OpenAI-compatible 细节、`response_format`、多模态 `image_url`、`chat_template_kwargs` 等能力不保证跨版本/模型/GGUF 一致。V1 不自动重试删字段；endpoint 不兼容时直接 fallback，并把原因留在 diagnostics
 
 ## Onboarding
 
@@ -336,6 +354,9 @@ Durable note 负责把值得长期记住的判断、偏好和项目脉络，放�
 - `CODEKSEI_PROACTIVE_JUDGMENT_HOST=auto|local|openai-compatible|codex|hermes|deterministic` 可为主动判断层单独指定语义宿主；默认 `auto`
 - `CODEKSEI_PROACTIVE_JUDGMENT_ENDPOINT` 默认 `http://127.0.0.1:11434/v1`，支持本地或云端 OpenAI-compatible API；失败不阻断 check-in，会回退 deterministic
 - `CODEKSEI_PROACTIVE_JUDGMENT_MODEL` 默认 `qwen3.5:2b`，只是推荐默认值，实际模型由本地/云端 endpoint 决定
+- `CODEKSEI_PROACTIVE_OBSERVATION_HOST=auto|local|openai-compatible|codex|hermes|deterministic` 可为 observation layer 单独指定语义宿主；默认 `auto`
+- `CODEKSEI_PROACTIVE_OBSERVATION_ENDPOINT` 默认 `http://127.0.0.1:8080/v1`，优先服务 Gemma 4 E2B-it 这类本地小模型
+- `CODEKSEI_PROACTIVE_OBSERVATION_TIMEOUT_MS` 默认 `8000`，`CODEKSEI_PROACTIVE_OBSERVATION_MIN_CONFIDENCE` 默认 `0.55`
 - 不传 `--date/--week/--month` 时，当前日期按统一 timezone contract 推断
 - 失败或超时会回退 deterministic
 - nightly 是周/月复盘的前置压缩层

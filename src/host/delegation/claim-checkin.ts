@@ -9,8 +9,9 @@ import {
 } from "../../checkin";
 import { syncHostedCheckinPlanViaHermes } from "../recipes/hermes/wake-forwarder";
 import { buildProactiveDecision } from "../../proactive/decision";
+import { maybeGenerateProactiveObservation } from "../../proactive/observation";
 import { readRecentProactiveOutcomes } from "../../proactive/outcome-log";
-import type { ProactiveDecision, ProactiveJudgmentInput } from "../../proactive/contracts";
+import type { ProactiveDecision, ProactiveJudgmentConfig, ProactiveJudgmentInput } from "../../proactive/contracts";
 import type {
   ClaimedPayload,
   DelegationLease,
@@ -44,9 +45,16 @@ type ClaimConfig = Pick<
   | "proactiveJudgmentMode"
   | "proactiveJudgmentModel"
   | "proactiveJudgmentTimeoutMs"
+  | "proactiveObservationApiKey"
+  | "proactiveObservationEndpoint"
+  | "proactiveObservationHost"
+  | "proactiveObservationMinConfidence"
+  | "proactiveObservationMode"
+  | "proactiveObservationModel"
+  | "proactiveObservationTimeoutMs"
   | "workspaceBootstrapConfigFile"
   | "workspaceRoot"
->>;
+>> & Partial<Pick<ProactiveJudgmentConfig, "proactiveObservationGenerator">>;
 
 export interface HostClaimCheckinResult {
   bookkeepingExpectations: HostCheckinBookkeepingExpectation[];
@@ -175,13 +183,21 @@ export async function claimDelegatedCheckin(
   const hostedSync = provider === "hermes"
     ? syncHostedCheckinPlanViaHermes(config, target, acknowledged)
     : null;
+  const observationInput = buildProactiveJudgmentInput(config, target, contextBoard, acknowledged);
+  const observation = await maybeGenerateProactiveObservation(config, observationInput);
+  const observedContextBoard = observation.data
+    ? tryRefreshContextBoard(config, target, {
+      mode: "proactive",
+      observation: observation.data,
+    }) || contextBoard
+    : contextBoard;
   const proactiveDecision = await buildProactiveDecision(
     config,
-    buildProactiveJudgmentInput(config, target, contextBoard, acknowledged),
+    buildProactiveJudgmentInput(config, target, observedContextBoard, acknowledged),
   );
   return {
     bookkeepingExpectations: [...HOSTED_CHECKIN_BOOKKEEPING_EXPECTATIONS],
-    contextBriefing,
+    contextBriefing: buildContextBriefingSnapshot(observedContextBoard) || contextBriefing,
     status: "claimed",
     lease: acknowledged.activeWake ? buildDelegationLease(acknowledged.activeWake.triggerId, acknowledged.activeWake.startedAt) : null,
     payload: firstTick.payload ? {
@@ -252,6 +268,7 @@ function buildContextBriefingSnapshot(
   return {
     briefingText: briefing.briefingText,
     followupContext: briefing.followupContext,
+    observation: briefing.observation,
     stale: briefing.stale,
     staleReasons: [...briefing.staleReasons],
   };
@@ -278,6 +295,7 @@ function buildProactiveJudgmentInput(
     },
     now: new Date().toISOString(),
     recentOutcomes: readRecentProactiveOutcomes(config, { targetKey }),
+    observation: briefing?.observation || undefined,
     stateCard: briefing?.stateCard || {
       activeThread: "",
       currentLikelyState: "当前判断上下文偏薄，需要先确认用户此刻状态。",

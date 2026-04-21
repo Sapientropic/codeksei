@@ -34,9 +34,12 @@ export interface SemanticJsonRuntimeConfig {
 }
 
 export interface SemanticJsonRunInput {
+  apiKey?: unknown;
+  endpoint?: unknown;
   label: string;
   model?: unknown;
   prompt: string;
+  requestExtraBody?: Record<string, unknown>;
   timeoutMs: number;
   workspaceRoot?: unknown;
 }
@@ -130,7 +133,7 @@ export async function runOpenAICompatibleSemanticJson(
   config: SemanticJsonRuntimeConfig = {},
   input: SemanticJsonRunInput,
 ): Promise<JsonObject> {
-  const endpoint = normalizeText(config.proactiveJudgmentEndpoint);
+  const endpoint = normalizeText(input.endpoint) || normalizeText(config.proactiveJudgmentEndpoint);
   if (!endpoint) {
     throw new Error(`${input.label} missing OpenAI-compatible endpoint`);
   }
@@ -150,8 +153,9 @@ export async function runOpenAICompatibleSemanticJson(
         response_format: { type: "json_object" },
         stream: false,
         temperature: 0,
+        ...(input.requestExtraBody || {}),
       }),
-      headers: buildOpenAICompatibleHeaders(config),
+      headers: buildOpenAICompatibleHeaders(config, input),
       method: "POST",
       signal: controller.signal,
     });
@@ -244,8 +248,8 @@ export function waitForSemanticJsonTurnCompletion(
   });
 }
 
-function buildOpenAICompatibleHeaders(config: SemanticJsonRuntimeConfig): Record<string, string> {
-  const apiKey = normalizeText(config.proactiveJudgmentApiKey);
+function buildOpenAICompatibleHeaders(config: SemanticJsonRuntimeConfig, input: SemanticJsonRunInput): Record<string, string> {
+  const apiKey = normalizeText(input.apiKey) || normalizeText(config.proactiveJudgmentApiKey);
   return {
     ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
     "Content-Type": "application/json",

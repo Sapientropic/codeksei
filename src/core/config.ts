@@ -163,6 +163,13 @@ function parseEnvConfig(env: EnvSource, options: ReadConfigOptions = {}): AppRun
       proactiveJudgmentMode: readPrefixedEnv(env, "PROACTIVE_JUDGMENT_MODE") || "hybrid",
       proactiveJudgmentModel: readPrefixedEnv(env, "PROACTIVE_JUDGMENT_MODEL") || "qwen3.5:2b",
       proactiveJudgmentTimeoutMs: readPrefixedIntEnv(env, "PROACTIVE_JUDGMENT_TIMEOUT_MS") || 2500,
+      proactiveObservationApiKey: readPrefixedEnv(env, "PROACTIVE_OBSERVATION_API_KEY") || "",
+      proactiveObservationEndpoint: readPrefixedEnv(env, "PROACTIVE_OBSERVATION_ENDPOINT") || "http://127.0.0.1:8080/v1",
+      proactiveObservationHost: normalizeProactiveJudgmentHost(readPrefixedEnv(env, "PROACTIVE_OBSERVATION_HOST")) || "auto",
+      proactiveObservationMinConfidence: readPrefixedFloatEnv(env, "PROACTIVE_OBSERVATION_MIN_CONFIDENCE") || 0.55,
+      proactiveObservationMode: readPrefixedEnv(env, "PROACTIVE_OBSERVATION_MODE") || "hybrid",
+      proactiveObservationModel: readPrefixedEnv(env, "PROACTIVE_OBSERVATION_MODEL") || "gemma-4-E2B-it",
+      proactiveObservationTimeoutMs: readPrefixedIntEnv(env, "PROACTIVE_OBSERVATION_TIMEOUT_MS") || 8000,
     },
     checkinRuntime: {
       workspaceId: readPrefixedEnv(env, "WORKSPACE_ID") || "default",

@@ -46,6 +46,18 @@ const TOPIC_HELP = {
       "  proactive 更偏主动判断；review 更偏复盘 framing 与重入提示。",
     ],
   }),
+  proactive: () => ({
+    usage: [
+      buildExample("proactive.observe", true),
+      buildExample("proactive.eval", true),
+    ],
+    bodyLabel: "补充：",
+    body: [
+      "  observation layer 只做本地语义观察，不接管 schedule truth，也不自动写 companion memory。",
+      "  observe 默认会写入 latest observation 并刷新 context board；--show 只读当前 latest 状态，不触发模型调用。",
+      "  eval 只读 fixture，用来比较小模型观察与 deterministic decision 的行为差异。",
+    ],
+  }),
   onboarding: () => ({
     usage: [
       buildExample("onboarding.start", true),
@@ -242,6 +254,25 @@ const LEAF_HELP = {
     body: [
       "  从 command truth 渲染 provider-facing host asset。",
       "  当前第一条 renderer 固定是 Hermes companion skill；--validate 会在渲染内容与仓内模板不一致时返回 partial。",
+    ],
+    includeFlagBlock: true,
+  }),
+  "proactive.observe": () => ({
+    usage: [buildTerminalActionExample("proactive.observe", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  生成或查看本地小模型 proactive observation。",
+      "  --dry-run 会调用观察层但不写 observation store；--show 只显示 latest observation、sourceHash、expired 与 usable 状态。",
+      "  命令输出格式继续走全局 --format json|text，不提供局部 --json。",
+    ],
+    includeFlagBlock: true,
+  }),
+  "proactive.eval": () => ({
+    usage: [buildTerminalActionExample("proactive.eval", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  只读评测 proactive observation fixture，不写本地 state。",
+      "  如果本地 endpoint 不兼容或模型失败，case 会记录 fallback reason，而不会影响主链路。",
     ],
     includeFlagBlock: true,
   }),

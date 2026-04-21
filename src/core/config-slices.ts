@@ -90,6 +90,13 @@ export interface SchemaAndTemplateConfig {
   proactiveJudgmentMode: string;
   proactiveJudgmentModel: string;
   proactiveJudgmentTimeoutMs: number;
+  proactiveObservationApiKey: string;
+  proactiveObservationEndpoint: string;
+  proactiveObservationHost: ProactiveJudgmentHost;
+  proactiveObservationMinConfidence: number;
+  proactiveObservationMode: string;
+  proactiveObservationModel: string;
+  proactiveObservationTimeoutMs: number;
 }
 
 export interface CheckinRuntimeConfig extends Pick<WorkspacePathsConfig, "workspaceId" | "workspaceRoot">, Pick<IdentityAndTimeConfig, "allowedUserIds" | "userName"> {

@@ -13,7 +13,7 @@
   Hermes 托管 agent + 官方 Weixin；Codeksei 通过 CLI / operator / skill surface 暴露领域能力
 
 这次不会把 Hermes 的 Python Weixin adapter 硬塞进 Node/TS。Hermes Weixin 仍由 Hermes 官方维护，Codeksei 负责 timeline / diary / reminder / review / note / project radar 这些领域能力，并通过 `host attachment contract` 与兼容 `operator hermes` 入口暴露 recipe surface。
-主动 checkin 也按同一条边界收口：Codeksei 负责 trigger generation、`tick -> ack -> complete` 调度真相与下一次唤醒决策；Codex Mode 继续持有本地 poller，Hosted Mode 则只执行由 Codeksei 重新 arm 的受控 wake/recovery/guard job set。主动判断依赖 Codeksei 自己维护的 context board 与 host-neutral proactive judgment core：受控输入先聚合成 companion state card，再由 deterministic policy + 可选 OpenAI-compatible 本地/云端小模型产出 `ProactiveDecision`。宿主只消费 decision、负责投递/执行，不重新接管调度真相；raw vault/filesystem 仍不会直接暴露给 cron prompt。对外公开 attach 时，推荐使用 `host seed-proactive / claim-checkin / settle-checkin`，而不是把内部 tick/ack/complete 状态机直接泄露给宿主。
+主动 checkin 也按同一条边界收口：Codeksei 负责 trigger generation、`tick -> ack -> complete` 调度真相与下一次唤醒决策；Codex Mode 继续持有本地 poller，Hosted Mode 则只执行由 Codeksei 重新 arm 的受控 wake/recovery/guard job set。主动判断依赖 Codeksei 自己维护的 context board 与 host-neutral proactive judgment core：受控输入先聚合成 deterministic companion state card；可选的小模型 observation layer 只产出 `ProactiveObservation` 旁路信号，再由 deterministic policy + guardrails 产出 `ProactiveDecision`。observation 不反写 stateCard、不接管投递、不自动写 memory；上下文偏薄时，观察层不能把判断升级成项目重入。宿主只消费 decision、负责投递/执行，不重新接管调度真相；raw vault/filesystem 仍不会直接暴露给 cron prompt。对外公开 attach 时，推荐使用 `host seed-proactive / claim-checkin / settle-checkin`，而不是把内部 tick/ack/complete 状态机直接泄露给宿主。
 运行配置入口也已经收口成 `src/core/config.ts` 的 `parseEnvConfig()`：env/CLI override 先规范化成显式字段的 `AppRuntimeConfig`，下游 factory / host policy / CLI 命令不再各自做一轮局部 `typeof config.xxx === "string"` 补丁式收口。
 
 当前质量基线也已经同步到结构层：
@@ -274,6 +274,7 @@
 - `src/integrations/*` 负责接上游能力，例如 timeline
 - `src/checkin/*` 负责 proactive checkin 的 target resolution、wake schedule truth 与 bridge poller scheduling
 - `src/context/*` 负责主动性判断上下文层：context board 的聚合、managed markdown 落盘、briefing CLI 与 Hermes script 注入合同
+- `src/proactive/*` 负责 host-neutral proactive core：deterministic state card、observation normalize/store/eval、decision guardrails；`sourceHash` 固定来自脱敏 observation source pack，不包含模型输出，避免循环依赖
 - `src/companion-memory/*` 负责 host-neutral 的持续记忆主链：六域语义抽取、小模型优先/规则兜底、去重/纠错/runtime freshness state，以及把 onboarding / hosted chat / review / diary / reminder 的高价值事实统一写回 companion note
 - `src/review/*` 负责 nightly / weekly / monthly review
 - `src/notes/*` 负责 durable note routing 与写入
