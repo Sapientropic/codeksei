@@ -38,6 +38,17 @@ test("critical coverage parser reconstructs nested file paths", () => {
   assert.equal(rows[0]?.functionPercent, 80);
 });
 
+test("critical coverage parser accepts TAP diagnostic coverage rows from CI", () => {
+  const tapFixture = COVERAGE_FIXTURE.replace(/^ℹ/gmu, "#");
+  const rows = parseNodeCoverageReport(tapFixture);
+
+  assert.deepEqual(rows.map((row) => row.filePath), [
+    "src/runtime/stream-delivery/turn-finalize.ts",
+    "src/runtime/stream-delivery/delta-merge.ts",
+    "src/core/config.ts",
+  ]);
+});
+
 test("critical coverage violations name the file and metric that missed the gate", () => {
   const rows = parseNodeCoverageReport(COVERAGE_FIXTURE);
   const violations = resolveCriticalCoverageViolations(rows, {

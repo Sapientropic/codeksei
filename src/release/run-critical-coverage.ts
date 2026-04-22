@@ -137,7 +137,7 @@ export function resolveExpectedCriticalCoverageFiles(cwd: string = process.cwd()
 }
 
 function stripInfoPrefix(line: string): string {
-  return line.replace(/^\s*ℹ\s?/u, "");
+  return line.replace(/^\s*(?:ℹ|#)\s?/u, "");
 }
 
 function parsePercent(value: unknown): number {

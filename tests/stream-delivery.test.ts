@@ -992,6 +992,74 @@ test("turn finalize helper replaces existing items and marks abandoned turns", a
   assert.equal(stateByRunKey.has("thread-missing:turn-missing"), false);
 });
 
+test("turn finalize fallback handles missing pending state and empty watchdog tails", async () => {
+  const flushed: Array<{ itemId: string; fragmentKind: string; text: string }> = [];
+  const disposed: string[] = [];
+  const stateByRunKey = new Map();
+  const context = {
+    stateByRunKey,
+    weixinReplyMode: "stream" as const,
+    attachReplyTarget(state: { replyTarget?: unknown }) {
+      state.replyTarget = { provider: "weixin", userId: "user-fallback", contextToken: "ctx-fallback" };
+      return state.replyTarget as never;
+    },
+    clearScheduledFlush() {},
+    disposeRunState(runKey: unknown) {
+      disposed.push(String(runKey || ""));
+      stateByRunKey.delete(String(runKey || ""));
+    },
+    async flush(state: { itemOrder: string[]; items: Map<string, { currentText: string }> }, options: { trigger?: { itemId?: string; fragmentKind?: string } | null }) {
+      const itemId = String(options.trigger?.itemId || "");
+      flushed.push({
+        fragmentKind: String(options.trigger?.fragmentKind || ""),
+        itemId,
+        text: String(state.items.get(itemId)?.currentText || ""),
+      });
+    },
+  };
+
+  await finalizeAbandonedStreamTurn(context, {
+    threadId: "thread-fallback",
+    trailingText: "用尾巴补成最终答复。",
+  });
+  assert.deepEqual(flushed[0], {
+    fragmentKind: "completed_snapshot",
+    itemId: "final",
+    text: "用尾巴补成最终答复。",
+  });
+  assert.equal(disposed.includes("thread-fallback:pending"), true);
+
+  const state = createRunState({
+    threadId: "thread-empty-tail",
+    turnId: "turn-empty-tail",
+    weixinReplyMode: "stream",
+  });
+  state.replyTarget = { provider: "weixin", userId: "user-empty", contextToken: "ctx-empty" };
+  upsertStateItem(state, {
+    itemId: "final-1",
+    text: "已有安全文本。",
+    completed: true,
+    phase: "final",
+    fragmentKind: "completed_snapshot",
+  });
+  stateByRunKey.set(state.runKey, state);
+
+  await finalizeAbandonedStreamTurn(context, {
+    threadId: "thread-empty-tail",
+    turnId: "turn-empty-tail",
+    trailingText: "",
+  });
+
+  assert.deepEqual(flushed.at(-1), {
+    fragmentKind: "",
+    itemId: "",
+    text: "",
+  });
+  assert.equal(state.sentText, "已有安全文本。");
+  assert.equal(state.lastDeliveredVisibleText, "已有安全文本。");
+  assert.equal(state.abandonedAt > 0, true);
+});
+
 test("delivery failure helper ignores missing run keys and tolerates callback failures", async () => {
   const ignoredRunKeys = new Set<string>();
   const disposed: string[] = [];
