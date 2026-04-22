@@ -10,6 +10,7 @@ import type { HostRecipeId } from "../contracts/host-recipe";
 import { resolveHostAttachment, type HostAttachmentConfigInput } from "./model";
 import { loadResolvedHostConfig } from "./config";
 import { collectHermesRecipeDoctorReport, runHermesRecipeSmoke } from "../recipes/hermes/doctor";
+import { collectCodexRecipeDoctorReport, runCodexRecipeSmoke } from "../recipes/codex/doctor";
 import { buildHostAttachmentManifest } from "./manifest";
 import { resolveGenericShellRecipe } from "../recipes/generic/recipe";
 
@@ -80,6 +81,26 @@ export function collectHostDoctorReport(
       },
       provider: {
         id: "hermes",
+        doctor,
+        smokeReady: smoke.ok,
+      },
+      upgrade,
+    };
+  }
+
+  if (attachment.provider === "codex") {
+    const doctor = collectCodexRecipeDoctorReport(config);
+    const smoke = runCodexRecipeSmoke(config);
+    const upgrade = buildHostUpgradeStatus(manifest, resolvedConfig, true, "codex");
+    return {
+      daemon: { required: true, state: daemonState },
+      attachment,
+      resolvedConfig: {
+        path: resolvedConfig.path,
+        exists: Boolean(resolvedConfig.config),
+      },
+      provider: {
+        id: "codex",
         doctor,
         smokeReady: smoke.ok,
       },

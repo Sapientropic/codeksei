@@ -1,6 +1,5 @@
 import {
   DEFAULT_SECTION,
-  SECTION_HEADINGS,
   TODO_LINE_RE,
   TODO_START_MARKER_RE,
   TODO_STATE_MARKERS,
@@ -9,12 +8,15 @@ import {
   type TodoState,
   buildSectionLineText,
   escapeRegExp,
+  getDiarySectionHeading,
+  getDiarySectionHeadingAliases,
   normalizeBody,
   normalizeFileEnding,
   normalizeLineItem,
   normalizeSection,
   normalizeTodoClock,
   normalizeTodoState,
+  resolveDiaryLocale,
   stripTodoMetadata,
 } from "./shared";
 
@@ -50,24 +52,37 @@ export interface TodoLineParseResult {
   todoStartedAt: string;
 }
 
-export function buildDiaryFileSkeleton({ createdAt, updated }: { createdAt: string; updated: string }): string {
-  return [
+export function buildDiaryFileSkeleton({
+  createdAt,
+  locale,
+  updated,
+}: {
+  createdAt: string;
+  locale?: unknown;
+  updated: string;
+}): string {
+  const localeKey = resolveDiaryLocale(locale);
+  const frontmatter = [
     "---",
     `created: ${createdAt}`,
     `updated: ${updated}`,
+    ...(localeKey === "en" ? ["codeksei_locale: en"] : []),
     "---",
-    "## Todo",
+  ];
+  return [
+    ...frontmatter,
+    `## ${getDiarySectionHeading("todo", localeKey)}`,
     "- [ ] ",
     "",
-    "## 时间线事实",
+    `## ${getDiarySectionHeading("timeline", localeKey)}`,
     "- ",
     "",
-    "## 今日碎片",
+    `## ${getDiarySectionHeading("fragment", localeKey)}`,
     "- ",
     "",
-    "## 补充记录",
+    `## ${getDiarySectionHeading("supplement", localeKey)}`,
     "",
-    "## 总结",
+    `## ${getDiarySectionHeading("summary", localeKey)}`,
     "",
   ].join("\n");
 }
@@ -121,6 +136,16 @@ export function findSectionRange(content: string, headingText: string): SectionR
   };
 }
 
+export function findDiarySectionRange(content: string, section: DiarySection): SectionRange | null {
+  for (const headingText of getDiarySectionHeadingAliases(section)) {
+    const range = findSectionRange(content, headingText);
+    if (range) {
+      return range;
+    }
+  }
+  return null;
+}
+
 export function extractSectionLines(sectionBody: string, section: DiarySection): string[] {
   const normalizedBody = normalizeFileEnding(sectionBody);
   const lines = normalizedBody.split("\n").map((line) => line.replace(/\s+$/u, ""));
@@ -168,7 +193,7 @@ export function findTodoStartTimeInDiaryContent(
   if (!normalizedContent.trim()) {
     return "";
   }
-  const range = findSectionRange(normalizedContent, SECTION_HEADINGS.todo);
+  const range = findDiarySectionRange(normalizedContent, "todo");
   if (!range) {
     return "";
   }
@@ -201,7 +226,7 @@ function locateNextLevelTwoHeading(content: string, fromIndex: number): number {
 }
 
 function insertSupplementEntry(content: string, payload: NormalizedDiaryEntryPayload): string {
-  const range = findSectionRange(content, SECTION_HEADINGS.supplement);
+  const range = findDiarySectionRange(content, "supplement");
   if (!range || !payload.entry) {
     return content;
   }
@@ -215,8 +240,7 @@ function insertSupplementEntry(content: string, payload: NormalizedDiaryEntryPay
 }
 
 function insertBulletSectionEntry(content: string, payload: NormalizedDiaryEntryPayload): string {
-  const headingText = SECTION_HEADINGS[payload.section as keyof typeof SECTION_HEADINGS];
-  const range = findSectionRange(content, headingText);
+  const range = findDiarySectionRange(content, payload.section);
   if (!range || !payload.entry) {
     return content;
   }

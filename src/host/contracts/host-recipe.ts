@@ -5,6 +5,7 @@ import type {
 import type { HostCapabilityId, HostModeClass, HostTransport } from "./attachment-capabilities";
 
 export const HOST_RECIPE_IDS = [
+  "codex",
   "hermes",
   "generic-shell",
 ] as const;
@@ -27,6 +28,29 @@ export interface HostRecipeDescriptor {
 }
 
 const HOST_RECIPES = Object.freeze<readonly HostRecipeDescriptor[]>([
+  Object.freeze({
+    id: "codex",
+    label: "Codex",
+    description: "Codeksei 托管 Codex runtime 与 first-party channel bridge。",
+    transport: "cli_stdio",
+    modeClasses: Object.freeze(["codex-managed"] satisfies HostModeClass[]),
+    capabilities: Object.freeze([
+      "invokeCodekseiAction",
+      "deliverVisibleText",
+      "deliverVisibleFile",
+      "bridgeRuntimeLifecycle",
+      "bridgeQueueAccess",
+      "contextTokenAccess",
+      "weixinAccountAccess",
+      "semanticReviewHybrid",
+    ] satisfies HostCapabilityId[]),
+    runtimeProviders: Object.freeze(["codex"] satisfies CodekseiRuntimeProvider[]),
+    channelProviders: Object.freeze(["codeksei"] satisfies CodekseiChannelProvider[]),
+    channelKinds: Object.freeze(["weixin"] satisfies string[]),
+    defaultDeliveryRecipe: "codeksei-weixin-bridge",
+    supportsDelegatedCheckin: true,
+    supportsToolSurface: true,
+  }),
   Object.freeze({
     id: "hermes",
     label: "Hermes",

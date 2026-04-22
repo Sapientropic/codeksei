@@ -33,6 +33,14 @@ export interface HostEntrypointManifest {
   finalizeCheckin: string[];
   render: string[];
   companionRemember: string[];
+  diaryWrite: string[];
+  timelineEvent: string[];
+  timelineCategories: string[];
+  timelineRead: string[];
+  reviewNightly: string[];
+  noteAuto: string[];
+  projectRadar: string[];
+  reminderWrite: string[];
   onboardingStart: string[];
   onboardingStep: string[];
   onboardingStatus: string[];
@@ -54,7 +62,15 @@ export interface HostWorkflowStep {
     | "onboardingStep"
     | "onboardingStatus"
     | "companionRemember"
-    | "contextBriefing";
+    | "contextBriefing"
+    | "diaryWrite"
+    | "timelineEvent"
+    | "timelineCategories"
+    | "timelineRead"
+    | "reviewNightly"
+    | "noteAuto"
+    | "projectRadar"
+    | "reminderWrite";
   reason: string;
 }
 
@@ -65,6 +81,10 @@ export interface HostWorkflowHint {
     | "ongoing_companion_memory"
     | "proactive_checkin"
     | "proactive_continuity"
+    | "time_block_capture"
+    | "cutover_bookkeeping"
+    | "sleep_closeout"
+    | "project_continuity_write"
     | "context_handoff_refresh"
     | "user_correction_persistence";
   trigger: string;

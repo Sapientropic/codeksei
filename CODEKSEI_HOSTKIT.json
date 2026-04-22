@@ -138,6 +138,62 @@
       "--format",
       "json"
     ],
+    "diaryWrite": [
+      "codeksei",
+      "diary",
+      "write",
+      "--format",
+      "json"
+    ],
+    "timelineEvent": [
+      "codeksei",
+      "timeline",
+      "event",
+      "--format",
+      "json"
+    ],
+    "timelineCategories": [
+      "codeksei",
+      "timeline",
+      "categories",
+      "--format",
+      "json"
+    ],
+    "timelineRead": [
+      "codeksei",
+      "timeline",
+      "read",
+      "--format",
+      "json"
+    ],
+    "reviewNightly": [
+      "codeksei",
+      "review",
+      "nightly",
+      "--format",
+      "json"
+    ],
+    "noteAuto": [
+      "codeksei",
+      "note",
+      "auto",
+      "--format",
+      "json"
+    ],
+    "projectRadar": [
+      "codeksei",
+      "project",
+      "radar",
+      "--format",
+      "json"
+    ],
+    "reminderWrite": [
+      "codeksei",
+      "reminder",
+      "write",
+      "--format",
+      "json"
+    ],
     "onboardingStart": [
       "codeksei",
       "onboarding",
@@ -185,6 +241,22 @@
     "leaseExpiryFallback": "daemon_local_recovery"
   },
   "recipes": [
+    {
+      "id": "codex",
+      "kind": "first_party",
+      "runtimeProviders": [
+        "codex"
+      ],
+      "channelProviders": [
+        "codeksei"
+      ],
+      "channelKinds": [
+        "weixin"
+      ],
+      "defaultDeliveryRecipe": "codeksei-weixin-bridge",
+      "supportsDelegatedCheckin": true,
+      "supportsToolSurface": true
+    },
     {
       "id": "hermes",
       "kind": "first_party",
@@ -324,6 +396,82 @@
         {
           "commandRef": "finalizeCheckin",
           "reason": "Finalize the proactive handoff only after the main session has decided whether continuity writing or follow-up changed the real next wake."
+        }
+      ]
+    },
+    {
+      "id": "time_block_capture",
+      "trigger": "The host notices a concrete work/life block that should become timeline truth while it is still fresh.",
+      "steps": [
+        {
+          "commandRef": "timelineCategories",
+          "reason": "Read available category ids before inventing labels for the new time block."
+        },
+        {
+          "commandRef": "timelineEvent",
+          "reason": "Write the dated time block as structured timeline data instead of leaving it only in conversation."
+        },
+        {
+          "commandRef": "diaryWrite",
+          "reason": "Mirror the human-readable fact into diary timeline/fragment when it helps later review."
+        }
+      ]
+    },
+    {
+      "id": "cutover_bookkeeping",
+      "trigger": "The user finishes, switches tasks, or the host detects a project cutover that should be captured before context is lost.",
+      "steps": [
+        {
+          "commandRef": "diaryWrite",
+          "reason": "Close or update the active Todo and, when useful, emit the matching timeline fact in the same command batch."
+        },
+        {
+          "commandRef": "timelineEvent",
+          "reason": "Record the finished block with start/end time when the cutover has clear temporal boundaries."
+        },
+        {
+          "commandRef": "noteAuto",
+          "reason": "Persist durable project or companion context when the cutover changes future re-entry behavior."
+        },
+        {
+          "commandRef": "contextBriefing",
+          "reason": "Refresh the handoff surface after bookkeeping so the next proactive pass sees current truth."
+        }
+      ]
+    },
+    {
+      "id": "sleep_closeout",
+      "trigger": "The user is about to sleep, pause for the night, or asks to wrap the day.",
+      "steps": [
+        {
+          "commandRef": "diaryWrite",
+          "reason": "Capture the night summary or remaining open loop while the user still remembers it."
+        },
+        {
+          "commandRef": "reviewNightly",
+          "reason": "Generate the nightly review draft from diary facts instead of relying on chat memory."
+        },
+        {
+          "commandRef": "reminderWrite",
+          "reason": "Only schedule a follow-up reminder if the closeout creates a concrete re-entry need."
+        }
+      ]
+    },
+    {
+      "id": "project_continuity_write",
+      "trigger": "The host sees reusable project state, repo direction, or a next-step handoff that should survive thread loss.",
+      "steps": [
+        {
+          "commandRef": "projectRadar",
+          "reason": "Inspect the tracked project and read-first files before choosing the durable note target."
+        },
+        {
+          "commandRef": "noteAuto",
+          "reason": "Write continuity into the project/companion note through schema-aware routing."
+        },
+        {
+          "commandRef": "contextBriefing",
+          "reason": "Refresh the controlled context board after durable continuity changes."
         }
       ]
     },

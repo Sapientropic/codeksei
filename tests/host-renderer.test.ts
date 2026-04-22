@@ -55,8 +55,14 @@ test("hostkit static asset stays round-tripped from the hosted-first renderer tr
   assert.deepEqual(hostkit.entrypoints.claimCheckin, ["codeksei", "host", "claim-checkin", "--provider", "hermes", "--format", "json"]);
   assert.deepEqual(hostkit.entrypoints.finalizeCheckin, ["codeksei", "host", "finalize-checkin", "--provider", "hermes", "--format", "json"]);
   assert.deepEqual(hostkit.entrypoints.settleCheckin, ["codeksei", "host", "settle-checkin", "--provider", "hermes", "--format", "json"]);
+  assert.deepEqual(hostkit.entrypoints.diaryWrite, ["codeksei", "diary", "write", "--format", "json"]);
+  assert.deepEqual(hostkit.entrypoints.timelineEvent, ["codeksei", "timeline", "event", "--format", "json"]);
+  assert.deepEqual(hostkit.entrypoints.reviewNightly, ["codeksei", "review", "nightly", "--format", "json"]);
+  assert.equal(hostkit.recipes.some((entry: { id: string; kind: string }) => entry.id === "codex" && entry.kind === "first_party"), true);
   assert.equal(hostkit.recommendedWorkflows.some((entry: { id: string }) => entry.id === "first_activation_onboarding"), true);
   assert.equal(hostkit.recommendedWorkflows.some((entry: { id: string }) => entry.id === "ongoing_companion_memory"), true);
   assert.equal(hostkit.recommendedWorkflows.some((entry: { id: string }) => entry.id === "proactive_checkin"), true);
   assert.equal(hostkit.recommendedWorkflows.some((entry: { id: string }) => entry.id === "proactive_continuity"), true);
+  assert.equal(hostkit.recommendedWorkflows.some((entry: { id: string }) => entry.id === "cutover_bookkeeping"), true);
+  assert.equal(hostkit.recommendedWorkflows.some((entry: { id: string }) => entry.id === "sleep_closeout"), true);
 });

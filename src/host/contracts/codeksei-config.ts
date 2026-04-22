@@ -16,12 +16,12 @@ const hostUserSchema = z.object({
 });
 
 const hostBindingSchemaV1 = z.object({
-  provider: z.enum(["hermes", "generic-shell"]),
+  provider: z.enum(["codex", "hermes", "generic-shell"]),
   channel: z.string().min(1),
 });
 
 const hostBindingSchemaV2 = z.object({
-  provider: z.enum(["hermes", "generic-shell"]),
+  provider: z.enum(["codex", "hermes", "generic-shell"]),
   runtimeProvider: z.enum(["codex", "hermes", "openclaw-reserved"]),
   runtimeOwner: z.enum(["codeksei", "host"]),
   channelProvider: z.enum(["codeksei", "hermes", "host"]),
@@ -38,9 +38,9 @@ const hostBindingSchema = z.union([hostBindingSchemaV2, hostBindingSchemaV1]).tr
     provider: value.provider,
     runtimeProvider: value.provider === "hermes" ? "hermes" : "codex",
     runtimeOwner: value.provider === "hermes" ? "host" : "codeksei",
-    channelProvider: value.provider === "hermes" ? "hermes" : "host",
+    channelProvider: value.provider === "hermes" ? "hermes" : value.provider === "codex" ? "codeksei" : "host",
     channelKind: value.channel || "none",
-    deliveryRecipe: value.provider === "hermes" ? "hermes-origin" : "generic-shell",
+    deliveryRecipe: value.provider === "hermes" ? "hermes-origin" : value.provider === "codex" ? "codeksei-weixin-bridge" : "generic-shell",
     channel: value.channel,
   };
 });

@@ -135,7 +135,7 @@ export function renderRepoHostkitDocument(): string {
 function buildHostkitRecipeEntries(): HostkitRecipeEntry[] {
   return listHostRecipes().map((entry) => ({
     id: entry.id,
-    kind: entry.id === "hermes" ? "first_party" : "generic",
+    kind: entry.id === "hermes" || entry.id === "codex" ? "first_party" : "generic",
     runtimeProviders: [...entry.runtimeProviders],
     channelProviders: [...entry.channelProviders],
     channelKinds: [...entry.channelKinds],

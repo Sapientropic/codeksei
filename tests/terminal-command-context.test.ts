@@ -196,6 +196,7 @@ test("createTerminalCommandContext derives leafArgs and checkin from the provide
       {
         debug: false,
         format: "text",
+        locale: "zh-CN",
         stdinIsTty: true,
         stdoutIsTty: true,
         verbose: false,
@@ -442,6 +443,7 @@ test("createTerminalCommandContext applies hosted config fallback for hosted che
       {
         debug: false,
         format: "text",
+        locale: "zh-CN",
         stdinIsTty: true,
         stdoutIsTty: true,
         verbose: false,

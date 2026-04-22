@@ -22,6 +22,7 @@ import {
 interface DiaryWriteConfig extends ContextBoardConfig {
   cliIdempotencyLedgerFile?: string;
   diaryDir?: string;
+  locale?: string;
   timezone?: unknown;
 }
 
@@ -69,7 +70,7 @@ export async function runDiaryWriteCommand(config: DiaryWriteConfig, args: strin
     },
     execute: async () => {
       fs.mkdirSync(diaryDir, { recursive: true });
-      ensureDiaryFile(filePath, now, timezone);
+      ensureDiaryFile(filePath, now, timezone, config.locale);
       const current = fs.readFileSync(filePath, "utf8");
       const timelineResolution = resolveTodoDoneTimelineText({
         existingContent: current,
@@ -150,11 +151,16 @@ export async function runDiaryWriteCommand(config: DiaryWriteConfig, args: strin
   });
 }
 
-function ensureDiaryFile(filePath: string, now: Date, timezone: unknown = LEGACY_TIMELINE_TIMEZONE): void {
+function ensureDiaryFile(
+  filePath: string,
+  now: Date,
+  timezone: unknown = LEGACY_TIMELINE_TIMEZONE,
+  locale?: unknown,
+): void {
   if (fs.existsSync(filePath) && fs.statSync(filePath).size > 0) {
     return;
   }
   const createdAt = formatDateTime(now, timezone);
   const updated = formatDate(now, timezone);
-  writeForeignTextDocument(filePath, buildDiaryFileSkeleton({ createdAt, updated }), { encoding: "utf8" });
+  writeForeignTextDocument(filePath, buildDiaryFileSkeleton({ createdAt, locale, updated }), { encoding: "utf8" });
 }

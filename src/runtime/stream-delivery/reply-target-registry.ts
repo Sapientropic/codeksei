@@ -4,6 +4,7 @@ interface ReplyTarget {
   userId: string;
   contextToken: string;
   provider: string;
+  deliveryPolicy?: "normal" | "final_only";
 }
 
 interface ReplyTargetState {
@@ -29,11 +30,24 @@ function normalizeReplyTarget(value: unknown): ReplyTarget | null {
   if (!userId || !contextToken) {
     return null;
   }
+  const deliveryPolicy = normalizeDeliveryPolicy(record.deliveryPolicy);
   return {
     userId,
     contextToken,
     provider: normalizeText(record.provider),
+    ...(deliveryPolicy ? { deliveryPolicy } : {}),
   };
+}
+
+function normalizeDeliveryPolicy(value: unknown): "normal" | "final_only" | undefined {
+  const normalized = normalizeText(value).toLowerCase();
+  if (normalized === "final_only" || normalized === "final-only") {
+    return "final_only";
+  }
+  if (normalized === "normal") {
+    return "normal";
+  }
+  return undefined;
 }
 
 function createReplyTargetRegistry({ sessionStore }: { sessionStore: ReplyTargetSessionStore }) {

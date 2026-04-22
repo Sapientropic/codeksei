@@ -256,6 +256,15 @@ async function completeTurn(delivery: StreamDeliveryInstance, threadId: string, 
   });
 }
 
+function attachSystemFinalOnly(delivery: StreamDeliveryInstance, threadId: string): void {
+  delivery.queueReplyTargetForThread(threadId, {
+    userId: `user-${threadId}`,
+    contextToken: `ctx-${threadId}`,
+    provider: "system",
+    deliveryPolicy: "final_only",
+  } as never);
+}
+
 test("stream mode does not idle-flush unfinished final fragments", async (t) => {
   enableMockTimers(t);
   const { delivery, sent, attach } = createDelivery({
@@ -276,6 +285,69 @@ test("stream mode does not idle-flush unfinished final fragments", async (t) => 
   assert.equal(sent.length, 0);
 
   await advanceDelivery(t, delivery, sent, { ms: 20, expectedLength: 2 });
+  assert.deepEqual(sent, []);
+});
+
+test("final-only system turns do not deliver commentary before final completion", async (t) => {
+  enableMockTimers(t);
+  const { delivery, sent } = createDelivery({
+    streamForceFlushChars: 1,
+    streamBoundaryFlushChars: 1,
+  });
+  attachSystemFinalOnly(delivery, "thread-system-final-only");
+  await startTurn(delivery, "thread-system-final-only", "turn-system-final-only");
+
+  await sendCompleted(delivery, {
+    threadId: "thread-system-final-only",
+    turnId: "turn-system-final-only",
+    itemId: "commentary-1",
+    text: "I am thinking through whether to stay silent.",
+    phase: "commentary",
+  });
+  await advanceDelivery(t, delivery, sent, { ms: 20, expectedLength: 1 });
+  assert.deepEqual(sent, []);
+
+  await sendCompleted(delivery, {
+    threadId: "thread-system-final-only",
+    turnId: "turn-system-final-only",
+    itemId: "final-1",
+    text: "继续这条线吗？",
+    phase: "final",
+  });
+  await completeTurn(delivery, "thread-system-final-only", "turn-system-final-only");
+  await advanceDelivery(t, delivery, sent, { ms: 20, expectedLength: 1 });
+
+  assert.deepEqual(sent, [
+    { text: "继续这条线吗？", preserveBlock: true },
+  ]);
+});
+
+test("final-only system turns suppress final SILENT without leaking earlier reasoning", async (t) => {
+  enableMockTimers(t);
+  const { delivery, sent } = createDelivery({
+    streamForceFlushChars: 1,
+    streamBoundaryFlushChars: 1,
+  });
+  attachSystemFinalOnly(delivery, "thread-system-silent");
+  await startTurn(delivery, "thread-system-silent", "turn-system-silent");
+
+  await sendCompleted(delivery, {
+    threadId: "thread-system-silent",
+    turnId: "turn-system-silent",
+    itemId: "commentary-1",
+    text: "I should probably stay quiet.",
+    phase: "commentary",
+  });
+  await sendCompleted(delivery, {
+    threadId: "thread-system-silent",
+    turnId: "turn-system-silent",
+    itemId: "final-1",
+    text: "SILENT",
+    phase: "final",
+  });
+  await completeTurn(delivery, "thread-system-silent", "turn-system-silent");
+  await advanceDelivery(t, delivery, sent, { ms: 20, expectedLength: 1 });
+
   assert.deepEqual(sent, []);
 });
 

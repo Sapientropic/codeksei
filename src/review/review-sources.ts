@@ -4,6 +4,7 @@ import { normalizeText } from "../core/text-normalization";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { getDiarySectionHeadingAliases, type DiarySection } from "../core/diary-sections";
 import { normalizeDisplayPath } from "../core/path-utils";
 import { parseManagedBulletList } from "./review-document";
 import type { DiaryReviewEntry, DiarySupplementEntry, NightlyReviewEntry } from "./review-types";
@@ -44,11 +45,11 @@ function parseDiaryFile(filePath: string, date: string): DiaryReviewEntry {
   return {
     date,
     filePath: normalizeDisplayPath(filePath),
-    todo: parseTodoSection(readSectionBody(content, "Todo")),
-    timeline: parseBulletSection(readSectionBody(content, "时间线事实")),
-    fragment: parseBulletSection(readSectionBody(content, "今日碎片")),
-    supplement: parseSupplementSection(readSectionBody(content, "补充记录")),
-    summary: parseSummarySection(readSectionBody(content, "总结")),
+    todo: parseTodoSection(readDiarySectionBody(content, "todo")),
+    timeline: parseBulletSection(readDiarySectionBody(content, "timeline")),
+    fragment: parseBulletSection(readDiarySectionBody(content, "fragment")),
+    supplement: parseSupplementSection(readDiarySectionBody(content, "supplement")),
+    summary: parseSummarySection(readDiarySectionBody(content, "summary")),
   };
 }
 
@@ -80,6 +81,16 @@ function readSectionBody(content: string, headingText: string): string {
     return rest.trim();
   }
   return rest.slice(0, nextHeading.index).trim();
+}
+
+function readDiarySectionBody(content: string, section: DiarySection): string {
+  for (const heading of getDiarySectionHeadingAliases(section)) {
+    const body = readSectionBody(content, heading);
+    if (body) {
+      return body;
+    }
+  }
+  return "";
 }
 
 function parseTodoSection(body: string): { done: string[]; open: string[] } {

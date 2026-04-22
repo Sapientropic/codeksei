@@ -29,6 +29,7 @@ test("readConfig uses CODEKSEI_* values", () => {
 
   try {
     const config = withPatchedEnv({
+      CODEKSEI_LOCALE: "en",
       CODEKSEI_USER_LANGUAGE: "en",
       CODEKSEI_USER_NAME: "NewName",
       CODEKSEI_WORKSPACE_ROOT: "E:/new-workspace",
@@ -36,6 +37,7 @@ test("readConfig uses CODEKSEI_* values", () => {
     }, () => readConfig());
 
     assert.equal(config.userName, "NewName");
+    assert.equal(config.locale, "en");
     assert.equal(config.userLanguage, "en");
     assert.equal(config.workspaceRoot, "E:/new-workspace");
     assert.equal(config.weixinReplyMode, "settled");

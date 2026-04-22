@@ -30,6 +30,7 @@ test("config slices compose into the legacy-compatible app runtime surface", () 
       timelineStateTimezone: "Asia/Shanghai",
       userName: "Tester",
       userGender: "female",
+      locale: "zh-CN",
       allowedUserIds: ["wx-user"],
     },
     weixinBridge: {

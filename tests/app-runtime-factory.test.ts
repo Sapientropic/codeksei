@@ -32,6 +32,7 @@ function createRuntimeConfig(): AppRuntimeConfig {
     hermesRepoLocalShimPath: "",
     hermesRepoRoot: "",
     logDir: path.join(tempRoot, "logs"),
+    locale: "zh-CN",
     projectRadarConfigFile: path.join(workspaceRoot, ".codex", "code-projects.json"),
     reminderQueueFile: path.join(tempRoot, "reminder-queue.json"),
     reviewSchemaConfigFile: path.join(workspaceRoot, ".codex", "review-schema.json"),

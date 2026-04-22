@@ -52,7 +52,7 @@ export function resolveHostAttachment(
 
   if (runtime === "codex" && channelProvider === "codeksei") {
     return createSupportedAttachment({
-      provider: "",
+      provider: "codex",
       profile: "codex-mode",
       legacyProfileIds: channel === "weixin" ? ["bridge-codex-weixin"] : [],
       modeClass: "codex-managed",

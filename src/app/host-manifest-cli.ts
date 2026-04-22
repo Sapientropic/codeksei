@@ -8,6 +8,7 @@ import { buildHostAttachmentManifest } from "../host";
 interface HostManifestOptions {
   config: string;
   help: boolean;
+  provider: string;
 }
 
 export async function runHostManifestCommand(
@@ -24,6 +25,7 @@ export async function runHostManifestCommand(
 
   const manifest = buildHostAttachmentManifest({
     ...config,
+    provider: options.provider,
   });
   return {
     data: manifest,

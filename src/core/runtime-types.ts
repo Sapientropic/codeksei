@@ -6,6 +6,7 @@ export interface ReplyTarget {
   userId: string;
   contextToken: string;
   provider: string;
+  deliveryPolicy?: "normal" | "final_only";
 }
 
 export interface AttachmentFailure {

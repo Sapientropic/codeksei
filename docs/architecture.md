@@ -8,11 +8,11 @@
 这一版开始把 `Codeksei` 明确收口成 `daemon-first / host-attachable / companion engine`，而不是默认绑死某一个固定 agent 宿主。
 
 - `Codex Mode`
-  `Codeksei Weixin bridge + Codex runtime`
+  `provider=codex`：`Codeksei Weixin bridge + Codex runtime`，由 Codeksei 自己 bootstrap / doctor / smoke
 - `Hosted Mode`
-  Hermes 托管 agent + 官方 Weixin；Codeksei 通过 CLI / operator / skill surface 暴露领域能力
+  `provider=hermes`：Hermes 托管 agent + 官方 Weixin；Codeksei 通过 CLI / operator / skill surface 暴露领域能力
 
-这次不会把 Hermes 的 Python Weixin adapter 硬塞进 Node/TS。Hermes Weixin 仍由 Hermes 官方维护，Codeksei 负责 timeline / diary / reminder / review / note / project radar 这些领域能力，并通过 `host attachment contract` 与兼容 `operator hermes` 入口暴露 recipe surface。
+这次不会把 Hermes 的 Python Weixin adapter 硬塞进 Node/TS。Hermes Weixin 仍由 Hermes 官方维护，Codeksei 负责 timeline / diary / reminder / review / note / project radar 这些领域能力，并通过 `host attachment contract` 暴露 `codex` / `hermes` 两条 first-party recipe surface；`operator hermes` 只保留为兼容与维护入口。
 主动 checkin 也按同一条边界收口：Codeksei 负责 trigger generation、`tick -> ack -> complete` 调度真相与下一次唤醒决策；Codex Mode 继续持有本地 poller，Hosted Mode 则只执行由 Codeksei 重新 arm 的受控 wake/recovery/guard job set。主动判断依赖 Codeksei 自己维护的 context board 与 host-neutral proactive judgment core：受控输入先聚合成 deterministic companion state card；可选的小模型 observation layer 只产出 `ProactiveObservation` 旁路信号，再由 deterministic policy + guardrails 产出 `ProactiveDecision`。observation 不反写 stateCard、不接管投递、不自动写 memory；上下文偏薄时，观察层不能把判断升级成项目重入。宿主只消费 decision、负责投递/执行，不重新接管调度真相；raw vault/filesystem 仍不会直接暴露给 cron prompt。对外公开 attach 时，推荐使用 `host seed-proactive / claim-checkin / settle-checkin`，而不是把内部 tick/ack/complete 状态机直接泄露给宿主。
 运行配置入口也已经收口成 `src/core/config.ts` 的 `parseEnvConfig()`：env/CLI override 先规范化成显式字段的 `AppRuntimeConfig`，下游 factory / host policy / CLI 命令不再各自做一轮局部 `typeof config.xxx === "string"` 补丁式收口。
 
@@ -72,6 +72,8 @@
   best-effort / cleanup 失败的显式 suppressed-error 路径；teardown 不再靠 bare catch 静默吞掉
 - `message-catalog.ts`
   用户面与运维面文案策略入口：用户可见 CLI / WeChat / runtime failure 保持中文，operator / maintainer diagnostics 与 shared status line 保持英文
+- `locale.ts`
+  全局 `CODEKSEI_LOCALE` / `--locale` 的 owner；用户可见 CLI/help/errors/templates/diary/review/context 文案走这里，JSON envelope 字段名和 operator diagnostics 保持稳定
 
 ## 2. Runtime Subsystem
 
@@ -161,10 +163,12 @@
   attachment resolution、manifest、doctor
 - `recipes/hermes/*`
   Hermes 的 skill install、repo-local doctor、smoke、wake forwarder
+- `recipes/codex/*`
+  Codex Mode 的本地 doctor/smoke：state dir、模板、Weixin account/runtime capability 与 shared scripts readiness，不依赖 Hermes
 - `delegation/*`
   `seed-proactive / claim-checkin / settle-checkin` facade
 - `renderers/*`
-  从 command truth 生成 provider-facing asset；当前第一条 renderer 是 Hermes companion skill
+  从 command truth 生成 provider-facing asset；Hostkit 同时暴露 Codex / Hermes bootstrap、主动 bookkeeping entrypoints 与 workflows，Hermes companion skill 继续作为 provider-facing 人类可读资产
 
 设计边界：
 

@@ -13,6 +13,7 @@ function createCliOptions(overrides: Partial<GlobalCliOptions> = {}): GlobalCliO
   return {
     debug: false,
     format: "json",
+    locale: "zh-CN",
     stdinIsTty: false,
     stdoutIsTty: false,
     verbose: false,

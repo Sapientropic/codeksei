@@ -14,8 +14,16 @@ interface HostDoctorOptions {
 
 type DoctorConfig = Partial<Pick<
   AppRuntimeConfig,
+  | "accountId"
+  | "accountsDir"
+  | "channel"
   | "channelProvider"
   | "runtime"
+  | "runtimeCommand"
+  | "runtimeEndpoint"
+  | "stateDir"
+  | "weixinInstructionsFile"
+  | "weixinOperationsFile"
   | "workspaceRoot"
   | "hermesCommand"
   | "hermesHome"
@@ -40,9 +48,7 @@ export async function runHostDoctorCommand(
     configFile: options.config,
     defaultProvider: "hermes",
   });
-  const effectiveConfig = resolvedProvider.provider === "hermes"
-    ? { ...config, runtime: "hermes", channelProvider: "hermes" }
-    : config;
+  const effectiveConfig = resolveDoctorEffectiveConfig(config, resolvedProvider.provider);
   const report = collectHostDoctorReport({
     ...effectiveConfig,
     configFile: options.config,
@@ -63,4 +69,17 @@ export async function runHostDoctorCommand(
         : []),
     ].join("\n"),
   };
+}
+
+function resolveDoctorEffectiveConfig(config: DoctorConfig, provider: string): DoctorConfig {
+  if (provider === "hermes") {
+    return { ...config, runtime: "hermes", channelProvider: "hermes" };
+  }
+  if (provider === "codex") {
+    return { ...config, runtime: "codex", channelProvider: "codeksei" };
+  }
+  if (provider === "generic-shell") {
+    return { ...config, runtime: "codex", channelProvider: "host", channel: "none" };
+  }
+  return config;
 }

@@ -313,3 +313,22 @@ test("context briefing command refreshes board and returns prompt-ready text", a
   assert.match(String(result.text || ""), /Codeksei context board \(review framing\)/u);
   assert.match(String(result.data.boardText || ""), /## 当前状态/u);
 });
+
+test("context briefing honors english locale for prompt-ready board text", async () => {
+  const fixture = createContextFixture();
+  const result = await runContextBriefingCommand({
+    ...fixture.config,
+    locale: "en",
+    userLanguage: "en",
+  }, [
+    "--user", fixture.target.senderId,
+    "--workspace", fixture.target.workspaceRoot,
+    "--mode", "proactive",
+  ]);
+
+  assert.equal(result.data.mode, "proactive");
+  assert.match(String(result.text || ""), /Codeksei context board \(proactive\)/u);
+  assert.match(String(result.text || ""), /## Current Status/u);
+  assert.match(String(result.text || ""), /## Today Facts/u);
+  assert.doesNotMatch(String(result.text || ""), /## 当前状态/u);
+});

@@ -38,15 +38,18 @@
 
 1. 先读 repo 根的 `CODEKSEI_HOSTKIT.json`
 2. 把 README 当成人类说明，把 `HOSTKIT + codeksei host manifest/bootstrap/doctor/smoke` 当机器入口
-3. 默认优先 `Hosted Mode`
-4. 把 `host bootstrap` 理解成“Codeksei attach/bootstrap 完成”，不要误读成 “Hermes gateway / Weixin live bring-up 已完成”
+3. 先明确宿主路径：`Codex Mode` 用 `--provider codex`，`Hosted Mode` 用 `--provider hermes`
+4. 把 `host bootstrap` 理解成“Codeksei attach/bootstrap 完成”，不要误读成 “宿主 gateway / Weixin live bring-up 已完成”
 
-- `CODEKSEI_HOSTKIT.json` 现在也会带最小 entrypoint/workflow hints，足够让新 host 知道 onboarding / companion memory / context briefing 的默认路由；默认 Hosted Mode / Hermes 机器合同以 `codeksei host manifest` 为准，当前环境真相统一看 `codeksei host doctor`
+- `CODEKSEI_HOSTKIT.json` 现在也会带最小 entrypoint/workflow hints，足够让新 host 知道 onboarding / companion memory / context briefing / diary / timeline / review / note / reminder 的默认路由；`codeksei host manifest --provider codex|hermes` 可按 provider 视角查看入口，当前环境真相统一看 `codeksei host doctor --provider <provider>`
 
 推荐顺序：
 
 ```bash
 npx -y codeksei@latest host manifest
+npx -y codeksei@latest host bootstrap --provider codex
+npx -y codeksei@latest host doctor --provider codex
+npx -y codeksei@latest host smoke --provider codex
 npx -y codeksei@latest host bootstrap --provider hermes
 npx -y codeksei@latest host doctor --provider hermes
 npx -y codeksei@latest host smoke --provider hermes
@@ -60,9 +63,9 @@ npx -y codeksei@latest host smoke --provider hermes
 Codeksei 现在把自己定义成 **daemon-first / host-attachable / companion engine**，不再默认等于某一个固定 agent 宿主。
 
 - `Codex Mode`
-  现有默认路径：`Codeksei first-party Weixin adapter + Codex runtime`
+  `provider=codex`：`Codeksei first-party Weixin adapter + Codex runtime`，Codeksei 自己持有 bootstrap / doctor / smoke / bridge lifecycle
 - `Hosted Mode`
-  Hermes 负责 agent loop 和宿主侧消息面；Codeksei 通过 CLI / skill surface 暴露 timeline、diary、reminder、review、note、project radar 等能力
+  `provider=hermes`：Hermes 负责 agent loop 和宿主侧消息面；Codeksei 通过 CLI / skill surface 暴露 timeline、diary、reminder、review、note、project radar 等能力
 - `主动性判断上下文层`
   Hosted proactive wake 默认读 Codeksei 自己维护的 context board。它由 checkin state、当日日记、companion note、project radar 和 workspace continuity 聚合而成，再由 Hermes cron `script` 在运行前注入，不要求用户必须维护 Obsidian/vault
 - 外部宿主默认通过 `host attachment contract` 接入：
@@ -137,6 +140,9 @@ codeksei host manifest
 git clone https://github.com/Sapientropic/codeksei.git
 cd codeksei
 npm install
+codeksei host bootstrap --provider codex
+codeksei host doctor --provider codex
+codeksei host smoke --provider codex
 npm run login
 npm run shared:start
 ```
@@ -144,6 +150,7 @@ npm run shared:start
 补充：
 
 - Codex Mode 的 first-party Weixin adapter 默认协议版本会跟随腾讯官方包 `@tencent-weixin/openclaw-weixin@2.1.8`
+- `host bootstrap --provider codex` 会写入 `modeClass=codex-managed`、`runtimeProvider=codex`、`runtimeOwner=codeksei`、`channelProvider=codeksei`、`deliveryRecipe=codeksei-weixin-bridge`
 - 海外 / 国际版 WeChat 当前仍可能受官方地域灰度限制；如果手机扫码直接报网络问题，优先核对账号与客户端资格
 
 常见后续命令：
@@ -160,7 +167,11 @@ npm run shared:status
 推荐顺序：
 
 ```bash
-codeksei host manifest
+codeksei host manifest --provider codex
+codeksei host bootstrap --provider codex
+codeksei host doctor --provider codex
+codeksei host smoke --provider codex
+codeksei host manifest --provider hermes
 codeksei host bootstrap --provider hermes
 codeksei host doctor --provider hermes
 codeksei host smoke --provider hermes
@@ -251,7 +262,7 @@ codeksei host smoke --provider hermes
 - 非 TTY 默认 JSON envelope，TTY 默认 text
 - `stderr` 留给诊断；`stdout` 留给结果数据
 - 统一全局参数：
-  `--format json|text`、`--verbose`、`--workspace-root /absolute/path`
+  `--format json|text`、`--locale zh-CN|en`、`--verbose`、`--workspace-root /absolute/path`
 
 ## Codex Mode 运行时配置
 
@@ -298,6 +309,7 @@ CODEKSEI_WEIXIN_MIN_CHUNK_CHARS=80
 CODEKSEI_WEIXIN_ROUTE_TAG=
 CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION=2.1.8
 CODEKSEI_TIMEZONE=Asia/Shanghai
+CODEKSEI_LOCALE=zh-CN
 CODEKSEI_TIMELINE_LOCALE=zh-CN
 CODEKSEI_DIARY_DIR=/绝对路径/你的 vault/日记
 CODEKSEI_TIMELINE_STATE_DIR=/绝对路径/你的 Codeksei 状态根
@@ -344,6 +356,7 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - 微信 persona / continuity instructions 默认来自仓库里的 `templates/weixin-instructions.md`，如需本地覆盖可在状态目录放 `weixin-instructions.local.md`
 - 如果你在共享模式下使用多 workspace，建议启动前就设置好 `CODEKSEI_WORKSPACE_ROOT`
 - `CODEKSEI_TIMEZONE` 可选；若显式设置，它会统一驱动 reminder / diary / review / timeline 的本地时间解释
+- `CODEKSEI_LOCALE=zh-CN|en` 可切换用户可见 CLI/help/errors/templates/diary/review/context 文案；JSON envelope 字段名保持稳定不本地化
 - `CODEKSEI_TIMELINE_LOCALE` 可选；当前用于 timeline dashboard 的文案、日期格式和 demo data 语言切换，支持 `zh-CN` 与 `en`
 - workspace 级 schema / radar 自动发现现在优先 `.codeksei/*`；旧的 `.codex/*` 仍保留兼容回退
 - `CODEKSEI_HERMES_REPO_ROOT` 可选；Hosted Mode 下若 sibling `../hermes-agent` 不成立，用它显式指向 repo-local upstream checkout

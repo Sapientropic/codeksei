@@ -180,6 +180,17 @@ interface HermesRepoLocalInvocation {
   session_key?: string;
 }
 
+export interface PythonInvocation {
+  command: string;
+  argsPrefix: string[];
+}
+
+interface ResolvePythonInvocationOptions {
+  platform?: NodeJS.Platform;
+  resolveCommandOnPathImpl?: (command: string) => string;
+  isUsablePythonInvocation?: (invocation: PythonInvocation) => boolean;
+}
+
 export interface HermesRepoLocalConfigInput {
   hermesHome?: unknown;
   hermesRepoRoot?: unknown;
@@ -461,30 +472,74 @@ function readHermesRepoCommit(repoRoot: string): string {
   return result.ok ? normalizeText(result.stdout) : "";
 }
 
-function resolvePythonInvocation(config: HermesRepoLocalConfigInput): {
-  command: string;
-  argsPrefix: string[];
-} {
+export function resolveHermesRepoLocalPythonInvocation(
+  config: HermesRepoLocalConfigInput = {},
+  {
+    platform = process.platform,
+    resolveCommandOnPathImpl = resolveCommandOnPath,
+    isUsablePythonInvocation = isUsablePython3Invocation,
+  }: ResolvePythonInvocationOptions = {},
+): PythonInvocation {
   const explicit = normalizeText(config.hermesPythonCommand || config.CODEKSEI_HERMES_PYTHON_COMMAND);
   if (explicit) {
-    return {
-      command: resolveCommandOnPath(explicit) || explicit,
-      argsPrefix: [],
+    return resolveExplicitPythonInvocation(explicit, resolveCommandOnPathImpl);
+  }
+
+  const candidates = platform === "win32"
+    ? [
+      { command: "python", argsPrefix: [] },
+      { command: "py", argsPrefix: ["-3"] },
+      { command: "python3", argsPrefix: [] },
+    ]
+    : [
+      { command: "python3", argsPrefix: [] },
+      { command: "python", argsPrefix: [] },
+      { command: "py", argsPrefix: ["-3"] },
+    ];
+  for (const candidate of candidates) {
+    const resolvedCommand = resolveCommandOnPathImpl(candidate.command);
+    if (!resolvedCommand) {
+      continue;
+    }
+    const invocation = {
+      command: resolvedCommand,
+      argsPrefix: [...candidate.argsPrefix],
     };
+    if (isUsablePythonInvocation(invocation)) {
+      return invocation;
+    }
   }
-  const python = resolveCommandOnPath("python");
-  if (python) {
-    return { command: python, argsPrefix: [] };
-  }
-  const python3 = resolveCommandOnPath("python3");
-  if (python3) {
-    return { command: python3, argsPrefix: [] };
-  }
-  const pyLauncher = resolveCommandOnPath("py");
-  if (pyLauncher) {
-    return { command: pyLauncher, argsPrefix: ["-3"] };
-  }
-  return { command: "python", argsPrefix: [] };
+  return platform === "win32"
+    ? { command: "python", argsPrefix: [] }
+    : { command: "python3", argsPrefix: [] };
+}
+
+function resolvePythonInvocation(config: HermesRepoLocalConfigInput): PythonInvocation {
+  return resolveHermesRepoLocalPythonInvocation(config);
+}
+
+function resolveExplicitPythonInvocation(
+  explicit: string,
+  resolveCommandOnPathImpl: (command: string) => string,
+): PythonInvocation {
+  const resolved = resolveCommandOnPathImpl(explicit) || explicit;
+  const basename = path.basename(resolved).toLowerCase();
+  return basename === "py" || basename === "py.exe"
+    ? { command: resolved, argsPrefix: ["-3"] }
+    : { command: resolved, argsPrefix: [] };
+}
+
+function isUsablePython3Invocation(invocation: PythonInvocation): boolean {
+  const useShell = process.platform === "win32" && /\.(cmd|bat)$/iu.test(invocation.command);
+  const result = spawnSync(invocation.command, [...invocation.argsPrefix, "--version"], {
+    encoding: "utf8",
+    shell: useShell,
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout: 5000,
+    windowsHide: true,
+  });
+  const output = `${normalizeText(result.stdout)} ${normalizeText(result.stderr)}`.trim();
+  return typeof result.status === "number" && result.status === 0 && /^Python\s+3\./iu.test(output);
 }
 
 export function buildHermesRepoLocalEnv({

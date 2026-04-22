@@ -30,7 +30,7 @@
         "deliveryRecipe"
       ],
       "properties": {
-        "provider": { "enum": ["hermes", "generic-shell"] },
+        "provider": { "enum": ["codex", "hermes", "generic-shell"] },
         "runtimeProvider": { "enum": ["codex", "hermes", "openclaw-reserved"] },
         "runtimeOwner": { "enum": ["codeksei", "host"] },
         "channelProvider": { "enum": ["codeksei", "hermes", "host"] },

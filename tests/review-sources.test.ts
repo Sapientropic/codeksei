@@ -51,6 +51,48 @@ test("review sources parse diary todo metadata and supplement sections determini
   assert.deepEqual(entries[0].summary, ["明天先把提醒链路补完整"]);
 });
 
+test("review sources parse english diary headings without breaking old chinese files", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-review-sources-en-"));
+  const diaryDir = path.join(tempRoot, "diary");
+  fs.mkdirSync(diaryDir, { recursive: true });
+  fs.writeFileSync(path.join(diaryDir, "2026-04-11.md"), [
+    "---",
+    "codeksei_locale: en",
+    "---",
+    "## Todo",
+    "- [ ] Check the Codex bootstrap smoke <!-- codeksei-todo:start=09:00 -->",
+    "- [x] Draft the host recipe tests <!-- codeksei-todo:start=08:30 -->",
+    "",
+    "## Timeline Facts",
+    "- 08:30-09:00 Drafted host recipe tests",
+    "",
+    "## Daily Fragments",
+    "- English diary headings should remain review-readable.",
+    "",
+    "## Supplement",
+    "### 09:10 Bootstrap boundary",
+    "",
+    "Codex bootstrap should not depend on Hermes.",
+    "",
+    "## Summary",
+    "- Continue with final-only delivery tests.",
+  ].join("\n"), "utf8");
+
+  const entries = collectDiaryEntries(diaryDir, "2026-04-11", "2026-04-11");
+
+  assert.equal(entries.length, 1);
+  assert.deepEqual(entries[0].todo.open, ["Check the Codex bootstrap smoke"]);
+  assert.deepEqual(entries[0].todo.done, ["Draft the host recipe tests"]);
+  assert.deepEqual(entries[0].timeline, ["08:30-09:00 Drafted host recipe tests"]);
+  assert.deepEqual(entries[0].fragment, ["English diary headings should remain review-readable."]);
+  assert.deepEqual(entries[0].supplement, [{
+    time: "09:10",
+    title: "Bootstrap boundary",
+    body: "Codex bootstrap should not depend on Hermes.",
+  }]);
+  assert.deepEqual(entries[0].summary, ["Continue with final-only delivery tests."]);
+});
+
 test("review sources drop generated fallback bullets when reading nightly reviews", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-review-sources-"));
   fs.writeFileSync(path.join(tempRoot, "2026-04-10.md"), [

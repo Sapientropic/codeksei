@@ -12,17 +12,17 @@
 当前有两条官方路径：
 
 - `Codex Mode`
-  `runtime=codex` + `channelProvider=codeksei` + `channel=weixin`
+  `provider=codex`：`runtime=codex` + `channelProvider=codeksei` + `channel=weixin`
 - `Hosted Mode`
-  `runtime=hermes` + `channelProvider=hermes` + `channel=weixin`
+  `provider=hermes`：`runtime=hermes` + `channelProvider=hermes` + `channel=weixin`
 
 边界：
 
-- `Codex Mode` 下，Codeksei 自己托管 bridge / shared 线程
+- `Codex Mode` 下，Codeksei 自己托管 bridge / shared 线程；`host bootstrap/doctor/smoke --provider codex` 是一等公民路径
 - `Hosted Mode` 下，宿主控制命令交给 Hermes；Codeksei 主要暴露 timeline / diary / reminder / review / note / project radar / doctor / schema，并提供 Hermes operator 入口做 skill/status/smoke
 - `channel send-file`、`reminder write` 已接上 Hermes repo-local 路径；bridge-only backstage queue 仍是内部 owner，不再暴露 `system send` public CLI
 - `Hosted Mode` 下，Hermes 只执行受控 wake/recovery/guard job set；Codeksei 继续持有 `tick -> ack -> complete` 的调度真相，对外默认通过 `host seed-proactive / claim-checkin / settle-checkin / finalize-checkin` 接入
-- 外部宿主优先通过 `host attachment contract` 接入：`host manifest`、`host bootstrap`、`host doctor`、`host smoke`、`host seed-proactive`、`host claim-checkin`、`host settle-checkin`、`host finalize-checkin`
+- 外部宿主优先通过 `host attachment contract` 接入：`host manifest --provider codex|hermes|generic-shell`、`host bootstrap`、`host doctor`、`host smoke`、`host seed-proactive`、`host claim-checkin`、`host settle-checkin`、`host finalize-checkin`
 
 ## 命名
 
@@ -38,7 +38,7 @@ README、帮助文本和公开示例默认都按 `codeksei` 书写。
 
 表层文案约定：
 
-- 用户可见的 CLI / WeChat / runtime failure 提示默认中文
+- 用户可见的 CLI / help / error / template / diary / review / context 文案默认中文，可用 `CODEKSEI_LOCALE=zh-CN|en` 或全局 `--locale zh-CN|en` 切换；非 TTY JSON envelope 字段名不本地化
 - operator / maintainer diagnostics、shared status line 默认英文
 
 ## 终端主入口
@@ -113,7 +113,7 @@ operator / bootstrap：
 - `Codeksei` 当前 hosted check-in 主链不再要求 Hermes upstream 先支持 cron `env`；若想把 Hermes 原生 cron `env` 能力也补上，可选补丁统一看 [`docs/hermes-cron-env-patch.md`](./hermes-cron-env-patch.md)
 - 非 TTY 默认返回 JSON envelope；TTY 默认返回 text
 - `stdout` 留给结果数据，`stderr` 留给诊断与 debug 信息
-- 全局参数统一支持：`--format json|text`、`--verbose`、`--workspace-root /absolute/path`
+- 全局参数统一支持：`--format json|text`、`--locale zh-CN|en`、`--verbose`、`--workspace-root /absolute/path`
 - 日常使用默认走共享模式，让微信入口和终端执行落在同一条线上
 - `codeksei start` / `npm run start:checkin` 更适合 operator 调试，不再视作默认 public discovery 面
 - 如果当前配置是 `Hosted Mode`，`codeksei start` 与 `shared:start` 会明确提示“改由 Hermes gateway 托管”，不会隐式回退到 Codex app-server
@@ -193,11 +193,17 @@ operator / bootstrap：
 这一组是面向外部宿主的机器入口，不是仓内 TypeScript seam。
 
 - `codeksei host manifest`
-  输出默认 Hosted Mode / Hermes 的 host attachment manifest / hostkit 机器入口
+  输出 host attachment manifest / hostkit 机器入口；可传 `--provider codex|hermes|generic-shell` 切换视角，默认仍列出全部 recipes / workflows
+- `codeksei host bootstrap --provider codex`
+  写入 Codex Mode canonical config：`modeClass=codex-managed`、`runtimeProvider=codex`、`runtimeOwner=codeksei`、`channelProvider=codeksei`、`deliveryRecipe=codeksei-weixin-bridge`
 - `codeksei host bootstrap --provider hermes`
   写入 canonical `codeksei.config.json`，并按 provider 做最小 bootstrap
+- `codeksei host doctor --provider codex`
+  检查 Codex Mode state dir、模板、Weixin account / runtime capability 与 shared scripts readiness
 - `codeksei host doctor --provider hermes`
   统一查看当前环境 / 当前 canonical config 下的 daemon / attachment / provider recipe readiness
+- `codeksei host smoke --provider codex`
+  执行不依赖 Hermes 的本地 readonly smoke
 - `codeksei host smoke --provider hermes`
   执行 provider recipe 的最小 attach smoke
 - `codeksei host seed-proactive --provider hermes --user <senderId> --workspace /absolute/workspace`
@@ -214,6 +220,7 @@ operator / bootstrap：
 - canonical 真相层现在是 `coreInvariant=codeksei-core-owned` 与 `scheduleTruthOwner=codeksei`；`runtimeInvariant=bridge-full` 只保留给旧 hostkit / config consumer 做兼容读取，不再是公开主命名。
 - `host manifest` 现在表达默认机器合同，不再伪装成当前环境探测；当前机器/当前 workspace 的实际 provider、profile 与 readiness 统一看 `host doctor`。
 - `system checkin-*` 仍保留为低层 truth layer；新宿主默认优先走 `host seed / claim / settle / finalize`。
+- Hostkit 的 `entrypoints` 现在也暴露 `diaryWrite`、`timelineEvent`、`timelineCategories`、`timelineRead`、`reviewNightly`、`noteAuto`、`projectRadar`、`reminderWrite`，`recommendedWorkflows` 会提示 `time_block_capture`、`cutover_bookkeeping`、`sleep_closeout`、`project_continuity_write`。宿主应主动使用这些入口做 bookkeeping，而不是只把它们当 README prose。
 
 ## 微信命令
 

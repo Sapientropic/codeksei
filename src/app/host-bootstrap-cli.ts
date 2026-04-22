@@ -87,7 +87,7 @@ export async function runHostBootstrapCommand(
       }, null, 2),
       next: bootstrapTarget.provider === "hermes"
         ? ["codeksei host doctor --provider hermes", "codeksei host smoke --provider hermes"]
-        : [`codeksei host doctor --provider ${bootstrapTarget.provider}`],
+        : [`codeksei host doctor --provider ${bootstrapTarget.provider}`, `codeksei host smoke --provider ${bootstrapTarget.provider}`],
     },
     execute: async () => {
       const written = writeCodekseiHostConfig(bootstrapTarget.configFilePath, nextConfig);
@@ -112,7 +112,7 @@ export async function runHostBootstrapCommand(
         ].join("\n"),
         next: bootstrapTarget.provider === "hermes"
           ? ["codeksei host doctor --provider hermes", "codeksei host smoke --provider hermes"]
-          : ["codeksei host doctor"],
+          : [`codeksei host doctor --provider ${bootstrapTarget.provider}`, `codeksei host smoke --provider ${bootstrapTarget.provider}`],
       };
     },
     idempotencyKey: options.idempotencyKey,
@@ -235,6 +235,9 @@ function resolveModeClass(
   if (provider === "hermes") {
     return "hosted-proactive";
   }
+  if (provider === "codex") {
+    return "codex-managed";
+  }
   const runtimeProvider = resolveRuntimeProvider(existing, provider, config);
   const channelProvider = resolveChannelProvider(existing, provider, options, config);
   return runtimeProvider === "codex" && channelProvider === "codeksei"
@@ -248,11 +251,14 @@ function resolveRuntimeProvider(
   config: BootstrapConfig,
 ): CodekseiHostConfig["host"]["runtimeProvider"] {
   const current = normalizeText(existing?.host.runtimeProvider) as CodekseiHostConfig["host"]["runtimeProvider"] | "";
-  if (current) {
-    return current;
-  }
   if (provider === "hermes") {
     return "hermes";
+  }
+  if (provider === "codex") {
+    return "codex";
+  }
+  if (current) {
+    return current;
   }
   return normalizeText(config.runtime) === "hermes" ? "hermes" : "codex";
 }
@@ -263,6 +269,12 @@ function resolveRuntimeOwner(
   config: BootstrapConfig,
 ): CodekseiHostConfig["host"]["runtimeOwner"] {
   const current = normalizeText(existing?.host.runtimeOwner) as CodekseiHostConfig["host"]["runtimeOwner"] | "";
+  if (provider === "codex") {
+    return "codeksei";
+  }
+  if (provider === "hermes") {
+    return "host";
+  }
   if (current) {
     return current;
   }
@@ -276,9 +288,10 @@ function resolveChannelKind(
   options: HostBootstrapOptions,
 ): string {
   return normalizeText(options.channel)
+    || (provider === "hermes" || provider === "codex" ? "weixin" : "")
     || normalizeText(existing?.host.channelKind)
     || normalizeText(existing?.host.channel)
-    || (provider === "hermes" ? "weixin" : "none");
+    || "none";
 }
 
 function resolveChannelProvider(
@@ -288,12 +301,15 @@ function resolveChannelProvider(
   config: BootstrapConfig,
 ): CodekseiHostConfig["host"]["channelProvider"] {
   const current = normalizeText(existing?.host.channelProvider) as CodekseiHostConfig["host"]["channelProvider"] | "";
-  if (current) {
-    return current;
-  }
   const channelKind = resolveChannelKind(existing, provider, options);
   if (provider === "hermes") {
     return channelKind === "weixin" ? "hermes" : "host";
+  }
+  if (provider === "codex") {
+    return "codeksei";
+  }
+  if (current) {
+    return current;
   }
   return normalizeText(config.runtime) === "codex" && channelKind === "weixin" ? "codeksei" : "host";
 }
@@ -305,15 +321,15 @@ function resolveDeliveryRecipe(
   config: BootstrapConfig,
 ): string {
   const current = normalizeText(existing?.host.deliveryRecipe);
-  if (current) {
-    return current;
-  }
   const channelProvider = resolveChannelProvider(existing, provider, options, config);
   if (provider === "hermes" && channelProvider === "hermes") {
     return "hermes-origin";
   }
   if (channelProvider === "codeksei") {
     return "codeksei-weixin-bridge";
+  }
+  if (current) {
+    return current;
   }
   return "generic-shell";
 }

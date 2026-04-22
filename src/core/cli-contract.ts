@@ -8,6 +8,7 @@ import type {
 } from "../contracts/cli-contract";
 import { normalizeText } from "./text-normalization";
 import { resolveCrossPlatformPath } from "./path-utils";
+import { normalizeCodekseiLocale, resolveCodekseiLocale } from "./locale";
 
 interface CliErrorOptions {
   code: string;
@@ -37,6 +38,11 @@ const GLOBAL_FLAG_HELP = [
     description: "覆盖当前 workspace root，并据此重算相关 schema/config 入口",
     keys: ["--workspace-root"],
     placeholder: "/absolute/path",
+  },
+  {
+    description: "设置用户可见文本语言",
+    keys: ["--locale"],
+    placeholder: "zh-CN|en",
   },
 ] as const;
 
@@ -287,6 +293,7 @@ export function listGlobalCliFlags() {
 export function parseGlobalCliOptions(argv: string[]): ParsedGlobalCliOptions {
   const cleaned: string[] = [];
   let format: CliFormat | undefined;
+  let locale = "";
   let verbose = false;
   let workspaceRoot = "";
 
@@ -319,6 +326,26 @@ export function parseGlobalCliOptions(argv: string[]): ParsedGlobalCliOptions {
       }
       continue;
     }
+    if (token === "--locale") {
+      const value = String(argv[index + 1] || "").trim();
+      if (!value || value.startsWith("--")) {
+        throw buildValidationError("--locale 需要显式值：zh-CN 或 en");
+      }
+      locale = normalizeCodekseiLocale(value);
+      if (!locale) {
+        throw buildValidationError(`不支持的 --locale: ${value}`);
+      }
+      index += 1;
+      continue;
+    }
+    if (token.startsWith("--locale=")) {
+      const value = token.slice("--locale=".length);
+      locale = normalizeCodekseiLocale(value);
+      if (!locale) {
+        throw buildValidationError(`不支持的 --locale: ${value}`);
+      }
+      continue;
+    }
     if (token === "--workspace-root") {
       const value = String(argv[index + 1] || "").trim();
       if (!value || value.startsWith("--")) {
@@ -338,6 +365,7 @@ export function parseGlobalCliOptions(argv: string[]): ParsedGlobalCliOptions {
   return {
     argv: cleaned,
     format,
+    locale,
     verbose,
     workspaceRoot,
   };
@@ -347,6 +375,7 @@ export function resolveGlobalCliOptions(parsed: ParsedGlobalCliOptions): GlobalC
   return {
     debug: process.env.CODEKSEI_DEBUG === "1",
     format: parsed.format || (process.stdout.isTTY ? "text" : "json"),
+    locale: resolveCodekseiLocale(parsed.locale, process.env.CODEKSEI_LOCALE, process.env.CODEKSEI_USER_LANGUAGE),
     stdinIsTty: Boolean(process.stdin.isTTY),
     stdoutIsTty: Boolean(process.stdout.isTTY),
     verbose: parsed.verbose,

@@ -15,6 +15,7 @@ const { runHostSeedProactiveCommand } = require("../src/app/host-seed-proactive-
 const { runHostSettleCheckinCommand } = require("../src/app/host-settle-checkin-cli");
 const { runHostManifestCommand } = require("../src/app/host-manifest-cli");
 const { runHostRenderCommand } = require("../src/app/host-render-cli");
+const { runHostSmokeCommand } = require("../src/app/host-smoke-cli");
 const { getCurrentDateStringInTimezone } = require("../src/core/timezone");
 const { createFakeHermesRepoLocalFixture } = require("./helpers/fake-hermes-repo-local.ts");
 
@@ -89,16 +90,45 @@ test("host manifest returns the hosted-first discovery contract plus compatibili
   assert.equal(result.data.recommendedWorkflows.some((entry: { id: string }) => entry.id === "ongoing_companion_memory"), true);
   assert.equal(result.data.recommendedWorkflows.some((entry: { id: string }) => entry.id === "proactive_checkin"), true);
   assert.equal(result.data.recommendedWorkflows.some((entry: { id: string }) => entry.id === "proactive_continuity"), true);
+  assert.equal(result.data.recommendedWorkflows.some((entry: { id: string }) => entry.id === "time_block_capture"), true);
+  assert.equal(result.data.recommendedWorkflows.some((entry: { id: string }) => entry.id === "cutover_bookkeeping"), true);
+  assert.equal(result.data.recommendedWorkflows.some((entry: { id: string }) => entry.id === "sleep_closeout"), true);
+  assert.equal(result.data.recommendedWorkflows.some((entry: { id: string }) => entry.id === "project_continuity_write"), true);
   assert.deepEqual(result.data.entrypoints.bootstrap, ["codeksei", "host", "bootstrap", "--provider", "hermes", "--format", "json"]);
   assert.deepEqual(result.data.entrypoints.doctor, ["codeksei", "host", "doctor", "--provider", "hermes", "--format", "json"]);
   assert.deepEqual(result.data.entrypoints.seedProactive, ["codeksei", "host", "seed-proactive", "--provider", "hermes", "--format", "json"]);
   assert.deepEqual(result.data.entrypoints.claimCheckin, ["codeksei", "host", "claim-checkin", "--provider", "hermes", "--format", "json"]);
   assert.deepEqual(result.data.entrypoints.finalizeCheckin, ["codeksei", "host", "finalize-checkin", "--provider", "hermes", "--format", "json"]);
   assert.deepEqual(result.data.entrypoints.settleCheckin, ["codeksei", "host", "settle-checkin", "--provider", "hermes", "--format", "json"]);
+  assert.deepEqual(result.data.entrypoints.diaryWrite, ["codeksei", "diary", "write", "--format", "json"]);
+  assert.deepEqual(result.data.entrypoints.timelineEvent, ["codeksei", "timeline", "event", "--format", "json"]);
+  assert.deepEqual(result.data.entrypoints.timelineCategories, ["codeksei", "timeline", "categories", "--format", "json"]);
+  assert.deepEqual(result.data.entrypoints.timelineRead, ["codeksei", "timeline", "read", "--format", "json"]);
+  assert.deepEqual(result.data.entrypoints.reviewNightly, ["codeksei", "review", "nightly", "--format", "json"]);
+  assert.deepEqual(result.data.entrypoints.noteAuto, ["codeksei", "note", "auto", "--format", "json"]);
+  assert.deepEqual(result.data.entrypoints.projectRadar, ["codeksei", "project", "radar", "--format", "json"]);
+  assert.deepEqual(result.data.entrypoints.reminderWrite, ["codeksei", "reminder", "write", "--format", "json"]);
   assert.equal(Array.isArray(result.data.entrypoints.companionRemember), true);
   assert.equal(Array.isArray(result.data.entrypoints.onboardingStart), true);
   assert.equal(Array.isArray(result.data.entrypoints.contextBriefing), true);
   assert.equal(result.data.upgrade.startupDoctorRequired, true);
+});
+
+test("host manifest can render the Codex provider view without hiding Hermes", async () => {
+  const fixture = createHostFixture("codeksei-host-manifest-codex-");
+  const result = await runHostManifestCommand(fixture.config, [
+    "--provider", "codex",
+  ]);
+
+  assert.equal(result.data.provider, "codex");
+  assert.equal(result.data.hostIdentity.profile, "codex-mode");
+  assert.equal(result.data.hostIdentity.runtimeProvider, "codex");
+  assert.equal(result.data.hostIdentity.runtimeOwner, "codeksei");
+  assert.equal(result.data.hostIdentity.channelProvider, "codeksei");
+  assert.equal(result.data.hostIdentity.deliveryRecipe, "codeksei-weixin-bridge");
+  assert.deepEqual(result.data.entrypoints.bootstrap, ["codeksei", "host", "bootstrap", "--provider", "codex", "--format", "json"]);
+  assert.equal(result.data.recipes.some((entry: { id: string }) => entry.id === "codex"), true);
+  assert.equal(result.data.recipes.some((entry: { id: string }) => entry.id === "hermes"), true);
 });
 
 test("host bootstrap defaults to hermes on clean install when provider is omitted", async () => {
@@ -128,6 +158,70 @@ test("host bootstrap defaults to hermes on clean install when provider is omitte
   ]);
 });
 
+test("host bootstrap supports first-party Codex Mode without installing Hermes skill", async () => {
+  const fixture = createHostFixture("codeksei-host-bootstrap-codex-");
+  const targetWorkspace = path.join(fixture.tempRoot, "target-workspace");
+  fs.mkdirSync(targetWorkspace, { recursive: true });
+
+  const result = await runHostBootstrapCommand(fixture.config, [
+    "--provider", "codex",
+    "--workspace", targetWorkspace,
+    "--dry-run",
+  ]);
+
+  assert.equal(result.meta.dryRun, true);
+  assert.equal(result.data.provider, "codex");
+  assert.equal(result.data.config.modeClass, "codex-managed");
+  assert.equal(result.data.config.host.provider, "codex");
+  assert.equal(result.data.config.host.runtimeProvider, "codex");
+  assert.equal(result.data.config.host.runtimeOwner, "codeksei");
+  assert.equal(result.data.config.host.channelProvider, "codeksei");
+  assert.equal(result.data.config.host.channelKind, "weixin");
+  assert.equal(result.data.config.host.deliveryRecipe, "codeksei-weixin-bridge");
+  assert.equal(result.data.skillInstall, null);
+  assert.deepEqual(result.meta.sideEffects, [
+    { kind: "write_canonical_config", target: path.join(targetWorkspace, "codeksei.config.json") },
+  ]);
+});
+
+test("host bootstrap provider selection overrides stale canonical host fields", async () => {
+  const fixture = createHostFixture("codeksei-host-bootstrap-codex-override-");
+  const configPath = path.join(fixture.workspaceRoot, "codeksei.config.json");
+  fs.writeFileSync(configPath, JSON.stringify({
+    $schema: "./schemas/codeksei-config-v2.json",
+    modeClass: "hosted-proactive",
+    workspaceRoot: fixture.workspaceRoot,
+    stateDir: fixture.stateDir,
+    user: {
+      id: "wx-user",
+      name: "Tester",
+      timezone: "Asia/Shanghai",
+    },
+    host: {
+      provider: "hermes",
+      runtimeProvider: "hermes",
+      runtimeOwner: "host",
+      channelProvider: "hermes",
+      channelKind: "weixin",
+      deliveryRecipe: "hermes-origin",
+      channel: "weixin",
+    },
+  }, null, 2), "utf8");
+
+  const result = await runHostBootstrapCommand(fixture.config, [
+    "--provider", "codex",
+    "--config", configPath,
+    "--dry-run",
+  ]);
+
+  assert.equal(result.data.config.modeClass, "codex-managed");
+  assert.equal(result.data.config.host.provider, "codex");
+  assert.equal(result.data.config.host.runtimeProvider, "codex");
+  assert.equal(result.data.config.host.runtimeOwner, "codeksei");
+  assert.equal(result.data.config.host.channelProvider, "codeksei");
+  assert.equal(result.data.config.host.deliveryRecipe, "codeksei-weixin-bridge");
+});
+
 test("host bootstrap writes canonical config and previews Hermes bootstrap", async () => {
   const fixture = createHostFixture("codeksei-host-bootstrap-");
   const configPath = path.join(fixture.workspaceRoot, "codeksei.config.json");
@@ -149,6 +243,25 @@ test("host bootstrap writes canonical config and previews Hermes bootstrap", asy
   assert.equal(result.data.config.bootstrap.manifestContractVersion > 0, true);
   assert.match(String(result.data.config.bootstrap.completedAt || ""), /T/u);
   assert.equal(fs.existsSync(configPath), false);
+});
+
+test("host doctor and smoke expose Codex provider readiness without Hermes prerequisites", async () => {
+  const fixture = createHostFixture("codeksei-host-doctor-codex-");
+
+  const doctor = await runHostDoctorCommand(fixture.config, [
+    "--provider", "codex",
+  ]);
+  assert.equal(doctor.data.provider.id, "codex");
+  assert.equal(doctor.data.attachment.profile, "codex-mode");
+  assert.equal(doctor.data.attachment.runtimeProvider, "codex");
+  assert.equal(doctor.data.attachment.channelProvider, "codeksei");
+
+  const smoke = await runHostSmokeCommand(fixture.config, [
+    "--provider", "codex",
+  ]);
+  assert.equal(smoke.ok, true);
+  assert.equal(smoke.data.provider, "codex");
+  assert.equal(smoke.data.checks.stateDir.ok, true);
 });
 
 test("host doctor flags legacy config without bootstrap snapshot for re-bootstrap", async () => {

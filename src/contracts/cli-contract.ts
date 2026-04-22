@@ -32,6 +32,7 @@ export interface CommandExecutionResult<T = unknown, TMeta extends Record<string
 export interface GlobalCliOptions {
   debug: boolean;
   format: CliFormat;
+  locale: string;
   stdinIsTty: boolean;
   stdoutIsTty: boolean;
   verbose: boolean;
@@ -41,6 +42,7 @@ export interface GlobalCliOptions {
 export interface ParsedGlobalCliOptions {
   argv: string[];
   format?: CliFormat | undefined;
+  locale?: string | undefined;
   verbose: boolean;
   workspaceRoot: string;
 }

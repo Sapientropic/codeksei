@@ -49,6 +49,22 @@ test("terminal manifest declares unique command keys", () => {
   assert.equal(new Set(keys).size, keys.length);
 });
 
+test("public terminal leaves keep runner, args schema, help, and host metadata aligned", () => {
+  for (const action of listCommandActions()) {
+    if (action.entrypointType !== "cli" || action.status !== "active") {
+      continue;
+    }
+    assert.ok(action.runner, `${action.action} should declare a runner`);
+    assert.ok(action.mutability, `${action.action} should declare mutability`);
+    assert.ok(action.safetyTier, `${action.action} should declare safety`);
+    assert.ok(action.hostSupportTier, `${action.action} should declare host support`);
+    assert.ok(Array.isArray(action.hostProfileIds), `${action.action} should declare supported host profiles`);
+    assert.ok(action.help?.detail, `${action.action} should declare help detail`);
+    assert.ok(action.argsSchemaKey, `${action.action} should declare argsSchemaKey`);
+    assert.ok(getCommandArgsSchema(action.argsSchemaKey), `${action.action} args schema should exist`);
+  }
+});
+
 test("command surface can resolve routed terminal commands from a single manifest", () => {
   assert.equal(findTerminalCommandManifest("note", "auto")?.action, "note.auto");
   assert.equal(findTerminalCommandManifest("context", "briefing")?.action, "context.briefing");

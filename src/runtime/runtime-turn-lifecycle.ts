@@ -128,6 +128,7 @@ export class RuntimeTurnLifecycle {
       userId: normalized.senderId,
       contextToken: normalized.contextToken,
       provider: normalized.provider,
+      deliveryPolicy: normalized.provider === "system" ? "final_only" : "normal",
     });
 
     if (allowCommands && await this.maybeDispatchCommand(normalized)) {

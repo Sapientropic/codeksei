@@ -25,6 +25,14 @@ function buildSkeleton(): string {
   });
 }
 
+function buildEnglishSkeleton(): string {
+  return buildDiaryFileSkeleton({
+    createdAt: "2026-04-10T00:00",
+    locale: "en",
+    updated: "2026-04-10",
+  });
+}
+
 test("todo entries update state in place without duplicate lines", () => {
   const opened = insertDiaryEntry(
     buildSkeleton(),
@@ -115,6 +123,23 @@ test("timeline, fragment, and summary entries land in their own sections", () =>
   assert.match(content, /## 时间线事实\n\n- 17:30-17:58 把药单发出去了/);
   assert.match(content, /## 今日碎片\n\n- 今天切换点统一收口比边聊边记更稳。/);
   assert.match(content, /## 总结\n\n- 明天第一步先验证 Apple Watch 最小提醒链路。/);
+});
+
+test("english diary skeleton and writes use localized headings while keeping section ids stable", () => {
+  const content = insertDiaryEntry(
+    buildEnglishSkeleton(),
+    buildDiaryEntryPayload({
+      section: "fragment",
+      timeString: "19:14",
+      body: "Energy dipped after dinner.",
+    }),
+    "2026-04-10"
+  );
+
+  assert.match(content, /codeksei_locale: en/u);
+  assert.match(content, /## Timeline Facts/u);
+  assert.match(content, /## Daily Fragments\n\n- Energy dipped after dinner\./u);
+  assert.doesNotMatch(content, /## 今日碎片/u);
 });
 
 test("runDiaryWriteCommand accepts fragment writes without requiring todo state", async () => {

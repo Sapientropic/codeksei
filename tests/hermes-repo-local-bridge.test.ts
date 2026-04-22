@@ -4,9 +4,14 @@ const path: typeof import("node:path") = require("node:path");
 const test: typeof import("node:test") = require("node:test");
 const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 const { spawnSync }: typeof import("node:child_process") = require("node:child_process");
+const {
+  resolveHermesRepoLocalPythonInvocation,
+}: typeof import("../src/core/hermes-repo-local") = require("../src/core/hermes-repo-local");
 
 const bridgePath = path.join(__dirname, "..", "tools", "hermes_repo_local", "bridge.py");
-const pythonCommand = process.env.CODEKSEI_TEST_PYTHON || process.env.PYTHON || "python3";
+const pythonInvocation = resolveHermesRepoLocalPythonInvocation({
+  hermesPythonCommand: process.env.CODEKSEI_TEST_PYTHON || process.env.PYTHON || "",
+});
 
 test("repo-local sync_checkin_cron keeps the existing recovery job when wake creation fails", () => {
   const fixture = createBridgeFixture("create_failure", {
@@ -311,7 +316,7 @@ function invokeBridge(
   payload: Record<string, unknown>,
   action: "create_reminder" | "sync_checkin_cron" = "sync_checkin_cron",
 ) {
-  return spawnSync(pythonCommand, [bridgePath], {
+  return spawnSync(pythonInvocation.command, [...pythonInvocation.argsPrefix, bridgePath], {
     cwd: fixture.repoRoot,
     encoding: "utf8",
     env: {

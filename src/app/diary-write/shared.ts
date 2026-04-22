@@ -4,6 +4,13 @@ import {
   formatDateTimeInTimezone,
   formatTimeInTimezone,
 } from "../../core/timezone";
+import {
+  DIARY_SECTION_HEADING_REGISTRY,
+  getDiarySectionHeading,
+  getDiarySectionHeadingAliases,
+  resolveDiaryLocale,
+  type DiarySection,
+} from "../../core/diary-sections";
 
 export const DEFAULT_SECTION = "supplement" as const;
 export const SECTION_HEADINGS = Object.freeze({
@@ -20,10 +27,10 @@ export const TODO_STATE_MARKERS = Object.freeze({
 export const TODO_LINE_RE = /^- \[( |x|X)\] (.*)$/u;
 export const TODO_START_MARKER_RE = /\s*<!--\s*codeksei-todo:start=(\d{2}:\d{2})\s*-->\s*$/u;
 
-export type DiarySection = keyof typeof SECTION_HEADINGS;
 export type TodoState = keyof typeof TODO_STATE_MARKERS;
 export type DiaryEntryTodoState = TodoState | "";
 export type TodoTimelineResolutionMode = "explicit" | "none" | "range_from_todo" | "point_in_time";
+export type { DiarySection };
 
 export function normalizeSection(value: unknown): DiarySection {
   const normalized = String(value || "").trim().toLowerCase();
@@ -43,6 +50,13 @@ export function normalizeSection(value: unknown): DiarySection {
       throw new Error(`不支持的日记 section: ${value}`);
   }
 }
+
+export {
+  DIARY_SECTION_HEADING_REGISTRY,
+  getDiarySectionHeading,
+  getDiarySectionHeadingAliases,
+  resolveDiaryLocale,
+};
 
 export function normalizeTodoState(value: unknown, section: unknown = DEFAULT_SECTION): TodoState {
   const normalizedSection = normalizeSection(section);

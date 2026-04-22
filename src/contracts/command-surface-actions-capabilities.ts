@@ -330,6 +330,7 @@ export const CAPABILITIES_COMMAND_ACTION_DEFINITIONS = [
     scriptName: "help",
     command: "help",
     runner: "help",
+    argsSchemaKey: "appHelp",
     help: { topic: "", leafKey: "app.help", detail: "topic_only" },
   },
 ] as const satisfies readonly CommandActionDefinition[];

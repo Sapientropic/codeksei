@@ -18,3 +18,12 @@ test("terminal dispatch exposes handlers for every manifest runner", () => {
 
   assert.deepEqual(missing, []);
 });
+
+test("terminal dispatch runners are all referenced by the command manifest", () => {
+  const referenced = new Set<string>(listTerminalCommandManifest().map((entry) => entry.runner));
+  const unreferenced = listTerminalDispatchRunnerIds()
+    .filter((runner) => !referenced.has(runner))
+    .sort();
+
+  assert.deepEqual(unreferenced, []);
+});

@@ -4,6 +4,7 @@ import { parseCliArgs } from "../core/cli-args";
 import { buildTerminalLeafHelp } from "../core/command-registry";
 import type { AppRuntimeConfig } from "../core/app-service-contract";
 import { runHermesRecipeSmoke } from "../host/recipes/hermes/doctor";
+import { runCodexRecipeSmoke } from "../host/recipes/codex/doctor";
 import { resolveHostProviderWithConfig } from "./host-cli-shared";
 
 interface HostSmokeOptions {
@@ -14,6 +15,13 @@ interface HostSmokeOptions {
 
 type SmokeConfig = Partial<Pick<
   AppRuntimeConfig,
+  | "accountId"
+  | "accountsDir"
+  | "runtimeCommand"
+  | "runtimeEndpoint"
+  | "stateDir"
+  | "weixinInstructionsFile"
+  | "weixinOperationsFile"
   | "workspaceRoot"
   | "hermesCommand"
   | "hermesHome"
@@ -38,6 +46,19 @@ export async function runHostSmokeCommand(
     configFile: options.config,
     defaultProvider: "hermes",
   });
+  if (resolvedProvider.provider === "codex") {
+    const smoke = runCodexRecipeSmoke(config);
+    return {
+      ok: smoke.ok ? true : "partial",
+      data: smoke,
+      text: [
+        `provider: codex`,
+        `ok: ${smoke.ok ? "yes" : "no"}`,
+        ...Object.entries(smoke.checks).map(([key, value]) => `${key}: ${value.ok ? "ok" : "needs_attention"}`),
+      ].join("\n"),
+      next: smoke.next,
+    };
+  }
   if (resolvedProvider.provider !== "hermes") {
     return {
       data: {

@@ -66,6 +66,46 @@ const COMMON_IDEMPOTENCY_FLAG: CommandArgFlag = {
 };
 
 export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = Object.freeze({
+  appAccounts: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+    ],
+  }),
+  appDoctor: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+    ],
+  }),
+  appHelp: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+    ],
+  }),
+  appLogin: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+    ],
+  }),
+  appSchema: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+    ],
+  }),
+  appStart: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+    ],
+  }),
+  operatorHelp: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+    ],
+  }),
+  operatorSchema: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+    ],
+  }),
   channelSendFile: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,
@@ -211,6 +251,7 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
   hostManifest: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,
+      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "", description: "显式 provider 视角：codex|hermes|generic-shell" },
       { name: "config", keys: ["--config"], type: "string", defaultValue: "", description: "显式 canonical config 文件路径" },
     ],
   }),
@@ -219,7 +260,7 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       COMMON_HELP_FLAG,
       COMMON_DRY_RUN_FLAG,
       COMMON_IDEMPOTENCY_FLAG,
-      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "hermes", description: "目标 recipe provider，如 hermes；generic-shell 需显式指定" },
+      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "hermes", description: "目标 recipe provider，如 codex|hermes；generic-shell 需显式指定" },
       { name: "config", keys: ["--config"], type: "string", defaultValue: "", description: "显式 canonical config 文件路径" },
       { name: "modeClass", keys: ["--mode-class"], type: "string", defaultValue: "", description: "codex-managed|hosted-proactive|hosted-skill-only|cli-only（兼容 legacy: bridge-full）" },
       { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "canonical config 里的 workspaceRoot" },

@@ -57,7 +57,15 @@ export function prefersSettledDelivery(state: RunState | null | undefined): bool
     && normalizeWeixinReplyModeValue(state?.weixinReplyMode) === "settled";
 }
 
+export function prefersFinalOnlyDelivery(state: RunState | null | undefined): boolean {
+  const deliveryPolicy = normalizeText(state?.replyTarget?.deliveryPolicy).toLowerCase();
+  return deliveryPolicy === "final_only" || normalizeText(state?.replyTarget?.provider) === "system";
+}
+
 export function prefersStreamingDelivery(state: RunState | null | undefined): boolean {
+  if (prefersFinalOnlyDelivery(state)) {
+    return false;
+  }
   return normalizeText(state?.replyTarget?.provider) === "weixin"
     && normalizeWeixinReplyModeValue(state?.weixinReplyMode) === "stream";
 }
@@ -98,6 +106,20 @@ export function findLatestVisibleReplyText(state: RunState, { completedOnly }: {
       continue;
     }
     return item.text;
+  }
+  return "";
+}
+
+export function findLatestCompletedFinalReplyText(state: RunState): string {
+  const visibleItems = collectVisibleItems(state, { completedOnly: true });
+  for (let index = visibleItems.length - 1; index >= 0; index -= 1) {
+    const item = visibleItems[index];
+    if (!item || item.itemId === "__watchdog__") {
+      continue;
+    }
+    if (normalizeText(item.phase) === "final") {
+      return item.text;
+    }
   }
   return "";
 }
@@ -218,6 +240,10 @@ export function buildReplyText(
     force?: boolean;
   },
 ): string {
+  if (prefersFinalOnlyDelivery(state)) {
+    return findLatestCompletedFinalReplyText(state);
+  }
+
   if (prefersStreamingDelivery(state) && !preferLatestMessage) {
     return force && hasWatchdogTail(state, { completedOnly })
       ? buildStreamingWatchdogReplyText(state, { completedOnly })
@@ -241,7 +267,7 @@ export function buildCurrentSafeReplyText(
 ): string {
   const plainText = buildReplyText(state, {
     completedOnly,
-    preferLatestMessage: prefersSettledDelivery(state),
+    preferLatestMessage: prefersSettledDelivery(state) || prefersFinalOnlyDelivery(state),
     force,
   });
   return sanitizeReplyText(state.replyTarget, plainText).text;

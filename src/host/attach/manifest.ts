@@ -14,10 +14,31 @@ import { resolveHostAttachment, type HostAttachmentConfigInput } from "./model";
 import { listHostRecipes, type HostRecipeId } from "../contracts/host-recipe";
 import { previewHermesCompanionSkillInstall } from "../recipes/hermes/skill";
 import type { HermesHostedSkillConfigInput } from "../recipes/hermes/skill";
+import { normalizeText } from "../../contracts/text-normalization";
 
 export const DEFAULT_HOST_DISCOVERY_PROVIDER = "hermes" as const;
 
-export function buildHostedFirstHostAttachmentResolution(): ReturnType<typeof resolveHostAttachment> {
+interface HostManifestProviderInput {
+  provider?: unknown;
+}
+
+export function buildHostedFirstHostAttachmentResolution(
+  provider: HostRecipeId = DEFAULT_HOST_DISCOVERY_PROVIDER,
+): ReturnType<typeof resolveHostAttachment> {
+  if (provider === "codex") {
+    return resolveHostAttachment({
+      runtime: "codex",
+      channelProvider: "codeksei",
+      channel: "weixin",
+    });
+  }
+  if (provider === "generic-shell") {
+    return resolveHostAttachment({
+      runtime: "codex",
+      channelProvider: "host",
+      channel: "none",
+    });
+  }
   return resolveHostAttachment({
     runtime: "hermes",
     channelProvider: "hermes",
@@ -42,6 +63,14 @@ export function buildHostEntrypointManifest({
     finalizeCheckin: ["codeksei", "host", "finalize-checkin", ...providerArgs, "--format", "json"],
     render: ["codeksei", "host", "render", ...providerArgs, "--target", "skill", "--format", "json"],
     companionRemember: ["codeksei", "companion", "remember", "--format", "json"],
+    diaryWrite: ["codeksei", "diary", "write", "--format", "json"],
+    timelineEvent: ["codeksei", "timeline", "event", "--format", "json"],
+    timelineCategories: ["codeksei", "timeline", "categories", "--format", "json"],
+    timelineRead: ["codeksei", "timeline", "read", "--format", "json"],
+    reviewNightly: ["codeksei", "review", "nightly", "--format", "json"],
+    noteAuto: ["codeksei", "note", "auto", "--format", "json"],
+    projectRadar: ["codeksei", "project", "radar", "--format", "json"],
+    reminderWrite: ["codeksei", "reminder", "write", "--format", "json"],
     onboardingStart: ["codeksei", "onboarding", "start", "--format", "json"],
     onboardingStep: ["codeksei", "onboarding", "step", "--format", "json"],
     onboardingStatus: ["codeksei", "onboarding", "status", "--format", "json"],
@@ -50,11 +79,14 @@ export function buildHostEntrypointManifest({
 }
 
 export function buildHostAttachmentManifest(
-  config: HostAttachmentConfigInput & HermesHostedSkillConfigInput = {},
+  config: HostAttachmentConfigInput & HermesHostedSkillConfigInput & HostManifestProviderInput = {},
 ): HostAttachmentManifest {
-  const attachment = buildHostedFirstHostAttachmentResolution();
-  const entrypoints = buildHostEntrypointManifest();
-  const skillPreview = previewHermesCompanionSkillInstall(config);
+  const provider = normalizeHostManifestProvider(config.provider);
+  const attachment = buildHostedFirstHostAttachmentResolution(provider);
+  const entrypoints = buildHostEntrypointManifest({ defaultProvider: provider });
+  const skillPreview = provider === "hermes"
+    ? previewHermesCompanionSkillInstall(config)
+    : null;
   return {
     contractVersion: HOST_ATTACHMENT_CONTRACT_VERSION,
     coreInvariant: HOST_CORE_INVARIANT,
@@ -63,7 +95,7 @@ export function buildHostAttachmentManifest(
     runtimeInvariant: "bridge-full",
     transport: attachment.transport,
     modeClass: attachment.modeClass,
-    provider: DEFAULT_HOST_DISCOVERY_PROVIDER,
+    provider,
     supported: attachment.supported,
     reason: attachment.reason,
     install: {
@@ -75,22 +107,34 @@ export function buildHostAttachmentManifest(
       bootstrapSnapshotVersion: HOST_BOOTSTRAP_SNAPSHOT_VERSION,
       startupDoctorRequired: true,
       companionSkill: {
-        version: skillPreview.repoSkillAsset.version,
-        hash: skillPreview.repoSkillAsset.hash,
+        version: skillPreview?.repoSkillAsset.version || "",
+        hash: skillPreview?.repoSkillAsset.hash || "",
       },
       rerunBootstrapWhen: [
         "The stored host bootstrap snapshot is missing.",
         "The stored manifest contract version is older than the current host manifest contract version.",
-        "The stored companion skill hash is older than the repo skill hash exposed by this manifest.",
+        ...(provider === "hermes"
+          ? ["The stored companion skill hash is older than the repo skill hash exposed by this manifest."]
+          : []),
       ],
-      reinstallSkillWhen: [
-        "The installed Hermes companion skill is missing.",
-        "The installed Hermes companion skill hash differs from the repo skill hash exposed by this manifest.",
-      ],
+      reinstallSkillWhen: provider === "hermes"
+        ? [
+          "The installed Hermes companion skill is missing.",
+          "The installed Hermes companion skill hash differs from the repo skill hash exposed by this manifest.",
+        ]
+        : [],
     },
     recommendedWorkflows: buildRecommendedHostWorkflows(),
     recipes: listHostRecipes(),
   };
+}
+
+function normalizeHostManifestProvider(value: unknown): HostRecipeId {
+  const normalized = normalizeText(value);
+  if (normalized === "codex" || normalized === "generic-shell" || normalized === "hermes") {
+    return normalized;
+  }
+  return DEFAULT_HOST_DISCOVERY_PROVIDER;
 }
 
 function buildHostIdentity(
@@ -205,6 +249,82 @@ function buildRecommendedHostWorkflows(): HostWorkflowHint[] {
         {
           commandRef: "finalizeCheckin",
           reason: "Finalize the proactive handoff only after the main session has decided whether continuity writing or follow-up changed the real next wake.",
+        },
+      ],
+    },
+    {
+      id: "time_block_capture",
+      trigger: "The host notices a concrete work/life block that should become timeline truth while it is still fresh.",
+      steps: [
+        {
+          commandRef: "timelineCategories",
+          reason: "Read available category ids before inventing labels for the new time block.",
+        },
+        {
+          commandRef: "timelineEvent",
+          reason: "Write the dated time block as structured timeline data instead of leaving it only in conversation.",
+        },
+        {
+          commandRef: "diaryWrite",
+          reason: "Mirror the human-readable fact into diary timeline/fragment when it helps later review.",
+        },
+      ],
+    },
+    {
+      id: "cutover_bookkeeping",
+      trigger: "The user finishes, switches tasks, or the host detects a project cutover that should be captured before context is lost.",
+      steps: [
+        {
+          commandRef: "diaryWrite",
+          reason: "Close or update the active Todo and, when useful, emit the matching timeline fact in the same command batch.",
+        },
+        {
+          commandRef: "timelineEvent",
+          reason: "Record the finished block with start/end time when the cutover has clear temporal boundaries.",
+        },
+        {
+          commandRef: "noteAuto",
+          reason: "Persist durable project or companion context when the cutover changes future re-entry behavior.",
+        },
+        {
+          commandRef: "contextBriefing",
+          reason: "Refresh the handoff surface after bookkeeping so the next proactive pass sees current truth.",
+        },
+      ],
+    },
+    {
+      id: "sleep_closeout",
+      trigger: "The user is about to sleep, pause for the night, or asks to wrap the day.",
+      steps: [
+        {
+          commandRef: "diaryWrite",
+          reason: "Capture the night summary or remaining open loop while the user still remembers it.",
+        },
+        {
+          commandRef: "reviewNightly",
+          reason: "Generate the nightly review draft from diary facts instead of relying on chat memory.",
+        },
+        {
+          commandRef: "reminderWrite",
+          reason: "Only schedule a follow-up reminder if the closeout creates a concrete re-entry need.",
+        },
+      ],
+    },
+    {
+      id: "project_continuity_write",
+      trigger: "The host sees reusable project state, repo direction, or a next-step handoff that should survive thread loss.",
+      steps: [
+        {
+          commandRef: "projectRadar",
+          reason: "Inspect the tracked project and read-first files before choosing the durable note target.",
+        },
+        {
+          commandRef: "noteAuto",
+          reason: "Write continuity into the project/companion note through schema-aware routing.",
+        },
+        {
+          commandRef: "contextBriefing",
+          reason: "Refresh the controlled context board after durable continuity changes.",
         },
       ],
     },

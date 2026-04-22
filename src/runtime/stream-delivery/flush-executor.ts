@@ -9,6 +9,7 @@ import {
   buildReplyText,
   commitPreparedStreamingDelivery,
   normalizeDeliveryDelta,
+  prefersFinalOnlyDelivery,
   prefersSettledDelivery,
   prefersStreamingDelivery,
   prepareStreamingDelivery,
@@ -47,11 +48,15 @@ export async function executeStreamFlush(
   if (!state.replyTarget) {
     return;
   }
+  const finalOnlyDelivery = prefersFinalOnlyDelivery(state);
+  if (!force && finalOnlyDelivery) {
+    return;
+  }
   if (!force && prefersSettledDelivery(state)) {
     return;
   }
 
-  const completedOnly = prefersSettledDelivery(state) ? !force : false;
+  const completedOnly = finalOnlyDelivery ? true : (prefersSettledDelivery(state) ? !force : false);
   const streamPrepared = prefersStreamingDelivery(state)
     ? prepareStreamingDelivery(state, {
       completedOnly,
@@ -62,7 +67,7 @@ export async function executeStreamFlush(
     ? streamPrepared.safeText
     : buildReplyText(state, {
       completedOnly,
-      preferLatestMessage: prefersSettledDelivery(state),
+      preferLatestMessage: prefersSettledDelivery(state) || finalOnlyDelivery,
       force,
     });
   const sanitized = streamPrepared
@@ -129,6 +134,7 @@ export async function executeStreamFlush(
   }
 
   const settledWechatDelivery = prefersSettledDelivery(state);
+  const preserveFinalOnlyBlock = finalOnlyDelivery;
   const streamingPreserveBlock = Boolean(streamPrepared?.preserveBlock);
   const replyTarget = state.replyTarget;
   if (!replyTarget) {
@@ -157,12 +163,12 @@ export async function executeStreamFlush(
         userId: replyTarget.userId,
         text: delta,
         contextToken: replyTarget.contextToken,
-        preserveBlock: settledWechatDelivery || streamingPreserveBlock,
+        preserveBlock: settledWechatDelivery || preserveFinalOnlyBlock || streamingPreserveBlock,
         trace: context.deliveryTraceEnabled
           ? {
             ...tracePayload,
             origin: "stream-delivery",
-            preserveBlock: settledWechatDelivery || streamingPreserveBlock,
+            preserveBlock: settledWechatDelivery || preserveFinalOnlyBlock || streamingPreserveBlock,
           }
           : null,
       });

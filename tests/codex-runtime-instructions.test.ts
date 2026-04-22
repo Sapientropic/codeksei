@@ -88,6 +88,8 @@ test("weixin persona switches to english when the companion profile prefers engl
   });
 
   assert.match(content, /You are with the person you're with on WeChat right now\./u);
+  assert.match(content, /Use diary, timeline, review, reminder, and durable notes as active tools/u);
+  assert.match(content, /open loop or real follow-up commitment -> today's diary `Todo`/u);
   assert.doesNotMatch(content, /你现在是在微信里陪/u);
 });
 

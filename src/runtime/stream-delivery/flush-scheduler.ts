@@ -1,6 +1,7 @@
 import {
   hasCompletedFlushTrigger,
   hasNaturalFlushBoundary,
+  prefersFinalOnlyDelivery,
   prefersStreamingDelivery,
   prepareStreamingDelivery,
   shouldScheduleStreamingIdleFlush,
@@ -78,6 +79,9 @@ function createFlushScheduler({
       state: FlushState,
       { force = false, trigger = null }: Partial<FlushExecutionOptions> = {},
     ): void {
+      if (prefersFinalOnlyDelivery(state)) {
+        return;
+      }
       if (!prefersStreamingDelivery(state)) {
         return;
       }

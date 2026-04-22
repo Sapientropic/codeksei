@@ -30,6 +30,7 @@ import { createOnboardingStateStore } from "../onboarding/state";
 import { createSessionStore } from "../session/session-store-factory";
 import { buildProactiveStateCard } from "../proactive/state-card";
 import type { ProactiveObservation, ProactiveStateCard } from "../proactive/contracts";
+import { resolveCodekseiLocale, type CodekseiLocale } from "../core/locale";
 
 export type ContextBriefingMode = "proactive" | "review";
 
@@ -39,6 +40,7 @@ export interface ContextBoardConfig {
   checkinScheduleStateFile?: string;
   diaryDir?: string;
   durableNoteSchemaConfigFile?: string;
+  locale?: unknown;
   projectRadarConfigFile?: string;
   sessionsFile?: string;
   stateDir?: string;
@@ -143,6 +145,7 @@ export interface ContextBoardBriefing {
   companionNote: CompanionNoteSnapshot;
   followupContext: string;
   freshness: ContextBoardFreshness;
+  locale: CodekseiLocale;
   mode: ContextBriefingMode;
   observation: ProactiveObservation | null;
   onboarding: OnboardingSnapshot;
@@ -188,14 +191,14 @@ interface BestEffortRefreshOptions extends RefreshContextBoardOptions {
 }
 
 const CONTEXT_BOARD_SECTIONS = Object.freeze([
-  { slot: "current-status", title: "当前状态" },
-  { slot: "model-observation", title: "小模型观察" },
-  { slot: "today-facts", title: "今天事实" },
-  { slot: "active-threads", title: "活跃线头" },
-  { slot: "cautions", title: "注意事项" },
-  { slot: "reentry-points", title: "重入入口" },
-  { slot: "source-status", title: "上下文来源" },
-] as const satisfies Array<{ slot: string; title: string }>);
+  { slot: "current-status", title: { "zh-CN": "当前状态", en: "Current Status" } },
+  { slot: "model-observation", title: { "zh-CN": "小模型观察", en: "Model Observation" } },
+  { slot: "today-facts", title: { "zh-CN": "今天事实", en: "Today Facts" } },
+  { slot: "active-threads", title: { "zh-CN": "活跃线头", en: "Active Threads" } },
+  { slot: "cautions", title: { "zh-CN": "注意事项", en: "Cautions" } },
+  { slot: "reentry-points", title: { "zh-CN": "重入入口", en: "Re-entry Points" } },
+  { slot: "source-status", title: { "zh-CN": "上下文来源", en: "Context Sources" } },
+] as const satisfies Array<{ slot: string; title: Record<CodekseiLocale, string> }>);
 
 const COMPANION_CURRENT_SECTION_RE = /(当前状态|当前定位|当前焦点|协作节奏)/u;
 const COMPANION_THREAD_SECTION_RE = /(最近动作|当前实验|下一步|最近灵感|当前焦点|当前定位)/u;
@@ -210,7 +213,7 @@ export function refreshContextBoard(
   options: RefreshContextBoardOptions = {},
 ): ContextBoardBriefing {
   const briefing = buildContextBoardBriefing(config, target, options);
-  ensureContextBoardFile(briefing.boardPath, briefing.target);
+  ensureContextBoardFile(briefing.boardPath, briefing.target, briefing.locale);
 
   let content = fs.readFileSync(briefing.boardPath, "utf8");
   for (const section of buildManagedSections(briefing)) {
@@ -241,6 +244,7 @@ export function buildContextBoardBriefing(
   }: RefreshContextBoardOptions = {},
 ): ContextBoardBriefing {
   const updatedAt = now.toISOString();
+  const locale = resolveCodekseiLocale(config.locale, config.userLanguage);
   const targetKey = buildCheckinTargetKey(target);
   const boardPath = resolveContextBoardPath(config, target);
   const storedState = readStoredContextBoardState(boardPath);
@@ -312,6 +316,7 @@ export function buildContextBoardBriefing(
     boardPath,
     boardText: "",
     briefingText: renderBriefingText({
+      locale,
       mode,
       sections,
       stateCard,
@@ -320,6 +325,7 @@ export function buildContextBoardBriefing(
     companionNote,
     followupContext: effectiveFollowupContext,
     freshness,
+    locale,
     mode,
     observation,
     onboarding,
@@ -400,39 +406,44 @@ function buildManagedSections(briefing: ContextBoardBriefing): ContextBoardSecti
     {
       slot: "current-status",
       text: briefing.sections.currentStatus,
-      title: "当前状态",
+      title: getContextBoardSectionTitle("current-status", briefing.locale),
     },
     {
       slot: "model-observation",
       text: briefing.sections.observation,
-      title: "小模型观察",
+      title: getContextBoardSectionTitle("model-observation", briefing.locale),
     },
     {
       slot: "today-facts",
       text: briefing.sections.todayFacts,
-      title: "今天事实",
+      title: getContextBoardSectionTitle("today-facts", briefing.locale),
     },
     {
       slot: "active-threads",
       text: briefing.sections.activeThreads,
-      title: "活跃线头",
+      title: getContextBoardSectionTitle("active-threads", briefing.locale),
     },
     {
       slot: "cautions",
       text: briefing.sections.cautions,
-      title: "注意事项",
+      title: getContextBoardSectionTitle("cautions", briefing.locale),
     },
     {
       slot: "reentry-points",
       text: briefing.sections.reentryPoints,
-      title: "重入入口",
+      title: getContextBoardSectionTitle("reentry-points", briefing.locale),
     },
     {
       slot: "source-status",
       text: briefing.sections.sourceStatus,
-      title: "上下文来源",
+      title: getContextBoardSectionTitle("source-status", briefing.locale),
     },
   ].filter((section) => section.slot !== "model-observation" || normalizeText(section.text));
+}
+
+function getContextBoardSectionTitle(slot: string, locale: CodekseiLocale): string {
+  const section = CONTEXT_BOARD_SECTIONS.find((entry) => entry.slot === slot);
+  return section?.title[locale] || slot;
 }
 
 function buildObservationSection(observation: ProactiveObservation | null): string {
@@ -834,10 +845,12 @@ function collectStaleReasons(freshness: ContextBoardFreshness): string[] {
 }
 
 function renderBriefingText({
+  locale,
   mode,
   sections,
   stateCard,
 }: {
+  locale: CodekseiLocale;
   mode: ContextBriefingMode;
   sections: {
     activeThreads: string;
@@ -850,7 +863,9 @@ function renderBriefingText({
   };
   stateCard: ProactiveStateCard;
 }): string {
-  const prelude = mode === "review"
+  const prelude = locale === "en"
+    ? buildEnglishBriefingPrelude(mode)
+    : mode === "review"
     ? [
       "Codeksei context board (review framing)",
       "这是一份用于复盘 framing 和重入判断的轻量 handoff；真正的日记/复盘产物仍以 codeksei review 命令输出为准。",
@@ -864,37 +879,48 @@ function renderBriefingText({
   return [
     ...prelude,
     "",
-    "## 当前状态",
+    `## ${getContextBoardSectionTitle("current-status", locale)}`,
     sections.currentStatus,
     "",
-    "## 伴随状态卡",
-    renderStateCardSection(stateCard),
+    `## ${locale === "en" ? "Companion State Card" : "伴随状态卡"}`,
+    renderStateCardSection(stateCard, locale),
     ...(normalizeText(sections.observation)
       ? [
         "",
-        "## 小模型观察",
+        `## ${getContextBoardSectionTitle("model-observation", locale)}`,
         sections.observation,
       ]
       : []),
     "",
-    "## 今天事实",
+    `## ${getContextBoardSectionTitle("today-facts", locale)}`,
     sections.todayFacts,
     "",
-    "## 活跃线头",
+    `## ${getContextBoardSectionTitle("active-threads", locale)}`,
     sections.activeThreads,
     "",
-    "## 注意事项",
+    `## ${getContextBoardSectionTitle("cautions", locale)}`,
     sections.cautions,
     "",
-    "## 重入入口",
+    `## ${getContextBoardSectionTitle("reentry-points", locale)}`,
     sections.reentryPoints,
     "",
-    "## 上下文来源",
+    `## ${getContextBoardSectionTitle("source-status", locale)}`,
     sections.sourceStatus,
   ].join("\n").trim();
 }
 
-function renderStateCardSection(stateCard: ProactiveStateCard): string {
+function renderStateCardSection(stateCard: ProactiveStateCard, locale: CodekseiLocale): string {
+  if (locale === "en") {
+    return [
+      `- Current likely state: ${stateCard.currentLikelyState || "[⚠️ Needs confirmation] Unknown"}`,
+      `- Active thread: ${stateCard.activeThread || "[⚠️ Needs confirmation] Unknown"}`,
+      `- Likely blocker: ${stateCard.likelyBlocker || "[⚠️ Needs confirmation] Unknown"}`,
+      `- Easiest re-entry step: ${stateCard.easiestReentryStep || "[⚠️ Needs confirmation] Unknown"}`,
+      `- Avoid this time: ${stateCard.doNotDo.join("; ") || "Do not nag"}`,
+      `- Tone: ${stateCard.toneHint}`,
+      `- Context thickness: ${stateCard.sourceThickness}`,
+    ].join("\n");
+  }
   return [
     `- 现在大概在哪：${stateCard.currentLikelyState || "[⚠️ 需确认] 不确定"}`,
     `- 活跃线头：${stateCard.activeThread || "[⚠️ 需确认] 不确定"}`,
@@ -906,9 +932,24 @@ function renderStateCardSection(stateCard: ProactiveStateCard): string {
   ].join("\n");
 }
 
+function buildEnglishBriefingPrelude(mode: ContextBriefingMode): string[] {
+  return mode === "review"
+    ? [
+      "Codeksei context board (review framing)",
+      "This is a lightweight handoff for review framing and re-entry judgement; the canonical diary/review outputs still come from Codeksei review commands.",
+      "Treat any [⚠️ Needs confirmation] block as thin or stale context, not as confirmed fact.",
+    ]
+    : [
+      "Codeksei context board (proactive)",
+      "This is a lightweight handoff for proactive judgement; use it to decide whether to stay silent, send one concise message, or do backstage work only.",
+      "Treat any [⚠️ Needs confirmation] block as thin or stale context, not as confirmed fact.",
+    ];
+}
+
 function ensureContextBoardFile(
   filePath: string,
   target: ContextBoardBriefing["target"],
+  locale: CodekseiLocale,
 ): void {
   if (fs.existsSync(filePath)) {
     return;
@@ -916,13 +957,15 @@ function ensureContextBoardFile(
   const header = [
     "# Codeksei Context Board",
     "",
-    "这份 board 用 managed slots 重算主动判断上下文；如需手工补充，请写在各 section 的 managed block 之后。",
+    locale === "en"
+      ? "This board recomputes proactive context through managed slots. Put manual notes after the managed block inside a section."
+      : "这份 board 用 managed slots 重算主动判断上下文；如需手工补充，请写在各 section 的 managed block 之后。",
     "",
     `- target: ${target.senderId}`,
     `- workspace: ${target.workspaceRoot}`,
     `- targetKey: ${target.targetKey}`,
     "",
-    ...CONTEXT_BOARD_SECTIONS.flatMap((section) => [`## ${section.title}`, ""]),
+    ...CONTEXT_BOARD_SECTIONS.flatMap((section) => [`## ${section.title[locale]}`, ""]),
   ].join("\n");
   writeForeignTextDocument(filePath, ensureTrailingNewline(header), { encoding: "utf8" });
 }

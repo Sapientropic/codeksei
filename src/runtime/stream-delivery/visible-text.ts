@@ -228,8 +228,12 @@ export function rememberVisiblePart(parts: string[], seenParts: Set<string>, tex
   parts.push(String(text || ""));
 }
 
-function shouldSuppressSystemReply(replyTarget: { provider?: unknown } | null | undefined, plainReplyText: unknown): boolean {
-  if (replyTarget?.provider !== "system") {
+function shouldSuppressSystemReply(
+  replyTarget: { deliveryPolicy?: unknown; provider?: unknown } | null | undefined,
+  plainReplyText: unknown,
+): boolean {
+  const finalOnly = normalizeText(replyTarget?.deliveryPolicy) === "final_only";
+  if (replyTarget?.provider !== "system" && !finalOnly) {
     return false;
   }
   const normalized = normalizeLineEndings(String(plainReplyText || ""));
@@ -250,7 +254,7 @@ function shouldSuppressSystemReply(replyTarget: { provider?: unknown } | null | 
 }
 
 export function sanitizeReplyText(
-  replyTarget: { provider?: unknown } | null | undefined,
+  replyTarget: { deliveryPolicy?: unknown; provider?: unknown } | null | undefined,
   plainReplyText: unknown,
 ): SanitizedReplyText {
   const normalized = normalizeLineEndings(String(plainReplyText || ""));

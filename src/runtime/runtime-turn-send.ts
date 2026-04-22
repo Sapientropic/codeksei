@@ -96,6 +96,7 @@ export function createRuntimeTurnSend(
           userId: prepared.senderId,
           contextToken: prepared.contextToken,
           provider: prepared.provider,
+          deliveryPolicy: prepared.provider === "system" ? "final_only" : "normal",
         });
         if (turn.workspaceBootstrapPending) {
           dependencies.queuePendingWorkspaceBootstrap({

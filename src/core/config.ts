@@ -24,6 +24,7 @@ import {
 import { normalizeProactiveJudgmentHost } from "../proactive/contracts";
 import { resolveTimezoneConfig } from "./timezone";
 import { readPrefixedBoolEnv, readPrefixedEnv, readPrefixedIntEnv, readPrefixedListEnv, resolveAppHome, resolveStateDir } from "./branding";
+import { resolveCodekseiLocale } from "./locale";
 
 interface ReadConfigOptions {
   workspaceRoot?: string;
@@ -70,6 +71,10 @@ function parseEnvConfig(env: EnvSource, options: ReadConfigOptions = {}): AppRun
     readPrefixedEnv(env, "CHANNEL_PROVIDER") || (runtime === "hermes" ? "hermes" : "codeksei"),
   ) || (runtime === "hermes" ? "hermes" : "codeksei");
   const channel = normalizeCodekseiChannel(readPrefixedEnv(env, "CHANNEL")) || "weixin";
+  const locale = resolveCodekseiLocale(
+    readPrefixedEnv(env, "LOCALE"),
+    readPrefixedEnv(env, "USER_LANGUAGE"),
+  );
 
   return composeAppRuntimeConfig({
     workspacePaths: {
@@ -94,6 +99,7 @@ function parseEnvConfig(env: EnvSource, options: ReadConfigOptions = {}): AppRun
       timelineStateTimezone: timezoneConfig.timelineStateTimezone,
       userName: readPrefixedEnv(env, "USER_NAME") || "",
       userGender: readPrefixedEnv(env, "USER_GENDER") || "neutral",
+      locale,
       userLanguage: readPrefixedEnv(env, "USER_LANGUAGE") || "zh-CN",
       allowedUserIds: readPrefixedListEnv(env, "ALLOWED_USER_IDS"),
     },

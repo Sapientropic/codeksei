@@ -11,6 +11,7 @@ export const INTROSPECTION_COMMAND_ACTION_DEFINITIONS = [
     entrypointType: "cli",
     command: "schema",
     runner: "schema",
+    argsSchemaKey: "appSchema",
     help: { topic: "", leafKey: "app.schema", detail: "topic_only" },
   },
   {
@@ -24,6 +25,7 @@ export const INTROSPECTION_COMMAND_ACTION_DEFINITIONS = [
     command: "operator",
     subcommand: "help",
     runner: "operator.help",
+    argsSchemaKey: "operatorHelp",
     help: { topic: "", leafKey: "operator.help", detail: "topic_only" },
   },
   {
@@ -37,6 +39,7 @@ export const INTROSPECTION_COMMAND_ACTION_DEFINITIONS = [
     command: "operator",
     subcommand: "schema",
     runner: "operator.schema",
+    argsSchemaKey: "operatorSchema",
     help: { topic: "", leafKey: "operator.schema", detail: "topic_only" },
   },
 ] as const satisfies readonly CommandActionDefinition[];

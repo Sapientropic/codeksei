@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 
 const { getCommandArgsSchema } = require("../src/contracts/command-args");
 const { parseCliArgs } = require("../src/core/cli-args");
+const { parseGlobalCliOptions, resolveGlobalCliOptions } = require("../src/core/cli-contract");
 
 test("cli arg parser handles boolean, string, and repeated string flags", () => {
   const parsed = parseCliArgs([
@@ -54,4 +55,17 @@ test("cli arg parser reports missing values consistently", () => {
     () => parseCliArgs(["--project"], getCommandArgsSchema("noteAuto")),
     /参数缺少值: --project/u
   );
+});
+
+test("global cli parser accepts locale without passing it to leaf commands", () => {
+  const parsed = parseGlobalCliOptions([
+    "--locale", "en",
+    "diary",
+    "write",
+    "--text",
+    "hello",
+  ]);
+
+  assert.deepEqual(parsed.argv, ["diary", "write", "--text", "hello"]);
+  assert.equal(resolveGlobalCliOptions(parsed).locale, "en");
 });

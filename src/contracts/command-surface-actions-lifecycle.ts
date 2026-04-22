@@ -227,6 +227,8 @@ export const LIFECYCLE_COMMAND_ACTION_DEFINITIONS = [
     scriptName: "login",
     command: "login",
     runner: "login",
+    argsSchemaKey: "appLogin",
+    help: { topic: "", leafKey: "app.login", detail: "topic_only" },
   },
   {
     action: "app.accounts",
@@ -239,6 +241,8 @@ export const LIFECYCLE_COMMAND_ACTION_DEFINITIONS = [
     scriptName: "accounts",
     command: "accounts",
     runner: "accounts",
+    argsSchemaKey: "appAccounts",
+    help: { topic: "", leafKey: "app.accounts", detail: "topic_only" },
   },
   {
     action: "app.start",
@@ -251,6 +255,8 @@ export const LIFECYCLE_COMMAND_ACTION_DEFINITIONS = [
     scriptName: "start",
     command: "start",
     runner: "start",
+    argsSchemaKey: "appStart",
+    help: { topic: "", leafKey: "app.start", detail: "topic_only" },
   },
   {
     action: "app.shared_start",
@@ -323,6 +329,7 @@ export const LIFECYCLE_COMMAND_ACTION_DEFINITIONS = [
     scriptName: "doctor",
     command: "doctor",
     runner: "doctor",
+    argsSchemaKey: "appDoctor",
     help: { topic: "system", leafKey: "app.doctor", detail: "leaf" },
   },
   {

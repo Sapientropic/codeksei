@@ -141,6 +141,7 @@ function createTestAppHarness({
     timelineStateDir: tempRoot,
     userName: "",
     userGender: "female",
+    locale: "zh-CN",
     allowedUserIds: ["user-1"],
     channel: "weixin",
     channelProvider: "codeksei",
