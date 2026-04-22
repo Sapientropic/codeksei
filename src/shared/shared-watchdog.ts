@@ -210,9 +210,11 @@ async function sendVisibleAlert(
     const runtimeConfig = config;
     const account = resolveSelectedAccount(runtimeConfig);
     const sessionStore = new SessionStore({ filePath: runtimeConfig.sessionsFile });
+    const contextTokens = loadPersistedContextTokens(runtimeConfig, account.accountId);
     const senderId = resolvePreferredSenderId({
       config: runtimeConfig,
       accountId: account.accountId,
+      contextTokenSenderIds: Object.keys(contextTokens),
       sessionStore,
     });
     const workspaceRoot = resolvePreferredWorkspaceRoot({
@@ -221,7 +223,7 @@ async function sendVisibleAlert(
       senderId,
       sessionStore,
     });
-    const contextToken = loadPersistedContextTokens(runtimeConfig, account.accountId)?.[senderId] || "";
+    const contextToken = contextTokens[senderId] || "";
     if (!senderId || !contextToken) {
       return {
         sent: false,

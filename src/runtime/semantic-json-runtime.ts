@@ -1,4 +1,6 @@
 import { spawnSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 import { mapCodexMessageToRuntimeEvent } from "../adapters/runtime/codex/events";
 import { extractThreadId, extractThreadIdFromParams } from "../adapters/runtime/codex/message-utils";
@@ -88,28 +90,38 @@ export function runHermesSemanticJson(
   const hermesCommand = normalizeText(config.hermesCommand) || "hermes";
   const model = normalizeText(input.model);
   const workspaceRoot = normalizeText(input.workspaceRoot || process.cwd());
+  const promptDir = fs.mkdtempSync(path.join(workspaceRoot, ".codeksei-hermes-semantic-"));
+  const promptFile = path.join(promptDir, "prompt.txt");
+  let result: ReturnType<typeof spawnSync>;
 
-  // Hermes currently accepts semantic extraction via a one-shot CLI call.
-  // On Windows, oversized argv payloads can truncate silently across shell
-  // boundaries, so fail closed here and let callers fall back deterministically.
-  if (process.platform === "win32" && input.prompt.length > 6_000) {
-    throw new Error(`${input.label} prompt is too large for safe Windows CLI argument transport`);
+  try {
+    fs.writeFileSync(promptFile, input.prompt, "utf8");
+    // Hermes v0.9 exposes single-query input as `-q/--query`; it does not have
+    // a stdin or --prompt-file query flag. Keep semantic source packs out of
+    // argv by using Hermes' supported @file context reference. The query value
+    // intentionally has no spaces so Windows .cmd shims cannot split it.
+    const args = [
+      "chat",
+      "-Q",
+      "-q",
+      `@file:${path.relative(workspaceRoot, promptFile).replace(/\\/gu, "/")}`,
+    ];
+    if (model) {
+      args.push("--model", model);
+    }
+
+    const useShell = process.platform === "win32" && /\.(cmd|bat)$/iu.test(hermesCommand);
+    result = spawnSync(hermesCommand, args, {
+      cwd: workspaceRoot,
+      encoding: "utf8",
+      shell: useShell,
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: input.timeoutMs,
+      windowsHide: true,
+    });
+  } finally {
+    fs.rmSync(promptDir, { recursive: true, force: true });
   }
-
-  const args = ["chat", "-Q", "-q", input.prompt];
-  if (model) {
-    args.push("--model", model);
-  }
-
-  const useShell = process.platform === "win32" && /\.(cmd|bat)$/iu.test(hermesCommand);
-  const result = spawnSync(hermesCommand, args, {
-    cwd: workspaceRoot,
-    encoding: "utf8",
-    shell: useShell,
-    stdio: ["ignore", "pipe", "pipe"],
-    timeout: input.timeoutMs,
-    windowsHide: true,
-  });
 
   if (result.error instanceof Error) {
     throw new Error(`${input.label} failed: ${result.error.message}`);

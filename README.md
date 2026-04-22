@@ -466,7 +466,7 @@ codeksei context briefing --user <wechat_user_id> --workspace /absolute/workspac
 如果你在维护这个仓库，当前质量门分工是：
 
 - `npm run check`：只跑 source-level guard、typecheck 和 tests TS typecheck，不会刷新 `dist/`
-- `npm run coverage:critical`：只对关键 owner 集跑 coverage gate，目前覆盖 `config`、`weixin delivery text`、`runtime turn` 与 `stream delivery`；这是 `verify` 层，不进入 `check`
+- `npm run coverage:critical`：owner-focused + per-file coverage gate；只覆盖 `config`、`weixin delivery text`、`runtime turn` 与 `stream delivery` 这组关键 owner，并逐文件执行阈值；这是 `verify` 层，不进入 `check`
 - `npm run verify`：在 `check` 与 `coverage:critical` 之后显式 `build`，再跑 built-runtime tests 和 `npm run pack:dry-run`
 - `npm run build`：只在你明确要刷新 published runtime artifacts 时运行
 

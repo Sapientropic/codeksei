@@ -443,7 +443,7 @@ maintainer 仍需额外补一次真实账号 smoke：
   source-only：跑 authored-source JS guard、published runtime artifact guard、其它 lint guard、源码 typecheck、tests TS typecheck；不会重建 `dist/`
   这里已经直接覆盖 duplicate helper、bare empty catch、redundant `typedXxx`、`!:`、explicit `any` 等结构债 guard
 - `npm run coverage:critical`
-  owner-focused coverage gate：只覆盖 `config`、`weixin delivery text`、`runtime turn`、`stream delivery` 这组关键 owner；不进入 `check`
+  owner-focused + per-file coverage gate：只覆盖 `config`、`weixin delivery text`、`runtime turn`、`stream delivery` 这组关键 owner，并逐文件执行阈值；不进入 `check`
 - `npm run verify`
   built-runtime gate：先跑 `check` + `coverage:critical`，再显式 `npm run build`，然后跑 built `dist` 的仓内 tests，最后跑 `npm run pack:dry-run`
 - `npm run build`

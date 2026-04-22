@@ -1,5 +1,4 @@
 import { normalizeText } from "../core/text-normalization";
-import { loadPersistedContextTokens } from "../adapters/channel/weixin/context-token-store";
 import type { SessionBinding } from "../contracts/session-state";
 
 interface ConfigLike {
@@ -35,6 +34,7 @@ interface WorkspaceResolutionSessionStoreLike extends SenderResolutionSessionSto
 interface ResolvePreferredSenderIdArgs {
   config: ConfigLike;
   accountId: string;
+  contextTokenSenderIds?: readonly unknown[];
   explicitUser?: string;
   sessionStore?: SenderResolutionSessionStoreLike | null;
 }
@@ -58,12 +58,14 @@ export interface PreferredTargetResolution {
 export function resolvePreferredSenderId({
   config,
   accountId,
+  contextTokenSenderIds = [],
   explicitUser = "",
   sessionStore = null,
 }: ResolvePreferredSenderIdArgs): string {
   return inspectPreferredSenderId({
     config,
     accountId,
+    contextTokenSenderIds,
     explicitUser,
     sessionStore,
   }).value;
@@ -88,6 +90,7 @@ export function resolvePreferredWorkspaceRoot({
 export function inspectPreferredSenderId({
   config,
   accountId,
+  contextTokenSenderIds = [],
   explicitUser = "",
   sessionStore = null,
 }: ResolvePreferredSenderIdArgs): PreferredTargetResolution {
@@ -144,9 +147,7 @@ export function inspectPreferredSenderId({
     };
   }
 
-  const persistedUserIds = Object.keys(loadPersistedContextTokens(config, accountId) || {})
-    .map((value) => normalizeText(value))
-    .filter(Boolean);
+  const persistedUserIds = normalizeCandidateList(contextTokenSenderIds);
   if (persistedUserIds.length === 1) {
     return {
       ambiguous: false,
@@ -173,6 +174,11 @@ export function inspectPreferredSenderId({
     source: "",
     value: "",
   };
+}
+
+function normalizeCandidateList(values: readonly unknown[] = []): string[] {
+  return Array.from(new Set(values.map((value) => normalizeText(value)).filter(Boolean)))
+    .sort((left, right) => left.localeCompare(right));
 }
 
 export function inspectPreferredWorkspaceRoot({

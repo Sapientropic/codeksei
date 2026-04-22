@@ -4,12 +4,7 @@ const {
   collectSourceFiles,
   resolveImportBoundaryViolations,
 } = require("../src/release/import-boundary-guard");
-const allowlist: Array<{ from: string; to: string }> = [
-  {
-    from: "src/workspace/default-targets.ts",
-    to: "src/adapters/channel/weixin/context-token-store.ts",
-  },
-];
+const allowlist: Array<{ from: string; to: string }> = [];
 const rules: Array<{
   sourcePrefix: string;
   forbiddenPrefixes: string[];

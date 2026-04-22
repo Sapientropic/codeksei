@@ -249,6 +249,49 @@ test("prepareIncomingMessageForRuntime prepends pending proactive handoff contex
   assert.match(String(prepared?.text || ""), /host finalize-checkin/u);
 });
 
+test("prepareIncomingMessageForRuntime keeps saved attachments and failure metadata when runtime text remains usable", async () => {
+  const harness = createLifecycle({
+    persistIncomingWeixinAttachmentsImpl: async () => ({
+      saved: [{ filePath: "E:/state/media/payload.txt", sourceFileName: "payload.txt" }],
+      failed: [{ reason: "thumbnail skipped" }],
+    }),
+    buildRuntimeInboundTextImpl: (_normalized, persisted) => {
+      const saved = Array.isArray(persisted.saved) ? persisted.saved : [];
+      const failed = Array.isArray(persisted.failed) ? persisted.failed : [];
+      return `saved=${saved.length} failed=${failed.length}`;
+    },
+  });
+
+  const prepared = await harness.lifecycle.prepareIncomingMessageForRuntime(buildIncomingMessage({
+    text: "请看附件",
+    attachments: [{ kind: "file", fileName: "payload.txt" }],
+  }), "E:/repo/current");
+
+  assert.equal(prepared?.text, "saved=1 failed=1");
+  assert.deepEqual(prepared?.attachments, [{ filePath: "E:/state/media/payload.txt", sourceFileName: "payload.txt" }]);
+  assert.deepEqual(prepared?.attachmentFailures, [{ reason: "thumbnail skipped" }]);
+  assert.deepEqual(harness.sendTextCalls, []);
+});
+
+test("prepareIncomingMessageForRuntime notifies when attachment processing collapses runtime payload to empty", async () => {
+  const harness = createLifecycle({
+    persistIncomingWeixinAttachmentsImpl: async () => ({
+      saved: [{ filePath: "E:/state/media/payload.txt" }],
+      failed: [{ reason: "metadata invalid" }],
+    }),
+    buildRuntimeInboundTextImpl: () => "",
+  });
+
+  const prepared = await harness.lifecycle.prepareIncomingMessageForRuntime(buildIncomingMessage({
+    text: "这里本来有附件",
+    attachments: [{ kind: "file", fileName: "payload.txt" }],
+  }), "E:/repo/current");
+
+  assert.equal(prepared, null);
+  assert.equal(harness.sendTextCalls.length, 1);
+  assert.match(String(harness.sendTextCalls[0]?.text || ""), /metadata invalid/u);
+});
+
 test("sendLocalFileToCurrentChat sends the resolved file path to the active chat", async (t) => {
   const harness = createLifecycle();
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-runtime-turn-"));

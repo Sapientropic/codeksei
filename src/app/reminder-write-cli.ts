@@ -202,9 +202,11 @@ async function runReminderWriteCommand(
 
   const account = resolveSelectedAccount(config);
   const sessionStore = createSessionStore(config.sessionsFile);
+  const contextTokens = loadPersistedContextTokens(config, account.accountId);
   const senderResolution = inspectPreferredSenderId({
     config,
     accountId: account.accountId,
+    contextTokenSenderIds: Object.keys(contextTokens),
     explicitUser: normalizeText(options.user),
     sessionStore,
   });
@@ -219,7 +221,6 @@ async function runReminderWriteCommand(
   }
   const senderId = senderResolution.value;
 
-  const contextTokens = loadPersistedContextTokens(config, account.accountId);
   const contextToken = normalizeText(contextTokens[senderId]);
   if (!contextToken) {
     throw buildAuthRequiredError(
