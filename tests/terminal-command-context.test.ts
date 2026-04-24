@@ -487,3 +487,277 @@ test("createTerminalCommandContext applies hosted config fallback for hosted che
     }
   }
 });
+
+test("hosted config fallback uses the leaf workspace before repo-local sample config", () => {
+  const contextModulePath = require.resolve("../src/app/terminal-command-context");
+  const terminalFacadeModulePath = require.resolve("../src/core/app-terminal-facade");
+  const brandingModulePath = require.resolve("../src/core/branding");
+  const envLoaderModulePath = require.resolve("../src/core/env-loader");
+  const configModulePath = require.resolve("../src/core/config");
+  const instructionsTemplateModulePath = require.resolve("../src/core/instructions-template");
+  const timelineIntegrationModulePath = require.resolve("../src/integrations/timeline");
+  const jsonStateModulePath = require.resolve("../src/state/json-state");
+  const pathUtilsModulePath = require.resolve("../src/core/path-utils");
+  const personReferenceModulePath = require.resolve("../src/contracts/person-reference");
+  const hostAttachConfigModulePath = require.resolve("../src/host/attach/config");
+
+  const originals = new Map<string, NodeJS.Module | undefined>();
+  for (const modulePath of [
+    contextModulePath,
+    terminalFacadeModulePath,
+    brandingModulePath,
+    envLoaderModulePath,
+    configModulePath,
+    instructionsTemplateModulePath,
+    timelineIntegrationModulePath,
+    jsonStateModulePath,
+    pathUtilsModulePath,
+    personReferenceModulePath,
+    hostAttachConfigModulePath,
+  ]) {
+    originals.set(modulePath, require.cache[modulePath]);
+  }
+
+  const capturedFallbacks: Array<{ cwd: string; explicitPath: unknown }> = [];
+  const workspaceRoot = "/Users/example/real-workspace";
+  const explicitConfig = "/Users/example/real-workspace/codeksei.config.json";
+
+  try {
+    require.cache[terminalFacadeModulePath] = {
+      id: terminalFacadeModulePath,
+      filename: terminalFacadeModulePath,
+      loaded: true,
+      exports: {
+        createTerminalAppFacade(config: Record<string, unknown>) {
+          return {
+            config,
+            login() {
+              return Promise.resolve();
+            },
+            getDoctorReport() {
+              return {};
+            },
+            printAccounts() {
+              return undefined;
+            },
+            printDoctor() {
+              return undefined;
+            },
+            sendLocalFileToCurrentChat() {
+              return Promise.resolve();
+            },
+            start() {
+              return Promise.resolve();
+            },
+          };
+        },
+      },
+    } as NodeJS.Module;
+
+    require.cache[brandingModulePath] = {
+      id: brandingModulePath,
+      filename: brandingModulePath,
+      loaded: true,
+      exports: {
+        ensureCodekseiHomeEnv() {
+          return undefined;
+        },
+        ensureStateDirectory() {
+          return undefined;
+        },
+      },
+    } as NodeJS.Module;
+
+    require.cache[envLoaderModulePath] = {
+      id: envLoaderModulePath,
+      filename: envLoaderModulePath,
+      loaded: true,
+      exports: {
+        loadEnvStack() {
+          return undefined;
+        },
+      },
+    } as NodeJS.Module;
+
+    require.cache[configModulePath] = {
+      id: configModulePath,
+      filename: configModulePath,
+      loaded: true,
+      exports: {
+        readConfig() {
+          return {
+            sessionsFile: "sessions.json",
+            stateDir: "state-dir",
+            systemMessageQueueFile: "system-message-queue.json",
+            systemMessageDeadLetterFile: "system-message-dead-letter.json",
+            workspaceId: "workspace-1",
+            workspaceRoot,
+            startWithCheckin: false,
+            weixinInstructionsFile: "",
+          };
+        },
+      },
+    } as NodeJS.Module;
+
+    require.cache[hostAttachConfigModulePath] = {
+      id: hostAttachConfigModulePath,
+      filename: hostAttachConfigModulePath,
+      loaded: true,
+      exports: {
+        applyHostConfigEnvFallback(_env: NodeJS.ProcessEnv, cwd: string, explicitPath?: unknown) {
+          capturedFallbacks.push({ cwd, explicitPath });
+          return null;
+        },
+      },
+    } as NodeJS.Module;
+
+    require.cache[instructionsTemplateModulePath] = {
+      id: instructionsTemplateModulePath,
+      filename: instructionsTemplateModulePath,
+      loaded: true,
+      exports: {
+        renderInstructionTemplate(template: string) {
+          return template;
+        },
+      },
+    } as NodeJS.Module;
+
+    require.cache[timelineIntegrationModulePath] = {
+      id: timelineIntegrationModulePath,
+      filename: timelineIntegrationModulePath,
+      loaded: true,
+      exports: {
+        createTimelineIntegration() {
+          return {
+            runSubcommand: async () => undefined,
+          };
+        },
+      },
+    } as NodeJS.Module;
+
+    require.cache[jsonStateModulePath] = {
+      id: jsonStateModulePath,
+      filename: jsonStateModulePath,
+      loaded: true,
+      exports: {
+        writeForeignTextDocument() {
+          return undefined;
+        },
+      },
+    } as NodeJS.Module;
+
+    require.cache[pathUtilsModulePath] = {
+      id: pathUtilsModulePath,
+      filename: pathUtilsModulePath,
+      loaded: true,
+      exports: {
+        resolvePackageRoot() {
+          return "/Users/example/codeksei";
+        },
+      },
+    } as NodeJS.Module;
+
+    require.cache[personReferenceModulePath] = {
+      id: personReferenceModulePath,
+      filename: personReferenceModulePath,
+      loaded: true,
+      exports: {
+        resolveConfiguredPersonName() {
+          return "Tester";
+        },
+      },
+    } as NodeJS.Module;
+
+    delete require.cache[contextModulePath];
+    const {
+      createTerminalCommandContext,
+    }: typeof import("../src/app/terminal-command-context") = require(contextModulePath);
+
+    createTerminalCommandContext(
+      ["system", "checkin-trigger", "--user", "wx-user", "--workspace", workspaceRoot],
+      {
+        debug: false,
+        format: "json",
+        locale: "zh-CN",
+        stdinIsTty: false,
+        stdoutIsTty: false,
+        verbose: false,
+        workspaceRoot: "",
+      },
+      {
+        action: "system.checkin_trigger",
+        approval: { autoApprove: true },
+        argsSchemaKey: "systemCheckinTrigger",
+        audience: "public",
+        authRequirement: "none",
+        command: "system",
+        entrypointType: "cli",
+        helpTopic: "system",
+        hostDependencies: [],
+        hostProfileIds: ["hosted-mode"],
+        hostSupportTier: "hosted_ready",
+        key: "system checkin-trigger",
+        kind: "",
+        mutability: "read",
+        pathTokens: ["system", "checkin-trigger"],
+        runner: "system.checkin-trigger",
+        safetyTier: "open",
+        scriptName: "system:checkin-trigger",
+        sideEffects: [],
+        subcommand: "checkin-trigger",
+        tokenCount: 2,
+        timelineSubcommand: "",
+      },
+    );
+
+    createTerminalCommandContext(
+      ["host", "claim-checkin", "--provider", "hermes", "--config", explicitConfig, "--workspace", "/ignored"],
+      {
+        debug: false,
+        format: "json",
+        locale: "zh-CN",
+        stdinIsTty: false,
+        stdoutIsTty: false,
+        verbose: false,
+        workspaceRoot: "",
+      },
+      {
+        action: "host.claim_checkin",
+        approval: { autoApprove: true },
+        argsSchemaKey: "hostClaimCheckin",
+        audience: "public",
+        authRequirement: "none",
+        command: "host",
+        entrypointType: "cli",
+        helpTopic: "host",
+        hostDependencies: [],
+        hostProfileIds: ["hosted-mode"],
+        hostSupportTier: "hosted_ready",
+        key: "host claim-checkin",
+        kind: "",
+        mutability: "write",
+        pathTokens: ["host", "claim-checkin"],
+        runner: "host.claim_checkin",
+        safetyTier: "warned",
+        scriptName: "",
+        sideEffects: [],
+        subcommand: "claim-checkin",
+        tokenCount: 2,
+        timelineSubcommand: "",
+      },
+    );
+
+    assert.equal(capturedFallbacks[0]?.cwd, workspaceRoot);
+    assert.equal(capturedFallbacks[0]?.explicitPath, undefined);
+    assert.equal(capturedFallbacks[1]?.cwd, process.cwd());
+    assert.equal(capturedFallbacks[1]?.explicitPath, explicitConfig);
+  } finally {
+    for (const [modulePath, original] of originals.entries()) {
+      if (original) {
+        require.cache[modulePath] = original;
+      } else {
+        delete require.cache[modulePath];
+      }
+    }
+  }
+});

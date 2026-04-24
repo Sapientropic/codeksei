@@ -180,6 +180,13 @@ interface HermesRepoLocalInvocation {
   session_key?: string;
 }
 
+interface HermesRepoLocalStoredSession {
+  chatId: string;
+  sessionKey: string;
+  threadId: string;
+  userId: string;
+}
+
 export interface PythonInvocation {
   command: string;
   argsPrefix: string[];
@@ -282,12 +289,13 @@ export function sendFileViaHermesRepoLocal(
   config: HermesRepoLocalConfigInput,
   payload: HermesRepoLocalSendFilePayload,
 ): HermesRepoLocalSendFileResult {
+  const hermesHome = resolveHermesHomePath(config);
   const data = invokeHermesRepoLocalBridge<HermesRepoLocalSendFileShimResult>(config, {
     action: "send_file",
-    hermes_home: resolveHermesHomePath(config),
+    hermes_home: hermesHome,
     payload,
     repo_root: resolveHermesRepoRoot(config),
-    session_key: normalizeText(process.env.HERMES_SESSION_KEY),
+    session_key: resolveHermesRepoLocalSessionKey(config, payload, hermesHome),
   });
   return {
     filePath: normalizeText(data.file_path) || normalizeText(payload.file_path),
@@ -304,12 +312,13 @@ export function createReminderViaHermesRepoLocal(
   config: HermesRepoLocalConfigInput,
   payload: HermesRepoLocalReminderPayload,
 ): HermesRepoLocalReminderResult {
+  const hermesHome = resolveHermesHomePath(config);
   const data = invokeHermesRepoLocalBridge<HermesRepoLocalReminderShimResult>(config, {
     action: "create_reminder",
-    hermes_home: resolveHermesHomePath(config),
+    hermes_home: hermesHome,
     payload,
     repo_root: resolveHermesRepoRoot(config),
-    session_key: normalizeText(process.env.HERMES_SESSION_KEY),
+    session_key: resolveHermesRepoLocalSessionKey(config, payload, hermesHome),
   });
   return {
     jobId: normalizeText(data.job_id),
@@ -329,12 +338,13 @@ export function syncCheckinCronViaHermesRepoLocal(
   payload: HermesRepoLocalSyncCheckinCronPayload,
 ): HermesRepoLocalSyncCheckinCronResult {
   const normalizedPayload = ensureContextScriptForSyncPayload(config, payload);
+  const hermesHome = resolveHermesHomePath(config);
   const data = invokeHermesRepoLocalBridge<HermesRepoLocalSyncCheckinCronShimResult>(config, {
     action: "sync_checkin_cron",
-    hermes_home: resolveHermesHomePath(config),
+    hermes_home: hermesHome,
     payload: normalizedPayload,
     repo_root: resolveHermesRepoRoot(config),
-    session_key: normalizeText(process.env.HERMES_SESSION_KEY),
+    session_key: resolveHermesRepoLocalSessionKey(config, normalizedPayload, hermesHome),
   });
   return {
     chatId: normalizeText(data.origin?.chat_id),
@@ -346,6 +356,130 @@ export function syncCheckinCronViaHermesRepoLocal(
     sessionKey: normalizeText(data.session_key),
     threadId: normalizeText(data.origin?.thread_id),
   };
+}
+
+function resolveHermesRepoLocalSessionKey(
+  config: HermesRepoLocalConfigInput,
+  payload: HermesRepoLocalReminderPayload | HermesRepoLocalSendFilePayload | HermesRepoLocalSyncCheckinCronPayload,
+  hermesHome = resolveHermesHomePath(config),
+): string {
+  const explicit = normalizeText(process.env.HERMES_SESSION_KEY);
+  if (explicit) {
+    return explicit;
+  }
+  const senderId = resolveHermesRepoLocalPayloadSenderId(payload);
+  const sessions = readHermesRepoLocalSessions(hermesHome);
+  const matched = senderId
+    ? sessions.filter((session) => (
+      session.sessionKey === senderId
+      || session.chatId === senderId
+      || session.userId === senderId
+      || session.threadId === senderId
+    ))
+    : sessions;
+  if (matched.length === 1) {
+    return matched[0]?.sessionKey || "";
+  }
+  if (senderId && sessions.length === 1) {
+    return sessions[0]?.sessionKey || "";
+  }
+  if (hasHermesOriginEnvFallback()) {
+    return "";
+  }
+  const sessionsPath = path.join(hermesHome, "sessions", "sessions.json");
+  if (matched.length > 1) {
+    throw new Error(
+      `Hermes repo-local session 不唯一：sender=${senderId || "(missing)"} 命中 ${matched.length} 个 session；请显式设置 HERMES_SESSION_KEY。`
+    );
+  }
+  if (senderId) {
+    throw new Error(
+      `Hermes repo-local 找不到 sender=${senderId} 对应 session；请先让 Hermes 收到该用户一条消息，或显式设置 HERMES_SESSION_KEY。sessions=${sessionsPath}`
+    );
+  }
+  throw new Error(
+    `Hermes repo-local 缺少 origin context；请显式设置 HERMES_SESSION_KEY，或提供 HERMES_SESSION_CHAT_ID/HERMES_SESSION_PLATFORM。sessions=${sessionsPath}`
+  );
+}
+
+function resolveHermesRepoLocalPayloadSenderId(
+  payload: HermesRepoLocalReminderPayload | HermesRepoLocalSendFilePayload | HermesRepoLocalSyncCheckinCronPayload,
+): string {
+  const direct = normalizeText(payload.sender_id);
+  if (direct) {
+    return direct;
+  }
+  if ("plans" in payload && Array.isArray(payload.plans)) {
+    for (const plan of payload.plans) {
+      const senderId = normalizeText(plan?.sender_id);
+      if (senderId) {
+        return senderId;
+      }
+    }
+  }
+  return "";
+}
+
+function readHermesRepoLocalSessions(hermesHome: string): HermesRepoLocalStoredSession[] {
+  const sessionsPath = path.join(hermesHome, "sessions", "sessions.json");
+  if (!fs.existsSync(sessionsPath)) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(sessionsPath, "utf8"));
+    return normalizeHermesRepoLocalSessions(parsed);
+  } catch {
+    return [];
+  }
+}
+
+function normalizeHermesRepoLocalSessions(value: unknown): HermesRepoLocalStoredSession[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => normalizeHermesRepoLocalSession(entry, ""))
+      .filter((entry): entry is HermesRepoLocalStoredSession => Boolean(entry));
+  }
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+  const record = value as Record<string, unknown>;
+  const nestedSessions = record.sessions;
+  if (Array.isArray(nestedSessions)) {
+    return normalizeHermesRepoLocalSessions(nestedSessions);
+  }
+  if (nestedSessions && typeof nestedSessions === "object") {
+    return normalizeHermesRepoLocalSessions(nestedSessions);
+  }
+  return Object.entries(record)
+    .map(([key, entry]) => normalizeHermesRepoLocalSession(entry, key))
+    .filter((entry): entry is HermesRepoLocalStoredSession => Boolean(entry));
+}
+
+function normalizeHermesRepoLocalSession(value: unknown, fallbackKey: string): HermesRepoLocalStoredSession | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const origin = (record.origin && typeof record.origin === "object" && !Array.isArray(record.origin))
+    ? record.origin as Record<string, unknown>
+    : {};
+  const sessionKey = normalizeText(record.session_key || record.sessionKey || record.key || fallbackKey);
+  if (!sessionKey) {
+    return null;
+  }
+  return {
+    chatId: normalizeText(origin.chat_id || origin.chatId || record.chat_id || record.chatId),
+    sessionKey,
+    threadId: normalizeText(origin.thread_id || origin.threadId || record.thread_id || record.threadId),
+    userId: normalizeText(origin.user_id || origin.userId || record.user_id || record.userId),
+  };
+}
+
+function hasHermesOriginEnvFallback(): boolean {
+  return Boolean(
+    normalizeText(process.env.HERMES_SESSION_CHAT_ID)
+    && normalizeText(process.env.HERMES_SESSION_PLATFORM),
+  );
 }
 
 function ensureContextScriptForSyncPayload(

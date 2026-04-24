@@ -766,6 +766,10 @@ function collectCurrentProjectRadar(
       normalizeDisplayPath(project.repoRoot) === normalizedWorkspaceRoot
     )) || (result.projects.length === 1 ? result.projects[0] : null);
     if (!matched) {
+      const candidates = rankTrackedProjectCandidates(result.projects).slice(0, 3);
+      if (candidates.length) {
+        return buildTrackedProjectCandidatesSnapshot(candidates);
+      }
       return {
         available: false,
         branch: "",
@@ -808,6 +812,80 @@ function collectCurrentProjectRadar(
       reason: error instanceof Error ? error.message : String(error || "unknown error"),
     };
   }
+}
+
+type CollectedProjectRadar = ReturnType<typeof collectProjectRadars>["projects"][number];
+
+function buildTrackedProjectCandidatesSnapshot(projects: CollectedProjectRadar[]): ProjectRadarSnapshot {
+  const best = projects[0];
+  const firstRecentCommit = projects
+    .map((project) => project.git.recentCommits[0])
+    .find(Boolean);
+  const readFirst = uniqueWorkspaceContinuityFiles(
+    projects.flatMap((project) => project.readFirst)
+      .filter(Boolean)
+      .map((file) => ({
+        absolutePath: normalizeText(file?.path),
+        role: `${normalizeText(file?.kind) || "workspace note"} (${normalizeText(
+          projects.find((project) => project.readFirst.includes(file))?.slug
+        ) || "tracked project"})`,
+        when: "",
+      }))
+  );
+  const unavailableReasons = projects
+    .filter((project) => !project.git.ok)
+    .map((project) => `${project.slug}:${normalizeText(project.git.reason) || normalizeText(project.git.message)}`)
+    .filter(Boolean);
+  return {
+    available: projects.some((project) => project.git.ok),
+    branch: normalizeText(best?.git.branch),
+    dirty: projects.some((project) => Boolean(project.git.dirty)),
+    matchedProject: `tracked project candidates: ${projects.map((project) => project.slug).join(", ")}`,
+    notePath: normalizeText(best?.notePath),
+    readFirst,
+    recentCommit: firstRecentCommit
+      ? `${normalizeText(firstRecentCommit.shortHash)} ${normalizeText(firstRecentCommit.subject)}`
+      : "",
+    reason: projects.some((project) => project.git.ok)
+      ? ""
+      : unavailableReasons.join("; ") || "tracked_project_candidates_unavailable",
+  };
+}
+
+function rankTrackedProjectCandidates(projects: CollectedProjectRadar[]): CollectedProjectRadar[] {
+  return [...projects].sort((left, right) => {
+    const leftScore = scoreTrackedProjectCandidate(left);
+    const rightScore = scoreTrackedProjectCandidate(right);
+    if (leftScore !== rightScore) {
+      return rightScore - leftScore;
+    }
+    return normalizeText(left.slug).localeCompare(normalizeText(right.slug));
+  });
+}
+
+function scoreTrackedProjectCandidate(project: CollectedProjectRadar): number {
+  return (project.git.ok ? 100 : 0)
+    + (project.git.dirty ? 50 : 0)
+    + (project.git.recentCommits.length ? 10 : 0)
+    + (project.readFirst.length ? 1 : 0);
+}
+
+function uniqueWorkspaceContinuityFiles(files: WorkspaceContinuityFile[]): WorkspaceContinuityFile[] {
+  const seen = new Set<string>();
+  const unique: WorkspaceContinuityFile[] = [];
+  for (const file of files) {
+    const absolutePath = normalizeText(file.absolutePath);
+    if (!absolutePath || seen.has(absolutePath)) {
+      continue;
+    }
+    seen.add(absolutePath);
+    unique.push({
+      absolutePath,
+      role: normalizeText(file.role),
+      when: normalizeText(file.when),
+    });
+  }
+  return unique.slice(0, 6);
 }
 
 function resolveFreshness({

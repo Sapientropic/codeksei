@@ -1,7 +1,15 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { normalizeText } from "../contracts/text-normalization";
+import {
+  buildCheckinTargetResolutionErrorMessage,
+  resolveCheckinTarget,
+} from "../checkin";
 import { captureSubprocess, resolveCommandOnPath } from "./subprocess-capture";
+import {
+  collectHostedCheckinCronSummary,
+  collectHostedCheckinManagedJobs,
+} from "./hosted-checkin-cron";
 import {
   collectHermesRepoLocalReport,
   resolveHermesHomePath,
@@ -19,6 +27,7 @@ import {
   type ReviewSemanticHost,
   type ReviewSemanticHostConfigInput,
 } from "./review-semantic-host-policy";
+import { createSessionStore } from "../session/session-store-factory";
 
 export interface HermesHostedDoctorReport {
   command: string;
@@ -87,6 +96,10 @@ export interface HermesHostedSmokeReport {
       ok: boolean;
       reason: string;
     };
+    managedCheckin: {
+      ok: boolean;
+      reason: string;
+    };
     semanticReview: {
       ok: boolean;
       reason: string;
@@ -97,9 +110,22 @@ export interface HermesHostedSmokeReport {
 
 export interface HostedHermesDiagnosticsConfigInput
   extends HermesHostedSkillConfigInput, ReviewSemanticHostConfigInput {
+  accountId?: unknown;
+  allowedUserIds?: unknown;
+  checkinConfigFile?: unknown;
+  checkinScheduleStateFile?: unknown;
+  sessionsFile?: unknown;
+  stateDir?: unknown;
+  userName?: unknown;
+  workspaceId?: unknown;
   workspaceRoot?: unknown;
   hermesCommand?: unknown;
   CODEKSEI_HERMES_COMMAND?: unknown;
+}
+
+interface ManagedCheckinSmokeTarget {
+  senderId: string;
+  workspaceRoot: string;
 }
 
 export function collectHermesHostedDoctorReport(
@@ -205,6 +231,7 @@ export function runHermesHostedSmoke(
         ? (skillCatalog.listed ? "" : "Hermes skills list 里未看到 codeksei-companion。")
         : skillCatalog.error || "无法执行 Hermes skills list。",
     },
+    managedCheckin: buildManagedCheckinSmokeCheck(config),
     semanticReview: {
       ok: hermes.semanticReview.available,
       reason: hermes.semanticReview.reason,
@@ -227,6 +254,9 @@ export function runHermesHostedSmoke(
   if (checks.hermesCommand.ok && !checks.skillCatalog.ok) {
     next.push("执行 `hermes skills list` 确认 Hermes 已扫描到 codeksei-companion。");
   }
+  if (!checks.managedCheckin.ok) {
+    next.push("执行 `codeksei host seed-proactive --provider hermes --user <user> --workspace <workspace>`，确认 Hermes cron 里存在 wake/recovery/guard 且带 origin/env。");
+  }
   if (!checks.semanticReview.ok && hermes.semanticReview.activeHost === "hermes") {
     next.push("先确保 Hermes CLI 可执行，再重试 hosted semantic review。");
   }
@@ -240,6 +270,135 @@ export function runHermesHostedSmoke(
     checks,
     next,
   };
+}
+
+function buildManagedCheckinSmokeCheck(config: HostedHermesDiagnosticsConfigInput): {
+  ok: boolean;
+  reason: string;
+} {
+  const resolution = resolveCheckinTarget({
+    accountId: normalizeText(config.accountId),
+    config: {
+      allowedUserIds: normalizeStringList(config.allowedUserIds),
+      workspaceId: normalizeText(config.workspaceId),
+      workspaceRoot: normalizeText(config.workspaceRoot),
+    },
+    sessionStore: createSessionStore(config.sessionsFile),
+  });
+  const cronConfig = buildManagedCheckinCronConfig(config);
+  const inferredTarget = inferUniqueManagedCheckinTarget(cronConfig);
+  const target: ManagedCheckinSmokeTarget | null = resolution.ok && resolution.value
+    ? {
+      senderId: resolution.value.senderId,
+      workspaceRoot: resolution.value.workspaceRoot,
+    }
+    : inferredTarget.target;
+  if (!target) {
+    return {
+      ok: false,
+      reason: [
+        inferredTarget.reason || buildCheckinTargetResolutionErrorMessage(resolution),
+        "host smoke 无法验证用户可见 check-in loop；请先显式配置 user/workspace，或执行 codeksei host seed-proactive --provider hermes。",
+      ].join("；"),
+    };
+  }
+
+  const summary = collectHostedCheckinCronSummary(cronConfig, target);
+  const missingRoles = [
+    summary.wakeJobs.length === 1 ? "" : `wake=${summary.wakeJobs.length}`,
+    summary.recoveryJobs.length === 1 ? "" : `recovery=${summary.recoveryJobs.length}`,
+    summary.guardJobs.length === 1 ? "" : `guard=${summary.guardJobs.length}`,
+  ].filter(Boolean);
+  if (missingRoles.length || summary.duplicateCount > 0) {
+    return {
+      ok: false,
+      reason: [
+        `managed check-in jobs 不完整：${missingRoles.join(", ") || `duplicates=${summary.duplicateCount}`}`,
+        `target=${summary.targetKey}`,
+        "请执行 codeksei host seed-proactive --provider hermes 同步 wake/recovery/guard。",
+      ].join("；"),
+    };
+  }
+
+  const unhealthyJobs = summary.futureJobs.filter((job) => (
+    job.deliver !== "origin"
+    || !job.hasOrigin
+    || !job.hasEnv
+  ));
+  if (unhealthyJobs.length) {
+    return {
+      ok: false,
+      reason: [
+        `managed check-in jobs 缺少可投递 origin/env：${unhealthyJobs.map((job) => job.role || job.jobId).join(", ")}`,
+        "请重新 seed-proactive，让 Hermes cron 持久化 origin/env。",
+      ].join("；"),
+    };
+  }
+
+  return {
+    ok: true,
+    reason: "",
+  };
+}
+
+function buildManagedCheckinCronConfig(config: HostedHermesDiagnosticsConfigInput): {
+  hermesHome: string;
+} {
+  return {
+    hermesHome: normalizeText(config.hermesHome || config.CODEKSEI_HERMES_HOME),
+  };
+}
+
+function inferUniqueManagedCheckinTarget(config: { hermesHome: string }): {
+  reason: string;
+  target: ManagedCheckinSmokeTarget | null;
+} {
+  const targetKeys = [...new Set(
+    collectHostedCheckinManagedJobs(config)
+      .map((job) => normalizeText(job.targetKey))
+      .filter(Boolean)
+  )];
+  if (targetKeys.length === 0) {
+    return {
+      reason: "",
+      target: null,
+    };
+  }
+  if (targetKeys.length > 1) {
+    return {
+      reason: `managed check-in target 不唯一：${targetKeys.length} 个 future target；请显式配置 --user/--workspace 或清理重复 cron jobs。`,
+      target: null,
+    };
+  }
+  const target = parseManagedCheckinTargetKey(targetKeys[0] || "");
+  return {
+    reason: target ? "" : "managed check-in targetKey 无法解析；请重新 seed-proactive。",
+    target,
+  };
+}
+
+function parseManagedCheckinTargetKey(targetKey: string): ManagedCheckinSmokeTarget | null {
+  const separator = "::";
+  const index = targetKey.indexOf(separator);
+  if (index <= 0) {
+    return null;
+  }
+  const senderId = normalizeText(targetKey.slice(0, index));
+  const workspaceRoot = normalizeText(targetKey.slice(index + separator.length));
+  if (!senderId || !workspaceRoot) {
+    return null;
+  }
+  return {
+    senderId,
+    workspaceRoot,
+  };
+}
+
+function normalizeStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.map((entry) => normalizeText(entry)).filter(Boolean);
 }
 
 export function collectHermesSkillCatalogProbe({

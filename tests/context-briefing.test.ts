@@ -1,6 +1,7 @@
 const fs: typeof import("node:fs") = require("node:fs");
 const os: typeof import("node:os") = require("node:os");
 const path: typeof import("node:path") = require("node:path");
+const { spawnSync }: typeof import("node:child_process") = require("node:child_process");
 const test: typeof import("node:test") = require("node:test");
 const assert: typeof import("node:assert/strict") = require("node:assert/strict");
 
@@ -139,6 +140,27 @@ function createContextFixture() {
   };
 }
 
+function createContextGitRepo(tempRoot: string, slug: string): string {
+  const repoRoot = path.join(tempRoot, slug);
+  fs.mkdirSync(repoRoot, { recursive: true });
+  runContextGit(repoRoot, ["init", "--initial-branch", "main"]);
+  runContextGit(repoRoot, ["config", "user.email", "bot@example.com"]);
+  runContextGit(repoRoot, ["config", "user.name", "Codeksei Bot"]);
+  fs.writeFileSync(path.join(repoRoot, "README.md"), `# ${slug}\n`, "utf8");
+  runContextGit(repoRoot, ["add", "README.md"]);
+  runContextGit(repoRoot, ["commit", "-m", `${slug} initial`]);
+  return repoRoot;
+}
+
+function runContextGit(repoRoot: string, args: string[]): void {
+  const result = spawnSync("git", args, {
+    cwd: repoRoot,
+    encoding: "utf8",
+    windowsHide: true,
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout || `git ${args.join(" ")} failed`);
+}
+
 test("context board refresh builds a deterministic handoff with fresh diary and companion context", () => {
   const fixture = createContextFixture();
   const result = refreshContextBoard(fixture.config, fixture.target, {
@@ -157,6 +179,42 @@ test("context board refresh builds a deterministic handoff with fresh diary and 
   assert.match(result.stateCard.easiestReentryStep, /hosted checkin script/u);
   assert.match(result.boardText, /待带进下一次主动判断的内部后续：午饭后 30 分钟重新接这条线。/u);
   assert.match(result.boardText, /## 重入入口/u);
+});
+
+test("context board keeps tracked project candidates when current workspace is the vault", () => {
+  const fixture = createContextFixture();
+  const reposRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-context-board-repos-"));
+  const codekseiRepo = createContextGitRepo(reposRoot, "codeksei");
+  const otherRepo = createContextGitRepo(reposRoot, "other");
+  fs.writeFileSync(path.join(codekseiRepo, "current.txt"), "dirty work\n", "utf8");
+  fs.writeFileSync(path.join(fixture.workspaceRoot, "notes", "Codeksei.md"), "# Codeksei note\n", "utf8");
+  fs.writeFileSync(path.join(fixture.workspaceRoot, "notes", "Other.md"), "# Other note\n", "utf8");
+  fs.writeFileSync(fixture.config.projectRadarConfigFile, JSON.stringify({
+    projects: [
+      {
+        slug: "other",
+        title: "Other",
+        repoRoot: otherRepo,
+        notePath: "notes/Other.md",
+        overviewFiles: ["README.md"],
+      },
+      {
+        slug: "codeksei",
+        title: "Codeksei",
+        repoRoot: codekseiRepo,
+        notePath: "notes/Codeksei.md",
+        overviewFiles: ["README.md"],
+      },
+    ],
+  }, null, 2), "utf8");
+
+  const result = refreshContextBoard(fixture.config, fixture.target, {
+    mode: "proactive",
+  });
+
+  assert.match(result.briefingText, /tracked project candidates/u);
+  assert.match(result.briefingText, /codeksei/u);
+  assert.doesNotMatch(result.briefingText, /workspace_not_tracked/u);
 });
 
 test("context board renders proactive observation without mutating deterministic state card", () => {

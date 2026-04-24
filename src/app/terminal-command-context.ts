@@ -34,7 +34,8 @@ export function createTerminalCommandContext(
   cli: GlobalCliOptions,
   manifest: TerminalCommandManifestEntry | null = null,
 ): TerminalCommandContext {
-  const bootstrapCwd = cli.workspaceRoot || process.cwd();
+  const fallbackInput = resolveHostedConfigFallbackInput(manifest, argv, cli);
+  const bootstrapCwd = fallbackInput.cwd;
   loadEnvStack();
   // Hosted proactive/check-in commands can be launched by Hermes cron from a
   // clean environment. Rehydrate their CODEKSEI_* defaults from the canonical
@@ -42,7 +43,7 @@ export function createTerminalCommandContext(
   // runtime flags come back without leaking hosted user defaults into unrelated
   // bridge-only commands.
   if (shouldApplyHostedConfigFallback(manifest)) {
-    applyHostConfigEnvFallback(process.env, bootstrapCwd);
+    applyHostConfigEnvFallback(process.env, bootstrapCwd, fallbackInput.explicitConfigPath);
   }
   loadEnvStack();
   ensureStateDirectory();
@@ -113,6 +114,62 @@ function hasArgFlag(argv: string[], flag: string): boolean {
 function shouldApplyHostedConfigFallback(manifest: TerminalCommandManifestEntry | null): boolean {
   const action = manifest?.action || "";
   return HOSTED_CONFIG_FALLBACK_ACTIONS.has(action);
+}
+
+function resolveHostedConfigFallbackInput(
+  manifest: TerminalCommandManifestEntry | null,
+  argv: string[],
+  cli: GlobalCliOptions,
+): {
+  cwd: string;
+  explicitConfigPath: string | undefined;
+} {
+  const cliWorkspace = normalizeOptionPath(cli.workspaceRoot);
+  const explicitConfigPath = shouldApplyHostedConfigFallback(manifest)
+    ? normalizeOptionPath(readOptionValue(argv, "--config"))
+    : "";
+  if (explicitConfigPath) {
+    return {
+      cwd: cliWorkspace || process.cwd(),
+      explicitConfigPath,
+    };
+  }
+
+  const leafWorkspace = shouldApplyHostedConfigFallback(manifest)
+    ? normalizeOptionPath(readOptionValue(argv, "--workspace"))
+    : "";
+  return {
+    cwd: cliWorkspace || leafWorkspace || process.cwd(),
+    explicitConfigPath: undefined,
+  };
+}
+
+function normalizeOptionPath(value: string): string {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return "";
+  }
+  if (/^[A-Za-z]:[\\/]/u.test(normalized) || /^\\\\/u.test(normalized)) {
+    return normalized.replace(/\\/gu, "/");
+  }
+  return path.resolve(normalized);
+}
+
+function readOptionValue(argv: string[], optionName: string): string {
+  if (!Array.isArray(argv) || !optionName) {
+    return "";
+  }
+  const equalsPrefix = `${optionName}=`;
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = String(argv[index] || "").trim();
+    if (token.startsWith(equalsPrefix)) {
+      return token.slice(equalsPrefix.length);
+    }
+    if (token === optionName) {
+      return String(argv[index + 1] || "").trim();
+    }
+  }
+  return "";
 }
 
 const HOSTED_CONFIG_FALLBACK_ACTIONS = new Set<string>([

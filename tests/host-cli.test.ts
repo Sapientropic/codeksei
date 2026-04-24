@@ -69,6 +69,26 @@ function writeFreshHostDiary(fixture: ReturnType<typeof createHostFixture>) {
   return diaryDir;
 }
 
+function writeInstalledHermesSkill(hermesHome: string) {
+  const sourcePath = path.join(__dirname, "..", "templates", "hermes", "skills", "codeksei-companion", "SKILL.md");
+  const installedPath = path.join(hermesHome, "skills", "codeksei-companion", "SKILL.md");
+  fs.mkdirSync(path.dirname(installedPath), { recursive: true });
+  fs.copyFileSync(sourcePath, installedPath);
+}
+
+function writeFakeHermesCommand(tempRoot: string) {
+  const commandPath = path.join(tempRoot, process.platform === "win32" ? "hermes.cmd" : "hermes");
+  fs.writeFileSync(
+    commandPath,
+    process.platform === "win32"
+      ? "@echo off\r\necho codeksei-companion\r\n"
+      : "#!/bin/sh\necho codeksei-companion\n",
+    "utf8"
+  );
+  fs.chmodSync(commandPath, 0o755);
+  return commandPath;
+}
+
 test("host manifest returns the hosted-first discovery contract plus compatibility invariant", async () => {
   const fixture = createHostFixture("codeksei-host-manifest-");
   const result = await runHostManifestCommand(fixture.config);
@@ -262,6 +282,71 @@ test("host doctor and smoke expose Codex provider readiness without Hermes prere
   assert.equal(smoke.ok, true);
   assert.equal(smoke.data.provider, "codex");
   assert.equal(smoke.data.checks.stateDir.ok, true);
+});
+
+test("host smoke reports missing managed checkin jobs for a configured hosted target", async () => {
+  const fixture = createHostFixture("codeksei-host-smoke-managed-checkin-");
+  const repoLocal = createFakeHermesRepoLocalFixture(
+    fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-host-smoke-managed-checkin-repo-local-"))
+  );
+  writeInstalledHermesSkill(repoLocal.hermesHome);
+  const hermesCommand = writeFakeHermesCommand(fixture.tempRoot);
+
+  const smoke = await runHostSmokeCommand({
+    ...fixture.config,
+    ...repoLocal.env,
+    channelProvider: "hermes",
+    hermesCommand,
+    hermesHome: repoLocal.hermesHome,
+    hermesRepoLocalShimPath: repoLocal.shimPath,
+    hermesRepoRoot: repoLocal.repoRoot,
+    runtime: "hermes",
+  }, [
+    "--provider", "hermes",
+  ]);
+
+  assert.equal(smoke.ok, "partial");
+  assert.equal(smoke.data.checks.managedCheckin.ok, false);
+  assert.match(smoke.data.checks.managedCheckin.reason, /seed-proactive/u);
+});
+
+test("host smoke can infer the target from a unique managed checkin job set", async () => {
+  const fixture = createHostFixture("codeksei-host-smoke-managed-checkin-target-");
+  const repoLocal = createFakeHermesRepoLocalFixture(
+    fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-host-smoke-managed-checkin-target-repo-local-"))
+  );
+  fs.mkdirSync(path.join(repoLocal.hermesHome, "weixin", "accounts"), { recursive: true });
+  fs.writeFileSync(path.join(repoLocal.hermesHome, "weixin", "accounts", "test-account.json"), "{}", "utf8");
+  writeInstalledHermesSkill(repoLocal.hermesHome);
+  const hermesCommand = writeFakeHermesCommand(fixture.tempRoot);
+  const runtimeConfig = {
+    ...fixture.config,
+    ...repoLocal.env,
+    channelProvider: "hermes",
+    hermesCommand,
+    hermesHome: repoLocal.hermesHome,
+    hermesRepoLocalShimPath: repoLocal.shimPath,
+    hermesRepoRoot: repoLocal.repoRoot,
+    runtime: "hermes",
+  };
+
+  await runHostSeedProactiveCommand(runtimeConfig, [
+    "--provider", "hermes",
+    "--user", "wx-user",
+    "--workspace", fixture.workspaceRoot,
+    "--sleep-for", "2h",
+  ]);
+
+  const smoke = await runHostSmokeCommand({
+    ...runtimeConfig,
+    allowedUserIds: [],
+    sessionsFile: path.join(fixture.stateDir, "missing-sessions.json"),
+  }, [
+    "--provider", "hermes",
+  ]);
+
+  assert.equal(smoke.ok, true);
+  assert.equal(smoke.data.checks.managedCheckin.ok, true);
 });
 
 test("host doctor flags legacy config without bootstrap snapshot for re-bootstrap", async () => {

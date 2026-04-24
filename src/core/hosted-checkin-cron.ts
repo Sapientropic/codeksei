@@ -40,11 +40,16 @@ export interface HostedCheckinCronSyncPlanSet {
 }
 
 export interface HostedCheckinManagedJob {
+  deliver: string;
   enabled: boolean;
+  hasEnv: boolean;
+  hasOrigin: boolean;
   jobId: string;
   name: string;
   nextRunAt: string;
   role: HostedCheckinCronRole;
+  skill: string;
+  skills: string[];
   state: string;
   targetKey: string;
 }
@@ -63,10 +68,15 @@ export interface HostedCheckinCronSummary {
 interface RawCronJob extends Record<string, unknown> {
   codeksei_checkin_role?: unknown;
   codeksei_checkin_target_key?: unknown;
+  deliver?: unknown;
   enabled?: unknown;
+  env?: unknown;
   id?: unknown;
   name?: unknown;
   next_run_at?: unknown;
+  origin?: unknown;
+  skill?: unknown;
+  skills?: unknown;
   state?: unknown;
 }
 
@@ -94,14 +104,8 @@ export function collectHostedCheckinCronSummary(
   } = {},
 ): HostedCheckinCronSummary {
   const targetKey = buildCheckinTargetKey(target);
-  const jobsFile = path.join(resolveHermesHomePath(config), "cron", "jobs.json");
-  const allJobs = readManagedCronJobs(jobsFile);
-  const toleranceMs = 1_000;
-  const futureJobs = allJobs.filter((job) => (
-    job.targetKey === targetKey
-    && job.nextRunAt
-    && Date.parse(job.nextRunAt) >= nowMs - toleranceMs
-  ));
+  const futureJobs = collectHostedCheckinManagedJobs(config, { nowMs })
+    .filter((job) => job.targetKey === targetKey);
   const guardJobs = futureJobs.filter((job) => job.role === "guard");
   const wakeJobs = futureJobs.filter((job) => job.role === "wake");
   const recoveryJobs = futureJobs.filter((job) => job.role === "recovery");
@@ -120,6 +124,23 @@ export function collectHostedCheckinCronSummary(
     targetKey,
     wakeJobs,
   };
+}
+
+export function collectHostedCheckinManagedJobs(
+  config: Partial<HostedCheckinConfig>,
+  {
+    nowMs = Date.now(),
+  }: {
+    nowMs?: number;
+  } = {},
+): HostedCheckinManagedJob[] {
+  const jobsFile = path.join(resolveHermesHomePath(config), "cron", "jobs.json");
+  const allJobs = readManagedCronJobs(jobsFile);
+  const toleranceMs = 1_000;
+  return allJobs.filter((job) => (
+    job.nextRunAt
+    && Date.parse(job.nextRunAt) >= nowMs - toleranceMs
+  ));
 }
 
 export function createHostedCheckinCronPlanSetFromTick(
@@ -462,14 +483,44 @@ function normalizeManagedCheckinJob(value: unknown): HostedCheckinManagedJob | n
     return null;
   }
   return {
+    deliver: normalizeText(job.deliver),
     enabled: Boolean(job.enabled !== false),
+    hasEnv: Boolean(job.env && typeof job.env === "object" && !Array.isArray(job.env)),
+    hasOrigin: hasManagedCheckinOrigin(job.origin),
     jobId: normalizeText(job.id),
     name: normalizeText(job.name),
     nextRunAt,
     role,
+    skill: normalizeText(job.skill),
+    skills: normalizeStringList(job.skills),
     state: normalizeText(job.state) || "scheduled",
     targetKey,
   };
+}
+
+function hasManagedCheckinOrigin(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const origin = value as Record<string, unknown>;
+  return Boolean(
+    normalizeText(origin.platform)
+    && (
+      normalizeText(origin.chat_id)
+      || normalizeText(origin.chatId)
+      || normalizeText(origin.user_id)
+      || normalizeText(origin.userId)
+    ),
+  );
+}
+
+function normalizeStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((entry) => normalizeText(entry))
+    .filter(Boolean);
 }
 
 function normalizeManagedRole(value: unknown): HostedCheckinCronRole | "" {
