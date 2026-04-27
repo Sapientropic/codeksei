@@ -54,6 +54,11 @@ public CLI：
 - `codeksei onboarding start`
 - `codeksei onboarding status`
 - `codeksei context briefing`
+- `codeksei context inspect`
+- `codeksei capabilities status`
+- `codeksei pulse today`
+- `codeksei pulse generate`
+- `codeksei pulse feedback`
 - `codeksei host manifest`
 - `codeksei host bootstrap`
 - `codeksei host doctor`
@@ -103,6 +108,8 @@ operator / bootstrap：
 - `codeksei system checkin-complete --user <senderId> --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for <duration>`
 - `codeksei context briefing --user <senderId> --workspace /absolute/workspace --mode proactive`
 - `codeksei context briefing --user <senderId> --workspace /absolute/workspace --mode review`
+- `codeksei context inspect --user <senderId> --workspace /absolute/workspace --mode proactive`
+- `codeksei pulse today --user <senderId> --workspace /absolute/workspace`
 
 说明：
 
@@ -130,15 +137,61 @@ operator / bootstrap：
 - `codeksei context briefing --user <senderId> --workspace /absolute/workspace`
 - `codeksei context briefing --user <senderId> --workspace /absolute/workspace --mode proactive`
 - `codeksei context briefing --user <senderId> --workspace /absolute/workspace --mode review`
+- `codeksei context inspect --user <senderId> --workspace /absolute/workspace --mode proactive`
+- `codeksei context inspect --user <senderId> --workspace /absolute/workspace --text "本轮用户消息"`
 
 说明：
 
 - 默认输出当前 target 的 prompt-ready briefing；`--mode proactive|review` 用来调整 framing
+- `context inspect` 在 briefing 之上解释本轮装配：layers、excluded、staleReasons、pendingHandoff、stateCard、redaction 与 contextPacks
+- 文本输出默认脱敏本地路径和敏感 token；机器消费时用全局 `--format json`
 - board 落在 `CODEKSEI_STATE_DIR/context/boards/<targetKey>.md`
 - 来源固定为受控输入集：checkin state、当日日记、最近 companion note、proactive follow-up context、project radar、workspace continuity 入口
 - 缺源时显式标 `[⚠️ 需确认]`，不会编造
 - Hosted Mode 下的 proactive wake 会在 cron 运行前现读这份 board；原始 `AGENTS.md / Home.md / diary` 是输入源，不再是 cron prompt 的直接 surface
 - context board 不会默认触发模型调用；小模型 observation 只能由 `proactive observe` 或 host claim-checkin 的 observation pass 显式生成
+
+## Capability Governance
+
+这一组入口回答“能力是否真的可用”，避免把“配置里有”误读成“当前会话可执行”。
+
+- `codeksei capabilities status`
+- `codeksei capabilities status --provider hermes --user <senderId> --workspace /absolute/workspace`
+
+说明：
+
+- JSON 每项包含 `id`、`label`、`configured`、`availableNow`、`status`、`reasons`、`entrypoints`、`mutability`、`sideEffect`、`safetyTier`、`hostSupportTier`、`hostProfiles`
+- 文本输出会按 available / degraded / blocked / unknown 汇总，并列出当前不可用原因
+- 这条命令只读，不会 bootstrap、安装 Hermes skill 或改写 canonical config
+- 判断依据来自当前 command surface、host profile、host dependencies 与 target/workspace 解析，不从字段名猜语义
+- 未显式验证的 host readiness 依赖会保守标为 `degraded`；`host doctor/smoke` 这类诊断入口仍保持可调用，用来进一步确认真实状态
+
+## Codeksei Pulse
+
+Pulse 是用户可见的每日策展层：最多给出 3 张今天值得继续推进的卡片，不是自动打扰层。
+
+- `codeksei pulse today --user <senderId> --workspace /absolute/workspace`
+- `codeksei pulse generate --user <senderId> --workspace /absolute/workspace --focus "今天想继续哪条线"`
+- `codeksei pulse feedback --kind like|dislike|hide|save|task --card <pulseCardId> --topic "主题" --text "反馈"`
+
+说明：
+
+- V1 deterministic-first，不强依赖模型；候选来自 diary、context board、project radar、pending check-in handoff、capability status 与历史反馈
+- capability status 只代表“当前可调用/不可调用”，不代表已经拿到实时外部结果；Pulse 不会凭空编外部事实
+- 本地状态写入 `CODEKSEI_STATE_DIR/pulse/` 下的 `runs`、`feedback`、`tasks`
+- 排序规则固定：focus、未完成任务、项目重入、pending handoff、今天事实充足、like/save 正反馈会加分；最近重复、dislike/hide 负反馈、上下文偏薄会降权
+- `pulse today` 会读取当天已有 run；没有 run 时才生成
+- `pulse feedback --kind task` 会把卡片主题转成跨天 open task；`like` / `save` / `dislike` / `hide` 只影响本地排序，不训练远端模型
+
+## Scoped Context Packs
+
+Context packs 是可解释、可限预算的定向规则包，不是角色扮演 Worldbook。
+
+- 配置文件：workspace 下 `.codex/context-packs.json`
+- 最小字段：`id`、`enabled`、`scope`、`triggers.include`、`triggers.exclude`、`modes`、`budgetChars`、`cooldownHours`、`content`
+- V1 只接入 `context inspect` 和 Pulse 的解释/候选层；不会直接污染 runtime prompt
+- `exclude` 优先级高于 `include`，适合挡住“文档提到 Hermes 但不应触发本机 Hermes 运维包”这类 false positive
+- `context inspect` 本身只读，不会刷新 cooldown；Pulse 生成命中的 pack 会把运行态写到 `CODEKSEI_STATE_DIR/context-packs/`，后续命中会显示 `cooldown active until ...`
 
 ## Proactive Observation
 
@@ -220,7 +273,7 @@ operator / bootstrap：
 - canonical 真相层现在是 `coreInvariant=codeksei-core-owned` 与 `scheduleTruthOwner=codeksei`；`runtimeInvariant=bridge-full` 只保留给旧 hostkit / config consumer 做兼容读取，不再是公开主命名。
 - `host manifest` 现在表达默认机器合同，不再伪装成当前环境探测；当前机器/当前 workspace 的实际 provider、profile 与 readiness 统一看 `host doctor`。
 - `system checkin-*` 仍保留为低层 truth layer；新宿主默认优先走 `host seed / claim / settle / finalize`。
-- Hostkit 的 `entrypoints` 现在也暴露 `diaryWrite`、`timelineEvent`、`timelineCategories`、`timelineRead`、`reviewNightly`、`noteAuto`、`projectRadar`、`reminderWrite`，`recommendedWorkflows` 会提示 `time_block_capture`、`cutover_bookkeeping`、`sleep_closeout`、`project_continuity_write`。宿主应主动使用这些入口做 bookkeeping，而不是只把它们当 README prose。
+- Hostkit 的 `entrypoints` 现在也暴露 `capabilitiesStatus`、`contextInspect`、`pulseToday`、`pulseGenerate`、`pulseFeedback`、`diaryWrite`、`timelineEvent`、`timelineCategories`、`timelineRead`、`reviewNightly`、`noteAuto`、`projectRadar`、`reminderWrite`，`recommendedWorkflows` 会提示 `capability_governance_check`、`daily_pulse_review`、`time_block_capture`、`cutover_bookkeeping`、`sleep_closeout`、`project_continuity_write`。宿主应主动使用这些入口做 bookkeeping 与解释，而不是只把它们当 README prose。
 
 ## 微信命令
 

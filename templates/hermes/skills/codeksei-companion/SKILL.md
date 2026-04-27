@@ -51,6 +51,11 @@ codeksei review weekly
 codeksei review monthly
 codeksei project radar --project <slug> --json
 codeksei context briefing --user <wechatUserId> --workspace /absolute/workspace --mode proactive
+codeksei context inspect --user <wechatUserId> --workspace /absolute/workspace --mode proactive
+codeksei capabilities status --provider hermes --user <wechatUserId> --workspace /absolute/workspace
+codeksei pulse today --user <wechatUserId> --workspace /absolute/workspace
+codeksei pulse generate --user <wechatUserId> --workspace /absolute/workspace --focus "..."
+codeksei pulse feedback --kind like|dislike|hide|save|task --card <pulseCardId> --topic "..."
 codeksei host seed-proactive --provider hermes --user <wechatUserId> --workspace /absolute/workspace
 codeksei host claim-checkin --provider hermes --user <wechatUserId> --workspace /absolute/workspace
 codeksei host settle-checkin --provider hermes --user <wechatUserId> --workspace /absolute/workspace --lease <leaseId> --result sent_message --create-handoff --message "..." --observed-state "..." --followup-context "..." --bookkeeping-action "timeline|done|..."
@@ -64,9 +69,20 @@ Use this decision order unless the user explicitly asks for something narrower:
 1. If the user is new, profile context is thin, or you need to learn support style and boundaries before acting, call `onboarding status` first. If status is `not_started`, call `onboarding start`; if status is `in_progress` or `followup_needed`, route the latest user reply through `onboarding step` instead of freehand profiling in chat.
 2. If you need current proactive/review context, call `context briefing` instead of reading raw notes or guessing from memory.
    If that briefing shows a pending proactive handoff, absorb it before replying and finish the turn with `host finalize-checkin` instead of leaving the lease hanging.
-3. If the user just said something that should change future support style, boundaries, timing, or likely re-entry behavior, persist it through `onboarding step` when onboarding is still active; otherwise call `companion remember`.
-4. If the task is a hosted proactive wake, use the hosted contract: `host seed-proactive / claim-checkin / settle-checkin --create-handoff / finalize-checkin`.
-5. Only skip Codeksei CLI when Hermes already owns the surface completely.
+3. If the host or user needs to know why something is usable or blocked, call `capabilities status` instead of inferring from config alone.
+4. If the user asks what is worth continuing today, call `pulse today` or `pulse generate` and present the cards as visible curation, not as an automatic wake.
+5. If the user just said something that should change future support style, boundaries, timing, or likely re-entry behavior, persist it through `onboarding step` when onboarding is still active; otherwise call `companion remember`.
+6. If the task is a hosted proactive wake, use the hosted contract: `host seed-proactive / claim-checkin / settle-checkin --create-handoff / finalize-checkin`.
+7. Only skip Codeksei CLI when Hermes already owns the surface completely.
+
+## Governance And Pulse
+
+- `capabilities status` is the read-only governance view. It distinguishes configured command surface from currently available session capability, including host profile support, prerequisites, side effects, and blocked reasons.
+- `context inspect` is the explainability view for context assembly. Use it when the host needs to show which sources entered the current handoff, which were excluded, whether a pending proactive handoff exists, and whether context packs matched.
+- `pulse today` / `pulse generate` produce at most three deterministic curation cards from diary, timeline, companion memory, context board, project radar, reminders, reviews, check-in handoff, capability status, and prior feedback.
+- A capability-status signal means the capability is callable or blocked. It is not evidence that fresh external facts have already been fetched.
+- `pulse feedback` writes local feedback only. It does not train a remote model; `like` and `save` raise future scores, `dislike` and `hide` lower future scores, while `task` keeps a cross-day open loop.
+- Pulse is not a proactive send layer. Do not auto-send Pulse cards to Weixin unless a higher-level workflow explicitly asks for visible curation.
 
 ## Proactive Default
 

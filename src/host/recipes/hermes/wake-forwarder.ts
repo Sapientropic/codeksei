@@ -61,6 +61,7 @@ export function syncHostedCheckinPlanSetViaHermes(
       sender_id: job.senderId,
       target_key: job.targetKey,
       workspace_root: job.workspaceRoot,
+      wrap_response: job.wrapResponse,
     })),
     sender_id: planSet.senderId,
     target_key: planSet.targetKey,

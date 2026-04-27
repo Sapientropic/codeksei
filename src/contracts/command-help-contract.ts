@@ -38,7 +38,10 @@ const TOPIC_HELP = {
     ],
   }),
   context: () => ({
-    usage: [buildExample("context.briefing", true)],
+    usage: [
+      buildExample("context.briefing", true),
+      buildTerminalActionExample("context.inspect", { audience: "public", includeArgs: true }),
+    ],
     bodyLabel: "补充：",
     body: [
       "  这条命令会先刷新本地 context board，再输出一份 prompt-ready handoff。",
@@ -56,6 +59,19 @@ const TOPIC_HELP = {
       "  observation layer 只做本地语义观察，不接管 schedule truth，也不自动写 companion memory。",
       "  observe 默认会写入 latest observation 并刷新 context board；--show 只读当前 latest 状态，不触发模型调用。",
       "  eval 只读 fixture，用来比较小模型观察与 deterministic decision 的行为差异。",
+    ],
+  }),
+  pulse: () => ({
+    usage: [
+      buildTerminalActionExample("pulse.today", { audience: "public", includeArgs: true }),
+      buildTerminalActionExample("pulse.generate", { audience: "public", includeArgs: true }),
+      buildTerminalActionExample("pulse.feedback", { audience: "public", includeArgs: true }),
+    ],
+    bodyLabel: "补充：",
+    body: [
+      "  Pulse 是用户可见的每日策展层，不是自动打扰层，也不改变 proactive schedule。",
+      "  generate 会基于 diary、context board、project radar、pending handoff、capability status 和历史反馈生成最多 3 张卡。",
+      "  feedback 会把 like/dislike/hide/save/task 写入本地 state，用于下一次 deterministic 排序。",
     ],
   }),
   onboarding: () => ({
@@ -94,6 +110,14 @@ const TOPIC_HELP = {
   }),
   channel: () => ({
     usage: [buildExample("channel.send_file", true)],
+  }),
+  capabilities: () => ({
+    usage: [buildTerminalActionExample("capabilities.status", { audience: "public", includeArgs: true })],
+    bodyLabel: "补充：",
+    body: [
+      "  capabilities status 区分“命令已配置”和“当前宿主/会话真的可用”。",
+      "  输出会解释 host profile、mutability、sideEffect、safety、依赖项和 blocked reason，适合宿主接入前自检。",
+    ],
   }),
   system: () => ({
     usage: [
@@ -287,6 +311,20 @@ const LEAF_HELP = {
     ],
     includeFlagBlock: true,
   }),
+  "capabilities.status": () => ({
+    usage: [buildTerminalActionExample("capabilities.status", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  输出当前 Codeksei command surface 的能力治理报告。",
+      "  每个能力都会带 configured、availableNow、status、reasons、entrypoints、mutability、sideEffect、safetyTier、hostSupportTier 和 hostProfiles。",
+      "  未显式验证的 host readiness 依赖会保守标为 degraded；诊断/修复入口仍保持可调用。",
+      "  这条命令只读，不会安装 skill、跑 bootstrap 或写宿主配置。",
+    ],
+    examples: [
+      "  codeksei capabilities status --provider hermes --user wxid_xxx --workspace /absolute/workspace",
+    ],
+    includeFlagBlock: true,
+  }),
   "operator.hermes.install_skill": () => ({
     usage: [buildTerminalActionExample("operator.hermes.install_skill", { audience: "public", includeArgs: true })],
     bodyLabel: "说明：",
@@ -390,6 +428,48 @@ const LEAF_HELP = {
     examples: [
       "  codeksei context briefing --user <wechatUserId> --workspace /absolute/workspace",
       "  codeksei context briefing --user <wechatUserId> --workspace /absolute/workspace --mode review",
+    ],
+    includeFlagBlock: true,
+  }),
+  "context.inspect": () => ({
+    usage: [buildTerminalActionExample("context.inspect", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  在 context briefing 之上解释本轮上下文装配，而不是新增事实来源。",
+      "  JSON 输出包含 layers、excluded、staleReasons、pendingHandoff、stateCard、redaction 和 contextPacks。",
+      "  文本输出默认脱敏本地路径和敏感 token；需要机器消费时使用全局 --format json。",
+    ],
+    examples: [
+      "  codeksei context inspect --user <wechatUserId> --workspace /absolute/workspace --mode proactive",
+      "  codeksei context inspect --user <wechatUserId> --workspace /absolute/workspace --text \"本轮用户消息\"",
+    ],
+    includeFlagBlock: true,
+  }),
+  "pulse.today": () => ({
+    usage: [buildTerminalActionExample("pulse.today", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  读取今天已有的 Pulse；如果当天还没有 run，会按 deterministic V1 规则生成一次。",
+      "  默认最多 3 张卡，不自动发消息，也不改变 proactive 调度。",
+    ],
+    includeFlagBlock: true,
+  }),
+  "pulse.generate": () => ({
+    usage: [buildTerminalActionExample("pulse.generate", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  重新生成指定日期的 Pulse run，并写入 stateDir/pulse/runs。",
+      "  --focus 是本次策展最高优先级信号之一，但仍会受负反馈、重复主题和上下文薄弱惩罚影响。",
+    ],
+    includeFlagBlock: true,
+  }),
+  "pulse.feedback": () => ({
+    usage: [buildTerminalActionExample("pulse.feedback", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  记录 Pulse 卡片反馈；--kind task 会额外写入跨天未完成任务。",
+      "  like/save 会提高同主题后续候选分数；dislike/hide 会降低同主题后续候选分数。",
+      "  反馈只写本地 state，不训练远端模型，也不会自动推送给宿主。",
     ],
     includeFlagBlock: true,
   }),

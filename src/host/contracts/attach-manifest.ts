@@ -25,6 +25,7 @@ export interface HostIdentity {
 export interface HostEntrypointManifest {
   manifest: string[];
   bootstrap: string[];
+  capabilitiesStatus: string[];
   doctor: string[];
   smoke: string[];
   seedProactive: string[];
@@ -45,12 +46,17 @@ export interface HostEntrypointManifest {
   onboardingStep: string[];
   onboardingStatus: string[];
   contextBriefing: string[];
+  contextInspect: string[];
+  pulseFeedback: string[];
+  pulseGenerate: string[];
+  pulseToday: string[];
 }
 
 export interface HostWorkflowStep {
   commandRef:
     | "manifest"
     | "bootstrap"
+    | "capabilitiesStatus"
     | "doctor"
     | "smoke"
     | "render"
@@ -63,6 +69,7 @@ export interface HostWorkflowStep {
     | "onboardingStatus"
     | "companionRemember"
     | "contextBriefing"
+    | "contextInspect"
     | "diaryWrite"
     | "timelineEvent"
     | "timelineCategories"
@@ -70,13 +77,17 @@ export interface HostWorkflowStep {
     | "reviewNightly"
     | "noteAuto"
     | "projectRadar"
-    | "reminderWrite";
+    | "reminderWrite"
+    | "pulseFeedback"
+    | "pulseGenerate"
+    | "pulseToday";
   reason: string;
 }
 
 export interface HostWorkflowHint {
   id:
     | "bootstrap_and_install_skill"
+    | "capability_governance_check"
     | "first_activation_onboarding"
     | "ongoing_companion_memory"
     | "proactive_checkin"
@@ -86,6 +97,7 @@ export interface HostWorkflowHint {
     | "sleep_closeout"
     | "project_continuity_write"
     | "context_handoff_refresh"
+    | "daily_pulse_review"
     | "user_correction_persistence";
   trigger: string;
   steps: HostWorkflowStep[];

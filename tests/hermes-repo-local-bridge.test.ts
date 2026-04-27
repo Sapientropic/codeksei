@@ -153,6 +153,37 @@ test("repo-local sync_checkin_cron degrades gracefully when Hermes create_job ha
   assert.deepEqual(jobsState.jobs.map((job: { codeksei_checkin_role: string }) => job.codeksei_checkin_role).sort(), ["guard", "recovery", "wake"]);
 });
 
+test("repo-local sync_checkin_cron persists clean delivery wrapping preference", () => {
+  const fixture = createBridgeFixture("wrap_response");
+
+  const result = invokeBridge(fixture, {
+    plans: [
+      {
+        due_at_iso: new Date(Date.now() + 10 * 60_000).toISOString(),
+        env: {
+          CODEKSEI_RUNTIME: "hermes",
+        },
+        name: "ck-checkin-wake",
+        prompt: "run hosted checkin",
+        role: "wake",
+        script: "/tmp/.hermes/scripts/codeksei_context_briefing.py",
+        sender_id: "wx-user",
+        target_key: "wx-user::/tmp/workspace",
+        workspace_root: "/tmp/workspace",
+        wrap_response: false,
+      },
+    ],
+    sender_id: "wx-user",
+    target_key: "wx-user::/tmp/workspace",
+    workspace_root: "/tmp/workspace",
+  });
+
+  assert.equal(result.status, 0, result.stderr || "expected bridge to succeed");
+  const jobsState = JSON.parse(fs.readFileSync(fixture.jobsFile, "utf8"));
+  assert.equal(jobsState.jobs.length, 1);
+  assert.equal(jobsState.jobs[0].wrap_response, false);
+});
+
 test("repo-local create_reminder stores a rephrasing prompt instead of verbatim echo instructions", () => {
   const fixture = createBridgeFixture("create_reminder_prompt");
   const result = invokeBridge(fixture, {

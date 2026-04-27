@@ -343,6 +343,22 @@ def _normalize_job_env(value: Any) -> Dict[str, str]:
     return normalized
 
 
+def _normalize_optional_bool(value: Any, field_name: str) -> Optional[bool]:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)) and value in (0, 1):
+        return bool(value)
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text in {"1", "true", "yes", "on"}:
+            return True
+        if text in {"0", "false", "no", "off"}:
+            return False
+    raise RuntimeError(f"sync_checkin_cron plan {field_name} must be a boolean")
+
+
 def _normalize_sync_checkin_plan(value: Any) -> Dict[str, Any]:
     if not isinstance(value, dict):
         raise RuntimeError("sync_checkin_cron plan must be an object")
@@ -356,6 +372,7 @@ def _normalize_sync_checkin_plan(value: Any) -> Dict[str, Any]:
     workspace_root = str(value.get("workspace_root") or "").strip()
     sender_id = str(value.get("sender_id") or "").strip()
     name = str(value.get("name") or "").strip()
+    wrap_response = _normalize_optional_bool(value.get("wrap_response"), "wrap_response")
 
     if not due_at_iso:
         raise RuntimeError("sync_checkin_cron plan is missing due_at_iso")
@@ -384,6 +401,7 @@ def _normalize_sync_checkin_plan(value: Any) -> Dict[str, Any]:
         "sender_id": sender_id,
         "target_key": target_key,
         "workspace_root": workspace_root,
+        "wrap_response": wrap_response,
     }
 
 
@@ -399,13 +417,14 @@ def _build_checkin_job_updates(
     sender_id: str,
     target_key: str,
     workspace_root: str,
+    wrap_response: Optional[bool],
 ) -> Dict[str, Any]:
     from cron.jobs import parse_schedule
 
     schedule = parse_schedule(due_at_iso)
     # Keep origin/deliver on every update so bare cron runs can still deliver
     # to the original Weixin chat without needing a session lookup at send time.
-    return {
+    updates = {
         "codeksei_checkin_role": role,
         "codeksei_checkin_target_key": target_key,
         "codeksei_sender_id": sender_id,
@@ -430,6 +449,9 @@ def _build_checkin_job_updates(
         "skills": ["codeksei-companion"],
         "state": "scheduled",
     }
+    if wrap_response is not None:
+        updates["wrap_response"] = wrap_response
+    return updates
 
 
 def _supports_kwarg(func: Any, name: str) -> bool:
@@ -546,6 +568,7 @@ def _handle_sync_checkin_cron(request: Dict[str, Any], origin_context: Dict[str,
             sender_id=plan["sender_id"],
             target_key=plan["target_key"],
             workspace_root=plan["workspace_root"],
+            wrap_response=plan["wrap_response"],
         )
         desired_job = desired_jobs_by_role.get(plan["role"])
         created = False

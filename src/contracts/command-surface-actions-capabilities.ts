@@ -2,6 +2,22 @@ import type { CommandActionDefinition } from "./command-surface-definition-types
 
 export const CAPABILITIES_COMMAND_ACTION_DEFINITIONS = [
   {
+    action: "capabilities.status",
+    groupId: "capabilities",
+    summary: "解释当前能力配置、可用性和不可用原因",
+    terminal: ["capabilities status"],
+    weixin: [],
+    status: "active",
+    entrypointType: "cli",
+    scriptName: "capabilities:status",
+    command: "capabilities",
+    subcommand: "status",
+    runner: "capabilities.status",
+    argsSchemaKey: "capabilitiesStatus",
+    help: { topic: "capabilities", leafKey: "capabilities.status", detail: "leaf" },
+    approval: { autoApprove: true },
+  },
+  {
     action: "model.inspect",
     groupId: "capabilities",
     summary: "查看当前模型与 effort",

@@ -16,11 +16,16 @@ type CommandActionLike = Pick<
 
 
 const ACTION_USAGE_ARGS: Readonly<Partial<Record<CommandActionId, string>>> = Object.freeze({
+  "capabilities.status": "[--provider codex|hermes|generic-shell] [--user <wechat_user_id>] [--workspace /绝对路径]",
   "channel.send_file": "--path /绝对路径",
   "companion.remember": "--user <wechat_user_id> --workspace /绝对路径 --source host_user_turn [--text \"内容\" | --stdin]",
   "context.briefing": "--user <wechat_user_id> --workspace /绝对路径 [--mode proactive|review]",
+  "context.inspect": "--user <wechat_user_id> --workspace /绝对路径 [--mode proactive|review] [--text \"本轮用户消息\"]",
   "proactive.observe": "--user <wechat_user_id> --workspace /绝对路径 [--dry-run | --show]",
   "proactive.eval": "--fixture /绝对路径/proactive-observation-cases.json [--model gemma-4-E2B-it] [--endpoint http://127.0.0.1:8080/v1]",
+  "pulse.today": "[--date YYYY-MM-DD] [--user <wechat_user_id>] [--workspace /绝对路径] [--focus \"今天想推进的线\"]",
+  "pulse.generate": "[--date YYYY-MM-DD] [--user <wechat_user_id>] [--workspace /绝对路径] [--focus \"今天想推进的线\"]",
+  "pulse.feedback": "--kind like|dislike|hide|save|task [--card <pulseCardId>] [--topic \"主题\"] [--text \"反馈\"]",
   "diary.append": "--section todo --state open --text \"内容\"",
   "host.bootstrap": "--provider hermes [--workspace /绝对路径]",
   "host.doctor": "--provider hermes",

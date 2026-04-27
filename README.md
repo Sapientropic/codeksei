@@ -41,7 +41,7 @@
 3. 先明确宿主路径：`Codex Mode` 用 `--provider codex`，`Hosted Mode` 用 `--provider hermes`
 4. 把 `host bootstrap` 理解成“Codeksei attach/bootstrap 完成”，不要误读成 “宿主 gateway / Weixin live bring-up 已完成”
 
-- `CODEKSEI_HOSTKIT.json` 现在也会带最小 entrypoint/workflow hints，足够让新 host 知道 onboarding / companion memory / context briefing / diary / timeline / review / note / reminder 的默认路由；`codeksei host manifest --provider codex|hermes` 可按 provider 视角查看入口，当前环境真相统一看 `codeksei host doctor --provider <provider>`
+- `CODEKSEI_HOSTKIT.json` 现在也会带最小 entrypoint/workflow hints，足够让新 host 知道 onboarding / companion memory / context briefing / context inspect / capabilities status / pulse / diary / timeline / review / note / reminder 的默认路由；`codeksei host manifest --provider codex|hermes` 可按 provider 视角查看入口，当前环境真相统一看 `codeksei host doctor --provider <provider>`
 
 推荐顺序：
 
@@ -68,6 +68,8 @@ Codeksei 现在把自己定义成 **daemon-first / host-attachable / companion e
   `provider=hermes`：Hermes 负责 agent loop 和宿主侧消息面；Codeksei 通过 CLI / skill surface 暴露 timeline、diary、reminder、review、note、project radar 等能力
 - `主动性判断上下文层`
   Hosted proactive wake 默认读 Codeksei 自己维护的 context board。它由 checkin state、当日日记、companion note、project radar 和 workspace continuity 聚合而成，再由 Hermes cron `script` 在运行前注入，不要求用户必须维护 Obsidian/vault
+- `治理与策展层`
+  `capabilities status` 区分“已配置”和“当前可用”；`context inspect` 解释本轮上下文装配；`pulse today/generate/feedback` 提供最多三张每日可继续推进的用户可见卡片，不自动改变 proactive schedule
 - 外部宿主默认通过 `host attachment contract` 接入：
   `codeksei host manifest`、`codeksei host bootstrap`、`codeksei host doctor`、`codeksei host smoke`、`codeksei host seed-proactive`、`codeksei host claim-checkin`、`codeksei host settle-checkin`、`codeksei host finalize-checkin`
 
@@ -113,6 +115,7 @@ npm install
 codeksei help
 codeksei schema
 codeksei host manifest
+codeksei capabilities status
 ```
 
 如果你走的是 `npx` 路径，没有全局 `codeksei` 可执行名，就把同样的子命令挂到 `npx -y codeksei@latest` 后面执行。
@@ -209,6 +212,9 @@ codeksei host smoke --provider hermes
 - `Onboarding`：首次激活不走表单，而是走聊天式访谈。长期真相写进 companion note，再由 context board 投影给宿主；没有 Obsidian / workspace schema 时也能自动回退到本地 state-dir 下的 companion profile
 - `Companion memory`：首访之后也会继续更新。只要用户新的自述、纠正、支持偏好、边界或近线任务会影响后续陪伴判断，就可以走 `companion remember` 这条 ongoing memory 主链，而不是把变化只留在宿主聊天记忆里
 - `Context board`：主动判断用的受控上下文层。它把 checkin state、今天事实、活跃线头、注意事项和重入入口收口到一份 prompt-ready briefing；Hosted Mode 下每次 cron 运行前都会现读最新 board，而不是盲扫原始 vault 文件
+- `Capability governance`：解释每个入口是“已配置、可用、降级还是阻断”，并给出 host profile、前置条件、side effect 与不可用原因
+- `Context inspector`：在 context board 之上解释本轮上下文装配来源、排除项、stale 标记、pending handoff 和 context packs，不新增事实来源
+- `Codeksei Pulse`：每日最多三张可继续推进的策展卡，默认 deterministic-first，读本地状态和反馈；like/save 会提高同主题后续候选分数，不自动推送微信，也不改变 proactive schedule
 - `Reminders`：提醒写入与调度，给生活节奏和待办推进一个外部支点。Hosted Mode 下默认会把用户可见提醒绑定回当前 origin chat；未来 proactive 唤醒统一走 hosted check-in 主链
 - `Review`：nightly / weekly / monthly，把日常记录压成更稳定的节奏校准与复盘材料
 - `Project support`：workspace bootstrap、project radar、按 workspace 恢复共享线程。项目切走再回来时，不用先把整条线在脑子里重建一遍；本地 git 仍是第一真相，只有 repo 缺失或不是 git repo 时才回退到 GitHub activity continuity signal
@@ -255,6 +261,12 @@ codeksei host smoke --provider hermes
   输出 host attachment manifest / hostkit 机器入口
 - `codeksei host doctor`
   查看 daemon / attachment / provider recipe readiness
+- `codeksei capabilities status`
+  查看当前 command surface 在当前 host/session 下哪些能力可用、降级或阻断
+- `codeksei context inspect`
+  解释 context board 本轮读入/排除的来源和 pending handoff
+- `codeksei pulse today`
+  查看或生成今天最多三张可继续推进的 Pulse 卡
 - `codeksei operator help`
   查看 bootstrap、shared、background、maintainer 这类 operator surface
 - `codeksei operator schema`

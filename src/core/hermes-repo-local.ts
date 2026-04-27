@@ -114,6 +114,7 @@ interface HermesRepoLocalSyncCheckinCronPlanPayload {
   sender_id: string;
   target_key: string;
   workspace_root: string;
+  wrap_response?: boolean;
 }
 
 interface HermesRepoLocalSyncCheckinCronPayload {
@@ -127,6 +128,7 @@ interface HermesRepoLocalSyncCheckinCronPayload {
   sender_id: string;
   target_key: string;
   workspace_root: string;
+  wrap_response?: boolean;
 }
 
 interface HermesRepoLocalSendFileShimResult {

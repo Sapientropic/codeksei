@@ -123,6 +123,50 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "mode", keys: ["--mode"], type: "string", defaultValue: "proactive", description: "proactive|review" },
     ],
   }),
+  contextInspect: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id" },
+      { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "显式绝对 workspace 路径" },
+      { name: "mode", keys: ["--mode"], type: "string", defaultValue: "proactive", description: "proactive|review" },
+      { name: "text", keys: ["--text"], type: "string", defaultValue: "", description: "用于 context packs 触发评估的本轮文本" },
+    ],
+  }),
+  capabilitiesStatus: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "", description: "显式 provider 视角：codex|hermes|generic-shell" },
+      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id，用于判断 target-scoped 能力" },
+      { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "显式 workspace 路径，用于判断 target-scoped 能力" },
+    ],
+  }),
+  pulseToday: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id" },
+      { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "显式 workspace 路径" },
+      { name: "date", keys: ["--date"], type: "string", defaultValue: "", placeholder: "YYYY-MM-DD", description: "目标日期" },
+      { name: "focus", keys: ["--focus"], type: "string", defaultValue: "", description: "今日显式关注焦点" },
+    ],
+  }),
+  pulseGenerate: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id" },
+      { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "显式 workspace 路径" },
+      { name: "date", keys: ["--date"], type: "string", defaultValue: "", placeholder: "YYYY-MM-DD", description: "目标日期" },
+      { name: "focus", keys: ["--focus"], type: "string", defaultValue: "", description: "今日显式关注焦点" },
+    ],
+  }),
+  pulseFeedback: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "card", keys: ["--card"], type: "string", defaultValue: "", required: true, description: "Pulse card id" },
+      { name: "kind", keys: ["--kind"], type: "string", defaultValue: "like", description: "like|dislike|hide|save|task" },
+      { name: "topic", keys: ["--topic"], type: "string", defaultValue: "", description: "反馈主题，用于后续排序" },
+      { name: "text", keys: ["--text"], type: "string", defaultValue: "", description: "反馈正文或任务描述" },
+    ],
+  }),
   proactiveObserve: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,

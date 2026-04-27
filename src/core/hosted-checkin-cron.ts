@@ -30,6 +30,7 @@ export interface HostedCheckinCronSyncJobPlan {
   senderId: string;
   targetKey: string;
   workspaceRoot: string;
+  wrapResponse: boolean;
 }
 
 export interface HostedCheckinCronSyncPlanSet {
@@ -297,6 +298,7 @@ function createHostedCheckinCronPlan(
     senderId: target.senderId,
     targetKey,
     workspaceRoot: target.workspaceRoot,
+    wrapResponse: false,
   };
 }
 

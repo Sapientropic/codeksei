@@ -1,6 +1,8 @@
 import { runChannelSendFileCommand } from "./channel-send-file-cli";
+import { runCapabilitiesStatusCommand } from "./capabilities-status-cli";
 import { runCompanionRememberCommand } from "./companion-remember-cli";
 import { runContextBriefingCommand } from "./context-briefing-cli";
+import { runContextInspectCommand } from "./context-inspect-cli";
 import { runDiaryWriteCommand } from "./diary-write-cli";
 import {
   runHostBootstrapCommand,
@@ -43,6 +45,7 @@ import {
   runOnboardingStepCommand,
 } from "./onboarding-cli";
 import { runProjectRadarCommand } from "./project-radar-cli";
+import { runPulseCommand } from "./pulse-cli";
 import { runProactiveEvalCommand } from "./proactive-eval-cli";
 import { runProactiveObserveCommand } from "./proactive-observe-cli";
 import { runReminderWriteCommand } from "./reminder-write-cli";
@@ -137,6 +140,9 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
   "host.manifest": async (_manifest, context) => {
     return runHostManifestCommand(context.config, context.leafArgs);
   },
+  "capabilities.status": async (_manifest, context) => {
+    return runCapabilitiesStatusCommand(context.config, context.leafArgs);
+  },
   "host.bootstrap": async (_manifest, context) => {
     return runHostBootstrapCommand(context.config, context.leafArgs);
   },
@@ -207,11 +213,17 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
   "context.briefing": async (_manifest, context) => {
     return runContextBriefingCommand(context.config, context.leafArgs);
   },
+  "context.inspect": async (_manifest, context) => {
+    return runContextInspectCommand(context.config, context.leafArgs);
+  },
   "proactive.observe": async (_manifest, context) => {
     return runProactiveObserveCommand(context.config, context.leafArgs);
   },
   "proactive.eval": async (_manifest, context) => {
     return runProactiveEvalCommand(context.config, context.leafArgs);
+  },
+  "pulse.command": async (manifest, context) => {
+    return runPulseCommand(context.config, [manifest.kind || "today", ...context.leafArgs]);
   },
   "note.sync": async (_manifest, context) => {
     return runNoteSyncCommand(context.config, context.leafArgs);

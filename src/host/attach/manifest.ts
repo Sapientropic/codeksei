@@ -55,6 +55,7 @@ export function buildHostEntrypointManifest({
   return {
     manifest: ["codeksei", "host", "manifest", "--format", "json"],
     bootstrap: ["codeksei", "host", "bootstrap", ...providerArgs, "--format", "json"],
+    capabilitiesStatus: ["codeksei", "capabilities", "status", ...providerArgs, "--format", "json"],
     doctor: ["codeksei", "host", "doctor", ...providerArgs, "--format", "json"],
     smoke: ["codeksei", "host", "smoke", ...providerArgs, "--format", "json"],
     seedProactive: ["codeksei", "host", "seed-proactive", ...providerArgs, "--format", "json"],
@@ -75,6 +76,10 @@ export function buildHostEntrypointManifest({
     onboardingStep: ["codeksei", "onboarding", "step", "--format", "json"],
     onboardingStatus: ["codeksei", "onboarding", "status", "--format", "json"],
     contextBriefing: ["codeksei", "context", "briefing", "--format", "json"],
+    contextInspect: ["codeksei", "context", "inspect", "--format", "json"],
+    pulseFeedback: ["codeksei", "pulse", "feedback", "--format", "json"],
+    pulseGenerate: ["codeksei", "pulse", "generate", "--format", "json"],
+    pulseToday: ["codeksei", "pulse", "today", "--format", "json"],
   };
 }
 
@@ -181,6 +186,20 @@ function buildRecommendedHostWorkflows(): HostWorkflowHint[] {
       ],
     },
     {
+      id: "capability_governance_check",
+      trigger: "The host or user needs to understand why a Codeksei capability is configured but not available in the current session.",
+      steps: [
+        {
+          commandRef: "capabilitiesStatus",
+          reason: "List configured capabilities, current availability, host profiles, side effects, safety, mutability, and blocked reasons.",
+        },
+        {
+          commandRef: "doctor",
+          reason: "Use host doctor only when the status report points at host/provider readiness rather than user intent.",
+        },
+      ],
+    },
+    {
       id: "first_activation_onboarding",
       trigger: "The user is new, profile context is thin, or the host should not pretend it already knows the person.",
       steps: [
@@ -209,6 +228,24 @@ function buildRecommendedHostWorkflows(): HostWorkflowHint[] {
         {
           commandRef: "contextBriefing",
           reason: "Refresh the controlled handoff surface after important memory updates when the host needs the new state immediately.",
+        },
+      ],
+    },
+    {
+      id: "daily_pulse_review",
+      trigger: "The user asks what is worth continuing today, or the host wants a visible curation layer rather than another proactive wake.",
+      steps: [
+        {
+          commandRef: "contextInspect",
+          reason: "Explain what context sources are available before generating curation cards.",
+        },
+        {
+          commandRef: "pulseToday",
+          reason: "Read or generate the current day's three visible curation cards.",
+        },
+        {
+          commandRef: "pulseFeedback",
+          reason: "Record like/dislike/hide/save/task feedback so the next Pulse remains explainable.",
         },
       ],
     },
