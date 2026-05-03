@@ -19,7 +19,6 @@ import { CheckinScheduleStateStore } from "../state/checkin-schedule-state-store
 import { inspectDurableNoteRouting } from "../notes/durable-note-schema";
 import { findSectionRange, syncNoteContent } from "../notes/note-sync";
 import { collectDiaryEntries } from "../review/review-sources";
-import { collectProjectRadars } from "../workspace/project-radar";
 import {
   collectWorkspaceContinuitySnapshot,
   type WorkspaceContinuityFile,
@@ -31,6 +30,19 @@ import { createSessionStore } from "../session/session-store-factory";
 import { buildProactiveStateCard } from "../proactive/state-card";
 import type { ProactiveObservation, ProactiveStateCard } from "../proactive/contracts";
 import { resolveCodekseiLocale, type CodekseiLocale } from "../core/locale";
+import type { WhereaboutsSummary } from "../whereabouts/contracts";
+import {
+  buildActiveThreadsSection,
+  buildCautionsSection,
+  buildCurrentStatusSection,
+  buildObservationSection,
+  buildReentrySection,
+  buildSourceStatusSection,
+  buildTodayFactsSection,
+  renderBriefingText,
+} from "./board-sections";
+import { collectCurrentProjectRadar } from "./board-project-radar";
+import { collectWhereaboutsContextSnapshot } from "./board-whereabouts";
 
 export type ContextBriefingMode = "proactive" | "review";
 
@@ -47,11 +59,16 @@ export interface ContextBoardConfig {
   timezone?: unknown;
   userGender?: unknown;
   userLanguage?: unknown;
+  whereaboutsHost?: unknown;
+  whereaboutsPlacesFile?: unknown;
+  whereaboutsPort?: unknown;
+  whereaboutsRetentionDays?: unknown;
+  whereaboutsToken?: unknown;
   workspaceBootstrapConfigFile?: string;
   workspaceRoot?: unknown;
 }
 
-interface CompanionNoteSnapshot {
+export interface CompanionNoteSnapshot {
   cautionLines: string[];
   currentLines: string[];
   exists: boolean;
@@ -64,7 +81,7 @@ interface CompanionNoteSnapshot {
   updatedAt: string;
 }
 
-interface ProjectRadarSnapshot {
+export interface ProjectRadarSnapshot {
   available: boolean;
   branch: string;
   dirty: boolean;
@@ -75,7 +92,7 @@ interface ProjectRadarSnapshot {
   reason: string;
 }
 
-interface CheckinSnapshot {
+export interface CheckinSnapshot {
   activeWakeStartedAt: string;
   lastCompletionAt: string;
   lastCompletionResult: string;
@@ -86,7 +103,7 @@ interface CheckinSnapshot {
   stateFound: boolean;
 }
 
-interface PendingHandoffSnapshot {
+export interface PendingHandoffSnapshot {
   bookkeepingActions: string[];
   exists: boolean;
   followupContext: string;
@@ -98,13 +115,13 @@ interface PendingHandoffSnapshot {
   userVisibleMessage: string;
 }
 
-interface OnboardingSnapshot {
+export interface OnboardingSnapshot {
   missingSlots: string[];
   status: string;
   updatedAt: string;
 }
 
-interface CompanionMemorySnapshot {
+export interface CompanionMemorySnapshot {
   lastSource: string;
   lastUpdatedAt: string;
   recentWriteCount: number;
@@ -121,7 +138,7 @@ interface ContextBoardSectionData {
   title: string;
 }
 
-interface ContextBoardFreshness {
+export interface ContextBoardFreshness {
   checkinRecent: boolean;
   companionRecent: boolean;
   diaryCurrent: boolean;
@@ -135,6 +152,13 @@ interface ContextBoardRenderedSections {
   reentryPoints: string;
   sourceStatus: string;
   todayFacts: string;
+}
+
+export interface WhereaboutsContextSnapshot {
+  available: boolean;
+  reason: string;
+  statusLine: string;
+  summary: WhereaboutsSummary | null;
 }
 
 export interface ContextBoardBriefing {
@@ -151,6 +175,7 @@ export interface ContextBoardBriefing {
   onboarding: OnboardingSnapshot;
   companionMemory: CompanionMemorySnapshot;
   projectRadar: ProjectRadarSnapshot;
+  whereabouts: WhereaboutsContextSnapshot;
   stale: boolean;
   staleReasons: string[];
   sections: ContextBoardRenderedSections;
@@ -262,6 +287,7 @@ export function buildContextBoardBriefing(
   const onboarding = collectOnboardingSnapshot(config, target.senderId);
   const companionMemory = collectCompanionMemorySnapshot(config, target.senderId);
   const projectRadar = collectCurrentProjectRadar(config, target.workspaceRoot);
+  const whereabouts = collectWhereaboutsContextSnapshot(config, updatedAt);
   const workspaceBootstrap = collectWorkspaceContinuitySnapshot(target.workspaceRoot, {
     workspaceBootstrapConfigFile: config.workspaceBootstrapConfigFile,
   });
@@ -280,6 +306,7 @@ export function buildContextBoardBriefing(
       companionNote,
       stale,
       staleReasons,
+      whereabouts,
     }),
     reentryPoints: buildReentrySection({
       companionNote,
@@ -297,6 +324,7 @@ export function buildContextBoardBriefing(
       todayDate,
       todayDiaryEntry,
       updatedAt,
+      whereabouts,
       workspaceBootstrap,
     }),
     activeThreads: buildActiveThreadsSection({
@@ -331,6 +359,7 @@ export function buildContextBoardBriefing(
     onboarding,
     companionMemory,
     projectRadar,
+    whereabouts,
     sections,
     stale,
     staleReasons,
@@ -444,193 +473,6 @@ function buildManagedSections(briefing: ContextBoardBriefing): ContextBoardSecti
 function getContextBoardSectionTitle(slot: string, locale: CodekseiLocale): string {
   const section = CONTEXT_BOARD_SECTIONS.find((entry) => entry.slot === slot);
   return section?.title[locale] || slot;
-}
-
-function buildObservationSection(observation: ProactiveObservation | null): string {
-  if (!observation) {
-    return "";
-  }
-  const lines = [
-    `模型：${observation.model.model || "(unknown)"} / ${observation.model.host}`,
-    `置信度：${observation.confidence.toFixed(2)} | 打扰风险：${observation.surfaceRisk} | 烦扰风险：${observation.annoyanceRisk} | 能量：${observation.userEnergy}`,
-    observation.currentStateHypothesis ? `状态假设：${observation.currentStateHypothesis}` : "",
-    observation.reentryCandidate ? `重入候选：${observation.reentryCandidate}` : "",
-    observation.likelyBlocker ? `可能卡点：${observation.likelyBlocker}` : "",
-    observation.suggestedTone ? `建议语气：${observation.suggestedTone}` : "",
-    observation.memoryCandidates.length
-      ? `记忆候选：${observation.memoryCandidates.slice(0, 3).map((item) => `${item.slotId}:${item.text}`).join("；")}`
-      : "",
-    observation.evidence.length ? `证据：${observation.evidence.slice(0, 3).join("；")}` : "",
-  ].filter(Boolean);
-  return renderBulletBlock(lines, "");
-}
-
-function buildCurrentStatusSection({
-  checkin,
-  companionNote,
-  stale,
-  staleReasons,
-}: {
-  checkin: CheckinSnapshot;
-  companionNote: CompanionNoteSnapshot;
-  stale: boolean;
-  staleReasons: string[];
-}): string {
-  const lines: string[] = [];
-  if (stale) {
-    lines.push(
-      `[⚠️ 需确认] 当前判断上下文偏薄：${staleReasons.map((reason) => formatStaleReason(reason)).join("；")}。`
-    );
-  }
-  if (companionNote.currentLines.length) {
-    lines.push(...companionNote.currentLines.slice(0, 3));
-  }
-  if (checkin.lastCompletionAt) {
-    lines.push(
-      `最近一次主动收尾：${checkin.lastCompletionAt}${checkin.lastCompletionResult ? `（${checkin.lastCompletionResult}）` : ""}`
-    );
-  }
-  if (checkin.nextWakeAt) {
-    lines.push(`下次计划唤醒：${checkin.nextWakeAt}${checkin.scheduleSource ? `（${checkin.scheduleSource}）` : ""}`);
-  }
-  if (checkin.pendingHandoff.exists) {
-    lines.push(
-      `待主会话收尾的 proactive handoff：${checkin.pendingHandoff.handoffCreatedAt || "unknown"}`
-      + `${checkin.pendingHandoff.outcome ? `（${checkin.pendingHandoff.outcome}）` : ""}`
-    );
-    if (checkin.pendingHandoff.triggerId) {
-      lines.push(`待吸收的 lease：${checkin.pendingHandoff.triggerId}`);
-    }
-    if (checkin.pendingHandoff.observedCurrentState) {
-      lines.push(`子 agent 当前观察：${checkin.pendingHandoff.observedCurrentState}`);
-    }
-    if (checkin.pendingHandoff.userVisibleMessage) {
-      lines.push(`子 agent 对外消息：${checkin.pendingHandoff.userVisibleMessage}`);
-    }
-    lines.push("主会话默认应先吸收这份 handoff，再决定 continuity 写入与真正的下一次唤醒，并在收尾时执行 host finalize-checkin。");
-  }
-  if (checkin.activeWakeStartedAt) {
-    lines.push(`当前有进行中的 active wake：${checkin.activeWakeStartedAt}`);
-  } else if (checkin.pendingTriggerCreatedAt) {
-    lines.push(`当前已有待处理 trigger：${checkin.pendingTriggerCreatedAt}`);
-  }
-  return renderParagraphBlock(lines, "[⚠️ 需确认] 缺少最近的状态 handoff。");
-}
-
-function buildTodayFactsSection(
-  todayDiaryEntry: ReturnType<typeof collectDiaryEntries>[number] | null,
-  todayDate: string,
-): string {
-  if (!todayDiaryEntry) {
-    return `- [⚠️ 需确认] ${todayDate} 的 diary 还不存在，今天事实只能依赖其它薄上下文。`;
-  }
-
-  const lines = [
-    ...todayDiaryEntry.timeline.slice(0, 4),
-    ...(todayDiaryEntry.todo.done.length
-      ? [`已完成 Todo：${todayDiaryEntry.todo.done.slice(0, 3).join("；")}`]
-      : []),
-    ...(todayDiaryEntry.todo.open.length
-      ? [`仍挂着 Todo：${todayDiaryEntry.todo.open.slice(0, 3).join("；")}`]
-      : []),
-    ...todayDiaryEntry.supplement
-      .slice(-3)
-      .map((entry) => [entry.time, entry.title || entry.body].filter(Boolean).join(" ").trim())
-      .filter(Boolean),
-  ].filter(Boolean);
-
-  return renderBulletBlock(lines, `[⚠️ 需确认] ${todayDate} diary 已存在，但还没有可用的结构化事实。`);
-}
-
-function buildActiveThreadsSection({
-  companionNote,
-  projectRadar,
-}: {
-  companionNote: CompanionNoteSnapshot;
-  projectRadar: ProjectRadarSnapshot;
-}): string {
-  const lines = [
-    ...companionNote.threadLines.slice(0, 5),
-    ...(projectRadar.available
-      ? [
-        `workspace repo：${projectRadar.matchedProject || "(workspace)"} | branch ${projectRadar.branch || "(unknown)"} | dirty ${projectRadar.dirty ? "yes" : "no"}`,
-        ...(projectRadar.recentCommit ? [`最近 commit：${projectRadar.recentCommit}`] : []),
-      ]
-      : []),
-  ].filter(Boolean);
-
-  return renderBulletBlock(lines, "[⚠️ 需确认] 还没有足够清楚的当前项目线索。");
-}
-
-function buildCautionsSection(companionNote: CompanionNoteSnapshot, followupContext: string): string {
-  const lines = [
-    ...(followupContext ? [`待带进下一次主动判断的内部后续：${followupContext}`] : []),
-    ...companionNote.cautionLines.slice(0, 5),
-  ].filter(Boolean);
-  return renderBulletBlock(lines, "[⚠️ 需确认] 还没有明确的注意事项或内部 follow-up。");
-}
-
-function buildReentrySection({
-  companionNote,
-  projectRadar,
-  workspaceBootstrap,
-}: {
-  companionNote: CompanionNoteSnapshot;
-  projectRadar: ProjectRadarSnapshot;
-  workspaceBootstrap: ContextBoardBriefing["workspaceBootstrap"];
-}): string {
-  const bootstrapLines = [
-    ...workspaceBootstrap.primaryFiles,
-    ...workspaceBootstrap.recentFiles,
-  ]
-    .slice(0, 6)
-    .map((file) => `${file.absolutePath} - ${file.role}`);
-  const lines = [
-    ...bootstrapLines,
-    ...companionNote.reentryLines.slice(0, 3),
-    ...projectRadar.readFirst.slice(0, 4).map((file) => `${file.absolutePath} - ${file.role}`),
-  ].filter(Boolean);
-  return renderBulletBlock(lines, "[⚠️ 需确认] 暂时没有稳定的重入入口文件。");
-}
-
-function buildSourceStatusSection({
-  checkin,
-  companionNote,
-  freshness,
-  companionMemory,
-  onboarding,
-  projectRadar,
-  staleReasons,
-  todayDate,
-  todayDiaryEntry,
-  updatedAt,
-  workspaceBootstrap,
-}: {
-  checkin: CheckinSnapshot;
-  companionNote: CompanionNoteSnapshot;
-  companionMemory: CompanionMemorySnapshot;
-  freshness: ContextBoardFreshness;
-  onboarding: OnboardingSnapshot;
-  projectRadar: ProjectRadarSnapshot;
-  staleReasons: string[];
-  todayDate: string;
-  todayDiaryEntry: { filePath?: string } | null;
-  updatedAt: string;
-  workspaceBootstrap: ContextBoardBriefing["workspaceBootstrap"];
-}): string {
-  const lines = [
-    `board 更新时间：${updatedAt}`,
-    `today diary：${freshness.diaryCurrent ? "present" : "missing"}${normalizeText(todayDiaryEntry?.filePath) ? ` | ${normalizeText(todayDiaryEntry?.filePath)}` : ` | ${todayDate}`}`,
-    `companion note：${companionNote.exists ? "present" : "missing"}${companionNote.updatedAt ? ` | updated ${companionNote.updatedAt}` : ""}`,
-    `companion memory：${companionMemory.lastUpdatedAt ? `${companionMemory.lastUpdatedAt}` : "missing"}${companionMemory.lastSource ? ` | source ${companionMemory.lastSource}` : ""}${companionMemory.recentWriteCount ? ` | recent writes ${companionMemory.recentWriteCount}` : ""}`,
-    `onboarding：${onboarding.status}${onboarding.updatedAt ? ` | updated ${onboarding.updatedAt}` : ""}${onboarding.missingSlots.length ? ` | missing ${onboarding.missingSlots.join(", ")}` : ""}`,
-    `checkin completion：${checkin.lastCompletionAt ? checkin.lastCompletionAt : "missing"}`,
-    `pending proactive handoff：${checkin.pendingHandoff.exists ? `${checkin.pendingHandoff.handoffCreatedAt || "present"}${checkin.pendingHandoff.handoffExpiresAt ? ` -> ${checkin.pendingHandoff.handoffExpiresAt}` : ""}${checkin.pendingHandoff.triggerId ? ` | lease ${checkin.pendingHandoff.triggerId}` : ""}` : "missing"}`,
-    `project radar：${projectRadar.available ? "available" : `unavailable${projectRadar.reason ? ` (${projectRadar.reason})` : ""}`}`,
-    `workspace bootstrap files：${workspaceBootstrap.primaryFiles.length + workspaceBootstrap.recentFiles.length}`,
-    ...(staleReasons.length ? [`stale reasons：${staleReasons.map((reason) => formatStaleReason(reason)).join("；")}`] : []),
-  ];
-  return renderBulletBlock(lines, "[⚠️ 需确认] 还没有可用的上下文来源状态。");
 }
 
 function collectCompanionNoteSnapshot(config: ContextBoardConfig, senderId: string): CompanionNoteSnapshot {
@@ -755,139 +597,6 @@ function collectCheckinSnapshot(
   };
 }
 
-function collectCurrentProjectRadar(
-  config: Pick<ContextBoardConfig, "projectRadarConfigFile" | "workspaceRoot">,
-  workspaceRoot: string,
-): ProjectRadarSnapshot {
-  try {
-    const result = collectProjectRadars(config, {});
-    const normalizedWorkspaceRoot = normalizeDisplayPath(workspaceRoot);
-    const matched = result.projects.find((project) => (
-      normalizeDisplayPath(project.repoRoot) === normalizedWorkspaceRoot
-    )) || (result.projects.length === 1 ? result.projects[0] : null);
-    if (!matched) {
-      const candidates = rankTrackedProjectCandidates(result.projects).slice(0, 3);
-      if (candidates.length) {
-        return buildTrackedProjectCandidatesSnapshot(candidates);
-      }
-      return {
-        available: false,
-        branch: "",
-        dirty: false,
-        matchedProject: "",
-        notePath: "",
-        readFirst: [],
-        recentCommit: "",
-        reason: "workspace_not_tracked",
-      };
-    }
-    return {
-      available: matched.git.ok,
-      branch: normalizeText(matched.git.branch),
-      dirty: Boolean(matched.git.dirty),
-      matchedProject: normalizeText(matched.slug),
-      notePath: normalizeText(matched.notePath),
-      readFirst: matched.readFirst
-        .filter(Boolean)
-        .map((file) => ({
-          absolutePath: normalizeText(file?.path),
-          role: normalizeText(file?.kind) || "workspace note",
-          when: "",
-        }))
-        .filter((file) => file.absolutePath),
-      recentCommit: matched.git.recentCommits[0]
-        ? `${normalizeText(matched.git.recentCommits[0].shortHash)} ${normalizeText(matched.git.recentCommits[0].subject)}`
-        : "",
-      reason: matched.git.ok ? "" : normalizeText(matched.git.reason) || normalizeText(matched.git.message),
-    };
-  } catch (error) {
-    return {
-      available: false,
-      branch: "",
-      dirty: false,
-      matchedProject: "",
-      notePath: "",
-      readFirst: [],
-      recentCommit: "",
-      reason: error instanceof Error ? error.message : String(error || "unknown error"),
-    };
-  }
-}
-
-type CollectedProjectRadar = ReturnType<typeof collectProjectRadars>["projects"][number];
-
-function buildTrackedProjectCandidatesSnapshot(projects: CollectedProjectRadar[]): ProjectRadarSnapshot {
-  const best = projects[0];
-  const firstRecentCommit = projects
-    .map((project) => project.git.recentCommits[0])
-    .find(Boolean);
-  const readFirst = uniqueWorkspaceContinuityFiles(
-    projects.flatMap((project) => project.readFirst)
-      .filter(Boolean)
-      .map((file) => ({
-        absolutePath: normalizeText(file?.path),
-        role: `${normalizeText(file?.kind) || "workspace note"} (${normalizeText(
-          projects.find((project) => project.readFirst.includes(file))?.slug
-        ) || "tracked project"})`,
-        when: "",
-      }))
-  );
-  const unavailableReasons = projects
-    .filter((project) => !project.git.ok)
-    .map((project) => `${project.slug}:${normalizeText(project.git.reason) || normalizeText(project.git.message)}`)
-    .filter(Boolean);
-  return {
-    available: projects.some((project) => project.git.ok),
-    branch: normalizeText(best?.git.branch),
-    dirty: projects.some((project) => Boolean(project.git.dirty)),
-    matchedProject: `tracked project candidates: ${projects.map((project) => project.slug).join(", ")}`,
-    notePath: normalizeText(best?.notePath),
-    readFirst,
-    recentCommit: firstRecentCommit
-      ? `${normalizeText(firstRecentCommit.shortHash)} ${normalizeText(firstRecentCommit.subject)}`
-      : "",
-    reason: projects.some((project) => project.git.ok)
-      ? ""
-      : unavailableReasons.join("; ") || "tracked_project_candidates_unavailable",
-  };
-}
-
-function rankTrackedProjectCandidates(projects: CollectedProjectRadar[]): CollectedProjectRadar[] {
-  return [...projects].sort((left, right) => {
-    const leftScore = scoreTrackedProjectCandidate(left);
-    const rightScore = scoreTrackedProjectCandidate(right);
-    if (leftScore !== rightScore) {
-      return rightScore - leftScore;
-    }
-    return normalizeText(left.slug).localeCompare(normalizeText(right.slug));
-  });
-}
-
-function scoreTrackedProjectCandidate(project: CollectedProjectRadar): number {
-  return (project.git.ok ? 100 : 0)
-    + (project.git.dirty ? 50 : 0)
-    + (project.git.recentCommits.length ? 10 : 0)
-    + (project.readFirst.length ? 1 : 0);
-}
-
-function uniqueWorkspaceContinuityFiles(files: WorkspaceContinuityFile[]): WorkspaceContinuityFile[] {
-  const seen = new Set<string>();
-  const unique: WorkspaceContinuityFile[] = [];
-  for (const file of files) {
-    const absolutePath = normalizeText(file.absolutePath);
-    if (!absolutePath || seen.has(absolutePath)) {
-      continue;
-    }
-    seen.add(absolutePath);
-    unique.push({
-      absolutePath,
-      role: normalizeText(file.role),
-      when: normalizeText(file.when),
-    });
-  }
-  return unique.slice(0, 6);
-}
-
 function resolveFreshness({
   checkin,
   companionNote,
@@ -920,108 +629,6 @@ function collectStaleReasons(freshness: ContextBoardFreshness): string[] {
     reasons.push("stale_companion_and_checkin_handoff");
   }
   return reasons;
-}
-
-function renderBriefingText({
-  locale,
-  mode,
-  sections,
-  stateCard,
-}: {
-  locale: CodekseiLocale;
-  mode: ContextBriefingMode;
-  sections: {
-    activeThreads: string;
-    cautions: string;
-    currentStatus: string;
-    observation?: string;
-    reentryPoints: string;
-    sourceStatus: string;
-    todayFacts: string;
-  };
-  stateCard: ProactiveStateCard;
-}): string {
-  const prelude = locale === "en"
-    ? buildEnglishBriefingPrelude(mode)
-    : mode === "review"
-    ? [
-      "Codeksei context board (review framing)",
-      "这是一份用于复盘 framing 和重入判断的轻量 handoff；真正的日记/复盘产物仍以 codeksei review 命令输出为准。",
-      "若看到 [⚠️ 需确认]，说明这块上下文偏薄或偏旧，不能当作确定事实。",
-    ]
-    : [
-      "Codeksei context board (proactive)",
-      "这是一份给主动判断使用的轻量 handoff；优先依据这里的事实决定是否沉默、发一句话，或只做 backstage work。",
-      "若看到 [⚠️ 需确认]，说明这块上下文偏薄或偏旧，不能当作确定事实。",
-    ];
-  return [
-    ...prelude,
-    "",
-    `## ${getContextBoardSectionTitle("current-status", locale)}`,
-    sections.currentStatus,
-    "",
-    `## ${locale === "en" ? "Companion State Card" : "伴随状态卡"}`,
-    renderStateCardSection(stateCard, locale),
-    ...(normalizeText(sections.observation)
-      ? [
-        "",
-        `## ${getContextBoardSectionTitle("model-observation", locale)}`,
-        sections.observation,
-      ]
-      : []),
-    "",
-    `## ${getContextBoardSectionTitle("today-facts", locale)}`,
-    sections.todayFacts,
-    "",
-    `## ${getContextBoardSectionTitle("active-threads", locale)}`,
-    sections.activeThreads,
-    "",
-    `## ${getContextBoardSectionTitle("cautions", locale)}`,
-    sections.cautions,
-    "",
-    `## ${getContextBoardSectionTitle("reentry-points", locale)}`,
-    sections.reentryPoints,
-    "",
-    `## ${getContextBoardSectionTitle("source-status", locale)}`,
-    sections.sourceStatus,
-  ].join("\n").trim();
-}
-
-function renderStateCardSection(stateCard: ProactiveStateCard, locale: CodekseiLocale): string {
-  if (locale === "en") {
-    return [
-      `- Current likely state: ${stateCard.currentLikelyState || "[⚠️ Needs confirmation] Unknown"}`,
-      `- Active thread: ${stateCard.activeThread || "[⚠️ Needs confirmation] Unknown"}`,
-      `- Likely blocker: ${stateCard.likelyBlocker || "[⚠️ Needs confirmation] Unknown"}`,
-      `- Easiest re-entry step: ${stateCard.easiestReentryStep || "[⚠️ Needs confirmation] Unknown"}`,
-      `- Avoid this time: ${stateCard.doNotDo.join("; ") || "Do not nag"}`,
-      `- Tone: ${stateCard.toneHint}`,
-      `- Context thickness: ${stateCard.sourceThickness}`,
-    ].join("\n");
-  }
-  return [
-    `- 现在大概在哪：${stateCard.currentLikelyState || "[⚠️ 需确认] 不确定"}`,
-    `- 活跃线头：${stateCard.activeThread || "[⚠️ 需确认] 不确定"}`,
-    `- 最可能卡点：${stateCard.likelyBlocker || "[⚠️ 需确认] 不确定"}`,
-    `- 最容易接回的一步：${stateCard.easiestReentryStep || "[⚠️ 需确认] 不确定"}`,
-    `- 这次别做：${stateCard.doNotDo.join("；") || "不要催债"}`,
-    `- 适合语气：${stateCard.toneHint}`,
-    `- 上下文厚度：${stateCard.sourceThickness}`,
-  ].join("\n");
-}
-
-function buildEnglishBriefingPrelude(mode: ContextBriefingMode): string[] {
-  return mode === "review"
-    ? [
-      "Codeksei context board (review framing)",
-      "This is a lightweight handoff for review framing and re-entry judgement; the canonical diary/review outputs still come from Codeksei review commands.",
-      "Treat any [⚠️ Needs confirmation] block as thin or stale context, not as confirmed fact.",
-    ]
-    : [
-      "Codeksei context board (proactive)",
-      "This is a lightweight handoff for proactive judgement; use it to decide whether to stay silent, send one concise message, or do backstage work only.",
-      "Treat any [⚠️ Needs confirmation] block as thin or stale context, not as confirmed fact.",
-    ];
 }
 
 function ensureContextBoardFile(
@@ -1151,21 +758,6 @@ function emptyCompanionMemorySnapshot(): CompanionMemorySnapshot {
   };
 }
 
-function renderParagraphBlock(lines: string[], fallback: string): string {
-  return lines.filter(Boolean).join("\n\n").trim() || fallback;
-}
-
-function renderBulletBlock(lines: string[], fallback: string): string {
-  const normalized = lines
-    .map((line) => normalizeText(line))
-    .filter(Boolean)
-    .slice(0, 8);
-  if (!normalized.length) {
-    return `- ${fallback}`;
-  }
-  return normalized.map((line) => `- ${line}`).join("\n");
-}
-
 function formatMaybeZonedDate(value: unknown, timezone: unknown): string {
   const normalized = normalizeText(value);
   if (!normalized) {
@@ -1177,17 +769,6 @@ function formatMaybeZonedDate(value: unknown, timezone: unknown): string {
 
 function normalizeTimezone(value: unknown): string {
   return normalizeText(value) || "Asia/Shanghai";
-}
-
-function formatStaleReason(reason: string): string {
-  switch (reason) {
-    case "missing_today_diary":
-      return "今天 diary 缺失";
-    case "stale_companion_and_checkin_handoff":
-      return "最近的 companion note / checkin completion 都不够新";
-    default:
-      return reason;
-  }
 }
 
 function sanitizeTargetKey(targetKey: string): string {

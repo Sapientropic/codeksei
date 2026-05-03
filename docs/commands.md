@@ -55,6 +55,11 @@ public CLI：
 - `codeksei onboarding status`
 - `codeksei context briefing`
 - `codeksei context inspect`
+- `codeksei whereabouts serve`
+- `codeksei whereabouts snapshot`
+- `codeksei whereabouts recent-stays`
+- `codeksei whereabouts recent-moves`
+- `codeksei whereabouts summary`
 - `codeksei capabilities status`
 - `codeksei pulse today`
 - `codeksei pulse generate`
@@ -109,6 +114,8 @@ operator / bootstrap：
 - `codeksei context briefing --user <senderId> --workspace /absolute/workspace --mode proactive`
 - `codeksei context briefing --user <senderId> --workspace /absolute/workspace --mode review`
 - `codeksei context inspect --user <senderId> --workspace /absolute/workspace --mode proactive`
+- `codeksei whereabouts snapshot`
+- `codeksei whereabouts summary`
 - `codeksei pulse today --user <senderId> --workspace /absolute/workspace`
 
 说明：
@@ -150,6 +157,34 @@ operator / bootstrap：
 - 缺源时显式标 `[⚠️ 需确认]`，不会编造
 - Hosted Mode 下的 proactive wake 会在 cron 运行前现读这份 board；原始 `AGENTS.md / Home.md / diary` 是输入源，不再是 cron prompt 的直接 surface
 - context board 不会默认触发模型调用；小模型 observation 只能由 `proactive observe` 或 host claim-checkin 的 observation pass 显式生成
+
+## Whereabouts
+
+这一组入口负责本地位置语义层：手机或本机上报端把事件写进 `CODEKSEI_STATE_DIR/whereabouts/`，后续由 `context inspect`、Pulse 和主动判断层只消费粗粒度摘要。
+
+- `codeksei whereabouts serve`
+- `codeksei whereabouts serve --host 127.0.0.1 --port 4318`
+- `codeksei whereabouts snapshot`
+- `codeksei whereabouts recent-stays`
+- `codeksei whereabouts recent-moves`
+- `codeksei whereabouts summary`
+
+说明：
+
+- `whereabouts serve` 是 V1 唯一 ingestion runtime；默认只监听 `127.0.0.1`，并要求 `CODEKSEI_WHEREABOUTS_TOKEN`
+- ingest 只接受 `application/json`；请求体默认上限 `64 KiB`，超限或错误 content-type 会在进入 JSON 解析前直接拒绝
+- 事件默认落盘到 `CODEKSEI_STATE_DIR/whereabouts/events.jsonl`；materialized 摘要写到同目录下的 `snapshot.json`、`summary.json`、`stays.json`、`moves.json`
+- 命名地点默认读取 `CODEKSEI_STATE_DIR/whereabouts/places.json`；支持 `home|work|custom`
+- `snapshot / summary / recent-stays / recent-moves` 只输出 coarse facts，不把裸经纬度带进用户可见文本
+- `context inspect` 会显示独立 `whereabouts` layer；Pulse 与 proactive 只读取 `whereabouts summary`，不会把它当作 schedule truth
+
+常用环境变量：
+
+- `CODEKSEI_WHEREABOUTS_HOST=127.0.0.1`
+- `CODEKSEI_WHEREABOUTS_PORT=4318`
+- `CODEKSEI_WHEREABOUTS_TOKEN=<local bearer token>`
+- `CODEKSEI_WHEREABOUTS_RETENTION_DAYS=30`
+- `CODEKSEI_WHEREABOUTS_PLACES_FILE=/absolute/path/to/places.json`
 
 ## Capability Governance
 

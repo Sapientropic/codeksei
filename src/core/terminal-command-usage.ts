@@ -21,6 +21,11 @@ const ACTION_USAGE_ARGS: Readonly<Partial<Record<CommandActionId, string>>> = Ob
   "companion.remember": "--user <wechat_user_id> --workspace /绝对路径 --source host_user_turn [--text \"内容\" | --stdin]",
   "context.briefing": "--user <wechat_user_id> --workspace /绝对路径 [--mode proactive|review]",
   "context.inspect": "--user <wechat_user_id> --workspace /绝对路径 [--mode proactive|review] [--text \"本轮用户消息\"]",
+  "whereabouts.serve": "[--host 127.0.0.1] [--port 4318]",
+  "whereabouts.snapshot": "[--now <ISO8601>]",
+  "whereabouts.recent_stays": "",
+  "whereabouts.recent_moves": "",
+  "whereabouts.summary": "[--now <ISO8601>]",
   "proactive.observe": "--user <wechat_user_id> --workspace /绝对路径 [--dry-run | --show]",
   "proactive.eval": "--fixture /绝对路径/proactive-observation-cases.json [--model gemma-4-E2B-it] [--endpoint http://127.0.0.1:8080/v1]",
   "pulse.today": "[--date YYYY-MM-DD] [--user <wechat_user_id>] [--workspace /绝对路径] [--focus \"今天想推进的线\"]",
@@ -101,6 +106,31 @@ export function buildTerminalActionExample(
     return `${command}${resolved.entrypointType === "cli" ? " -- " : " "}${argSuffix}`;
   }
   return `${command} ${argSuffix}`;
+}
+
+export function buildPublicTerminalCommandArgv(
+  action: CommandActionLike | CommandActionId | string,
+  {
+    appendArgs = [],
+    includeJsonFormat = false,
+  }: {
+    appendArgs?: readonly string[];
+    includeJsonFormat?: boolean;
+  } = {},
+): string[] {
+  const resolved = resolveAction(action);
+  const command = resolved ? buildPublicTerminalCommand(resolved) : "";
+  if (!command) {
+    return [];
+  }
+  const argv = command.split(/\s+/u).filter(Boolean);
+  if (appendArgs.length) {
+    argv.push(...appendArgs.filter(Boolean));
+  }
+  if (includeJsonFormat) {
+    argv.push("--format", "json");
+  }
+  return argv;
 }
 
 export function listRepoScriptActions(): CommandActionLike[] {

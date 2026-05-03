@@ -171,6 +171,7 @@ function buildBaseLayers(briefing: ContextBoardBriefing): ContextInspectLayer[] 
       briefing.sections.cautions,
       briefing.sections.reentryPoints,
     ].join("\n")),
+    buildLayer("whereabouts", "Whereabouts", "whereabouts", briefing.whereabouts.available, briefing.whereabouts.reason, briefing.whereabouts.statusLine || briefing.whereabouts.reason),
     buildLayer("companionMemory", "Companion Memory Runtime", "companion_memory", Boolean(briefing.companionMemory.lastUpdatedAt || briefing.companionMemory.recentWriteCount), briefing.companionMemory.lastUpdatedAt ? "recent companion memory state loaded" : "companion memory runtime state missing", JSON.stringify(briefing.companionMemory)),
     buildLayer("projectRadar", "Project Radar", "project_radar", briefing.projectRadar.available, briefing.projectRadar.available ? "project radar matched current workspace" : `project radar unavailable: ${briefing.projectRadar.reason || "unknown"}`, briefing.sections.activeThreads),
     buildLayer("workspaceBootstrap", "Workspace Bootstrap", "workspace_bootstrap", countWorkspaceFiles(briefing) > 0, countWorkspaceFiles(briefing) > 0 ? "workspace continuity files loaded" : "workspace bootstrap files missing", briefing.sections.reentryPoints),

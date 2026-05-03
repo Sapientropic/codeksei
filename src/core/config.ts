@@ -189,6 +189,14 @@ function parseEnvConfig(env: EnvSource, options: ReadConfigOptions = {}): AppRun
       systemMessageDeadLetterFile: path.join(stateDir, "system-message-dead-letter.json"),
       startWithCheckin: readPrefixedBoolEnv(env, "ENABLE_CHECKIN"),
     },
+    whereaboutsRuntime: {
+      whereaboutsHost: readPrefixedEnv(env, "WHEREABOUTS_HOST") || "127.0.0.1",
+      whereaboutsPlacesFile: readPrefixedEnv(env, "WHEREABOUTS_PLACES_FILE")
+        || path.join(stateDir, "whereabouts", "places.json"),
+      whereaboutsPort: readPrefixedIntEnv(env, "WHEREABOUTS_PORT") || 4318,
+      whereaboutsRetentionDays: readPrefixedIntEnv(env, "WHEREABOUTS_RETENTION_DAYS") || 30,
+      whereaboutsToken: readPrefixedEnv(env, "WHEREABOUTS_TOKEN") || "",
+    },
   });
 }
 

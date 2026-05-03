@@ -6,6 +6,7 @@ import type { AppRuntimeConfig } from "../core/app-service-contract";
 import { runHermesRecipeSmoke } from "../host/recipes/hermes/doctor";
 import { runCodexRecipeSmoke } from "../host/recipes/codex/doctor";
 import { resolveHostProviderWithConfig } from "./host-cli-shared";
+import { buildWhereaboutsSmokeCheck } from "../whereabouts/readiness";
 
 interface HostSmokeOptions {
   config: string;
@@ -57,15 +58,28 @@ export async function runHostSmokeCommand(
   });
   if (resolvedProvider.provider === "codex") {
     const smoke = runCodexRecipeSmoke(config);
+    const whereabouts = buildWhereaboutsSmokeCheck(config);
+    const overallOk = smoke.ok && (whereabouts.ok || !whereabouts.blocking);
+    const augmented = {
+      ...smoke,
+      ok: overallOk,
+      checks: {
+        ...smoke.checks,
+        whereabouts,
+      },
+      next: whereabouts.ok
+        ? smoke.next
+        : [...smoke.next, "配置 CODEKSEI_WHEREABOUTS_TOKEN 后可把 local ingest readiness 也纳入 smoke。"],
+    };
     return {
-      ok: smoke.ok ? true : "partial",
-      data: smoke,
+      ok: overallOk ? true : "partial",
+      data: augmented,
       text: [
         `provider: codex`,
-        `ok: ${smoke.ok ? "yes" : "no"}`,
-        ...Object.entries(smoke.checks).map(([key, value]) => `${key}: ${value.ok ? "ok" : "needs_attention"}`),
+        `ok: ${overallOk ? "yes" : "no"}`,
+        ...Object.entries(augmented.checks).map(([key, value]) => `${key}: ${value.ok ? "ok" : "needs_attention"}`),
       ].join("\n"),
-      next: smoke.next,
+      next: augmented.next,
     };
   }
   if (resolvedProvider.provider !== "hermes") {
@@ -83,14 +97,27 @@ export async function runHostSmokeCommand(
     runtime: "hermes",
     channelProvider: "hermes",
   });
+  const whereabouts = buildWhereaboutsSmokeCheck(config);
+  const overallOk = smoke.ok && (whereabouts.ok || !whereabouts.blocking);
+  const augmented = {
+    ...smoke,
+    ok: overallOk,
+    checks: {
+      ...smoke.checks,
+      whereabouts,
+    },
+    next: whereabouts.ok
+      ? smoke.next
+      : [...smoke.next, "配置 CODEKSEI_WHEREABOUTS_TOKEN 后可把 local ingest readiness 也纳入 smoke。"],
+  };
   return {
-    ok: smoke.ok ? true : "partial",
-    data: smoke,
+    ok: overallOk ? true : "partial",
+    data: augmented,
     text: [
       `provider: hermes`,
-      `ok: ${smoke.ok ? "yes" : "no"}`,
-      ...Object.entries(smoke.checks).map(([key, value]) => `${key}: ${value.ok ? "ok" : "needs_attention"}`),
+      `ok: ${overallOk ? "yes" : "no"}`,
+      ...Object.entries(augmented.checks).map(([key, value]) => `${key}: ${value.ok ? "ok" : "needs_attention"}`),
     ].join("\n"),
-    next: smoke.next,
+    next: augmented.next,
   };
 }

@@ -13,10 +13,20 @@ import { collectHermesRecipeDoctorReport, runHermesRecipeSmoke } from "../recipe
 import { collectCodexRecipeDoctorReport, runCodexRecipeSmoke } from "../recipes/codex/doctor";
 import { buildHostAttachmentManifest } from "./manifest";
 import { resolveGenericShellRecipe } from "../recipes/generic/recipe";
+import { buildWhereaboutsHostCheck } from "../../whereabouts/readiness";
 
 interface HostDoctorConfigInput
   extends HostAttachmentConfigInput,
-    Partial<Pick<AppRuntimeConfig, "workspaceRoot">> {
+    Partial<Pick<
+      AppRuntimeConfig,
+      | "stateDir"
+      | "whereaboutsHost"
+      | "whereaboutsPlacesFile"
+      | "whereaboutsPort"
+      | "whereaboutsRetentionDays"
+      | "whereaboutsToken"
+      | "workspaceRoot"
+    >> {
   configFile?: unknown;
 }
 
@@ -60,6 +70,7 @@ export function collectHostDoctorReport(
   const cwd = normalizeText(config.workspaceRoot) || process.cwd();
   const resolvedConfig = loadResolvedHostConfig(config.configFile, cwd);
   const manifest = buildHostAttachmentManifest(config);
+  const whereaboutsCheck = buildWhereaboutsHostCheck(config);
   const daemonState: AttachedDaemonState = {
     instanceId: "local-cli-state-owner",
     bridgeProfile: attachment.profile,
@@ -69,7 +80,12 @@ export function collectHostDoctorReport(
   };
 
   if (attachment.provider === "hermes") {
-    const doctor = collectHermesRecipeDoctorReport(config);
+    const doctor = {
+      ...collectHermesRecipeDoctorReport(config),
+      checks: {
+        whereabouts: whereaboutsCheck,
+      },
+    };
     const smoke = runHermesRecipeSmoke(config);
     const upgrade = buildHostUpgradeStatus(manifest, resolvedConfig, doctor.installedSkill.inSync, "hermes");
     return {
@@ -89,7 +105,14 @@ export function collectHostDoctorReport(
   }
 
   if (attachment.provider === "codex") {
-    const doctor = collectCodexRecipeDoctorReport(config);
+    const codexDoctor = collectCodexRecipeDoctorReport(config);
+    const doctor = {
+      ...codexDoctor,
+      checks: {
+        ...codexDoctor.checks,
+        whereabouts: whereaboutsCheck,
+      },
+    };
     const smoke = runCodexRecipeSmoke(config);
     const upgrade = buildHostUpgradeStatus(manifest, resolvedConfig, true, "codex");
     return {

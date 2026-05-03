@@ -106,6 +106,13 @@ test("config slices compose into the legacy-compatible app runtime surface", () 
       systemMessageDeadLetterFile: "E:/state/system-message-dead-letter.json",
       startWithCheckin: false,
     },
+    whereaboutsRuntime: {
+      whereaboutsHost: "127.0.0.1",
+      whereaboutsPlacesFile: "E:/state/whereabouts/places.json",
+      whereaboutsPort: 4318,
+      whereaboutsRetentionDays: 30,
+      whereaboutsToken: "",
+    },
   });
 
   assert.equal(config.workspaceRoot, "E:/workspace");

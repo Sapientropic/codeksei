@@ -1,5 +1,17 @@
 const test: typeof import("node:test") = require("node:test");
 const assert: typeof import("node:assert/strict") = require("node:assert/strict");
+const path: typeof import("node:path") = require("node:path");
+
+function resolveCrossPlatformPath(value: unknown): string {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return "";
+  }
+  if (path.isAbsolute(normalized) || path.win32.isAbsolute(normalized)) {
+    return normalized.replace(/\\/gu, "/");
+  }
+  return path.resolve(normalized).replace(/\\/gu, "/");
+}
 
 test("createTerminalCommandContext derives leafArgs and checkin from the provided argv", () => {
   const contextModulePath = require.resolve("../src/app/terminal-command-context");
@@ -169,6 +181,7 @@ test("createTerminalCommandContext derives leafArgs and checkin from the provide
       filename: pathUtilsModulePath,
       loaded: true,
       exports: {
+        resolveCrossPlatformPath,
         resolvePackageRoot() {
           return "E:/repo/codeksei";
         },
@@ -416,6 +429,7 @@ test("createTerminalCommandContext applies hosted config fallback for hosted che
       filename: pathUtilsModulePath,
       loaded: true,
       exports: {
+        resolveCrossPlatformPath,
         resolvePackageRoot() {
           return "E:/repo/codeksei";
         },
@@ -651,6 +665,7 @@ test("hosted config fallback uses the leaf workspace before repo-local sample co
       filename: pathUtilsModulePath,
       loaded: true,
       exports: {
+        resolveCrossPlatformPath,
         resolvePackageRoot() {
           return "/Users/example/codeksei";
         },

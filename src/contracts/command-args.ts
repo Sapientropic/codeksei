@@ -132,6 +132,35 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "text", keys: ["--text"], type: "string", defaultValue: "", description: "用于 context packs 触发评估的本轮文本" },
     ],
   }),
+  whereaboutsServe: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "host", keys: ["--host"], type: "string", defaultValue: "", description: "显式覆盖监听地址；默认读取 CODEKSEI_WHEREABOUTS_HOST" },
+      { name: "port", keys: ["--port"], type: "string", defaultValue: "", description: "显式覆盖监听端口；默认读取 CODEKSEI_WHEREABOUTS_PORT" },
+    ],
+  }),
+  whereaboutsSnapshot: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "now", keys: ["--now"], type: "string", defaultValue: "", description: "显式覆盖 freshness 判断时间（ISO 8601）" },
+    ],
+  }),
+  whereaboutsRecentStays: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+    ],
+  }),
+  whereaboutsRecentMoves: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+    ],
+  }),
+  whereaboutsSummary: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "now", keys: ["--now"], type: "string", defaultValue: "", description: "显式覆盖 freshness 判断时间（ISO 8601）" },
+    ],
+  }),
   capabilitiesStatus: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,

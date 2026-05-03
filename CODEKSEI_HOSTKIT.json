@@ -238,6 +238,25 @@
       "--format",
       "json"
     ],
+    "whereaboutsServe": [
+      "codeksei",
+      "whereabouts",
+      "serve"
+    ],
+    "whereaboutsSnapshot": [
+      "codeksei",
+      "whereabouts",
+      "snapshot",
+      "--format",
+      "json"
+    ],
+    "whereaboutsSummary": [
+      "codeksei",
+      "whereabouts",
+      "summary",
+      "--format",
+      "json"
+    ],
     "pulseFeedback": [
       "codeksei",
       "pulse",
@@ -425,6 +444,32 @@
         {
           "commandRef": "pulseFeedback",
           "reason": "Record like/dislike/hide/save/task feedback so the next Pulse remains explainable."
+        }
+      ]
+    },
+    {
+      "id": "whereabouts_ingest_and_context",
+      "trigger": "The host wants local location semantics, battery context, or interruption timing hints without exposing raw coordinates.",
+      "steps": [
+        {
+          "commandRef": "whereaboutsServe",
+          "reason": "Bring up the explicit local ingest server before expecting fresh whereabouts events."
+        },
+        {
+          "commandRef": "whereaboutsSnapshot",
+          "reason": "Confirm the current coarse location, motion, battery, and freshness view."
+        },
+        {
+          "commandRef": "whereaboutsSummary",
+          "reason": "Read the shared coarse summary that context board, pulse, and proactive layers should consume."
+        },
+        {
+          "commandRef": "contextInspect",
+          "reason": "Verify the controlled whereabouts layer is flowing into context board instead of leaking raw event shape."
+        },
+        {
+          "commandRef": "pulseToday",
+          "reason": "Confirm visible curation cards can reuse the coarse whereabouts summary without turning it into schedule truth."
         }
       ]
     },

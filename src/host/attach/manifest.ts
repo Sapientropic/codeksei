@@ -15,6 +15,7 @@ import { listHostRecipes, type HostRecipeId } from "../contracts/host-recipe";
 import { previewHermesCompanionSkillInstall } from "../recipes/hermes/skill";
 import type { HermesHostedSkillConfigInput } from "../recipes/hermes/skill";
 import { normalizeText } from "../../contracts/text-normalization";
+import { buildPublicTerminalCommandArgv } from "../../core/terminal-command-usage";
 
 export const DEFAULT_HOST_DISCOVERY_PROVIDER = "hermes" as const;
 
@@ -53,33 +54,36 @@ export function buildHostEntrypointManifest({
 } = {}): HostEntrypointManifest {
   const providerArgs = ["--provider", defaultProvider];
   return {
-    manifest: ["codeksei", "host", "manifest", "--format", "json"],
-    bootstrap: ["codeksei", "host", "bootstrap", ...providerArgs, "--format", "json"],
-    capabilitiesStatus: ["codeksei", "capabilities", "status", ...providerArgs, "--format", "json"],
-    doctor: ["codeksei", "host", "doctor", ...providerArgs, "--format", "json"],
-    smoke: ["codeksei", "host", "smoke", ...providerArgs, "--format", "json"],
-    seedProactive: ["codeksei", "host", "seed-proactive", ...providerArgs, "--format", "json"],
-    claimCheckin: ["codeksei", "host", "claim-checkin", ...providerArgs, "--format", "json"],
-    settleCheckin: ["codeksei", "host", "settle-checkin", ...providerArgs, "--format", "json"],
-    finalizeCheckin: ["codeksei", "host", "finalize-checkin", ...providerArgs, "--format", "json"],
-    render: ["codeksei", "host", "render", ...providerArgs, "--target", "skill", "--format", "json"],
-    companionRemember: ["codeksei", "companion", "remember", "--format", "json"],
-    diaryWrite: ["codeksei", "diary", "write", "--format", "json"],
-    timelineEvent: ["codeksei", "timeline", "event", "--format", "json"],
-    timelineCategories: ["codeksei", "timeline", "categories", "--format", "json"],
-    timelineRead: ["codeksei", "timeline", "read", "--format", "json"],
-    reviewNightly: ["codeksei", "review", "nightly", "--format", "json"],
-    noteAuto: ["codeksei", "note", "auto", "--format", "json"],
-    projectRadar: ["codeksei", "project", "radar", "--format", "json"],
-    reminderWrite: ["codeksei", "reminder", "write", "--format", "json"],
-    onboardingStart: ["codeksei", "onboarding", "start", "--format", "json"],
-    onboardingStep: ["codeksei", "onboarding", "step", "--format", "json"],
-    onboardingStatus: ["codeksei", "onboarding", "status", "--format", "json"],
-    contextBriefing: ["codeksei", "context", "briefing", "--format", "json"],
-    contextInspect: ["codeksei", "context", "inspect", "--format", "json"],
-    pulseFeedback: ["codeksei", "pulse", "feedback", "--format", "json"],
-    pulseGenerate: ["codeksei", "pulse", "generate", "--format", "json"],
-    pulseToday: ["codeksei", "pulse", "today", "--format", "json"],
+    manifest: buildPublicTerminalCommandArgv("host.manifest", { includeJsonFormat: true }),
+    bootstrap: buildPublicTerminalCommandArgv("host.bootstrap", { appendArgs: providerArgs, includeJsonFormat: true }),
+    capabilitiesStatus: buildPublicTerminalCommandArgv("capabilities.status", { appendArgs: providerArgs, includeJsonFormat: true }),
+    doctor: buildPublicTerminalCommandArgv("host.doctor", { appendArgs: providerArgs, includeJsonFormat: true }),
+    smoke: buildPublicTerminalCommandArgv("host.smoke", { appendArgs: providerArgs, includeJsonFormat: true }),
+    seedProactive: buildPublicTerminalCommandArgv("host.seed_proactive", { appendArgs: providerArgs, includeJsonFormat: true }),
+    claimCheckin: buildPublicTerminalCommandArgv("host.claim_checkin", { appendArgs: providerArgs, includeJsonFormat: true }),
+    settleCheckin: buildPublicTerminalCommandArgv("host.settle_checkin", { appendArgs: providerArgs, includeJsonFormat: true }),
+    finalizeCheckin: buildPublicTerminalCommandArgv("host.finalize_checkin", { appendArgs: providerArgs, includeJsonFormat: true }),
+    render: buildPublicTerminalCommandArgv("host.render", { appendArgs: [...providerArgs, "--target", "skill"], includeJsonFormat: true }),
+    companionRemember: buildPublicTerminalCommandArgv("companion.remember", { includeJsonFormat: true }),
+    diaryWrite: buildPublicTerminalCommandArgv("diary.append", { includeJsonFormat: true }),
+    timelineEvent: buildPublicTerminalCommandArgv("timeline.event", { includeJsonFormat: true }),
+    timelineCategories: buildPublicTerminalCommandArgv("timeline.categories", { includeJsonFormat: true }),
+    timelineRead: buildPublicTerminalCommandArgv("timeline.read", { includeJsonFormat: true }),
+    reviewNightly: buildPublicTerminalCommandArgv("review.nightly", { includeJsonFormat: true }),
+    noteAuto: buildPublicTerminalCommandArgv("note.auto", { includeJsonFormat: true }),
+    projectRadar: buildPublicTerminalCommandArgv("project.radar", { includeJsonFormat: true }),
+    reminderWrite: buildPublicTerminalCommandArgv("reminder.create", { includeJsonFormat: true }),
+    onboardingStart: buildPublicTerminalCommandArgv("onboarding.start", { includeJsonFormat: true }),
+    onboardingStep: buildPublicTerminalCommandArgv("onboarding.step", { includeJsonFormat: true }),
+    onboardingStatus: buildPublicTerminalCommandArgv("onboarding.status", { includeJsonFormat: true }),
+    contextBriefing: buildPublicTerminalCommandArgv("context.briefing", { includeJsonFormat: true }),
+    contextInspect: buildPublicTerminalCommandArgv("context.inspect", { includeJsonFormat: true }),
+    whereaboutsServe: buildPublicTerminalCommandArgv("whereabouts.serve"),
+    whereaboutsSnapshot: buildPublicTerminalCommandArgv("whereabouts.snapshot", { includeJsonFormat: true }),
+    whereaboutsSummary: buildPublicTerminalCommandArgv("whereabouts.summary", { includeJsonFormat: true }),
+    pulseFeedback: buildPublicTerminalCommandArgv("pulse.feedback", { includeJsonFormat: true }),
+    pulseGenerate: buildPublicTerminalCommandArgv("pulse.generate", { includeJsonFormat: true }),
+    pulseToday: buildPublicTerminalCommandArgv("pulse.today", { includeJsonFormat: true }),
   };
 }
 
@@ -246,6 +250,32 @@ function buildRecommendedHostWorkflows(): HostWorkflowHint[] {
         {
           commandRef: "pulseFeedback",
           reason: "Record like/dislike/hide/save/task feedback so the next Pulse remains explainable.",
+        },
+      ],
+    },
+    {
+      id: "whereabouts_ingest_and_context",
+      trigger: "The host wants local location semantics, battery context, or interruption timing hints without exposing raw coordinates.",
+      steps: [
+        {
+          commandRef: "whereaboutsServe",
+          reason: "Bring up the explicit local ingest server before expecting fresh whereabouts events.",
+        },
+        {
+          commandRef: "whereaboutsSnapshot",
+          reason: "Confirm the current coarse location, motion, battery, and freshness view.",
+        },
+        {
+          commandRef: "whereaboutsSummary",
+          reason: "Read the shared coarse summary that context board, pulse, and proactive layers should consume.",
+        },
+        {
+          commandRef: "contextInspect",
+          reason: "Verify the controlled whereabouts layer is flowing into context board instead of leaking raw event shape.",
+        },
+        {
+          commandRef: "pulseToday",
+          reason: "Confirm visible curation cards can reuse the coarse whereabouts summary without turning it into schedule truth.",
         },
       ],
     },

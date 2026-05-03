@@ -40,6 +40,12 @@ const {
   buildTerminalTopicHelp,
 } = require("../src/core/command-registry");
 const {
+  buildPublicTerminalCommandArgv,
+} = require("../src/core/terminal-command-usage");
+const {
+  buildHostEntrypointManifest,
+} = require("../src/host/attach/manifest");
+const {
   getCommandArgsSchema,
 } = require("../src/contracts/command-args");
 
@@ -75,6 +81,14 @@ test("command surface can resolve routed terminal commands from a single manifes
   assert.equal(findTerminalManifestByScriptName("note:auto")?.action, "note.auto");
   assert.equal(findTerminalCommandManifest(" NOTE ", " AUTO ")?.action, "note.auto");
   assert.equal(findTerminalManifestByScriptName(" Note:Auto ")?.action, "note.auto");
+});
+
+test("host entrypoint argv stays derived from the public command surface", () => {
+  const hermes = buildHostEntrypointManifest({ defaultProvider: "hermes" });
+  assert.deepEqual(hermes.manifest, buildPublicTerminalCommandArgv("host.manifest", { includeJsonFormat: true }));
+  assert.deepEqual(hermes.bootstrap, buildPublicTerminalCommandArgv("host.bootstrap", { appendArgs: ["--provider", "hermes"], includeJsonFormat: true }));
+  assert.deepEqual(hermes.whereaboutsServe, buildPublicTerminalCommandArgv("whereabouts.serve"));
+  assert.deepEqual(hermes.pulseToday, buildPublicTerminalCommandArgv("pulse.today", { includeJsonFormat: true }));
 });
 
 test("removed operator sync-checkin arg schema no longer exists", () => {

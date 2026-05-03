@@ -12,6 +12,7 @@ import { resolveHostMode, type HostProfileId } from "../core/host-mode";
 import type { HostModeConfigInput } from "../core/host-mode-resolution";
 import { createSessionStore } from "../session/session-store-factory";
 import { resolveCheckinTarget } from "../checkin";
+import { collectWhereaboutsCapabilityReadiness } from "../whereabouts/readiness";
 
 export const CAPABILITY_STATUS_VALUES = [
   "available",
@@ -58,6 +59,12 @@ export interface CapabilityStatusConfig extends HostModeConfigInput {
   accountId?: string;
   allowedUserIds?: string[];
   sessionsFile?: string;
+  stateDir?: string;
+  whereaboutsHost?: unknown;
+  whereaboutsPlacesFile?: unknown;
+  whereaboutsPort?: unknown;
+  whereaboutsRetentionDays?: unknown;
+  whereaboutsToken?: unknown;
   workspaceId?: string;
   workspaceRoot?: string;
 }
@@ -81,11 +88,13 @@ export function buildCapabilityStatusReport(
     explicitWorkspace: normalizeText(options.workspace),
     sessionStore: createSessionStore(config.sessionsFile),
   });
+  const whereaboutsReadiness = collectWhereaboutsCapabilityReadiness(config);
   const capabilities = listCommandActions()
     .filter((action) => action.status === "active")
     .map((action) => buildCapabilityStatusItem(action, {
       hostProfile: host.profile,
       hostSupported: host.supported,
+      localReadinessReasons: resolveLocalCapabilityReadinessReasons(action.action, whereaboutsReadiness),
       targetResolvable: Boolean(targetResolution.ok && targetResolution.value),
     }))
     .sort((left, right) => left.id.localeCompare(right.id));
@@ -105,10 +114,12 @@ function buildCapabilityStatusItem(
   {
     hostProfile,
     hostSupported,
+    localReadinessReasons,
     targetResolvable,
   }: {
     hostProfile: HostProfileId;
     hostSupported: boolean;
+    localReadinessReasons: string[];
     targetResolvable: boolean;
   },
 ): CapabilityStatusItem {
@@ -134,6 +145,7 @@ function buildCapabilityStatusItem(
       "run host doctor/smoke or pass a provider readiness signal before marking this capability available",
     ].join("; "));
   }
+  reasons.push(...localReadinessReasons);
   if (!entrypoints.length) {
     reasons.push("no public terminal or channel entrypoint is exposed");
   }
@@ -280,4 +292,22 @@ function resolveProviderLabel(
   host: ReturnType<typeof resolveHostMode>,
 ): string {
   return normalizeText(provider) || (host.channelProvider === "hermes" ? "hermes" : host.channelProvider === "host" ? "generic-shell" : "codex");
+}
+
+function resolveLocalCapabilityReadinessReasons(
+  actionId: string,
+  whereaboutsReadiness: ReturnType<typeof collectWhereaboutsCapabilityReadiness>,
+): string[] {
+  if (actionId === "whereabouts.serve") {
+    return whereaboutsReadiness.serve.available ? [] : [whereaboutsReadiness.serve.reason];
+  }
+  if (
+    actionId === "whereabouts.snapshot"
+    || actionId === "whereabouts.recent_stays"
+    || actionId === "whereabouts.recent_moves"
+    || actionId === "whereabouts.summary"
+  ) {
+    return whereaboutsReadiness.query.available ? [] : [whereaboutsReadiness.query.reason];
+  }
+  return [];
 }

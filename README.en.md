@@ -194,6 +194,7 @@ Boundaries:
 - `Onboarding`: first activation can happen as a conversational interview instead of a form. Long-term truth lands in the companion note and is then projected through the context board; when there is no Obsidian/workspace schema, Codeksei can fall back to a local companion profile under the state dir
 - `Companion memory`: the system keeps updating after first activation. When a user's new self-description, correction, support preference, boundary, or near-term task should change future companionship judgement, route it through `companion remember` instead of leaving it only in host chat memory
 - `Context board`: the controlled context layer for proactive judgement. It turns checkin state, today's facts, active threads, cautions, and re-entry handles into a prompt-ready briefing; Hosted Mode refreshes and injects that board at cron runtime instead of scanning raw vault files
+- `Whereabouts`: the local location-semantics layer. Events live under `CODEKSEI_STATE_DIR/whereabouts/`, and context inspect / Pulse / proactive only consume coarse facts like “home / out / low battery / moved recently” instead of raw coordinates
 - `Reminders`: reminder write and scheduling support for rhythm and follow-through. In Hosted Mode user-visible reminders are delivered back to the current origin chat; future proactive wakes now go through the hosted check-in contract instead of a reminder flag
 - `Review`: nightly / weekly / monthly review, with hybrid semantic extraction by default
 - `Project support`: workspace bootstrap, project radar, and shared-thread recovery by workspace so re-entry does not always start from scratch; local git remains the first truth and GitHub activity is only a fallback continuity signal
@@ -277,6 +278,11 @@ CODEKSEI_PROACTIVE_OBSERVATION_API_KEY=
 CODEKSEI_PROACTIVE_OBSERVATION_MODEL=gemma-4-E2B-it
 CODEKSEI_PROACTIVE_OBSERVATION_TIMEOUT_MS=8000
 CODEKSEI_PROACTIVE_OBSERVATION_MIN_CONFIDENCE=0.55
+CODEKSEI_WHEREABOUTS_HOST=127.0.0.1
+CODEKSEI_WHEREABOUTS_PORT=4318
+CODEKSEI_WHEREABOUTS_TOKEN=
+CODEKSEI_WHEREABOUTS_RETENTION_DAYS=30
+CODEKSEI_WHEREABOUTS_PLACES_FILE=/absolute/path/to/places.json
 CODEKSEI_CODEX_ENDPOINT=ws://127.0.0.1:8765
 CODEKSEI_WEIXIN_REPLY_MODE=stream
 CODEKSEI_WEIXIN_MIN_CHUNK_CHARS=80
@@ -315,6 +321,7 @@ Notes:
 - `CODEKSEI_ONBOARDING_SEMANTIC_MODEL` can pin a cheaper model just for hidden onboarding extraction
 - `CODEKSEI_ONBOARDING_SEMANTIC_TIMEOUT_MS` defaults to `15000`; timeouts fall back to deterministic extraction so activation turns stay responsive
 - `CODEKSEI_PROACTIVE_OBSERVATION_*` configures the optional local observation layer before proactive decisions. It only produces `ProactiveObservation`; it does not own delivery, schedule truth, or automatic companion-memory writes
+- `CODEKSEI_WHEREABOUTS_*` configures the local location-semantics layer: `serve` only binds to loopback by default and requires a bearer token; context / Pulse / proactive consume coarse summaries instead of raw coordinates
 - `codeksei proactive observe --user <id> --workspace <path>` generates and caches the latest observation; `--show` reads the latest observation/sourceHash/expired/usable status without calling a model. Use global `--format json|text` for output formatting
 - [⚠️ Needs confirmation] Gemma 4 E2B-it can be tried through llama.cpp server, for example `llama-server -hf ggml-org/gemma-4-E2B-it-GGUF:Q4_K_M --alias gemma-4-E2B-it --host 127.0.0.1 --port 8080 --jinja -c 8192 -ngl 99`. llama.cpp OpenAI-compatible behavior, `response_format`, multimodal `image_url`, and `chat_template_kwargs` support can vary by version/model/GGUF conversion. Codeksei does not hide incompatibility by auto-removing fields; endpoint failures fall back and surface the reason in diagnostics
 - `CODEKSEI_USER_NAME` is a display/persona field, not a routing id
@@ -419,6 +426,8 @@ codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/works
 codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace --ack <triggerId>
 codeksei system checkin-complete --user <wechat_user_id> --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for <duration>
 codeksei context briefing --user <wechat_user_id> --workspace /absolute/workspace --mode review
+codeksei whereabouts snapshot
+codeksei whereabouts summary
 ```
 
 More detailed references:

@@ -15,6 +15,7 @@ import type {
   RuntimeHostConfig,
   SchemaAndTemplateConfig,
   WeixinBridgeConfig,
+  WhereaboutsRuntimeConfig,
   WorkspacePathsConfig,
 } from "./config-slices";
 import type {
@@ -46,7 +47,8 @@ export interface AppRuntimeConfig extends
   WeixinBridgeConfig,
   RuntimeHostConfig,
   SchemaAndTemplateConfig,
-  CheckinRuntimeConfig {}
+  CheckinRuntimeConfig,
+  WhereaboutsRuntimeConfig {}
 
 export interface ChannelAccount {
   accountId: string;

@@ -47,6 +47,9 @@ export interface HostEntrypointManifest {
   onboardingStatus: string[];
   contextBriefing: string[];
   contextInspect: string[];
+  whereaboutsServe: string[];
+  whereaboutsSnapshot: string[];
+  whereaboutsSummary: string[];
   pulseFeedback: string[];
   pulseGenerate: string[];
   pulseToday: string[];
@@ -70,6 +73,9 @@ export interface HostWorkflowStep {
     | "companionRemember"
     | "contextBriefing"
     | "contextInspect"
+    | "whereaboutsServe"
+    | "whereaboutsSnapshot"
+    | "whereaboutsSummary"
     | "diaryWrite"
     | "timelineEvent"
     | "timelineCategories"
@@ -98,6 +104,7 @@ export interface HostWorkflowHint {
     | "project_continuity_write"
     | "context_handoff_refresh"
     | "daily_pulse_review"
+    | "whereabouts_ingest_and_context"
     | "user_correction_persistence";
   trigger: string;
   steps: HostWorkflowStep[];

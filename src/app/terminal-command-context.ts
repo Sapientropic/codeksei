@@ -9,7 +9,7 @@ import { renderInstructionTemplate } from "../core/instructions-template";
 import type { AppRuntimeConfig } from "../core/app-service-contract";
 import { createTimelineIntegration } from "../integrations/timeline";
 import { writeForeignTextDocument } from "../state/json-state";
-import { resolvePackageRoot } from "../core/path-utils";
+import { resolveCrossPlatformPath, resolvePackageRoot } from "../core/path-utils";
 import { resolveConfiguredPersonName } from "../contracts/person-reference";
 import type { GlobalCliOptions } from "../contracts/cli-contract";
 import type { TerminalCommandManifestEntry } from "../contracts/command-surface";
@@ -145,14 +145,7 @@ function resolveHostedConfigFallbackInput(
 }
 
 function normalizeOptionPath(value: string): string {
-  const normalized = String(value || "").trim();
-  if (!normalized) {
-    return "";
-  }
-  if (/^[A-Za-z]:[\\/]/u.test(normalized) || /^\\\\/u.test(normalized)) {
-    return normalized.replace(/\\/gu, "/");
-  }
-  return path.resolve(normalized);
+  return resolveCrossPlatformPath(value);
 }
 
 function readOptionValue(argv: string[], optionName: string): string {

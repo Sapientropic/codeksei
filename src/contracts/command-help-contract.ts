@@ -49,6 +49,20 @@ const TOPIC_HELP = {
       "  proactive 更偏主动判断；review 更偏复盘 framing 与重入提示。",
     ],
   }),
+  whereabouts: () => ({
+    usage: [
+      buildTerminalActionExample("whereabouts.serve", { audience: "public", includeArgs: true }),
+      buildTerminalActionExample("whereabouts.snapshot", { audience: "public", includeArgs: true }),
+      buildTerminalActionExample("whereabouts.summary", { audience: "public", includeArgs: true }),
+    ],
+    bodyLabel: "补充：",
+    body: [
+      "  whereabouts 是本地位置上下文能力，不是调度真相层，也不会直接改写 proactive schedule。",
+      "  ingest server 默认只监听 127.0.0.1，且必须带 Bearer token；context / pulse 只消费语义摘要，不消费裸坐标。",
+      "  ingest 只接受 application/json，请求体默认上限 64 KiB；超限或错误 content-type 会在进入解析前直接拒绝。",
+      "  命名地点默认来自 CODEKSEI_STATE_DIR/whereabouts/places.json；匹配不到时回退成通用位置语义。",
+    ],
+  }),
   proactive: () => ({
     usage: [
       buildExample("proactive.observe", true),
@@ -442,6 +456,53 @@ const LEAF_HELP = {
     examples: [
       "  codeksei context inspect --user <wechatUserId> --workspace /absolute/workspace --mode proactive",
       "  codeksei context inspect --user <wechatUserId> --workspace /absolute/workspace --text \"本轮用户消息\"",
+    ],
+    includeFlagBlock: true,
+  }),
+  "whereabouts.serve": () => ({
+    usage: [buildTerminalActionExample("whereabouts.serve", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  显式启动本地 whereabouts ingest server；这是 V1 唯一的上报入口。",
+      "  默认只监听本机回环地址，并要求 CODEKSEI_WHEREABOUTS_TOKEN；不会自动绑进 host bootstrap 或 shared:start。",
+      "  上报只接收 Codeksei 自有协议，落盘在 CODEKSEI_STATE_DIR/whereabouts/。",
+      "  HTTP ingest 只接受 application/json，请求体默认上限 64 KiB。",
+    ],
+    includeFlagBlock: true,
+  }),
+  "whereabouts.snapshot": () => ({
+    usage: [buildTerminalActionExample("whereabouts.snapshot", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  读取当前位置语义、电量、运动状态和最近触发来源。",
+      "  输出保持在 coarse facts 层，不会把原始经纬度带到用户可见文本里。",
+    ],
+    includeFlagBlock: true,
+  }),
+  "whereabouts.recent_stays": () => ({
+    usage: [buildTerminalActionExample("whereabouts.recent_stays", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  读取 materialized 停留历史，适合本地诊断和 agent 查询。",
+      "  输出的是命名地点或通用地点语义，不是 raw event dump。",
+    ],
+    includeFlagBlock: true,
+  }),
+  "whereabouts.recent_moves": () => ({
+    usage: [buildTerminalActionExample("whereabouts.recent_moves", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  读取 materialized 移动历史，适合查看最近地点切换或 trigger 变化。",
+      "  输出仍保持语义层，不直接暴露原始坐标。",
+    ],
+    includeFlagBlock: true,
+  }),
+  "whereabouts.summary": () => ({
+    usage: [buildTerminalActionExample("whereabouts.summary", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  输出给 context / pulse / proactive 复用的 coarse whereabouts 摘要。",
+      "  如果数据过旧，会明确标成 stale，而不是假装当前位置仍然确定。",
     ],
     includeFlagBlock: true,
   }),

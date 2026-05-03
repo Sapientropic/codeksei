@@ -358,6 +358,44 @@ test("pulse generate keeps at most three cards, applies feedback penalties, and 
   assert.equal(todayResult.data.cards.length, result.data.cards.length);
 });
 
+test("pulse generate does not leak missing-whereabouts diagnostics or local paths into visible cards", async () => {
+  const fixture = createGovernanceFixture("codeksei-pulse-sanitized-");
+  const today = writeTodayDiary(fixture);
+
+  const result = await runPulseCommand(fixture.config, [
+    "generate",
+    "--user", fixture.target.senderId,
+    "--workspace", fixture.target.workspaceRoot,
+    "--date", today,
+    "--focus", "继续 diary",
+  ]);
+
+  const renderedCards = JSON.stringify(result.data.cards);
+  assert.doesNotMatch(renderedCards, /whereabouts 还没有本地位置事件/u);
+  assert.doesNotMatch(renderedCards, /stale_companion_and_checkin_handoff/u);
+  assert.doesNotMatch(
+    renderedCards,
+    new RegExp(fixture.workspaceRoot.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"),
+  );
+});
+
+test("pulse focus scoring ignores generic continuation words and only boosts true topic matches", async () => {
+  const fixture = createGovernanceFixture("codeksei-pulse-focus-");
+  const today = writeTodayDiary(fixture);
+
+  const result = await runPulseCommand(fixture.config, [
+    "generate",
+    "--user", fixture.target.senderId,
+    "--workspace", fixture.target.workspaceRoot,
+    "--date", today,
+    "--focus", "继续 diary",
+  ]);
+
+  const focusBoosted = result.data.cards.filter((card: { scoreBreakdown: { focus: number } }) => card.scoreBreakdown.focus > 0);
+  assert.equal(focusBoosted.length, 1);
+  assert.equal(focusBoosted[0]?.type, "focus");
+});
+
 test("pulse feedback rejects missing card and invalid kind without writing state", async () => {
   const fixture = createGovernanceFixture("codeksei-pulse-feedback-invalid-");
 

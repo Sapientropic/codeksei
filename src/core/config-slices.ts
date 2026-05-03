@@ -109,6 +109,14 @@ export interface CheckinRuntimeConfig extends Pick<WorkspacePathsConfig, "worksp
   startWithCheckin: boolean;
 }
 
+export interface WhereaboutsRuntimeConfig {
+  whereaboutsHost: string;
+  whereaboutsPlacesFile: string;
+  whereaboutsPort: number;
+  whereaboutsRetentionDays: number;
+  whereaboutsToken: string;
+}
+
 export interface AppRuntimeConfigSlices {
   workspacePaths: WorkspacePathsConfig;
   identityAndTime: IdentityAndTimeConfig;
@@ -116,6 +124,7 @@ export interface AppRuntimeConfigSlices {
   runtimeHost: RuntimeHostConfig;
   schemaAndTemplate: SchemaAndTemplateConfig;
   checkinRuntime: CheckinRuntimeConfig;
+  whereaboutsRuntime: WhereaboutsRuntimeConfig;
 }
 
 export type CombinedAppRuntimeConfig =
@@ -124,7 +133,8 @@ export type CombinedAppRuntimeConfig =
   & WeixinBridgeConfig
   & RuntimeHostConfig
   & SchemaAndTemplateConfig
-  & CheckinRuntimeConfig;
+  & CheckinRuntimeConfig
+  & WhereaboutsRuntimeConfig;
 
 export function composeAppRuntimeConfig(slices: AppRuntimeConfigSlices): CombinedAppRuntimeConfig {
   return {
@@ -134,5 +144,6 @@ export function composeAppRuntimeConfig(slices: AppRuntimeConfigSlices): Combine
     ...slices.runtimeHost,
     ...slices.schemaAndTemplate,
     ...slices.checkinRuntime,
+    ...slices.whereaboutsRuntime,
   };
 }

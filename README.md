@@ -212,6 +212,7 @@ codeksei host smoke --provider hermes
 - `Onboarding`：首次激活不走表单，而是走聊天式访谈。长期真相写进 companion note，再由 context board 投影给宿主；没有 Obsidian / workspace schema 时也能自动回退到本地 state-dir 下的 companion profile
 - `Companion memory`：首访之后也会继续更新。只要用户新的自述、纠正、支持偏好、边界或近线任务会影响后续陪伴判断，就可以走 `companion remember` 这条 ongoing memory 主链，而不是把变化只留在宿主聊天记忆里
 - `Context board`：主动判断用的受控上下文层。它把 checkin state、今天事实、活跃线头、注意事项和重入入口收口到一份 prompt-ready briefing；Hosted Mode 下每次 cron 运行前都会现读最新 board，而不是盲扫原始 vault 文件
+- `Whereabouts`：本地位置语义层。事件落在 `CODEKSEI_STATE_DIR/whereabouts/`，再由 context inspect、Pulse 和 proactive 只消费“在家 / 在外 / 低电 / 刚移动过”这类粗粒度摘要，不把裸坐标带到用户可见面
 - `Capability governance`：解释每个入口是“已配置、可用、降级还是阻断”，并给出 host profile、前置条件、side effect 与不可用原因
 - `Context inspector`：在 context board 之上解释本轮上下文装配来源、排除项、stale 标记、pending handoff 和 context packs，不新增事实来源
 - `Codeksei Pulse`：每日最多三张可继续推进的策展卡，默认 deterministic-first，读本地状态和反馈；like/save 会提高同主题后续候选分数，不自动推送微信，也不改变 proactive schedule
@@ -315,6 +316,11 @@ CODEKSEI_PROACTIVE_OBSERVATION_API_KEY=
 CODEKSEI_PROACTIVE_OBSERVATION_MODEL=gemma-4-E2B-it
 CODEKSEI_PROACTIVE_OBSERVATION_TIMEOUT_MS=8000
 CODEKSEI_PROACTIVE_OBSERVATION_MIN_CONFIDENCE=0.55
+CODEKSEI_WHEREABOUTS_HOST=127.0.0.1
+CODEKSEI_WHEREABOUTS_PORT=4318
+CODEKSEI_WHEREABOUTS_TOKEN=
+CODEKSEI_WHEREABOUTS_RETENTION_DAYS=30
+CODEKSEI_WHEREABOUTS_PLACES_FILE=/绝对路径/places.json
 CODEKSEI_CODEX_ENDPOINT=ws://127.0.0.1:8765
 CODEKSEI_WEIXIN_REPLY_MODE=stream
 CODEKSEI_WEIXIN_MIN_CHUNK_CHARS=80
@@ -358,6 +364,7 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 - `CODEKSEI_PROACTIVE_JUDGMENT_MODEL` 默认 `qwen3.5:2b`，只是推荐默认，不把 Codeksei 绑到具体模型
 - `CODEKSEI_PROACTIVE_JUDGMENT_TIMEOUT_MS` 默认 `2500`，`CODEKSEI_PROACTIVE_JUDGMENT_MIN_CONFIDENCE` 默认 `0.62`；超时、低置信或 JSON 非法都会回退 deterministic
 - `CODEKSEI_PROACTIVE_OBSERVATION_*` 是主动判断前的小模型观察层。它只生成 `ProactiveObservation`，不接管投递、调度真相，也不自动写 companion memory
+- `CODEKSEI_WHEREABOUTS_*` 是本地位置语义层：`serve` 默认只监听 `127.0.0.1`，并要求 Bearer token；context / pulse / proactive 只消费 coarse summary，不消费裸坐标
 - observation 的 `sourceHash` 来自脱敏后的 observation source pack：checkin 摘要、context briefing、recent outcomes、deterministic stateCard、timezone、voice signal 和 target hash；不包含模型输出，也不包含 observation 回写后的 board，避免 stateCard / observation 循环依赖
 - observation 同时记录 `confidence` 与 `usable/discardReason`：低置信或缺证据的 observation 可以留在 eval/diagnostics 里，但不会进入 `ProactiveDecision`
 - `codeksei proactive observe --user <id> --workspace <path>` 会生成并缓存 latest observation；`--dry-run` 不写 observation store；`--show` 只读 latest、sourceHash、expired、usable 状态，不触发模型调用。输出格式继续用全局 `--format json|text`
@@ -466,6 +473,8 @@ codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/works
 codeksei system checkin-tick --user <wechat_user_id> --workspace /absolute/workspace --ack <triggerId>
 codeksei system checkin-complete --user <wechat_user_id> --workspace /absolute/workspace --trigger <triggerId> --result silent --sleep-for <duration>
 codeksei context briefing --user <wechat_user_id> --workspace /absolute/workspace --mode review
+codeksei whereabouts snapshot
+codeksei whereabouts summary
 ```
 
 更完整的命令与架构说明见：

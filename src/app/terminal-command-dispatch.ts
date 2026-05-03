@@ -50,6 +50,13 @@ import { runProactiveEvalCommand } from "./proactive-eval-cli";
 import { runProactiveObserveCommand } from "./proactive-observe-cli";
 import { runReminderWriteCommand } from "./reminder-write-cli";
 import { runReviewCommand } from "./review-cli";
+import {
+  runWhereaboutsRecentMovesCommand,
+  runWhereaboutsRecentStaysCommand,
+  runWhereaboutsServeCommand,
+  runWhereaboutsSnapshotCommand,
+  runWhereaboutsSummaryCommand,
+} from "./whereabouts-cli";
 import { runSystemCheckinConfigCommand } from "./system-checkin-config-cli";
 import { runSystemCheckinCompleteCommand } from "./system-checkin-complete-cli";
 import { runSystemCheckinTickCommand } from "./system-checkin-tick-cli";
@@ -215,6 +222,21 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
   },
   "context.inspect": async (_manifest, context) => {
     return runContextInspectCommand(context.config, context.leafArgs);
+  },
+  "whereabouts.serve": async (_manifest, context) => {
+    return runWhereaboutsServeCommand(context.config, context.leafArgs);
+  },
+  "whereabouts.snapshot": async (_manifest, context) => {
+    return runWhereaboutsSnapshotCommand(context.config, context.leafArgs);
+  },
+  "whereabouts.recent_stays": async (_manifest, context) => {
+    return runWhereaboutsRecentStaysCommand(context.config, context.leafArgs);
+  },
+  "whereabouts.recent_moves": async (_manifest, context) => {
+    return runWhereaboutsRecentMovesCommand(context.config, context.leafArgs);
+  },
+  "whereabouts.summary": async (_manifest, context) => {
+    return runWhereaboutsSummaryCommand(context.config, context.leafArgs);
   },
   "proactive.observe": async (_manifest, context) => {
     return runProactiveObserveCommand(context.config, context.leafArgs);
