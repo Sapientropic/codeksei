@@ -489,6 +489,7 @@ codeksei whereabouts summary
 - `npm run check`：只跑 source-level guard、typecheck 和 tests TS typecheck，不会刷新 `dist/`
 - `npm run coverage:critical`：owner-focused + per-file coverage gate；只覆盖 `config`、`weixin delivery text`、`runtime turn` 与 `stream delivery` 这组关键 owner，并逐文件执行阈值；这是 `verify` 层，不进入 `check`
 - `npm run verify`：在 `check` 与 `coverage:critical` 之后显式 `build`，再跑 built-runtime tests 和 `npm run pack:dry-run`
+- `npm run audit:prod`：production dependency 的独立联网 gate；当前只精确豁免已审过的 `vis-timeline -> vis-data -> uuid` 这一条链，不并入 `check` / `verify`
 - `npm run build`：只在你明确要刷新 published runtime artifacts 时运行
 
 这条分工是刻意收口的：以后不要再依赖 `prepare` 或 `npm pack` 的隐式 lifecycle 去偷偷帮你 build。

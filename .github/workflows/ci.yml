@@ -30,6 +30,24 @@ jobs:
       - name: Run verification suite
         run: npm run verify
 
+  audit-prod:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run production audit gate
+        run: npm run audit:prod
+
   verify-windows:
     runs-on: windows-latest
     steps:
