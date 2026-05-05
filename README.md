@@ -28,7 +28,7 @@
 
 - **它是什么**：一个本地优先、`daemon-first / host-attachable` 的 companion engine；对用户是陪伴型助理，对宿主是可附着的领域层
 - **CLI contract**：`codeksei help`、`codeksei schema`、`codeksei host manifest` 是默认 discovery 面；非 TTY 默认 JSON，`stdout` 留给结果，`stderr` 留给诊断
-- **推荐开始方式**：先做通用 `SETUP`，再按 `Codex Mode` 或 `Hosted Mode` 分流
+- **推荐开始方式**：先做通用 `SETUP`，再按 `Codex Mode`、`Claude Code Mode` 或 `Hosted Mode` 分流
 
 <a id="agent-quickstart"></a>
 
@@ -38,10 +38,10 @@
 
 1. 先读 repo 根的 `CODEKSEI_HOSTKIT.json`
 2. 把 README 当成人类说明，把 `HOSTKIT + codeksei host manifest/bootstrap/doctor/smoke` 当机器入口
-3. 先明确宿主路径：`Codex Mode` 用 `--provider codex`，`Hosted Mode` 用 `--provider hermes`
+3. 先明确宿主路径：`Codex Mode` 用 `--provider codex`，`Claude Code Mode` 用 `--provider claudecode`，`Hosted Mode` 用 `--provider hermes`
 4. 把 `host bootstrap` 理解成“Codeksei attach/bootstrap 完成”，不要误读成 “宿主 gateway / Weixin live bring-up 已完成”
 
-- `CODEKSEI_HOSTKIT.json` 现在也会带最小 entrypoint/workflow hints，足够让新 host 知道 onboarding / companion memory / context briefing / context inspect / capabilities status / pulse / diary / timeline / review / note / reminder 的默认路由；`codeksei host manifest --provider codex|hermes` 可按 provider 视角查看入口，当前环境真相统一看 `codeksei host doctor --provider <provider>`
+- `CODEKSEI_HOSTKIT.json` 现在也会带最小 entrypoint/workflow hints，足够让新 host 知道 onboarding / companion memory / context briefing / context inspect / capabilities status / pulse / diary / timeline / review / note / reminder 的默认路由；`codeksei host manifest --provider codex|claudecode|hermes` 可按 provider 视角查看入口，当前环境真相统一看 `codeksei host doctor --provider <provider>`
 
 推荐顺序：
 
@@ -64,6 +64,8 @@ Codeksei 现在把自己定义成 **daemon-first / host-attachable / companion e
 
 - `Codex Mode`
   `provider=codex`：`Codeksei first-party Weixin adapter + Codex runtime`，Codeksei 自己持有 bootstrap / doctor / smoke / bridge lifecycle
+- `Claude Code Mode`
+  `provider=claudecode`：`Codeksei first-party Weixin adapter + Claude Code runtime`，Codeksei 自己持有 bridge lifecycle，runtime 由 Claude Code CLI 子进程按 workspace 管理
 - `Hosted Mode`
   `provider=hermes`：Hermes 负责 agent loop 和宿主侧消息面；Codeksei 通过 CLI / skill surface 暴露 timeline、diary、reminder、review、note、project radar 等能力
 - `主动性判断上下文层`
@@ -123,7 +125,7 @@ codeksei capabilities status
 ### SETUP 的边界
 
 - 这一步成功只代表 CLI、public schema、host attachment contract / hostkit 可发现
-- 这一步不代表 `Codex Mode` 已扫码登录
+- 这一步不代表 `Codex Mode` / `Claude Code Mode` 已扫码登录
 - 这一步也不代表 `Hosted Mode` 已 live attach 到 Hermes gateway / 宿主桥
 - 这一步更不代表提醒、check-in、repo-local shim 或 hosted send-back 已全部就绪
 
@@ -162,6 +164,36 @@ npm run shared:start
 npm run shared:open
 npm run shared:status
 ```
+
+### Claude Code Mode
+
+适合你想复用 Codeksei 的微信桥、线程绑定和审批流程，但把 runtime 切到 Claude Code CLI 时。
+
+拉起顺序：
+
+```bash
+codeksei host manifest --provider claudecode
+codeksei host bootstrap --provider claudecode --workspace /absolute/path/to/workspace
+codeksei host doctor --provider claudecode
+CODEKSEI_RUNTIME=claudecode npm run shared:start
+```
+
+补充：
+
+- `host bootstrap --provider claudecode` 会写入 `modeClass=claudecode-managed`、`runtimeProvider=claudecode`、`runtimeOwner=codeksei`、`channelProvider=codeksei`、`deliveryRecipe=codeksei-weixin-bridge`
+- `CODEKSEI_CLAUDE_COMMAND` 默认回退 `CODEKSEI_RUNTIME_COMMAND`，再回退 `claude`
+- `shared:start` 只启动 Codeksei bridge，不启动 `codex app-server`
+- `shared:open` 只支持 Codex desktop attach；Claude Code Mode 下会明确返回不可用
+- Codeksei Tools MCP 是显式 opt-in；默认用 `codeksei tool mcp-bootstrap --scope local` 预览或安装，不会默认写 workspace `.mcp.json`
+
+Claude Code 需要调用 Codeksei 的 context、timeline、diary、note、reminder 等能力时，再显式安装 MCP：
+
+```bash
+codeksei tool mcp-bootstrap --scope local --workspace-root /absolute/path/to/workspace
+codeksei tool mcp-bootstrap --scope local --toolset companion --install --workspace-root /absolute/path/to/workspace
+```
+
+`--scope project --install` 会写项目级 `.mcp.json`，必须额外传 `--allow-project-config`。`claude mcp serve` 是把 Claude Code 暴露给其他 MCP client，不是 Codeksei Tools MCP server。
 
 ### Hosted Mode
 
@@ -208,7 +240,7 @@ codeksei host smoke --provider hermes
 
 - `Timeline`：把已经发生过的时间块、切换点和生活事实钉成时间感与记忆锚点，不让一天只剩模糊印象
 - `Diary`：Todo、碎片、补充记录、总结，以及和 timeline 紧密联动的时间线事实，帮你把零散日常慢慢收成可用痕迹
-- `Check-ins`：主动唤醒与主动分忧。发一句消息只是其中一种；它也会先回看上下文、整理后台、补一条 diary / timeline、留一个提醒，再决定是不是该主动露个面。Codeksei 负责生成 proactive trigger、维护 `tick -> ack -> complete` 的调度真相，并在 `checkin-complete` 时写回下一次唤醒；Codex Mode 下由本地 poller 包装 heartbeat 与入队，Hosted Mode 下由 Hermes 只执行受控 wake/recovery/guard job set，真正的下一次唤醒仍由 Codeksei 在 `checkin-complete` 里决定
+- `Check-ins`：主动唤醒与主动分忧。发一句消息只是其中一种；它也会先回看上下文、整理后台、补一条 diary / timeline、留一个提醒，再决定是不是该主动露个面。Codeksei 负责生成 proactive trigger、维护 `tick -> ack -> complete` 的调度真相，并在 `checkin-complete` 时写回下一次唤醒；first-party bridge modes 下由本地 poller 包装 heartbeat 与入队，Hosted Mode 下由 Hermes 只执行受控 wake/recovery/guard job set，真正的下一次唤醒仍由 Codeksei 在 `checkin-complete` 里决定
 - `Onboarding`：首次激活不走表单，而是走聊天式访谈。长期真相写进 companion note，再由 context board 投影给宿主；没有 Obsidian / workspace schema 时也能自动回退到本地 state-dir 下的 companion profile
 - `Companion memory`：首访之后也会继续更新。只要用户新的自述、纠正、支持偏好、边界或近线任务会影响后续陪伴判断，就可以走 `companion remember` 这条 ongoing memory 主链，而不是把变化只留在宿主聊天记忆里
 - `Context board`：主动判断用的受控上下文层。它把 checkin state、今天事实、活跃线头、注意事项和重入入口收口到一份 prompt-ready briefing；Hosted Mode 下每次 cron 运行前都会现读最新 board，而不是盲扫原始 vault 文件
@@ -220,9 +252,9 @@ codeksei host smoke --provider hermes
 - `Review`：nightly / weekly / monthly，把日常记录压成更稳定的节奏校准与复盘材料
 - `Project support`：workspace bootstrap、project radar、按 workspace 恢复共享线程。项目切走再回来时，不用先把整条线在脑子里重建一遍；本地 git 仍是第一真相，只有 repo 缺失或不是 git repo 时才回退到 GitHub activity continuity signal
 - `WeChat bridge`
-  Codex Mode 下由 Codeksei 托管；Hosted Mode 下推荐直接用宿主自己的桥接能力
+  Codex Mode / Claude Code Mode 下由 Codeksei 托管；Hosted Mode 下推荐直接用宿主自己的桥接能力
 - `Runtime host`
-  Codex Mode 当前默认是 Codex；Hosted Mode 由宿主自己托管 agent/runtime/审批/模型切换
+  Codex Mode 默认是 Codex；Claude Code Mode 使用 Claude Code CLI；Hosted Mode 由宿主自己托管 agent/runtime/审批/模型切换
 - `Durable note`：`note:auto`、`note:maybe`、`note:sync`
 
 ## 这些人会喜欢它
@@ -277,9 +309,9 @@ codeksei host smoke --provider hermes
 - 统一全局参数：
   `--format json|text`、`--locale zh-CN|en`、`--verbose`、`--workspace-root /absolute/path`
 
-## Codex Mode 运行时配置
+## First-Party Bridge 运行时配置
 
-Codex Mode 仍按“两阶段”补全环境变量：
+Codex Mode / Claude Code Mode 都按“两阶段”补全环境变量：
 
 1. 先保留当前进程里已经存在的环境变量
 2. 读取当前项目目录下的 `.env`
@@ -292,8 +324,18 @@ Codex Mode 仍按“两阶段”补全环境变量：
 
 ```dotenv
 CODEKSEI_ACCOUNT_ID=
+CODEKSEI_RUNTIME=codex
 CODEKSEI_RUNTIME_ENDPOINT=ws://127.0.0.1:8765
 CODEKSEI_RUNTIME_COMMAND=codex
+CODEKSEI_CLAUDE_COMMAND=claude
+CODEKSEI_CLAUDE_MODEL=
+CODEKSEI_CLAUDE_PERMISSION_MODE=
+CODEKSEI_CLAUDE_DISABLE_VERBOSE=
+CODEKSEI_CLAUDE_EXTRA_ARGS=
+CODEKSEI_CLAUDE_CONTEXT_WINDOW=
+CODEKSEI_CLAUDE_MAX_OUTPUT_TOKENS=
+CODEKSEI_CLAUDE_MCP_CONFIG=
+CODEKSEI_CLAUDE_STRICT_MCP_CONFIG=0
 CODEKSEI_HERMES_COMMAND=hermes
 CODEKSEI_REVIEW_SEMANTIC_HOST=auto
 CODEKSEI_COMPANION_SEMANTIC_HOST=
@@ -346,12 +388,14 @@ CODEKSEI_SHARED_DISABLE_SHELL_SNAPSHOT=0
 
 - `CODEKSEI_WEIXIN_REPLY_MODE=stream` 现在更接近 hybrid stream：优先在自然句边界或已完成块发送，避免把半句 final 提前裂成多个微信气泡
 - `CODEKSEI_WEIXIN_REPLY_MODE=settled` 仍表示“等整轮收口后再发”：只发送最新的可见最终回复
-- `CODEKSEI_WEIXIN_MIN_CHUNK_CHARS` 控制微信短片段合并阈值；运行中也可以用 `/reply mode ...` 和 `/reply merge ...` 写入持久覆盖，`/reply reset` 会回到 env / default
+- `CODEKSEI_WEIXIN_MIN_CHUNK_CHARS` 控制微信短片段合并阈值；`CODEKSEI_WEIXIN_PAGE_MODE=auto|off` 与 `CODEKSEI_WEIXIN_PAGE_CHARS=600-2000` 控制长回复翻页。运行中也可以用 `/reply mode ...`、`/reply merge ...`、`/reply page ...` 写入持久覆盖，`/reply reset` 会回到 env / default
 - 微信桥的正式 adapter 现在只保留 `v2`；issue #4 对应的媒体上传缺口只作为内部 legacy media fallback 处理，不再通过第二个 public adapter 暴露
 - `CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION` 默认跟随腾讯官方包 `@tencent-weixin/openclaw-weixin@2.1.8`；只有在有 source-backed 上游变更或兼容性回退证据时才建议手动覆盖
 - 国际版 / 海外 WeChat 扫码登录当前仍可能受官方地域灰度限制；腾讯公开资料提到香港地域已支持，其它地域仍在逐步开放
-- `CODEKSEI_RUNTIME` / `CODEKSEI_CHANNEL_PROVIDER` 决定当前是 `Codex Mode` 还是 `Hosted Mode`
+- `CODEKSEI_RUNTIME` / `CODEKSEI_CHANNEL_PROVIDER` 决定当前是 `Codex Mode`、`Claude Code Mode` 还是 `Hosted Mode`
 - `CODEKSEI_RUNTIME_ENDPOINT` / `CODEKSEI_RUNTIME_COMMAND` 是新的 host-neutral runtime 入口；旧的 `CODEKSEI_CODEX_*` 变量仍保留兼容
+- `CODEKSEI_CLAUDE_*` 只在 `CODEKSEI_RUNTIME=claudecode` 时生效；`CODEKSEI_CLAUDE_MAX_OUTPUT_TOKENS` 会兼容读取官方 `CLAUDE_CODE_MAX_OUTPUT_TOKENS`
+- `CODEKSEI_CLAUDE_MCP_CONFIG` 可传一个或多个 Claude MCP config 路径，逗号或分号分隔；只有显式设 `CODEKSEI_CLAUDE_STRICT_MCP_CONFIG=1` 才会传 `--strict-mcp-config`
 - `CODEKSEI_REVIEW_SEMANTIC_HOST=auto|codex|hermes|deterministic` 可显式指定 review hybrid 语义宿主；默认 `auto`
 - `CODEKSEI_COMPANION_SEMANTIC_HOST=auto|codex|hermes|deterministic` 可为 ongoing companion memory 抽取单独指定宿主；留空时沿用默认 host 决策
 - `CODEKSEI_COMPANION_SEMANTIC_MODEL` 可给 ongoing companion memory 抽取单独指定低成本模型
@@ -432,6 +476,8 @@ npm run shared:open
 npm run shared:status
 ```
 
+`shared:open` 只对应 Codex desktop attach；`CODEKSEI_RUNTIME=claudecode` 时用 `shared:start/status` 和微信命令做 smoke。
+
 微信：
 
 ```text
@@ -441,6 +487,7 @@ npm run shared:status
 /reread
 /switch <threadId>
 /stop
+/compact
 /yes
 /always
 /no
@@ -454,9 +501,17 @@ npm run shared:status
 /reply
 /reply mode stream|settled
 /reply merge <chars>
+/reply page auto|off|<chars>
 /reply reset
+/more
+/prev
+/page <n>
+/full
+/done
 /help
 ```
+
+长回复默认不会一次性刷屏：微信里先发第 1 页，后续用 `/more`、`/prev`、`/page <n>` 翻页；`/full` 会优先发临时 `.txt` 文件。
 
 终端：
 

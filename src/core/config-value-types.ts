@@ -1,9 +1,9 @@
 import { normalizeText } from "../contracts/text-normalization";
 
 export type CodekseiChannel = string;
-export type CodekseiRuntimeProvider = "codex" | "hermes" | "openclaw-reserved";
+export type CodekseiRuntimeProvider = "codex" | "claudecode" | "hermes" | "openclaw-reserved";
 export type CodekseiChannelProvider = "codeksei" | "hermes" | "host";
-export type CodekseiExecutionMode = "codex" | "hosted" | "unsupported";
+export type CodekseiExecutionMode = "codex" | "claudecode" | "hosted" | "unsupported";
 export type WeixinReplyMode = "settled" | "stream";
 export type CodekseiRuntimeAccessMode = "" | "current" | "full-access" | "workspace-write";
 export type ReviewSemanticHost = "auto" | "codex" | "hermes" | "deterministic";
@@ -12,6 +12,9 @@ export function normalizeCodekseiRuntimeProvider(value: unknown): CodekseiRuntim
   const normalized = normalizeText(value).toLowerCase();
   if (normalized === "hermes") {
     return "hermes";
+  }
+  if (normalized === "claudecode" || normalized === "claude-code" || normalized === "claude_code") {
+    return "claudecode";
   }
   if (normalized === "openclaw-reserved") {
     return "openclaw-reserved";

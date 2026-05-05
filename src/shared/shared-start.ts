@@ -29,10 +29,14 @@ function parseIntervalMinutes() {
 }
 
 async function main() {
-  assertBridgeMode(process.env, "npm run shared:start");
+  const hostMode = assertBridgeMode(process.env, "npm run shared:start");
   const sharedContext = resolveSharedProcessContext();
-  const appServer = await ensureManagedAppServer({ restartUnhealthy: true });
-  writeStdoutLine(operatorMessages.sharedStartAppServer(appServer.status, appServer.pid, sharedContext.listenUrl));
+  if (hostMode.runtimeProvider === "codex") {
+    const appServer = await ensureManagedAppServer({ restartUnhealthy: true });
+    writeStdoutLine(operatorMessages.sharedStartAppServer(appServer.status, appServer.pid, sharedContext.listenUrl));
+  } else {
+    writeStdoutLine("shared app-server skipped runtime=claudecode");
+  }
 
   const bridge = await ensureManagedBridge({ restartUnhealthy: true });
   writeStdoutLine(operatorMessages.sharedStartBridge(bridge.status, bridge.pid));

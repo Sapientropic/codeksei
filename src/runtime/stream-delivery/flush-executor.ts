@@ -3,6 +3,12 @@ import type { ChannelAdapterLike } from "../../core/app-service-contract";
 import { supportsChannelOperation } from "../../core/app-service-contract";
 import { logError, logInfo, logWarn } from "../../core/logging";
 import type { DeliveryFailurePayload, ReplyTarget } from "../../core/runtime-types";
+import {
+  buildPageArtifactUri,
+  formatWeixinPageMessage,
+  type PageArtifactStore,
+} from "../../state/page-artifacts";
+import { resolveWeixinDeliveryConfig } from "../../state/weixin-delivery-config";
 import { computeVisibleDeliveryDelta } from "./delta-merge";
 import {
   buildCurrentSafeReplyText,
@@ -35,7 +41,10 @@ export interface StreamFlushExecutionContext {
   };
   readonly ignoredRunKeys: Set<string>;
   readonly onDeliveryFailure: ((payload: DeliveryFailurePayload) => Promise<void> | void) | null;
+  readonly pageArtifactStore?: PageArtifactStore | null;
   readonly recentSettledWeixinDeliveries: Map<string, number>;
+  readonly runtimeId?: string;
+  readonly weixinDeliveryConfigFile?: string;
   disposeRunState(runKey: unknown): void;
   logDeliveryTrace(stage: unknown, payload: DeliveryTracePayload | null, error?: unknown): void;
 }
@@ -156,19 +165,30 @@ export async function executeStreamFlush(
     deliveredVisibleBefore: deltaResult.deliveredVisibleBefore,
     deliveredVisibleAfter: deltaResult.deliveredVisibleAfter,
   });
+  const pagedDelivery = preparePagedWeixinDelivery(context, state, {
+    delta,
+    force,
+    safeText,
+    streamPrepared,
+    trigger,
+  });
+  const outboundText = pagedDelivery?.text || delta;
+  const outboundPreserveBlock = pagedDelivery ? true : (
+    settledWechatDelivery || preserveFinalOnlyBlock || streamingPreserveBlock
+  );
   await context.flushScheduler.serializeSend(state, async () => {
     context.logDeliveryTrace("attempt", tracePayload);
     try {
       await context.channelAdapter.sendText({
         userId: replyTarget.userId,
-        text: delta,
+        text: outboundText,
         contextToken: replyTarget.contextToken,
-        preserveBlock: settledWechatDelivery || preserveFinalOnlyBlock || streamingPreserveBlock,
+        preserveBlock: outboundPreserveBlock,
         trace: context.deliveryTraceEnabled
           ? {
             ...tracePayload,
             origin: "stream-delivery",
-            preserveBlock: settledWechatDelivery || preserveFinalOnlyBlock || streamingPreserveBlock,
+            preserveBlock: outboundPreserveBlock,
           }
           : null,
       });
@@ -199,6 +219,95 @@ export async function executeStreamFlush(
       handleStreamDeliveryFailure(context, state, error);
     }
   });
+}
+
+function preparePagedWeixinDelivery(
+  context: StreamFlushExecutionContext,
+  state: RunState,
+  {
+    delta,
+    force,
+    safeText,
+    streamPrepared,
+    trigger,
+  }: {
+    delta: string;
+    force: boolean;
+    safeText: string;
+    streamPrepared: ReturnType<typeof prepareStreamingDelivery> | null;
+    trigger: FlushTrigger | null | undefined;
+  },
+): { text: string } | null {
+  const replyTarget = state.replyTarget;
+  if (!replyTarget || replyTarget.provider !== "weixin") {
+    return null;
+  }
+  if (!context.pageArtifactStore || !state.bindingKey) {
+    return null;
+  }
+  const resolvedConfig = resolveWeixinDeliveryConfig({
+    filePath: context.weixinDeliveryConfigFile || "",
+    defaultReplyMode: state.weixinReplyMode,
+  });
+  if (resolvedConfig.pageMode !== "auto") {
+    return null;
+  }
+  if (delta.length <= resolvedConfig.pageChars * 2) {
+    return null;
+  }
+  if (!isFinalVisibleDelivery({ force, streamPrepared, trigger })) {
+    return null;
+  }
+
+  const artifact = context.pageArtifactStore.createTextArtifact({
+    sourceKind: "weixin_reply",
+    sourceName: "runtime reply",
+    runtimeId: normalizeContextString(context.runtimeId) || "unknown",
+    workspaceRoot: "",
+    bindingKey: state.bindingKey,
+    threadId: state.threadId,
+    userId: replyTarget.userId,
+    contextToken: replyTarget.contextToken,
+    pageChars: resolvedConfig.pageChars,
+    text: delta,
+    metadata: {
+      safeChars: safeText.length,
+      turnId: state.turnId,
+      triggerSource: trigger?.source || "",
+    },
+  });
+  if (artifact.totalPages <= 1) {
+    return null;
+  }
+  context.pageArtifactStore.activatePointer(state.bindingKey, artifact.id, 1);
+  const firstPage = context.pageArtifactStore.readTextResourcePage(buildPageArtifactUri(artifact.id, 1));
+  if (!firstPage) {
+    return null;
+  }
+  return { text: formatWeixinPageMessage(firstPage) };
+}
+
+function isFinalVisibleDelivery({
+  force,
+  streamPrepared,
+  trigger,
+}: {
+  force: boolean;
+  streamPrepared: ReturnType<typeof prepareStreamingDelivery> | null;
+  trigger: FlushTrigger | null | undefined;
+}): boolean {
+  const triggerPhase = normalizeContextString(trigger?.phase);
+  if (triggerPhase && triggerPhase !== "final") {
+    return false;
+  }
+  if (streamPrepared) {
+    return streamPrepared.deliveredItems.some((item) => item.phase === "final");
+  }
+  return force || !triggerPhase || triggerPhase === "final";
+}
+
+function normalizeContextString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 export function handleStreamDeliveryFailure(

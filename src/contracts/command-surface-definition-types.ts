@@ -31,7 +31,7 @@ export type CommandHostDependencyDefinition =
   | "hosted_companion_skill"
   | "hosted_session_lookup"
   | "weixin_account";
-export type CommandHostProfileIdDefinition = "codex-mode" | "hosted-mode";
+export type CommandHostProfileIdDefinition = "codex-mode" | "claudecode-mode" | "hosted-mode";
 export type CommandHostSupportTierDefinition = "bridge_only" | "bridge_state_dependent" | "host_neutral" | "hosted_ready";
 export type CommandMutabilityDefinition = "bootstrap" | "long_running" | "read" | "write";
 export type CommandSafetyTierDefinition = "open" | "operator" | "warned";

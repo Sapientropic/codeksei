@@ -46,6 +46,36 @@ test("resolveHostMode recognizes Hermes hosted mode as a first-class supported p
   assert.equal(resolved.capabilities.supportsHostedSkillInstall, true);
 });
 
+test("resolveHostMode recognizes Claude Code as a first-party bridge runtime", () => {
+  const resolved = resolveHostMode({
+    runtime: "claudecode",
+    channelProvider: "codeksei",
+  });
+
+  assert.deepEqual(resolved, {
+    profile: "claudecode-mode",
+    legacyProfileIds: ["bridge-claudecode-weixin"],
+    runtime: "claudecode",
+    runtimeProvider: "claudecode",
+    runtimeOwner: "codeksei",
+    channelProvider: "codeksei",
+    channel: "weixin",
+    channelKind: "weixin",
+    deliveryRecipe: "codeksei-weixin-bridge",
+    mode: "claudecode",
+    supported: true,
+    reason: "",
+    capabilities: {
+      ownsBridgeLifecycle: true,
+      ownsSharedThreadControl: true,
+      ownsWeixinLogin: true,
+      supportsHostedSkillInstall: false,
+      supportsLiveHostedSmoke: false,
+      supportsSemanticReviewHybrid: true,
+    },
+  });
+});
+
 test("resolveHostMode keeps codex-mode open to host-managed non-weixin channels", () => {
   const resolved = resolveHostMode({
     runtime: "codex",

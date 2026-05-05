@@ -1,5 +1,6 @@
 export const HOST_MODE_CLASSES = [
   "codex-managed",
+  "claudecode-managed",
   "hosted-proactive",
   "hosted-skill-only",
   "cli-only",

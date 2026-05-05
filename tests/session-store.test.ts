@@ -74,9 +74,21 @@ test("SessionStore round-trips pending approvals with deep normalized state", as
     threadIdByWorkspaceRoot: {
       "E:/repo/current": "thread-current",
     },
+    threadIdByWorkspaceRootByRuntime: {
+      codex: {
+        "E:/repo/current": "thread-current",
+      },
+    },
+    pendingThreadIdByWorkspaceRootByRuntime: {},
     runtimeParamsByWorkspaceRoot: {},
+    runtimeParamsByWorkspaceRootByRuntime: {},
     workspaceBootstrapThreadIdByWorkspaceRoot: {
       "E:/repo/current": "",
+    },
+    workspaceBootstrapThreadIdByWorkspaceRootByRuntime: {
+      codex: {
+        "E:/repo/current": "",
+      },
     },
   });
   assert.deepEqual(reloaded.getPendingApprovalForThread("thread-current"), {
@@ -162,6 +174,50 @@ test("SessionStoreWriter persists rebinding, workspace bootstrap, model params, 
   assert.equal(reloaded.getPendingApprovalForThread("thread-current"), null);
   assert.equal(reloaded.getThreadIdForWorkspace("binding-a", "E:/repo/current"), "thread-rebound");
   assert.equal(binding.workspaceBootstrapThreadIdByWorkspaceRoot?.["E:/repo/current"] || "", "");
+});
+
+test("SessionStore keeps thread ids, pending switches, bootstrap, and params scoped by runtime", async () => {
+  const { filePath } = createTempSessionFile();
+  const codexStore = new SessionStore({ filePath });
+  const claudeStore = new SessionStore({ filePath, runtimeId: "claudecode" });
+  const codexWriter = new SessionStoreWriter(codexStore);
+  const claudeWriter = new SessionStoreWriter(claudeStore);
+
+  await codexWriter.setThreadIdForWorkspace("binding-a", "E:/repo/current", "codex-thread");
+  await codexWriter.setRuntimeParamsForWorkspace("binding-a", "E:/repo/current", {
+    model: "gpt-5.4",
+    effort: "high",
+  });
+  await claudeWriter.setThreadIdForWorkspace("binding-a", "E:/repo/current", "claude-thread");
+  await claudeWriter.setRuntimeParamsForWorkspace("binding-a", "E:/repo/current", {
+    model: "claude-sonnet-4-5",
+  });
+  await claudeWriter.setPendingThreadIdForWorkspace("binding-a", "E:/repo/current", "claude-pending");
+  await claudeWriter.rememberWorkspaceBootstrapForThread("binding-a", "E:/repo/current", "claude-thread");
+
+  const codexReloaded = new SessionStore({ filePath });
+  const claudeReloaded = new SessionStore({ filePath, runtimeId: "claudecode" });
+
+  assert.equal(codexReloaded.getThreadIdForWorkspace("binding-a", "E:/repo/current"), "codex-thread");
+  assert.equal(claudeReloaded.getThreadIdForWorkspace("binding-a", "E:/repo/current"), "claude-thread");
+  assert.deepEqual(codexReloaded.findBindingForThreadId("claude-thread"), null);
+  assert.deepEqual(claudeReloaded.findBindingForThreadId("claude-thread"), {
+    bindingKey: "binding-a",
+    workspaceRoot: "E:/repo/current",
+  });
+  assert.deepEqual(codexReloaded.getRuntimeParamsForWorkspace("binding-a", "E:/repo/current"), {
+    model: "gpt-5.4",
+    effort: "high",
+  });
+  assert.deepEqual(claudeReloaded.getRuntimeParamsForWorkspace("binding-a", "E:/repo/current"), {
+    model: "claude-sonnet-4-5",
+    effort: "",
+  });
+  assert.equal(claudeReloaded.getPendingThreadIdForWorkspace("binding-a", "E:/repo/current"), "claude-pending");
+  assert.equal(
+    claudeReloaded.hasWorkspaceBootstrapForThread("binding-a", "E:/repo/current", "claude-thread"),
+    true,
+  );
 });
 
 test("withSessionStoreLock yields while waiting for another writer to release the lock", async () => {

@@ -112,6 +112,7 @@ export function createRuntimeLifecycle({
         respondApproval: true,
         resumeThread: true,
         cancelTurn: true,
+        compactThread: false,
       },
       endpoint: normalizeText(config.runtimeEndpoint) || "(spawn)",
       sessionsFile: config.sessionsFile,

@@ -9,20 +9,22 @@
 
 ## Host Modes
 
-当前有两条官方路径：
+当前有三条官方路径：
 
 - `Codex Mode`
   `provider=codex`：`runtime=codex` + `channelProvider=codeksei` + `channel=weixin`
+- `Claude Code Mode`
+  `provider=claudecode`：`runtime=claudecode` + `channelProvider=codeksei` + `channel=weixin`
 - `Hosted Mode`
   `provider=hermes`：`runtime=hermes` + `channelProvider=hermes` + `channel=weixin`
 
 边界：
 
-- `Codex Mode` 下，Codeksei 自己托管 bridge / shared 线程；`host bootstrap/doctor/smoke --provider codex` 是一等公民路径
+- `Codex Mode` / `Claude Code Mode` 下，Codeksei 自己托管 bridge / shared 线程；`host bootstrap/doctor/smoke --provider codex|claudecode` 是一等公民路径
 - `Hosted Mode` 下，宿主控制命令交给 Hermes；Codeksei 主要暴露 timeline / diary / reminder / review / note / project radar / doctor / schema，并提供 Hermes operator 入口做 skill/status/smoke
 - `channel send-file`、`reminder write` 已接上 Hermes repo-local 路径；bridge-only backstage queue 仍是内部 owner，不再暴露 `system send` public CLI
 - `Hosted Mode` 下，Hermes 只执行受控 wake/recovery/guard job set；Codeksei 继续持有 `tick -> ack -> complete` 的调度真相，对外默认通过 `host seed-proactive / claim-checkin / settle-checkin / finalize-checkin` 接入
-- 外部宿主优先通过 `host attachment contract` 接入：`host manifest --provider codex|hermes|generic-shell`、`host bootstrap`、`host doctor`、`host smoke`、`host seed-proactive`、`host claim-checkin`、`host settle-checkin`、`host finalize-checkin`
+- 外部宿主优先通过 `host attachment contract` 接入：`host manifest --provider codex|claudecode|hermes|generic-shell`、`host bootstrap`、`host doctor`、`host smoke`、`host seed-proactive`、`host claim-checkin`、`host settle-checkin`、`host finalize-checkin`
 
 ## 命名
 
@@ -73,6 +75,7 @@ public CLI：
 - `codeksei host settle-checkin`
 - `codeksei host finalize-checkin`
 - `codeksei host render`
+- `codeksei tool mcp-bootstrap`
 
 operator / bootstrap：
 
@@ -81,20 +84,21 @@ operator / bootstrap：
 - `codeksei operator hermes install-skill`
 - `codeksei operator hermes status`
 - `codeksei operator hermes smoke`
-- `codeksei login` `Codex Mode only`
+- `codeksei login` `first-party bridge modes only`
   默认协议版本对齐腾讯官方包 `@tencent-weixin/openclaw-weixin@2.1.8`；海外 / 国际版 WeChat 扫码仍可能受官方地域灰度限制
-- `codeksei accounts` `Codex Mode only`
-- `codeksei start` `Codex Mode only`
+- `codeksei accounts` `first-party bridge modes only`
+- `codeksei start` `first-party bridge modes only`
+- `codeksei tool mcp-server` `MCP stdio endpoint; normally launched by Claude Code`
 - `codeksei system checkin-trigger`
 - `codeksei system checkin-tick`
 - `codeksei system checkin-complete`
 
 仓库脚本 / shared 模式：
 
-- `npm run shared:start` `Codex Mode only`
+- `npm run shared:start` `first-party bridge modes only`
 - `npm run shared:open` `Codex Mode only`
 - `npm run shared:status`
-- `npm run shared:watchdog` `Codex Mode only`
+- `npm run shared:watchdog` `first-party bridge modes only`
 - `npm run background:install`
 - `npm run background:uninstall`
 
@@ -136,6 +140,27 @@ operator / bootstrap：
 - hosted wake/recovery/guard job 会同时写入 Hermes cron `script`；每次 wake 前先由脚本执行 `host claim-checkin` 并读取最新 context board，再让 Hermes 子 agent 用这份 handoff context 执行一次观察式 proactive pass
 - hosted wake/recovery/guard sync 现在会先确保目标 job 已成功存在，再 best-effort 清理旧 job；中途失败时不会先把最后一条 recovery/guard backstop 删掉
 - `system checkin --range` 现在是 fallback window，不再代表 agent 的真实唤醒节奏
+
+## Claude Code Tools MCP
+
+这组入口只服务 Claude Code Mode 的显式 MCP 工具接入，不是运行 Claude Code Mode 的前置条件。
+
+- `codeksei tool mcp-bootstrap --scope local --workspace-root /absolute/workspace`
+  默认只打印 `claude mcp add` 命令和等价 JSON 配置，不修改 Claude 或 workspace 配置。
+- `codeksei tool mcp-bootstrap --scope local --toolset companion --install --workspace-root /absolute/workspace`
+  显式执行 `claude mcp add`，让 Claude Code 能调用 Codeksei context、timeline、diary、note、reminder 等工具。
+- `codeksei tool mcp-bootstrap --scope project --install --allow-project-config --workspace-root /absolute/workspace`
+  显式允许 project scope；这会写项目级 `.mcp.json`，因此必须多传 `--allow-project-config`。
+- `codeksei tool mcp-server`
+  MCP stdio server 入口，只由 Claude Code 或 MCP client 启动；stdout 只写 MCP 协议，诊断只写 stderr。
+
+说明：
+
+- 默认 toolset 是 `read`，只暴露 capabilities、context、project radar 和 timeline 只读工具。
+- `--toolset companion` 会额外暴露 diary、note、reminder、timeline 写入工具。
+- `--toolset delivery` 会额外暴露 timeline screenshot 和 channel send-file。
+- Codeksei 不会自动生成或修改 workspace `.mcp.json`；project scope 必须显式 opt-in。
+- Claude Code CLI 的 `claude mcp serve` 是把 Claude Code 暴露给其他 MCP client，不是 Codeksei Tools MCP server。
 
 ## Context Board
 
@@ -281,17 +306,23 @@ Context packs 是可解释、可限预算的定向规则包，不是角色扮演
 这一组是面向外部宿主的机器入口，不是仓内 TypeScript seam。
 
 - `codeksei host manifest`
-  输出 host attachment manifest / hostkit 机器入口；可传 `--provider codex|hermes|generic-shell` 切换视角，默认仍列出全部 recipes / workflows
+  输出 host attachment manifest / hostkit 机器入口；可传 `--provider codex|claudecode|hermes|generic-shell` 切换视角，默认仍列出全部 recipes / workflows
 - `codeksei host bootstrap --provider codex`
   写入 Codex Mode canonical config：`modeClass=codex-managed`、`runtimeProvider=codex`、`runtimeOwner=codeksei`、`channelProvider=codeksei`、`deliveryRecipe=codeksei-weixin-bridge`
+- `codeksei host bootstrap --provider claudecode`
+  写入 Claude Code Mode canonical config：`modeClass=claudecode-managed`、`runtimeProvider=claudecode`、`runtimeOwner=codeksei`、`channelProvider=codeksei`、`deliveryRecipe=codeksei-weixin-bridge`
 - `codeksei host bootstrap --provider hermes`
   写入 canonical `codeksei.config.json`，并按 provider 做最小 bootstrap
 - `codeksei host doctor --provider codex`
   检查 Codex Mode state dir、模板、Weixin account / runtime capability 与 shared scripts readiness
+- `codeksei host doctor --provider claudecode`
+  检查 Claude Code Mode state dir、模板、Weixin account / Claude Code runtime 配置与 shared scripts readiness
 - `codeksei host doctor --provider hermes`
   统一查看当前环境 / 当前 canonical config 下的 daemon / attachment / provider recipe readiness
 - `codeksei host smoke --provider codex`
   执行不依赖 Hermes 的本地 readonly smoke
+- `codeksei host smoke --provider claudecode`
+  执行不依赖 Hermes 的本地 readonly smoke；不验证 Claude Code 登录态
 - `codeksei host smoke --provider hermes`
   执行 provider recipe 的最小 attach smoke
 - `codeksei host seed-proactive --provider hermes --user <senderId> --workspace /absolute/workspace`
@@ -312,7 +343,7 @@ Context packs 是可解释、可限预算的定向规则包，不是角色扮演
 
 ## 微信命令
 
-下面这一组是 `Codex Mode` 下 Codeksei 自带微信桥的命令。`Hosted Mode` 下，宿主控制命令应交给 Hermes 自己。
+下面这一组是 first-party bridge modes 下 Codeksei 自带微信桥的命令。`Hosted Mode` 下，宿主控制命令应交给 Hermes 自己。
 
 - `/bind`
 - `/status`
@@ -320,6 +351,7 @@ Context packs 是可解释、可限预算的定向规则包，不是角色扮演
 - `/reread`
 - `/switch <threadId>`
 - `/stop`
+- `/compact`
 - `/yes`
 - `/always`
 - `/no`
@@ -333,10 +365,17 @@ Context packs 是可解释、可限预算的定向规则包，不是角色扮演
 - `/reply`
 - `/reply mode stream|settled`
 - `/reply merge <chars>`
+- `/reply page auto|off|<chars>`
 - `/reply reset`
+- `/more`
+- `/next`
+- `/prev`
+- `/page <n>`
+- `/full`
+- `/done`
 - `/help`
 
-`/reply` 只调整 Codeksei 自带微信桥的回复投递策略：`mode` 会影响后续 turn 的 stream / settled 行为，`merge` 会调整短片段合并阈值，`reset` 会回到 `CODEKSEI_WEIXIN_REPLY_MODE`、`CODEKSEI_WEIXIN_MIN_CHUNK_CHARS` 或默认值。它不提供旧分片命令的兼容别名，也不会改变 Hosted Mode 下 Hermes 自己的控制命令。
+`/reply` 只调整 Codeksei 自带微信桥的回复投递策略：`mode` 会影响后续 turn 的 stream / settled 行为，`merge` 会调整短片段合并阈值，`page` 会调整长回复是否自动分页和每页字符数，`reset` 会回到 `CODEKSEI_WEIXIN_REPLY_MODE`、`CODEKSEI_WEIXIN_MIN_CHUNK_CHARS`、`CODEKSEI_WEIXIN_PAGE_MODE`、`CODEKSEI_WEIXIN_PAGE_CHARS` 或默认值。长回复默认只发第 1 页，后续用 `/more`、`/prev`、`/page <n>` 翻页；`/full` 优先作为临时 `.txt` 文件发送，通道不支持文件时会提示继续翻页。中文短语 `更多`、`下一页`、`上一页`、`全文`、`收起`、`第3页` 只会在当前聊天已有 active page pointer 时被拦截，避免误吞普通消息。它不提供旧分片命令的兼容别名，也不会改变 Hosted Mode 下 Hermes 自己的控制命令。
 
 ## Timeline
 
@@ -417,7 +456,7 @@ Diary 用来接那些更琐碎、更生活化、也最容易散掉的东西。
 
 - 适合写那些不想只靠脑子记住的事
 - 提醒最好短、明确、可执行
-- Codex Mode 下写本地 reminder queue；Hosted Mode 下会创建 Hermes cron 并 deliver 回当前 origin chat
+- first-party bridge modes 下写本地 reminder queue；Hosted Mode 下会创建 Hermes cron 并 deliver 回当前 origin chat
 - 若要修复或安排未来 proactive 唤醒，改走 `host seed-proactive / claim-checkin / settle-checkin / finalize-checkin`
 - 如果一条事同时需要后续回看，可以配合 `diary:write` 或 `timeline:event`
 
@@ -495,7 +534,7 @@ Project radar 用于回答“项目现在在哪、应该从哪里重新进去”
 
 - `npm run shared:start`
 - `npm run shared:status`
-- `npm run shared:open`
+- `npm run shared:open` `Codex Mode only`
 - 模拟一次 runtime child close / reconnect
 - 验证 approval continuity after restart
 - 仓库内自动化基线现在还会跑 `tests/shared-mode-long-chain.test.ts`
@@ -519,6 +558,8 @@ maintainer 仍需额外补一次真实账号 smoke：
   assisted smoke。脚本会等待 pending approval 落盘、自动重启 bridge，然后等待 `/yes` 之后 approval 清空和最终 delivered hash。
 - 这三条脚本都会在 `shared-wechat.log` / `shared-app-server.log` 里写 `[codeksei-smoke] stage=...` checkpoint，排查时优先从这些 marker 往后看。
 - `[⚠️ 需确认]` 这组真实 smoke 依赖可用的 WeChat 登录态、绑定 thread 和能触发 approval 的活跃 Codex runtime；环境不满足时脚本会直接报错，而不是静默跳过。
+- Claude Code Mode 的真实 smoke 走 `CODEKSEI_RUNTIME=claudecode npm run shared:start`，验证普通 turn、审批、`/new`、`/switch`、`/compact`；不使用 `shared:open`。
+- Claude Code Tools MCP 的 smoke 先跑 `codeksei tool mcp-bootstrap --scope local --workspace-root <workspace>` 预览，再在可信 workspace 下显式 `--install`，通过 `claude mcp list` 或 Claude Code 内 `/mcp` 确认 `codeksei_tools`。
 - Hosted Mode 的真实验证不走这套 shared smoke；那条线要验证的是 Hermes gateway + Hermes Weixin + Codeksei companion skill。
 - Hosted operator 侧的前置检查入口是 `codeksei operator hermes smoke`；它会验证 Hermes CLI / repo-local sibling checkout / Weixin account / skill parity / hosted semantic review 准备度，不伪造 live Weixin 成功。
 - 最近一次 recorded 结果入口统一看 [docs/maintainer/live-smoke.md](./maintainer/live-smoke.md)

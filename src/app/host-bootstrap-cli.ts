@@ -232,16 +232,24 @@ function resolveModeClass(
   if (normalizeText(existing?.modeClass) === "codex-managed") {
     return "codex-managed";
   }
+  if (normalizeText(existing?.modeClass) === "claudecode-managed") {
+    return "claudecode-managed";
+  }
   if (provider === "hermes") {
     return "hosted-proactive";
   }
   if (provider === "codex") {
     return "codex-managed";
   }
+  if (provider === "claudecode") {
+    return "claudecode-managed";
+  }
   const runtimeProvider = resolveRuntimeProvider(existing, provider, config);
   const channelProvider = resolveChannelProvider(existing, provider, options, config);
   return runtimeProvider === "codex" && channelProvider === "codeksei"
     ? "codex-managed"
+    : runtimeProvider === "claudecode" && channelProvider === "codeksei"
+      ? "claudecode-managed"
     : (normalizeText(existing?.modeClass) as CodekseiHostConfig["modeClass"] | "") || "hosted-skill-only";
 }
 
@@ -257,10 +265,14 @@ function resolveRuntimeProvider(
   if (provider === "codex") {
     return "codex";
   }
+  if (provider === "claudecode") {
+    return "claudecode";
+  }
   if (current) {
     return current;
   }
-  return normalizeText(config.runtime) === "hermes" ? "hermes" : "codex";
+  const runtime = normalizeText(config.runtime);
+  return runtime === "hermes" ? "hermes" : runtime === "claudecode" ? "claudecode" : "codex";
 }
 
 function resolveRuntimeOwner(
@@ -269,7 +281,10 @@ function resolveRuntimeOwner(
   config: BootstrapConfig,
 ): CodekseiHostConfig["host"]["runtimeOwner"] {
   const current = normalizeText(existing?.host.runtimeOwner) as CodekseiHostConfig["host"]["runtimeOwner"] | "";
-  if (provider === "codex") {
+  if (provider === "codex" || provider === "claudecode") {
+    return "codeksei";
+  }
+  if (provider === "claudecode") {
     return "codeksei";
   }
   if (provider === "hermes") {
@@ -279,7 +294,7 @@ function resolveRuntimeOwner(
     return current;
   }
   const runtimeProvider = resolveRuntimeProvider(existing, provider, config);
-  return runtimeProvider === "codex" ? "codeksei" : "host";
+  return runtimeProvider === "codex" || runtimeProvider === "claudecode" ? "codeksei" : "host";
 }
 
 function resolveChannelKind(
@@ -288,7 +303,7 @@ function resolveChannelKind(
   options: HostBootstrapOptions,
 ): string {
   return normalizeText(options.channel)
-    || (provider === "hermes" || provider === "codex" ? "weixin" : "")
+    || (provider === "hermes" || provider === "codex" || provider === "claudecode" ? "weixin" : "")
     || normalizeText(existing?.host.channelKind)
     || normalizeText(existing?.host.channel)
     || "none";
@@ -311,7 +326,8 @@ function resolveChannelProvider(
   if (current) {
     return current;
   }
-  return normalizeText(config.runtime) === "codex" && channelKind === "weixin" ? "codeksei" : "host";
+  const runtime = normalizeText(config.runtime);
+  return (runtime === "codex" || runtime === "claudecode") && channelKind === "weixin" ? "codeksei" : "host";
 }
 
 function resolveDeliveryRecipe(

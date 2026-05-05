@@ -85,6 +85,7 @@ function parseEnvConfig(env: EnvSource, options: ReadConfigOptions = {}): AppRun
       diaryDir: readPrefixedEnv(env, "DIARY_DIR") || path.join(stateDir, "diary"),
       timelineStateDir,
       logDir: path.join(stateDir, "logs"),
+      pageArtifactsDir: path.join(stateDir, "page-artifacts"),
       reminderQueueFile: path.join(stateDir, "reminder-queue.json"),
       cliIdempotencyLedgerFile: path.join(stateDir, "cli-idempotency-ledger.json"),
       syncBufferDir: path.join(stateDir, "sync-buffers"),
@@ -127,6 +128,19 @@ function parseEnvConfig(env: EnvSource, options: ReadConfigOptions = {}): AppRun
         || "",
       runtimeAccessMode,
       codexAccessMode,
+      claudeCommand: readPrefixedEnv(env, "CLAUDE_COMMAND")
+        || readPrefixedEnv(env, "RUNTIME_COMMAND")
+        || "claude",
+      claudeContextWindow: readPrefixedIntEnv(env, "CLAUDE_CONTEXT_WINDOW") || 0,
+      claudeDisableVerbose: readPrefixedBoolEnv(env, "CLAUDE_DISABLE_VERBOSE"),
+      claudeExtraArgs: readPrefixedListEnv(env, "CLAUDE_EXTRA_ARGS").flatMap((entry) => entry.split(/\s+/u).filter(Boolean)),
+      claudeMcpConfigPaths: readPrefixedPathListEnv(env, "CLAUDE_MCP_CONFIG"),
+      claudeMaxOutputTokens: readPrefixedIntEnv(env, "CLAUDE_MAX_OUTPUT_TOKENS")
+        || Number.parseInt(String(env.CLAUDE_CODE_MAX_OUTPUT_TOKENS || ""), 10)
+        || 0,
+      claudeModel: readPrefixedEnv(env, "CLAUDE_MODEL") || "",
+      claudePermissionMode: readPrefixedEnv(env, "CLAUDE_PERMISSION_MODE") || "default",
+      claudeStrictMcpConfig: readPrefixedBoolEnv(env, "CLAUDE_STRICT_MCP_CONFIG"),
       hermesCommand: readPrefixedEnv(env, "HERMES_COMMAND")
         || env.HERMES_COMMAND
         || "hermes",
@@ -205,4 +219,11 @@ export { parseEnvConfig, readConfig };
 function readPrefixedFloatEnv(env: EnvSource, key: string): number {
   const parsed = Number.parseFloat(readPrefixedEnv(env, key));
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function readPrefixedPathListEnv(env: EnvSource, key: string): string[] {
+  return readPrefixedEnv(env, key)
+    .split(/[;,]/u)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }

@@ -21,12 +21,14 @@ test("WeixinDeliveryConfigStore persists and reloads reply delivery config", () 
   const { filePath } = createTempDeliveryFile();
   const store = new WeixinDeliveryConfigStore({ filePath });
 
-  store.setConfig({ replyMode: "settled", minChunkChars: 120 });
+  store.setConfig({ replyMode: "settled", minChunkChars: 120, pageMode: "auto", pageChars: 900 });
 
   const reloaded = new WeixinDeliveryConfigStore({ filePath }).getConfig();
   assert.ok(reloaded);
   assert.equal(reloaded.replyMode, "settled");
   assert.equal(reloaded.minChunkChars, 120);
+  assert.equal(reloaded.pageMode, "auto");
+  assert.equal(reloaded.pageChars, 900);
   assert.match(reloaded.updatedAt || "", /^\d{4}-\d{2}-\d{2}T/u);
 });
 
@@ -35,6 +37,8 @@ test("resolveWeixinDeliveryConfig prefers stored config over env and default", (
   new WeixinDeliveryConfigStore({ filePath }).setConfig({
     replyMode: "settled",
     minChunkChars: 160,
+    pageMode: "off",
+    pageChars: 1000,
   });
 
   const resolved = resolveWeixinDeliveryConfig({
@@ -43,6 +47,8 @@ test("resolveWeixinDeliveryConfig prefers stored config over env and default", (
     env: {
       CODEKSEI_WEIXIN_REPLY_MODE: "stream",
       CODEKSEI_WEIXIN_MIN_CHUNK_CHARS: "40",
+      CODEKSEI_WEIXIN_PAGE_MODE: "auto",
+      CODEKSEI_WEIXIN_PAGE_CHARS: "1800",
     },
   });
 
@@ -50,6 +56,10 @@ test("resolveWeixinDeliveryConfig prefers stored config over env and default", (
   assert.equal(resolved.replyModeSource, "stored");
   assert.equal(resolved.minChunkChars, 160);
   assert.equal(resolved.minChunkCharsSource, "stored");
+  assert.equal(resolved.pageMode, "off");
+  assert.equal(resolved.pageModeSource, "stored");
+  assert.equal(resolved.pageChars, 1000);
+  assert.equal(resolved.pageCharsSource, "stored");
 });
 
 test("resolveWeixinDeliveryConfig falls back to env and default independently", () => {
@@ -60,6 +70,7 @@ test("resolveWeixinDeliveryConfig falls back to env and default independently", 
     defaultReplyMode: "settled",
     env: {
       CODEKSEI_WEIXIN_MIN_CHUNK_CHARS: "64",
+      CODEKSEI_WEIXIN_PAGE_CHARS: "1500",
     },
   });
 
@@ -67,6 +78,10 @@ test("resolveWeixinDeliveryConfig falls back to env and default independently", 
   assert.equal(resolved.replyModeSource, "default");
   assert.equal(resolved.minChunkChars, 64);
   assert.equal(resolved.minChunkCharsSource, "env");
+  assert.equal(resolved.pageMode, "auto");
+  assert.equal(resolved.pageModeSource, "default");
+  assert.equal(resolved.pageChars, 1500);
+  assert.equal(resolved.pageCharsSource, "env");
 });
 
 test("WeixinDeliveryConfigStore quarantines schema-invalid config", () => {

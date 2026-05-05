@@ -16,7 +16,7 @@ type CommandActionLike = Pick<
 
 
 const ACTION_USAGE_ARGS: Readonly<Partial<Record<CommandActionId, string>>> = Object.freeze({
-  "capabilities.status": "[--provider codex|hermes|generic-shell] [--user <wechat_user_id>] [--workspace /绝对路径]",
+  "capabilities.status": "[--provider codex|claudecode|hermes|generic-shell] [--user <wechat_user_id>] [--workspace /绝对路径]",
   "channel.send_file": "--path /绝对路径",
   "companion.remember": "--user <wechat_user_id> --workspace /绝对路径 --source host_user_turn [--text \"内容\" | --stdin]",
   "context.briefing": "--user <wechat_user_id> --workspace /绝对路径 [--mode proactive|review]",
@@ -67,6 +67,8 @@ const ACTION_USAGE_ARGS: Readonly<Partial<Record<CommandActionId, string>>> = Ob
   "timeline.serve": "[--port 4317]",
   "timeline.dev": "[--port 4317]",
   "timeline.screenshot": "[--output /绝对路径] [其他 timeline screenshot 参数]",
+  "tool.mcp_bootstrap": "[--scope local|user|project] [--toolset read|companion|delivery] [--install]",
+  "tool.mcp_server": "--runtime-id claudecode --workspace-root /绝对路径 --toolset read|companion|delivery",
   "frame.serve": "[--port 4327]",
   "frame.dev": "[--port 4327]",
 });

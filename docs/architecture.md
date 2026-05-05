@@ -9,6 +9,8 @@
 
 - `Codex Mode`
   `provider=codex`：`Codeksei Weixin bridge + Codex runtime`，由 Codeksei 自己 bootstrap / doctor / smoke
+- `Claude Code Mode`
+  `provider=claudecode`：`Codeksei Weixin bridge + Claude Code CLI runtime`，由 Codeksei 自己 bootstrap / doctor / smoke；Claude Code 子进程按 workspace 管理
 - `Hosted Mode`
   `provider=hermes`：Hermes 托管 agent + 官方 Weixin；Codeksei 通过 CLI / operator / skill surface 暴露领域能力
 
@@ -112,6 +114,7 @@
 当前由它负责的核心对象：
 
 - `json-state.ts`
+- `page-artifacts.ts`
 - `system-message-queue-store.ts`
 - `reminder-queue-store.ts`
 
@@ -121,6 +124,7 @@
 - store 只操作 canonical state
 - queue / reminder 这类 managed state 不再挂在 `src/core`
 - note / review / timeline consumer 通过 typed boundary 进入 state owner，不再靠 allowlist 或 `@ts-nocheck` 兜底
+- `page-artifacts.ts` 只保存 transient text page artifact 和当前聊天的 active page pointer，默认 TTL 24h，不作为 thread / workspace / context truth store
 
 这一层是“状态怎么进、怎么存、怎么隔离坏文件”的真相层。
 
@@ -165,6 +169,8 @@
   Hermes 的 skill install、repo-local doctor、smoke、wake forwarder
 - `recipes/codex/*`
   Codex Mode 的本地 doctor/smoke：state dir、模板、Weixin account/runtime capability 与 shared scripts readiness，不依赖 Hermes
+- `recipes/claudecode/*`
+  Claude Code Mode 的本地 doctor/smoke：state dir、模板、Weixin account、Claude Code runtime 配置与 shared scripts readiness；不执行 live Claude Code 登录验证
 - `delegation/*`
   `seed-proactive / claim-checkin / settle-checkin` facade
 - `renderers/*`
@@ -180,7 +186,7 @@
 
 `src/adapters/channel/*`
 
-当前主要是 `Codex Mode` 下的 first-party WeChat adapter。
+当前主要是 first-party bridge modes 下的 WeChat adapter。
 
 负责：
 
@@ -215,7 +221,7 @@
 
 `src/adapters/runtime/*`
 
-当前仓内已实现的 bridge runtime 仍然是 Codex，但 core seam 已经按 host-neutral 方向收口。
+当前仓内已实现的 bridge runtime 包括 Codex 与 Claude Code，core seam 按 host-neutral 方向收口。
 
 负责：
 
@@ -236,21 +242,25 @@
 - `rpc-client.ts` 继续承担 transport owner，但不再顺手吸收 session / shared 恢复规则
 - runtime adapter 现在通过 `describe().operations` 显式声明 `initialize` / `interactiveTurn` / `refreshThreadInstructions` / `respondApproval` / `resumeThread` / `cancelTurn`
 - hosted mode adapter 不再伪装成“支持 bridge-only runtime/send-back 但运行时再拒绝”；bridge-only 能力由 descriptor 与命令合同一起前置挡住
+- `src/adapters/runtime/claudecode/*` 只负责 Claude Code CLI 进程、stream-json event mapping、审批、resume、compact 与 runtime-scoped session binding；不会自动写 workspace `.mcp.json`
+- `src/tools/mcp/*` 负责显式 opt-in 的 Codeksei Tools MCP：tool catalog 只暴露 allowlist，command runner 只调用现有 public CLI envelope，stdio server 的 stdout 只保留 MCP 协议，bootstrap 默认只打印配置；只有 `tool mcp-bootstrap --scope project --install --allow-project-config` 才允许写 project `.mcp.json`
+- MCP 长 tool result 通过 `page-artifacts.ts` 暴露为 `codeksei://mcp/tool-result/<artifactId>?page=<n>` resource；`resources/list` 只列当前 `workspaceRoot + runtimeId` 的最近 artifact，`resources/read` 一次只读一页，避免把大结果直接塞进 tool response
 
 ## 7. Shared Mode
 
 公开入口脚本在 `scripts/*.sh` / `scripts/*.ps1`，shared lifecycle 逻辑收口在 `src/shared/*`。
 
-这是当前 `Codex Mode` 的默认运行方式。
+这是当前 first-party bridge modes 的默认运行方式。
 
 负责：
 
-- 共享 `codex app-server`
+- Codex Mode 共享 `codex app-server`
+- Claude Code Mode 不启动 `codex app-server`，由 runtime adapter 按 workspace 管理 Claude Code child process
 - 共享 WeChat bridge
 - watchdog / supervisor / status / open
 - shared heartbeat ownership
 
-在 `Hosted Mode` 下，`shared:start` / `shared:open` / `shared:watchdog` 不会再偷偷起 Codeksei 自己的 bridge，而是明确提示“由 Hermes 宿主管理”。
+在 `Hosted Mode` 下，`shared:start` / `shared:open` / `shared:watchdog` 不会再偷偷起 Codeksei 自己的 bridge，而是明确提示“由 Hermes 宿主管理”。在 `Claude Code Mode` 下，`shared:open` 明确不可用，因为它只对应 Codex desktop attach。
 
 `src/shared/shared-bridge-heartbeat.ts` 现在是 heartbeat ingress 与 owner，不再挂在 `src/core`。
 

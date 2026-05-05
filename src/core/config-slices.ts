@@ -16,6 +16,7 @@ export interface WorkspacePathsConfig {
   diaryDir: string;
   timelineStateDir: string;
   logDir: string;
+  pageArtifactsDir: string;
   reminderQueueFile: string;
   cliIdempotencyLedgerFile: string;
   syncBufferDir: string;
@@ -57,6 +58,15 @@ export interface RuntimeHostConfig {
   runtimeCommand: string;
   runtimeAccessMode: CodekseiRuntimeAccessMode;
   codexAccessMode: CodekseiRuntimeAccessMode;
+  claudeCommand: string;
+  claudeContextWindow: number;
+  claudeDisableVerbose: boolean;
+  claudeExtraArgs: string[];
+  claudeMcpConfigPaths: string[];
+  claudeMaxOutputTokens: number;
+  claudeModel: string;
+  claudePermissionMode: string;
+  claudeStrictMcpConfig: boolean;
   hermesCommand: string;
   hermesHome: string;
   hermesRepoRoot: string;

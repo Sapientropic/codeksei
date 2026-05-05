@@ -16,6 +16,7 @@ import { WORKSPACE_COMMAND_ACTION_DEFINITIONS } from "./command-surface-actions-
 import { APPROVAL_COMMAND_ACTION_DEFINITIONS } from "./command-surface-actions-approval";
 import { PROJECTS_COMMAND_ACTION_DEFINITIONS } from "./command-surface-actions-projects";
 import { CAPABILITIES_COMMAND_ACTION_DEFINITIONS } from "./command-surface-actions-capabilities";
+import { TOOLS_COMMAND_ACTION_DEFINITIONS } from "./command-surface-actions-tools";
 import {
   COMMAND_AUDIENCE_OVERRIDES,
   COMMAND_AUTH_OVERRIDES,
@@ -60,6 +61,7 @@ export const COMMAND_ACTION_DEFINITION_SLICES = {
   approval: APPROVAL_COMMAND_ACTION_DEFINITIONS,
   projects: PROJECTS_COMMAND_ACTION_DEFINITIONS,
   capabilities: CAPABILITIES_COMMAND_ACTION_DEFINITIONS,
+  tools: TOOLS_COMMAND_ACTION_DEFINITIONS,
 } as const;
 
 export const COMMAND_ACTION_DEFINITIONS = [
@@ -69,6 +71,7 @@ export const COMMAND_ACTION_DEFINITIONS = [
   ...COMMAND_ACTION_DEFINITION_SLICES.approval,
   ...COMMAND_ACTION_DEFINITION_SLICES.projects,
   ...COMMAND_ACTION_DEFINITION_SLICES.capabilities,
+  ...COMMAND_ACTION_DEFINITION_SLICES.tools,
 ] as const satisfies readonly CommandActionDefinition[];
 // endregion
 
@@ -144,7 +147,7 @@ export function resolveCommandHostDependenciesDefinition(actionId: CommandAction
 
 export function resolveCommandHostProfileIdsDefinition(actionId: CommandActionId): readonly CommandHostProfileIdDefinition[] {
   return HOST_PROFILE_OVERRIDES[actionId]
-    || Object.freeze(["codex-mode", "hosted-mode"]);
+    || Object.freeze(["codex-mode", "claudecode-mode", "hosted-mode"]);
 }
 
 export function resolveCommandHostSupportTierDefinition(actionId: CommandActionId): CommandHostSupportTierDefinition {

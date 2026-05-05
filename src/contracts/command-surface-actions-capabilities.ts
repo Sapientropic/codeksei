@@ -74,7 +74,7 @@ export const CAPABILITIES_COMMAND_ACTION_DEFINITIONS = [
   {
     action: "reply.inspect",
     groupId: "capabilities",
-    summary: "查看当前微信回复投递模式与分片合并阈值",
+    summary: "查看当前微信回复投递模式、分片合并阈值与长回复翻页策略",
     terminal: [],
     weixin: ["/reply"],
     status: "active",
@@ -83,9 +83,9 @@ export const CAPABILITIES_COMMAND_ACTION_DEFINITIONS = [
   {
     action: "reply.configure",
     groupId: "capabilities",
-    summary: "调整微信回复投递模式或短片段合并阈值",
+    summary: "调整微信回复投递模式、短片段合并阈值或长回复翻页策略",
     terminal: [],
-    weixin: ["/reply mode stream|settled", "/reply merge <chars>", "/reply reset"],
+    weixin: ["/reply mode stream|settled", "/reply merge <chars>", "/reply page auto|off|<chars>", "/reply reset"],
     status: "active",
     entrypointType: "weixin",
   },

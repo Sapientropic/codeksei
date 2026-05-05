@@ -167,7 +167,7 @@ test("capabilities status explains configured, available, and blocked commands",
   assert.equal(timeline.configured, true);
   assert.equal(timeline.availableNow, true);
   assert.equal(timeline.status, "available");
-  assert.deepEqual(timeline.hostProfiles, ["codex-mode", "hosted-mode"]);
+  assert.deepEqual(timeline.hostProfiles, ["codex-mode", "claudecode-mode", "hosted-mode"]);
   assert.equal(timeline.mutability, "write");
   assert.equal(timeline.sideEffect, true);
   assert.equal(timeline.safetyTier, "warned");

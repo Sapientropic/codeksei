@@ -96,6 +96,52 @@ export function resolveHostAttachment(
     });
   }
 
+  if (runtime === "claudecode" && channelProvider === "codeksei") {
+    return createSupportedAttachment({
+      provider: "claudecode",
+      profile: "claudecode-mode",
+      legacyProfileIds: channel === "weixin" ? ["bridge-claudecode-weixin"] : [],
+      modeClass: "claudecode-managed",
+      runtime,
+      runtimeOwner: "codeksei",
+      channelProvider,
+      channel,
+      deliveryRecipe: channel === "weixin" ? "codeksei-weixin-bridge" : "codeksei-managed-channel",
+      mode: "claudecode",
+      capabilities: {
+        ownsBridgeLifecycle: channel === "weixin",
+        ownsSharedThreadControl: true,
+        ownsWeixinLogin: channel === "weixin",
+        supportsHostedSkillInstall: false,
+        supportsLiveHostedSmoke: false,
+        supportsSemanticReviewHybrid: true,
+      },
+    });
+  }
+
+  if (runtime === "claudecode" && channelProvider === "host") {
+    return createSupportedAttachment({
+      provider: "generic-shell",
+      profile: "claudecode-mode",
+      legacyProfileIds: [],
+      modeClass: "claudecode-managed",
+      runtime,
+      runtimeOwner: "codeksei",
+      channelProvider,
+      channel,
+      deliveryRecipe: "generic-shell",
+      mode: "claudecode",
+      capabilities: {
+        ownsBridgeLifecycle: false,
+        ownsSharedThreadControl: true,
+        ownsWeixinLogin: false,
+        supportsHostedSkillInstall: false,
+        supportsLiveHostedSmoke: false,
+        supportsSemanticReviewHybrid: true,
+      },
+    });
+  }
+
   if (runtime === "hermes" && (channelProvider === "hermes" || channelProvider === "host")) {
     return createSupportedAttachment({
       provider: channelProvider === "hermes" ? "hermes" : "generic-shell",
@@ -134,6 +180,15 @@ export function resolveHostAttachment(
       channelProvider,
       channel,
       reason: "当前组合尚未实现：runtime=codex + channelProvider=hermes。若要用 Hermes 托管 runtime/channel，请同时把 runtime 切到 hermes。",
+    });
+  }
+
+  if (runtime === "claudecode" && channelProvider === "hermes") {
+    return createUnsupportedAttachment({
+      runtime,
+      channelProvider,
+      channel,
+      reason: "当前组合尚未实现：runtime=claudecode + channelProvider=hermes。若要使用 Claude Code Mode，请改用 Codeksei first-party channel bridge。",
     });
   }
 
@@ -219,7 +274,7 @@ function createUnsupportedAttachment({
     transport: "cli_stdio",
     runtime,
     runtimeProvider: runtime,
-    runtimeOwner: runtime === "codex" ? "codeksei" : "host",
+    runtimeOwner: runtime === "codex" || runtime === "claudecode" ? "codeksei" : "host",
     channelProvider,
     channel,
     channelKind: channel,

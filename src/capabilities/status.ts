@@ -278,6 +278,9 @@ function resolveHostConfig(
   if (normalizedProvider === "codex") {
     return { ...config, runtime: "codex", channelProvider: "codeksei", channel: "weixin" };
   }
+  if (normalizedProvider === "claudecode") {
+    return { ...config, runtime: "claudecode", channelProvider: "codeksei", channel: "weixin" };
+  }
   if (normalizedProvider === "hermes") {
     return { ...config, runtime: "hermes", channelProvider: "hermes", channel: "weixin" };
   }
@@ -291,7 +294,8 @@ function resolveProviderLabel(
   provider: unknown,
   host: ReturnType<typeof resolveHostMode>,
 ): string {
-  return normalizeText(provider) || (host.channelProvider === "hermes" ? "hermes" : host.channelProvider === "host" ? "generic-shell" : "codex");
+  return normalizeText(provider)
+    || (host.runtime === "claudecode" ? "claudecode" : host.channelProvider === "hermes" ? "hermes" : host.channelProvider === "host" ? "generic-shell" : "codex");
 }
 
 function resolveLocalCapabilityReadinessReasons(

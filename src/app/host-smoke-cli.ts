@@ -5,6 +5,7 @@ import { buildTerminalLeafHelp } from "../core/command-registry";
 import type { AppRuntimeConfig } from "../core/app-service-contract";
 import { runHermesRecipeSmoke } from "../host/recipes/hermes/doctor";
 import { runCodexRecipeSmoke } from "../host/recipes/codex/doctor";
+import { runClaudeCodeRecipeSmoke } from "../host/recipes/claudecode/doctor";
 import { resolveHostProviderWithConfig } from "./host-cli-shared";
 import { buildWhereaboutsSmokeCheck } from "../whereabouts/readiness";
 
@@ -22,6 +23,7 @@ type SmokeConfig = Partial<Pick<
   | "checkinConfigFile"
   | "checkinScheduleStateFile"
   | "cliIdempotencyLedgerFile"
+  | "claudeCommand"
   | "runtimeCommand"
   | "runtimeEndpoint"
   | "sessionsFile"
@@ -76,6 +78,32 @@ export async function runHostSmokeCommand(
       data: augmented,
       text: [
         `provider: codex`,
+        `ok: ${overallOk ? "yes" : "no"}`,
+        ...Object.entries(augmented.checks).map(([key, value]) => `${key}: ${value.ok ? "ok" : "needs_attention"}`),
+      ].join("\n"),
+      next: augmented.next,
+    };
+  }
+  if (resolvedProvider.provider === "claudecode") {
+    const smoke = runClaudeCodeRecipeSmoke(config);
+    const whereabouts = buildWhereaboutsSmokeCheck(config);
+    const overallOk = smoke.ok && (whereabouts.ok || !whereabouts.blocking);
+    const augmented = {
+      ...smoke,
+      ok: overallOk,
+      checks: {
+        ...smoke.checks,
+        whereabouts,
+      },
+      next: whereabouts.ok
+        ? smoke.next
+        : [...smoke.next, "配置 CODEKSEI_WHEREABOUTS_TOKEN 后可把 local ingest readiness 也纳入 smoke。"],
+    };
+    return {
+      ok: overallOk ? true : "partial",
+      data: augmented,
+      text: [
+        "provider: claudecode",
         `ok: ${overallOk ? "yes" : "no"}`,
         ...Object.entries(augmented.checks).map(([key, value]) => `${key}: ${value.ok ? "ok" : "needs_attention"}`),
       ].join("\n"),

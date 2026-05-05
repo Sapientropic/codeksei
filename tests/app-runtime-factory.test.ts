@@ -24,6 +24,15 @@ function createRuntimeConfig(): AppRuntimeConfig {
     cliIdempotencyLedgerFile: path.join(tempRoot, "cli-idempotency-ledger.json"),
     codekseiHome: tempRoot,
     codexAccessMode: "current",
+    claudeCommand: "claude",
+    claudeContextWindow: 0,
+    claudeDisableVerbose: false,
+    claudeExtraArgs: [],
+    claudeMcpConfigPaths: [],
+    claudeMaxOutputTokens: 0,
+    claudeModel: "",
+    claudePermissionMode: "default",
+    claudeStrictMcpConfig: false,
     diaryDir: path.join(tempRoot, "diary"),
     durableNoteSchemaConfigFile: path.join(workspaceRoot, ".codex", "durable-note-schema.json"),
     hermesCommand: "hermes",
@@ -62,6 +71,7 @@ function createRuntimeConfig(): AppRuntimeConfig {
     proactiveObservationMode: "hybrid",
     proactiveObservationModel: "",
     proactiveObservationTimeoutMs: 8000,
+    pageArtifactsDir: path.join(tempRoot, "page-artifacts"),
     whereaboutsHost: "127.0.0.1",
     whereaboutsPlacesFile: path.join(tempRoot, "whereabouts", "places.json"),
     whereaboutsPort: 4318,
@@ -111,6 +121,20 @@ test("createAppServices composes the runtime graph from config alone", () => {
   assert.equal(typeof services.runtimeAdapter.getSessionWriter, "function");
   assert.equal(typeof services.runtimeTurnLifecycle.handlePreparedMessage, "function");
   assert.equal(typeof services.backstageTaskLifecycle.dispatchSystemMessage, "function");
+});
+
+test("createAppServices creates the Claude Code runtime adapter for Claude Code Mode", () => {
+  const config = {
+    ...createRuntimeConfig(),
+    runtime: "claudecode" as const,
+    claudeCommand: "claude-test",
+  };
+
+  const services = createAppServices({ config });
+
+  assert.equal(services.runtimeAdapter.describe().id, "claudecode");
+  assert.equal(services.runtimeAdapter.describe().provider, "claudecode");
+  assert.equal(services.runtimeAdapter.describe().operations.interactiveTurn, true);
 });
 
 test("CodekseiApp passes only config into the factory seam", () => {

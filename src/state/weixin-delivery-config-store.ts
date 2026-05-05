@@ -4,6 +4,7 @@ import {
   normalizeWeixinDeliveryConfig,
   validateWeixinDeliveryConfig,
   type WeixinDeliveryConfig,
+  type WeixinDeliveryPageMode,
   type WeixinDeliveryReplyMode,
 } from "../contracts/weixin-delivery-config";
 import {
@@ -34,7 +35,12 @@ class WeixinDeliveryConfigStore {
     return value ? normalizeWeixinDeliveryConfig(value) : null;
   }
 
-  setConfig(config: { replyMode?: WeixinDeliveryReplyMode; minChunkChars?: number }): WeixinDeliveryConfig {
+  setConfig(config: {
+    replyMode?: WeixinDeliveryReplyMode | undefined;
+    minChunkChars?: number | undefined;
+    pageMode?: WeixinDeliveryPageMode | undefined;
+    pageChars?: number | undefined;
+  }): WeixinDeliveryConfig {
     const nextConfig = normalizeWeixinDeliveryConfig({
       ...this.getConfig(),
       ...config,

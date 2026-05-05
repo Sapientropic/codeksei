@@ -12,6 +12,7 @@ import type {
   UnknownRecord,
 } from "../core/runtime-types";
 import { logError, logInfo } from "../core/logging";
+import type { PageArtifactStore } from "../state/page-artifacts";
 import {
   normalizeWeixinReplyMode,
   type FlushTrigger,
@@ -33,6 +34,9 @@ interface StreamDeliveryOptions {
   sessionStore: SessionStoreLike;
   weixinReplyMode?: unknown;
   deliveryTraceEnabled?: unknown;
+  pageArtifactStore?: PageArtifactStore | null;
+  runtimeId?: unknown;
+  weixinDeliveryConfigFile?: unknown;
   onDeliveryFailure?: ((payload: DeliveryFailurePayload) => Promise<void> | void) | null;
   streamIdleFlushMs?: unknown;
   streamForceFlushChars?: unknown;
@@ -48,6 +52,7 @@ export class StreamDelivery {
   flushScheduler: FlushScheduler;
   ignoredRunKeys: Set<string>;
   onDeliveryFailure: ((payload: DeliveryFailurePayload) => Promise<void> | void) | null;
+  pageArtifactStore: PageArtifactStore | null;
   recentSettledWeixinDeliveries: Map<string, number>;
   replyTargetRegistry: ReplyTargetRegistry;
   sessionStore: SessionStoreLike;
@@ -55,6 +60,8 @@ export class StreamDelivery {
   streamBoundaryFlushChars: number;
   streamForceFlushChars: number;
   streamIdleFlushMs: number;
+  runtimeId: string;
+  weixinDeliveryConfigFile: string;
   weixinReplyMode: "settled" | "stream";
 
   constructor({
@@ -62,6 +69,9 @@ export class StreamDelivery {
     sessionStore,
     weixinReplyMode = "settled",
     deliveryTraceEnabled = false,
+    pageArtifactStore = null,
+    runtimeId = "",
+    weixinDeliveryConfigFile = "",
     onDeliveryFailure = null,
     streamIdleFlushMs = STREAM_IDLE_FLUSH_MS,
     streamForceFlushChars = STREAM_FORCE_FLUSH_CHARS,
@@ -71,6 +81,9 @@ export class StreamDelivery {
     this.sessionStore = sessionStore;
     this.weixinReplyMode = normalizeWeixinReplyMode(weixinReplyMode);
     this.deliveryTraceEnabled = Boolean(deliveryTraceEnabled);
+    this.pageArtifactStore = pageArtifactStore;
+    this.runtimeId = typeof runtimeId === "string" && runtimeId.trim() ? runtimeId.trim() : "unknown";
+    this.weixinDeliveryConfigFile = typeof weixinDeliveryConfigFile === "string" ? weixinDeliveryConfigFile.trim() : "";
     this.onDeliveryFailure = typeof onDeliveryFailure === "function" ? onDeliveryFailure : null;
     this.streamIdleFlushMs = numberOrDefault(streamIdleFlushMs, STREAM_IDLE_FLUSH_MS);
     this.streamForceFlushChars = numberOrDefault(streamForceFlushChars, STREAM_FORCE_FLUSH_CHARS);

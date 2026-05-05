@@ -11,6 +11,7 @@ import { resolveHostAttachment, type HostAttachmentConfigInput } from "./model";
 import { loadResolvedHostConfig } from "./config";
 import { collectHermesRecipeDoctorReport, runHermesRecipeSmoke } from "../recipes/hermes/doctor";
 import { collectCodexRecipeDoctorReport, runCodexRecipeSmoke } from "../recipes/codex/doctor";
+import { collectClaudeCodeRecipeDoctorReport, runClaudeCodeRecipeSmoke } from "../recipes/claudecode/doctor";
 import { buildHostAttachmentManifest } from "./manifest";
 import { resolveGenericShellRecipe } from "../recipes/generic/recipe";
 import { buildWhereaboutsHostCheck } from "../../whereabouts/readiness";
@@ -20,6 +21,7 @@ interface HostDoctorConfigInput
     Partial<Pick<
       AppRuntimeConfig,
       | "stateDir"
+      | "claudeCommand"
       | "whereaboutsHost"
       | "whereaboutsPlacesFile"
       | "whereaboutsPort"
@@ -74,7 +76,7 @@ export function collectHostDoctorReport(
   const daemonState: AttachedDaemonState = {
     instanceId: "local-cli-state-owner",
     bridgeProfile: attachment.profile,
-    pollLoopActive: attachment.profile === "codex-mode" && attachment.channelKind === "weixin" && attachment.channelProvider === "codeksei",
+    pollLoopActive: (attachment.profile === "codex-mode" || attachment.profile === "claudecode-mode") && attachment.channelKind === "weixin" && attachment.channelProvider === "codeksei",
     scheduleOwner: "daemon",
     recoveryOwner: "daemon",
   };
@@ -124,6 +126,33 @@ export function collectHostDoctorReport(
       },
       provider: {
         id: "codex",
+        doctor,
+        smokeReady: smoke.ok,
+      },
+      upgrade,
+    };
+  }
+
+  if (attachment.provider === "claudecode") {
+    const claudeDoctor = collectClaudeCodeRecipeDoctorReport(config);
+    const doctor = {
+      ...claudeDoctor,
+      checks: {
+        ...claudeDoctor.checks,
+        whereabouts: whereaboutsCheck,
+      },
+    };
+    const smoke = runClaudeCodeRecipeSmoke(config);
+    const upgrade = buildHostUpgradeStatus(manifest, resolvedConfig, true, "claudecode");
+    return {
+      daemon: { required: true, state: daemonState },
+      attachment,
+      resolvedConfig: {
+        path: resolvedConfig.path,
+        exists: Boolean(resolvedConfig.config),
+      },
+      provider: {
+        id: "claudecode",
         doctor,
         smokeReady: smoke.ok,
       },

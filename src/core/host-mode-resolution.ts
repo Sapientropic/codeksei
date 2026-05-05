@@ -63,7 +63,11 @@ export function assertCodexMode(config: HostModeConfigInput, commandLabel: strin
 }
 
 export function assertBridgeMode(config: HostModeConfigInput, commandLabel: string): HostModeResolution {
-  return assertCodexMode(config, commandLabel);
+  const resolved = resolveHostMode(config);
+  if (resolved.profile === "codex-mode" || resolved.profile === "claudecode-mode") {
+    return resolved;
+  }
+  throw new Error(formatBridgeOnlyCommandMessage(resolved, commandLabel));
 }
 
 export function formatCodexOnlyCommandMessage(

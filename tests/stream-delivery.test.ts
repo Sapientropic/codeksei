@@ -1,14 +1,24 @@
 const test: typeof import("node:test") = require("node:test");
 const assert: typeof import("node:assert/strict") = require("node:assert/strict");
+const fs: typeof import("node:fs") = require("node:fs");
+const os: typeof import("node:os") = require("node:os");
+const path: typeof import("node:path") = require("node:path");
 
 import type { ChannelAdapterLike, SessionStoreLike } from "../src/core/app-service-contract";
 import type { DeliveryFailurePayload } from "../src/core/runtime-types";
 const { StreamDelivery }: typeof import("../src/runtime/stream-delivery") = require("../src/runtime/stream-delivery");
 const {
+  PageArtifactStore,
+}: typeof import("../src/state/page-artifacts") = require("../src/state/page-artifacts");
+const {
+  WeixinDeliveryConfigStore,
+}: typeof import("../src/state/weixin-delivery-config-store") = require("../src/state/weixin-delivery-config-store");
+const {
   finalizeAbandonedStreamTurn,
   finishStreamTurn,
 }: typeof import("../src/runtime/stream-delivery/turn-finalize") = require("../src/runtime/stream-delivery/turn-finalize");
 const {
+  executeStreamFlush,
   handleStreamDeliveryFailure,
 }: typeof import("../src/runtime/stream-delivery/flush-executor") = require("../src/runtime/stream-delivery/flush-executor");
 const {
@@ -39,6 +49,8 @@ interface CreateDeliveryOptions {
     visibleFileDelivery: boolean;
   }>;
   sendTextImpl?: ((payload: { text: string; preserveBlock?: boolean }) => Promise<void>) | null;
+  pageArtifactStore?: import("../src/state/page-artifacts").PageArtifactStore;
+  weixinDeliveryConfigFile?: string;
   onDeliveryFailure?: ((payload: DeliveryFailurePayload) => Promise<void> | void) | null;
 }
 
@@ -79,6 +91,8 @@ function createDelivery({
   streamBoundaryFlushChars = 6,
   channelOperations = {},
   sendTextImpl = null,
+  pageArtifactStore = undefined,
+  weixinDeliveryConfigFile = "",
   onDeliveryFailure = null,
 }: CreateDeliveryOptions = {}): DeliveryHarness {
   const sent: SentMessage[] = [];
@@ -155,16 +169,24 @@ function createDelivery({
       return [];
     },
   };
-  const delivery = new StreamDelivery({
+  const deliveryOptions = {
     weixinReplyMode,
     deliveryTraceEnabled,
     streamIdleFlushMs,
     streamForceFlushChars,
     streamBoundaryFlushChars,
     channelAdapter,
+    runtimeId: "claudecode",
     sessionStore,
     onDeliveryFailure,
-  });
+  } as ConstructorParameters<typeof StreamDelivery>[0];
+  if (pageArtifactStore) {
+    deliveryOptions.pageArtifactStore = pageArtifactStore;
+  }
+  if (weixinDeliveryConfigFile) {
+    deliveryOptions.weixinDeliveryConfigFile = weixinDeliveryConfigFile;
+  }
+  const delivery = new StreamDelivery(deliveryOptions);
 
   function attach(threadId: string): void {
     delivery.queueReplyTargetForThread(threadId, {
@@ -808,6 +830,125 @@ test("unsupported visible text delivery abandons the run before calling sendText
   assert.equal(degraded.length, 1);
   assert.equal(degraded[0]?.threadId, "thread-unsupported");
   assert.match(String(degraded[0]?.error || ""), /不支持可见文本回传/u);
+});
+
+test("wechat long final replies are paged and only the first page is sent", async () => {
+  const pageArtifactStore = new PageArtifactStore({
+    rootDir: fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-stream-pages-")),
+    now: () => new Date("2026-05-05T12:00:00.000Z"),
+  });
+  const configFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-stream-delivery-config-")), "weixin-delivery-config.json");
+  new WeixinDeliveryConfigStore({ filePath: configFile }).setConfig({
+    pageMode: "auto",
+    pageChars: 600,
+  });
+  const { delivery, sent, attach } = createDelivery({
+    pageArtifactStore,
+    weixinDeliveryConfigFile: configFile,
+    streamForceFlushChars: 5000,
+    streamBoundaryFlushChars: 5000,
+  });
+  attach("thread-paged");
+  await startTurn(delivery, "thread-paged", "turn-paged");
+
+  await sendCompleted(delivery, {
+    threadId: "thread-paged",
+    turnId: "turn-paged",
+    itemId: "final-1",
+    text: "长内容。".repeat(301),
+  });
+
+  assert.equal(sent.length, 1);
+  assert.match(sent[0]?.text || "", /内容较长，先发第 1\/\d+ 页/u);
+  assert.match(sent[0]?.text || "", /\/more 下一页/u);
+  assert.equal(pageArtifactStore.getActivePointer("binding-thread-paged")?.page, 1);
+});
+
+test("wechat pagination can be disabled without changing long final delivery", async () => {
+  const pageArtifactStore = new PageArtifactStore({
+    rootDir: fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-stream-pages-off-")),
+  });
+  const configFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-stream-delivery-config-off-")), "weixin-delivery-config.json");
+  new WeixinDeliveryConfigStore({ filePath: configFile }).setConfig({
+    pageMode: "off",
+    pageChars: 600,
+  });
+  const { delivery, sent, attach } = createDelivery({
+    pageArtifactStore,
+    weixinDeliveryConfigFile: configFile,
+    streamForceFlushChars: 5000,
+    streamBoundaryFlushChars: 5000,
+  });
+  attach("thread-unpaged");
+  await startTurn(delivery, "thread-unpaged", "turn-unpaged");
+
+  await sendCompleted(delivery, {
+    threadId: "thread-unpaged",
+    turnId: "turn-unpaged",
+    itemId: "final-1",
+    text: "长内容。".repeat(301),
+  });
+
+  assert.equal(sent.length, 1);
+  assert.doesNotMatch(sent[0]?.text || "", /内容较长/u);
+  assert.equal(pageArtifactStore.getActivePointer("binding-thread-unpaged"), null);
+});
+
+test("wechat pagination ignores non-final flush triggers", async () => {
+  const pageArtifactStore = new PageArtifactStore({
+    rootDir: fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-stream-pages-non-final-")),
+  });
+  const sent: SentMessage[] = [];
+  const state = createRunState({
+    threadId: "thread-non-final-page",
+    turnId: "turn-non-final-page",
+    weixinReplyMode: "stream",
+  });
+  state.bindingKey = "binding-non-final-page";
+  state.replyTarget = {
+    provider: "weixin",
+    userId: "user-non-final-page",
+    contextToken: "ctx-non-final-page",
+  };
+  upsertStateItem(state, {
+    itemId: "final-1",
+    text: "长内容。".repeat(700),
+    completed: true,
+    phase: "final",
+    fragmentKind: "completed_snapshot",
+  });
+
+  await executeStreamFlush({
+    channelAdapter: {
+      describe() {
+        return buildTestChannelDescriptor("test-channel");
+      },
+      async sendText(payload: { text: string; preserveBlock?: boolean }) {
+        sent.push({ text: payload.text, preserveBlock: payload.preserveBlock });
+      },
+    },
+    deliveryTraceEnabled: false,
+    flushScheduler: {
+      async serializeSend(_state: unknown, sendOperation: () => Promise<void>) {
+        await sendOperation();
+      },
+    },
+    ignoredRunKeys: new Set<string>(),
+    onDeliveryFailure: null,
+    pageArtifactStore,
+    recentSettledWeixinDeliveries: new Map<string, number>(),
+    runtimeId: "claudecode",
+    weixinDeliveryConfigFile: "",
+    disposeRunState() {},
+    logDeliveryTrace() {},
+  } as never, state, {
+    force: true,
+    trigger: { phase: "commentary", source: "coverage" },
+  });
+
+  assert.equal(sent.length, 1);
+  assert.doesNotMatch(sent[0]?.text || "", /内容较长/u);
+  assert.equal(pageArtifactStore.getActivePointer("binding-non-final-page"), null);
 });
 
 test("stream delivery constructor and utility methods keep fallbacks idempotent", () => {

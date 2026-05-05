@@ -97,6 +97,7 @@ function buildTestRuntimeDescriptor(id: string) {
       respondApproval: true,
       resumeThread: true,
       cancelTurn: true,
+      compactThread: false,
     },
   };
 }
@@ -139,6 +140,7 @@ function createTestAppHarness({
     timelineStateTimezone: "",
     diaryDir: path.join(tempRoot, "diary"),
     timelineStateDir: tempRoot,
+    pageArtifactsDir: path.join(tempRoot, "page-artifacts"),
     userName: "",
     userGender: "female",
     locale: "zh-CN",
@@ -172,6 +174,15 @@ function createTestAppHarness({
     runtimeCommand: "",
     runtimeAccessMode: "workspace-write",
     codexAccessMode: "",
+    claudeCommand: "claude",
+    claudeContextWindow: 0,
+    claudeDisableVerbose: false,
+    claudeExtraArgs: [],
+    claudeMcpConfigPaths: [],
+    claudeMaxOutputTokens: 0,
+    claudeModel: "",
+    claudePermissionMode: "default",
+    claudeStrictMcpConfig: false,
     hermesCommand: "hermes",
     hermesHome: path.join(tempRoot, ".hermes"),
     hermesRepoRoot: "",
@@ -428,6 +439,13 @@ function createTestAppHarness({
       return runTimelineSubcommandImpl(command, args);
     },
   };
+  const pageArtifactStore = {
+    activatePointer() {},
+    clearActivePointer() {},
+    getActivePointer() {
+      return null;
+    },
+  };
 
   const createAppServices: AppServiceFactory = ({
     config,
@@ -509,6 +527,7 @@ function createTestAppHarness({
       backstageTaskLifecycle,
       channelAdapter,
       channelCommandRouter,
+      pageArtifactStore,
       reminderQueue,
       runtimeAdapter,
       runtimeTurnLifecycle,

@@ -5,16 +5,23 @@ import { normalizeText } from "./text-normalization";
 type PlainObject = Record<string, unknown>;
 
 export type WeixinDeliveryReplyMode = "settled" | "stream";
+export type WeixinDeliveryPageMode = "auto" | "off";
 export const MAX_WEIXIN_MIN_CHUNK_CHARS = 3800;
+export const MIN_WEIXIN_PAGE_CHARS = 600;
+export const MAX_WEIXIN_PAGE_CHARS = 2000;
 
 export interface RawWeixinDeliveryConfig extends PlainObject {
   minChunkChars?: unknown;
+  pageChars?: unknown;
+  pageMode?: unknown;
   replyMode?: unknown;
   updatedAt?: unknown;
 }
 
 export interface WeixinDeliveryConfig {
   minChunkChars?: number;
+  pageChars?: number;
+  pageMode?: WeixinDeliveryPageMode;
   replyMode?: WeixinDeliveryReplyMode;
   updatedAt?: string;
 }
@@ -26,6 +33,18 @@ export function normalizeWeixinDeliveryReplyMode(value: unknown): WeixinDelivery
 export function normalizeOptionalWeixinDeliveryReplyMode(value: unknown): WeixinDeliveryReplyMode | "" {
   const normalized = normalizeText(value).toLowerCase();
   if (normalized === "stream" || normalized === "settled") {
+    return normalized;
+  }
+  return "";
+}
+
+export function normalizeWeixinDeliveryPageMode(value: unknown): WeixinDeliveryPageMode {
+  return normalizeText(value).toLowerCase() === "off" ? "off" : "auto";
+}
+
+export function normalizeOptionalWeixinDeliveryPageMode(value: unknown): WeixinDeliveryPageMode | "" {
+  const normalized = normalizeText(value).toLowerCase();
+  if (normalized === "auto" || normalized === "off") {
     return normalized;
   }
   return "";
@@ -46,6 +65,14 @@ export function normalizeWeixinDeliveryConfig(value: unknown): WeixinDeliveryCon
   if (minChunkChars > 0) {
     normalized.minChunkChars = minChunkChars;
   }
+  const pageMode = normalizeOptionalWeixinDeliveryPageMode(source.pageMode);
+  if (pageMode) {
+    normalized.pageMode = pageMode;
+  }
+  const pageChars = normalizePageChars(source.pageChars);
+  if (pageChars > 0) {
+    normalized.pageChars = pageChars;
+  }
   return normalized;
 }
 
@@ -62,6 +89,15 @@ export function validateWeixinDeliveryConfig(value: unknown): true | string {
   }
   if ("minChunkChars" in source && !isValidMinChunkChars(source.minChunkChars)) {
     return "weixin delivery config minChunkChars must be an integer from 1 to 3800";
+  }
+  if ("pageMode" in source) {
+    const normalizedPageMode = normalizeText(source.pageMode).toLowerCase();
+    if (normalizedPageMode !== "auto" && normalizedPageMode !== "off") {
+      return "weixin delivery config pageMode must be auto or off";
+    }
+  }
+  if ("pageChars" in source && !isValidPageChars(source.pageChars)) {
+    return "weixin delivery config pageChars must be an integer from 600 to 2000";
   }
   if ("updatedAt" in source && typeof source.updatedAt !== "string") {
     return "weixin delivery config updatedAt must be a string";
@@ -86,6 +122,11 @@ function normalizePositiveInteger(value: unknown): number {
   return Number.isInteger(numeric) && numeric > 0 && numeric <= MAX_WEIXIN_MIN_CHUNK_CHARS ? numeric : 0;
 }
 
+function normalizePageChars(value: unknown): number {
+  const numeric = Number(value);
+  return isValidPageChars(numeric) ? numeric : 0;
+}
+
 function normalizeIsoTimestamp(value: unknown): string {
   const normalized = normalizeText(value);
   if (!normalized) {
@@ -103,6 +144,11 @@ function isPositiveInteger(value: unknown): boolean {
 function isValidMinChunkChars(value: unknown): boolean {
   const numeric = Number(value);
   return isPositiveInteger(numeric) && numeric <= MAX_WEIXIN_MIN_CHUNK_CHARS;
+}
+
+function isValidPageChars(value: unknown): boolean {
+  const numeric = Number(value);
+  return isPositiveInteger(numeric) && numeric >= MIN_WEIXIN_PAGE_CHARS && numeric <= MAX_WEIXIN_PAGE_CHARS;
 }
 
 function isPlainObject(value: unknown): value is PlainObject {

@@ -55,4 +55,22 @@ export const WORKSPACE_COMMAND_ACTION_DEFINITIONS = [
     status: "active",
     entrypointType: "weixin",
   },
+  {
+    action: "thread.compact",
+    groupId: "workspace",
+    summary: "让支持的 runtime 压缩当前线程上下文",
+    terminal: [],
+    weixin: ["/compact"],
+    status: "active",
+    entrypointType: "weixin",
+  },
+  {
+    action: "reply.page",
+    groupId: "workspace",
+    summary: "翻阅当前聊天里最近一条长回复，不刷屏",
+    terminal: [],
+    weixin: ["/more", "/prev", "/page <n>", "/full", "/done"],
+    status: "active",
+    entrypointType: "weixin",
+  },
 ] as const satisfies readonly CommandActionDefinition[];

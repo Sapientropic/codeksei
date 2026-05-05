@@ -31,6 +31,7 @@ export const COMMAND_AUDIENCE_OVERRIDES = {
   "operator.hermes.status": "operator",
   "operator.help": "operator",
   "operator.schema": "operator",
+  "tool.mcp_server": "operator",
 } as const satisfies Record<string, CommandAudienceDefinition>;
 
 export const COMMAND_SAFETY_OVERRIDES = {
@@ -89,6 +90,8 @@ export const COMMAND_SAFETY_OVERRIDES = {
   "timeline.screenshot": "warned",
   "timeline.serve": "open",
   "timeline.write": "warned",
+  "tool.mcp_bootstrap": "warned",
+  "tool.mcp_server": "operator",
   "frame.build": "open",
   "frame.dev": "open",
   "frame.serve": "open",
@@ -162,6 +165,8 @@ export const COMMAND_MUTABILITY_OVERRIDES = {
   "timeline.screenshot": "write",
   "timeline.serve": "long_running",
   "timeline.write": "write",
+  "tool.mcp_bootstrap": "bootstrap",
+  "tool.mcp_server": "long_running",
   "frame.build": "read",
   "frame.dev": "long_running",
   "frame.serve": "long_running",

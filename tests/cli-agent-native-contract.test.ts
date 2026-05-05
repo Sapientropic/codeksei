@@ -75,7 +75,7 @@ test("channel send-file schema exposes warned mutation flags", () => {
 
   const payload = parseEnvelope(result.stdout);
   assert.equal(asRecord(payload.data).hostSupportTier, "hosted_ready");
-  assert.deepEqual(asRecord(payload.data).hostProfileIds, ["codex-mode", "hosted-mode"]);
+  assert.deepEqual(asRecord(payload.data).hostProfileIds, ["codex-mode", "claudecode-mode", "hosted-mode"]);
   const args = asCommandArgs(asRecord(asRecord(payload.data).args).command);
   const argNames = args.map((entry) => entry.name);
   assert.ok(argNames.includes("dryRun"));

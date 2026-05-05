@@ -78,4 +78,20 @@ export class SessionStoreWriter implements SessionStoreWriterLike {
   async clearThreadIdForWorkspace(bindingKey: string, workspaceRoot: string): Promise<unknown> {
     return this.store.clearThreadIdForWorkspace(bindingKey, workspaceRoot);
   }
+
+  async getPendingThreadIdForWorkspace(bindingKey: string, workspaceRoot: string): Promise<string> {
+    return this.store.getPendingThreadIdForWorkspace(bindingKey, workspaceRoot);
+  }
+
+  async setPendingThreadIdForWorkspace(
+    bindingKey: string,
+    workspaceRoot: string,
+    threadId: string,
+  ): Promise<unknown> {
+    return this.store.setPendingThreadIdForWorkspace(bindingKey, workspaceRoot, threadId);
+  }
+
+  async clearPendingThreadIdForWorkspace(bindingKey: string, workspaceRoot: string): Promise<unknown> {
+    return this.store.clearPendingThreadIdForWorkspace(bindingKey, workspaceRoot);
+  }
 }

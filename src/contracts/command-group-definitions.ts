@@ -7,4 +7,5 @@ export const COMMAND_GROUP_DEFINITIONS = [
   { id: "approval", label: "授权与控制" },
   { id: "projects", label: "代码项目" },
   { id: "capabilities", label: "能力集成" },
+  { id: "tools", label: "工具接入" },
 ] as const satisfies readonly CommandGroupDefinition[];

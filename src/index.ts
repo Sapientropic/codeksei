@@ -27,6 +27,7 @@ import { runTerminalManifestCommand } from "./app/terminal-command-dispatch";
 import type { TerminalCommandManifestEntry } from "./contracts/command-surface";
 import { buildHermesOperatorValidationError } from "./app/hermes-operator-cli";
 import { buildRemovedLiveCommandError } from "./core/removed-command-guidance";
+import { runCodekseiMcpServerCli } from "./tools/mcp";
 
 
 interface ParsedCommandIntent {
@@ -49,6 +50,10 @@ export async function main(): Promise<void> {
   }
 
   installCliRuntimeErrorHooks(cli);
+  if (intent.command === "tool" && intent.subcommand === "mcp-server" && !intent.helpFlag) {
+    await runCodekseiMcpServerCli(argv.slice(2));
+    return;
+  }
   const context = createTerminalCommandContext(argv, cli, intent.manifest);
   if (intent.manifest) {
     const result = await runTerminalManifestCommand(intent.manifest, context);
@@ -179,6 +184,11 @@ function normalizeArgToken(value: unknown): string {
 
 if (require.main === module) {
   main().catch((error: unknown) => {
+    if (process.argv[2] === "tool" && process.argv[3] === "mcp-server") {
+      process.stderr.write(`${error instanceof Error ? error.message : String(error || "unknown error")}\n`);
+      process.exitCode = 1;
+      return;
+    }
     const cli = resolveGlobalCliOptions(parseGlobalCliOptions(process.argv.slice(2)));
     process.exitCode = emitCliError(error, cli);
   });

@@ -15,7 +15,7 @@ export interface CommandHostAccessDescriptor {
 }
 
 const DEFAULT_COMMAND_HOST_ACCESS: CommandHostAccessDescriptor = Object.freeze({
-  modeClasses: Object.freeze(["codex-managed", "hosted-skill-only"] satisfies HostModeClass[]),
+  modeClasses: Object.freeze(["codex-managed", "claudecode-managed", "hosted-skill-only"] satisfies HostModeClass[]),
   capabilities: Object.freeze(["invokeCodekseiAction"] satisfies HostCapabilityId[]),
   providerRecipes: Object.freeze(["hermes"] satisfies HostRecipeId[]),
   supportTier: "host_neutral",
@@ -24,28 +24,28 @@ const DEFAULT_COMMAND_HOST_ACCESS: CommandHostAccessDescriptor = Object.freeze({
 
 const COMMAND_HOST_ACCESS_OVERRIDES = Object.freeze<Record<string, CommandHostAccessDescriptor>>({
   "app.accounts": Object.freeze({
-    modeClasses: Object.freeze(["codex-managed"] satisfies HostModeClass[]),
+    modeClasses: Object.freeze(["codex-managed", "claudecode-managed"] satisfies HostModeClass[]),
     capabilities: Object.freeze(["weixinAccountAccess"] satisfies HostCapabilityId[]),
     providerRecipes: Object.freeze([] satisfies HostRecipeId[]),
     supportTier: "bridge_only",
     enforceCurrentProfile: true,
   }),
   "app.login": Object.freeze({
-    modeClasses: Object.freeze(["codex-managed"] satisfies HostModeClass[]),
+    modeClasses: Object.freeze(["codex-managed", "claudecode-managed"] satisfies HostModeClass[]),
     capabilities: Object.freeze(["weixinAccountAccess"] satisfies HostCapabilityId[]),
     providerRecipes: Object.freeze([] satisfies HostRecipeId[]),
     supportTier: "bridge_only",
     enforceCurrentProfile: true,
   }),
   "app.start": Object.freeze({
-    modeClasses: Object.freeze(["codex-managed"] satisfies HostModeClass[]),
+    modeClasses: Object.freeze(["codex-managed", "claudecode-managed"] satisfies HostModeClass[]),
     capabilities: Object.freeze(["bridgeRuntimeLifecycle"] satisfies HostCapabilityId[]),
     providerRecipes: Object.freeze([] satisfies HostRecipeId[]),
     supportTier: "bridge_only",
     enforceCurrentProfile: true,
   }),
   "app.shared_start": Object.freeze({
-    modeClasses: Object.freeze(["codex-managed"] satisfies HostModeClass[]),
+    modeClasses: Object.freeze(["codex-managed", "claudecode-managed"] satisfies HostModeClass[]),
     capabilities: Object.freeze(["bridgeRuntimeLifecycle"] satisfies HostCapabilityId[]),
     providerRecipes: Object.freeze([] satisfies HostRecipeId[]),
     supportTier: "bridge_only",
@@ -59,63 +59,63 @@ const COMMAND_HOST_ACCESS_OVERRIDES = Object.freeze<Record<string, CommandHostAc
     enforceCurrentProfile: true,
   }),
   "app.shared_status": Object.freeze({
-    modeClasses: Object.freeze(["codex-managed"] satisfies HostModeClass[]),
+    modeClasses: Object.freeze(["codex-managed", "claudecode-managed"] satisfies HostModeClass[]),
     capabilities: Object.freeze(["bridgeRuntimeLifecycle"] satisfies HostCapabilityId[]),
     providerRecipes: Object.freeze([] satisfies HostRecipeId[]),
     supportTier: "bridge_only",
     enforceCurrentProfile: true,
   }),
   "app.shared_watchdog": Object.freeze({
-    modeClasses: Object.freeze(["codex-managed"] satisfies HostModeClass[]),
+    modeClasses: Object.freeze(["codex-managed", "claudecode-managed"] satisfies HostModeClass[]),
     capabilities: Object.freeze(["bridgeRuntimeLifecycle"] satisfies HostCapabilityId[]),
     providerRecipes: Object.freeze([] satisfies HostRecipeId[]),
     supportTier: "bridge_only",
     enforceCurrentProfile: true,
   }),
   "app.doctor": Object.freeze({
-    modeClasses: Object.freeze(["codex-managed", "hosted-proactive", "hosted-skill-only", "cli-only"] satisfies HostModeClass[]),
+    modeClasses: Object.freeze(["codex-managed", "claudecode-managed", "hosted-proactive", "hosted-skill-only", "cli-only"] satisfies HostModeClass[]),
     capabilities: Object.freeze(["semanticReviewHybrid"] satisfies HostCapabilityId[]),
     providerRecipes: Object.freeze(["hermes"] satisfies HostRecipeId[]),
     supportTier: "hosted_ready",
     enforceCurrentProfile: false,
   }),
   "approval.accept_once": Object.freeze({
-    modeClasses: Object.freeze(["codex-managed"] satisfies HostModeClass[]),
+    modeClasses: Object.freeze(["codex-managed", "claudecode-managed"] satisfies HostModeClass[]),
     capabilities: Object.freeze(["bridgeRuntimeLifecycle"] satisfies HostCapabilityId[]),
     providerRecipes: Object.freeze([] satisfies HostRecipeId[]),
     supportTier: "bridge_only",
     enforceCurrentProfile: true,
   }),
   "approval.accept_workspace": Object.freeze({
-    modeClasses: Object.freeze(["codex-managed"] satisfies HostModeClass[]),
+    modeClasses: Object.freeze(["codex-managed", "claudecode-managed"] satisfies HostModeClass[]),
     capabilities: Object.freeze(["bridgeRuntimeLifecycle"] satisfies HostCapabilityId[]),
     providerRecipes: Object.freeze([] satisfies HostRecipeId[]),
     supportTier: "bridge_only",
     enforceCurrentProfile: true,
   }),
   "approval.reject_once": Object.freeze({
-    modeClasses: Object.freeze(["codex-managed"] satisfies HostModeClass[]),
+    modeClasses: Object.freeze(["codex-managed", "claudecode-managed"] satisfies HostModeClass[]),
     capabilities: Object.freeze(["bridgeRuntimeLifecycle"] satisfies HostCapabilityId[]),
     providerRecipes: Object.freeze([] satisfies HostRecipeId[]),
     supportTier: "bridge_only",
     enforceCurrentProfile: true,
   }),
   "background.install": Object.freeze({
-    modeClasses: Object.freeze(["codex-managed"] satisfies HostModeClass[]),
+    modeClasses: Object.freeze(["codex-managed", "claudecode-managed"] satisfies HostModeClass[]),
     capabilities: Object.freeze(["bridgeRuntimeLifecycle"] satisfies HostCapabilityId[]),
     providerRecipes: Object.freeze([] satisfies HostRecipeId[]),
     supportTier: "bridge_only",
     enforceCurrentProfile: true,
   }),
   "background.uninstall": Object.freeze({
-    modeClasses: Object.freeze(["codex-managed"] satisfies HostModeClass[]),
+    modeClasses: Object.freeze(["codex-managed", "claudecode-managed"] satisfies HostModeClass[]),
     capabilities: Object.freeze(["bridgeRuntimeLifecycle"] satisfies HostCapabilityId[]),
     providerRecipes: Object.freeze([] satisfies HostRecipeId[]),
     supportTier: "bridge_only",
     enforceCurrentProfile: true,
   }),
   "checkin.select": Object.freeze({
-    modeClasses: Object.freeze(["codex-managed"] satisfies HostModeClass[]),
+    modeClasses: Object.freeze(["codex-managed", "claudecode-managed"] satisfies HostModeClass[]),
     capabilities: Object.freeze(["bridgeQueueAccess"] satisfies HostCapabilityId[]),
     providerRecipes: Object.freeze([] satisfies HostRecipeId[]),
     supportTier: "bridge_only",
@@ -129,21 +129,21 @@ const COMMAND_HOST_ACCESS_OVERRIDES = Object.freeze<Record<string, CommandHostAc
     enforceCurrentProfile: true,
   }),
   "model.select": Object.freeze({
-    modeClasses: Object.freeze(["codex-managed"] satisfies HostModeClass[]),
+    modeClasses: Object.freeze(["codex-managed", "claudecode-managed"] satisfies HostModeClass[]),
     capabilities: Object.freeze(["bridgeRuntimeLifecycle"] satisfies HostCapabilityId[]),
     providerRecipes: Object.freeze([] satisfies HostRecipeId[]),
     supportTier: "bridge_only",
     enforceCurrentProfile: true,
   }),
   "reply.configure": Object.freeze({
-    modeClasses: Object.freeze(["codex-managed"] satisfies HostModeClass[]),
+    modeClasses: Object.freeze(["codex-managed", "claudecode-managed"] satisfies HostModeClass[]),
     capabilities: Object.freeze(["bridgeRuntimeLifecycle"] satisfies HostCapabilityId[]),
     providerRecipes: Object.freeze([] satisfies HostRecipeId[]),
     supportTier: "bridge_only",
     enforceCurrentProfile: true,
   }),
   "channel.send_file": Object.freeze({
-    modeClasses: Object.freeze(["codex-managed", "hosted-proactive", "hosted-skill-only"] satisfies HostModeClass[]),
+    modeClasses: Object.freeze(["codex-managed", "claudecode-managed", "hosted-proactive", "hosted-skill-only"] satisfies HostModeClass[]),
     capabilities: Object.freeze(["deliverVisibleFile", "resolveHostedSession"] satisfies HostCapabilityId[]),
     providerRecipes: Object.freeze(["hermes"] satisfies HostRecipeId[]),
     supportTier: "hosted_ready",
@@ -171,7 +171,7 @@ const COMMAND_HOST_ACCESS_OVERRIDES = Object.freeze<Record<string, CommandHostAc
     enforceCurrentProfile: false,
   }),
   "reminder.create": Object.freeze({
-    modeClasses: Object.freeze(["codex-managed", "hosted-proactive", "hosted-skill-only"] satisfies HostModeClass[]),
+    modeClasses: Object.freeze(["codex-managed", "claudecode-managed", "hosted-proactive", "hosted-skill-only"] satisfies HostModeClass[]),
     capabilities: Object.freeze([
       "bridgeQueueAccess",
       "contextTokenAccess",
@@ -186,28 +186,28 @@ const COMMAND_HOST_ACCESS_OVERRIDES = Object.freeze<Record<string, CommandHostAc
   "host.manifest": Object.freeze({
     modeClasses: Object.freeze(["cli-only"] satisfies HostModeClass[]),
     capabilities: Object.freeze([] satisfies HostCapabilityId[]),
-    providerRecipes: Object.freeze(["hermes", "generic-shell"] satisfies HostRecipeId[]),
+    providerRecipes: Object.freeze(["claudecode", "hermes", "generic-shell"] satisfies HostRecipeId[]),
     supportTier: "host_neutral",
     enforceCurrentProfile: false,
   }),
   "host.bootstrap": Object.freeze({
     modeClasses: Object.freeze(["cli-only"] satisfies HostModeClass[]),
     capabilities: Object.freeze(["installCompanionSkill"] satisfies HostCapabilityId[]),
-    providerRecipes: Object.freeze(["hermes", "generic-shell"] satisfies HostRecipeId[]),
+    providerRecipes: Object.freeze(["claudecode", "hermes", "generic-shell"] satisfies HostRecipeId[]),
     supportTier: "host_neutral",
     enforceCurrentProfile: false,
   }),
   "host.doctor": Object.freeze({
     modeClasses: Object.freeze(["cli-only"] satisfies HostModeClass[]),
     capabilities: Object.freeze(["hostSmoke", "semanticReviewHybrid"] satisfies HostCapabilityId[]),
-    providerRecipes: Object.freeze(["hermes", "generic-shell"] satisfies HostRecipeId[]),
+    providerRecipes: Object.freeze(["claudecode", "hermes", "generic-shell"] satisfies HostRecipeId[]),
     supportTier: "host_neutral",
     enforceCurrentProfile: false,
   }),
   "host.smoke": Object.freeze({
     modeClasses: Object.freeze(["cli-only"] satisfies HostModeClass[]),
     capabilities: Object.freeze(["hostSmoke"] satisfies HostCapabilityId[]),
-    providerRecipes: Object.freeze(["hermes", "generic-shell"] satisfies HostRecipeId[]),
+    providerRecipes: Object.freeze(["claudecode", "hermes", "generic-shell"] satisfies HostRecipeId[]),
     supportTier: "host_neutral",
     enforceCurrentProfile: false,
   }),
@@ -262,7 +262,7 @@ const COMMAND_HOST_ACCESS_OVERRIDES = Object.freeze<Record<string, CommandHostAc
   "host.render": Object.freeze({
     modeClasses: Object.freeze(["cli-only"] satisfies HostModeClass[]),
     capabilities: Object.freeze(["installCompanionSkill"] satisfies HostCapabilityId[]),
-    providerRecipes: Object.freeze(["hermes", "generic-shell"] satisfies HostRecipeId[]),
+    providerRecipes: Object.freeze(["claudecode", "hermes", "generic-shell"] satisfies HostRecipeId[]),
     supportTier: "host_neutral",
     enforceCurrentProfile: false,
   }),
@@ -327,6 +327,9 @@ export function resolveLegacyCommandHostProfiles(
   const profiles = new Set<CommandHostProfileIdDefinition>();
   if (descriptor.modeClasses.includes("codex-managed")) {
     profiles.add("codex-mode");
+  }
+  if (descriptor.modeClasses.includes("claudecode-managed")) {
+    profiles.add("claudecode-mode");
   }
   if (
     descriptor.providerRecipes.includes("hermes")

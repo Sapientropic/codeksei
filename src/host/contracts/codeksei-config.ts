@@ -16,13 +16,13 @@ const hostUserSchema = z.object({
 });
 
 const hostBindingSchemaV1 = z.object({
-  provider: z.enum(["codex", "hermes", "generic-shell"]),
+  provider: z.enum(["codex", "claudecode", "hermes", "generic-shell"]),
   channel: z.string().min(1),
 });
 
 const hostBindingSchemaV2 = z.object({
-  provider: z.enum(["codex", "hermes", "generic-shell"]),
-  runtimeProvider: z.enum(["codex", "hermes", "openclaw-reserved"]),
+  provider: z.enum(["codex", "claudecode", "hermes", "generic-shell"]),
+  runtimeProvider: z.enum(["codex", "claudecode", "hermes", "openclaw-reserved"]),
   runtimeOwner: z.enum(["codeksei", "host"]),
   channelProvider: z.enum(["codeksei", "hermes", "host"]),
   channelKind: z.string().min(1),
@@ -36,11 +36,19 @@ const hostBindingSchema = z.union([hostBindingSchemaV2, hostBindingSchemaV1]).tr
   }
   return {
     provider: value.provider,
-    runtimeProvider: value.provider === "hermes" ? "hermes" : "codex",
+    runtimeProvider: value.provider === "hermes" ? "hermes" : value.provider === "claudecode" ? "claudecode" : "codex",
     runtimeOwner: value.provider === "hermes" ? "host" : "codeksei",
-    channelProvider: value.provider === "hermes" ? "hermes" : value.provider === "codex" ? "codeksei" : "host",
+    channelProvider: value.provider === "hermes"
+      ? "hermes"
+      : value.provider === "codex" || value.provider === "claudecode"
+        ? "codeksei"
+        : "host",
     channelKind: value.channel || "none",
-    deliveryRecipe: value.provider === "hermes" ? "hermes-origin" : value.provider === "codex" ? "codeksei-weixin-bridge" : "generic-shell",
+    deliveryRecipe: value.provider === "hermes"
+      ? "hermes-origin"
+      : value.provider === "codex" || value.provider === "claudecode"
+        ? "codeksei-weixin-bridge"
+        : "generic-shell",
     channel: value.channel,
   };
 });
@@ -55,7 +63,7 @@ const hostBootstrapSchema = z.object({
 
 export const codekseiHostConfigSchema = z.object({
   $schema: z.string().min(1),
-  modeClass: z.enum(["codex-managed", "hosted-proactive", "hosted-skill-only", "cli-only", "bridge-full"]),
+  modeClass: z.enum(["codex-managed", "claudecode-managed", "hosted-proactive", "hosted-skill-only", "cli-only", "bridge-full"]),
   workspaceRoot: z.string().min(1),
   stateDir: z.string().min(1),
   user: hostUserSchema,

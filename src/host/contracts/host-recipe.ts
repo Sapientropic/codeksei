@@ -6,6 +6,7 @@ import type { HostCapabilityId, HostModeClass, HostTransport } from "./attachmen
 
 export const HOST_RECIPE_IDS = [
   "codex",
+  "claudecode",
   "hermes",
   "generic-shell",
 ] as const;
@@ -52,6 +53,29 @@ const HOST_RECIPES = Object.freeze<readonly HostRecipeDescriptor[]>([
     supportsToolSurface: true,
   }),
   Object.freeze({
+    id: "claudecode",
+    label: "Claude Code",
+    description: "Codeksei 托管 Claude Code runtime 与 first-party channel bridge。",
+    transport: "cli_stdio",
+    modeClasses: Object.freeze(["claudecode-managed"] satisfies HostModeClass[]),
+    capabilities: Object.freeze([
+      "invokeCodekseiAction",
+      "deliverVisibleText",
+      "deliverVisibleFile",
+      "bridgeRuntimeLifecycle",
+      "bridgeQueueAccess",
+      "contextTokenAccess",
+      "weixinAccountAccess",
+      "semanticReviewHybrid",
+    ] satisfies HostCapabilityId[]),
+    runtimeProviders: Object.freeze(["claudecode"] satisfies CodekseiRuntimeProvider[]),
+    channelProviders: Object.freeze(["codeksei"] satisfies CodekseiChannelProvider[]),
+    channelKinds: Object.freeze(["weixin"] satisfies string[]),
+    defaultDeliveryRecipe: "codeksei-weixin-bridge",
+    supportsDelegatedCheckin: true,
+    supportsToolSurface: false,
+  }),
+  Object.freeze({
     id: "hermes",
     label: "Hermes",
     description: "Hermes 托管 runtime/channel，Codeksei 暴露 companion/domain workflows。",
@@ -88,7 +112,7 @@ const HOST_RECIPES = Object.freeze<readonly HostRecipeDescriptor[]>([
     capabilities: Object.freeze([
       "invokeCodekseiAction",
     ] satisfies HostCapabilityId[]),
-    runtimeProviders: Object.freeze(["codex", "hermes"] satisfies CodekseiRuntimeProvider[]),
+    runtimeProviders: Object.freeze(["codex", "claudecode", "hermes"] satisfies CodekseiRuntimeProvider[]),
     channelProviders: Object.freeze(["host"] satisfies CodekseiChannelProvider[]),
     channelKinds: Object.freeze(["none", "discord", "telegram", "feishu", "generic"] satisfies string[]),
     defaultDeliveryRecipe: "generic-shell",

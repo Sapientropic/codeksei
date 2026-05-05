@@ -64,6 +64,7 @@ import { runSystemCheckinTriggerCommand } from "./system-checkin-trigger-cli";
 import { runTimelineEventCommand } from "./timeline-event-cli";
 import { runTimelineScreenshotCommand } from "./timeline-screenshot-cli";
 import type { CommandExecutionResult } from "../contracts/cli-contract";
+import { runCodekseiMcpBootstrapCommand, runCodekseiMcpServerCli } from "../tools/mcp";
 import type {
   CommandRunnerId,
   TerminalCommandManifestEntry,
@@ -173,6 +174,13 @@ const RUNNERS: Record<CommandRunnerId, TerminalCommandHandler> = {
   },
   "host.render": async (_manifest, context) => {
     return runHostRenderCommand(context.config, context.leafArgs);
+  },
+  "tool.mcp-bootstrap": async (_manifest, context) => {
+    return runCodekseiMcpBootstrapCommand(context.leafArgs);
+  },
+  "tool.mcp-server": async (_manifest, context) => {
+    await runCodekseiMcpServerCli(context.leafArgs);
+    return undefined;
   },
   "operator.hermes.install_skill": async (_manifest, context) => {
     return runHermesInstallSkillCommand(context.config, context.leafArgs);

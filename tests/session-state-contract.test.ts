@@ -47,6 +47,8 @@ test("session state contract normalizes legacy runtime params and drops polluted
     activeWorkspaceRoot: "E:/repo/current",
     updatedAt: "",
     threadIdByWorkspaceRoot: {},
+    threadIdByWorkspaceRootByRuntime: {},
+    pendingThreadIdByWorkspaceRootByRuntime: {},
     codexParamsByWorkspaceRoot: {
       "E:/repo/current": {
         model: "gpt-5.4",
@@ -59,8 +61,21 @@ test("session state contract normalizes legacy runtime params and drops polluted
         effort: "",
       },
     },
+    runtimeParamsByWorkspaceRootByRuntime: {
+      codex: {
+        "E:/repo/current": {
+          model: "gpt-5.4",
+          effort: "",
+        },
+      },
+    },
     workspaceBootstrapThreadIdByWorkspaceRoot: {
       "E:/repo/current": "",
+    },
+    workspaceBootstrapThreadIdByWorkspaceRootByRuntime: {
+      codex: {
+        "E:/repo/current": "",
+      },
     },
   });
   assert.deepEqual(normalized.approvalPromptStateByThreadId["thread-1"], {
@@ -75,4 +90,71 @@ test("session state contract normalizes legacy runtime params and drops polluted
     models: ["gpt-5.4"],
     updatedAt: "",
   });
+});
+
+test("session state contract preserves runtime-scoped thread maps alongside legacy Codex maps", () => {
+  const normalized = normalizeSessionState({
+    bindings: {
+      "binding-a": {
+        threadIdByWorkspaceRoot: {
+          "E:/repo/current": "codex-thread",
+        },
+        threadIdByWorkspaceRootByRuntime: {
+          claudecode: {
+            "E:/repo/current": "claude-thread",
+          },
+        },
+        pendingThreadIdByWorkspaceRootByRuntime: {
+          claudecode: {
+            "E:/repo/current": "claude-pending",
+          },
+        },
+        runtimeParamsByWorkspaceRoot: {
+          "E:/repo/current": {
+            model: "gpt-5.4",
+            effort: "high",
+          },
+        },
+        runtimeParamsByWorkspaceRootByRuntime: {
+          claudecode: {
+            "E:/repo/current": {
+              model: "claude-sonnet-4-5",
+            },
+          },
+        },
+        workspaceBootstrapThreadIdByWorkspaceRoot: {
+          "E:/repo/current": "codex-thread",
+        },
+        workspaceBootstrapThreadIdByWorkspaceRootByRuntime: {
+          claudecode: {
+            "E:/repo/current": "claude-thread",
+          },
+        },
+      },
+    },
+  });
+
+  assert.equal(
+    normalized.bindings["binding-a"]?.threadIdByWorkspaceRootByRuntime.codex?.["E:/repo/current"],
+    "codex-thread",
+  );
+  assert.equal(
+    normalized.bindings["binding-a"]?.threadIdByWorkspaceRootByRuntime.claudecode?.["E:/repo/current"],
+    "claude-thread",
+  );
+  assert.equal(
+    normalized.bindings["binding-a"]?.pendingThreadIdByWorkspaceRootByRuntime.claudecode?.["E:/repo/current"],
+    "claude-pending",
+  );
+  assert.deepEqual(
+    normalized.bindings["binding-a"]?.runtimeParamsByWorkspaceRootByRuntime.claudecode?.["E:/repo/current"],
+    {
+      model: "claude-sonnet-4-5",
+      effort: "",
+    },
+  );
+  assert.equal(
+    normalized.bindings["binding-a"]?.workspaceBootstrapThreadIdByWorkspaceRootByRuntime.codex?.["E:/repo/current"],
+    "codex-thread",
+  );
 });

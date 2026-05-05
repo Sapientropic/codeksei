@@ -33,6 +33,13 @@ export function buildHostedFirstHostAttachmentResolution(
       channel: "weixin",
     });
   }
+  if (provider === "claudecode") {
+    return resolveHostAttachment({
+      runtime: "claudecode",
+      channelProvider: "codeksei",
+      channel: "weixin",
+    });
+  }
   if (provider === "generic-shell") {
     return resolveHostAttachment({
       runtime: "codex",
@@ -84,6 +91,7 @@ export function buildHostEntrypointManifest({
     pulseFeedback: buildPublicTerminalCommandArgv("pulse.feedback", { includeJsonFormat: true }),
     pulseGenerate: buildPublicTerminalCommandArgv("pulse.generate", { includeJsonFormat: true }),
     pulseToday: buildPublicTerminalCommandArgv("pulse.today", { includeJsonFormat: true }),
+    toolMcpBootstrap: buildPublicTerminalCommandArgv("tool.mcp_bootstrap", { includeJsonFormat: true }),
   };
 }
 
@@ -140,7 +148,7 @@ export function buildHostAttachmentManifest(
 
 function normalizeHostManifestProvider(value: unknown): HostRecipeId {
   const normalized = normalizeText(value);
-  if (normalized === "codex" || normalized === "generic-shell" || normalized === "hermes") {
+  if (normalized === "codex" || normalized === "claudecode" || normalized === "generic-shell" || normalized === "hermes") {
     return normalized;
   }
   return DEFAULT_HOST_DISCOVERY_PROVIDER;
@@ -186,6 +194,16 @@ function buildRecommendedHostWorkflows(): HostWorkflowHint[] {
         {
           commandRef: "render",
           reason: "Read the generated host skill if the runtime needs a human-readable decision tree instead of raw CLI discovery.",
+        },
+      ],
+    },
+    {
+      id: "claudecode_mcp_tools_bootstrap",
+      trigger: "Claude Code Mode is enabled and the operator explicitly wants Claude Code to call Codeksei timeline, context, diary, note, reminder, or delivery tools through MCP.",
+      steps: [
+        {
+          commandRef: "toolMcpBootstrap",
+          reason: "Preview the opt-in Codeksei Tools MCP configuration first; only pass --install when the operator has chosen a Claude MCP scope and toolset.",
         },
       ],
     },

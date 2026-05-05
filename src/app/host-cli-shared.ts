@@ -14,6 +14,7 @@ export type HostCliRuntimeConfig = Partial<Pick<
   | "accountId"
   | "allowedUserIds"
   | "channelProvider"
+  | "claudeCommand"
   | "checkinConfigFile"
   | "checkinScheduleStateFile"
   | "cliIdempotencyLedgerFile"

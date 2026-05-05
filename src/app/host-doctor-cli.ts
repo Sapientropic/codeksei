@@ -18,6 +18,7 @@ type DoctorConfig = Partial<Pick<
   | "accountsDir"
   | "channel"
   | "channelProvider"
+  | "claudeCommand"
   | "runtime"
   | "runtimeCommand"
   | "runtimeEndpoint"
@@ -77,6 +78,9 @@ function resolveDoctorEffectiveConfig(config: DoctorConfig, provider: string): D
   }
   if (provider === "codex") {
     return { ...config, runtime: "codex", channelProvider: "codeksei" };
+  }
+  if (provider === "claudecode") {
+    return { ...config, runtime: "claudecode", channelProvider: "codeksei" };
   }
   if (provider === "generic-shell") {
     return { ...config, runtime: "codex", channelProvider: "host", channel: "none" };

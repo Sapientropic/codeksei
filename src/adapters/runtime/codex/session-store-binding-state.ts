@@ -5,9 +5,11 @@ import {
 } from "../../../contracts/session-state";
 import {
   createEmptySessionBinding,
+  getPendingThreadMap,
   getRuntimeParamsMap,
   getThreadMap,
   getWorkspaceBootstrapThreadMap,
+  normalizeRuntimeId,
   normalizeValue,
   type BindingRef,
   type RuntimeWorkspaceParams,
@@ -57,12 +59,13 @@ export function getThreadIdForWorkspaceFromState(
   state: SessionState,
   bindingKey: unknown,
   workspaceRoot: unknown,
+  runtimeId: unknown = "codex",
 ): string {
   const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
   if (!normalizedWorkspaceRoot) {
     return "";
   }
-  const threadId = state.bindings[normalizeValue(bindingKey)]?.threadIdByWorkspaceRoot?.[normalizedWorkspaceRoot];
+  const threadId = getThreadMap(getBindingFromState(state, bindingKey), runtimeId)[normalizedWorkspaceRoot];
   return typeof threadId === "string" ? threadId : "";
 }
 
@@ -72,6 +75,7 @@ export function setThreadIdForWorkspaceInState(
   workspaceRoot: unknown,
   threadId: unknown,
   extra: Record<string, unknown> = {},
+  runtimeId: unknown = "codex",
 ): SessionBinding | null {
   const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
   const normalizedThreadId = normalizeValue(threadId);
@@ -82,11 +86,11 @@ export function setThreadIdForWorkspaceInState(
   if (!normalizedBindingKey) {
     return null;
   }
-
+  const normalizedRuntimeId = normalizeRuntimeId(runtimeId);
   const current = state.bindings[normalizedBindingKey] || createEmptySessionBinding();
-  const existingWorkspaceBootstrapMap = getWorkspaceBootstrapThreadMap(current);
+  const existingWorkspaceBootstrapMap = getWorkspaceBootstrapThreadMap(current, normalizedRuntimeId);
   const threadIdByWorkspaceRoot = {
-    ...getThreadMap(current),
+    ...getThreadMap(current, normalizedRuntimeId),
     [normalizedWorkspaceRoot]: normalizedThreadId,
   };
   const workspaceBootstrapThreadIdByWorkspaceRoot = {
@@ -101,8 +105,16 @@ export function setThreadIdForWorkspaceInState(
     ...current,
     ...extra,
     activeWorkspaceRoot: normalizedWorkspaceRoot,
-    threadIdByWorkspaceRoot,
-    workspaceBootstrapThreadIdByWorkspaceRoot,
+    ...(normalizedRuntimeId === "codex" ? { threadIdByWorkspaceRoot } : {}),
+    threadIdByWorkspaceRootByRuntime: {
+      ...(current.threadIdByWorkspaceRootByRuntime || {}),
+      [normalizedRuntimeId]: threadIdByWorkspaceRoot,
+    },
+    ...(normalizedRuntimeId === "codex" ? { workspaceBootstrapThreadIdByWorkspaceRoot } : {}),
+    workspaceBootstrapThreadIdByWorkspaceRootByRuntime: {
+      ...(current.workspaceBootstrapThreadIdByWorkspaceRootByRuntime || {}),
+      [normalizedRuntimeId]: workspaceBootstrapThreadIdByWorkspaceRoot,
+    },
     updatedAt: new Date().toISOString(),
   });
   state.bindings = {
@@ -116,13 +128,14 @@ export function getRuntimeParamsForWorkspaceFromState(
   state: SessionState,
   bindingKey: unknown,
   workspaceRoot: unknown,
+  runtimeId: unknown = "codex",
 ): RuntimeWorkspaceParams {
   const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
   if (!normalizedWorkspaceRoot) {
     return { model: "", effort: "" };
   }
   const current = getBindingFromState(state, bindingKey) || createEmptySessionBinding();
-  const runtimeParamsByWorkspaceRoot = getRuntimeParamsMap(current);
+  const runtimeParamsByWorkspaceRoot = getRuntimeParamsMap(current, runtimeId);
   const entry = runtimeParamsByWorkspaceRoot[normalizedWorkspaceRoot];
   return {
     model: typeof entry?.model === "string" ? entry.model : "",
@@ -135,6 +148,7 @@ export function setRuntimeParamsForWorkspaceInState(
   bindingKey: unknown,
   workspaceRoot: unknown,
   { model = "", effort = "" }: { model?: unknown; effort?: unknown },
+  runtimeId: unknown = "codex",
 ): SessionBinding | null {
   const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
   if (!normalizedWorkspaceRoot) {
@@ -144,9 +158,10 @@ export function setRuntimeParamsForWorkspaceInState(
   if (!normalizedBindingKey) {
     return null;
   }
+  const normalizedRuntimeId = normalizeRuntimeId(runtimeId);
   const current = state.bindings[normalizedBindingKey] || createEmptySessionBinding();
   const runtimeParamsByWorkspaceRoot = {
-    ...getRuntimeParamsMap(current),
+    ...getRuntimeParamsMap(current, normalizedRuntimeId),
     [normalizedWorkspaceRoot]: {
       model: normalizeValue(model),
       effort: normalizeValue(effort),
@@ -154,7 +169,11 @@ export function setRuntimeParamsForWorkspaceInState(
   };
   const normalizedBinding = normalizeSessionBinding({
     ...current,
-    runtimeParamsByWorkspaceRoot,
+    ...(normalizedRuntimeId === "codex" ? { runtimeParamsByWorkspaceRoot } : {}),
+    runtimeParamsByWorkspaceRootByRuntime: {
+      ...(current.runtimeParamsByWorkspaceRootByRuntime || {}),
+      [normalizedRuntimeId]: runtimeParamsByWorkspaceRoot,
+    },
     updatedAt: new Date().toISOString(),
   });
   state.bindings = {
@@ -169,7 +188,7 @@ export function getCodexParamsForWorkspaceFromState(
   bindingKey: unknown,
   workspaceRoot: unknown,
 ): RuntimeWorkspaceParams {
-  return getRuntimeParamsForWorkspaceFromState(state, bindingKey, workspaceRoot);
+  return getRuntimeParamsForWorkspaceFromState(state, bindingKey, workspaceRoot, "codex");
 }
 
 export function setCodexParamsForWorkspaceInState(
@@ -178,13 +197,14 @@ export function setCodexParamsForWorkspaceInState(
   workspaceRoot: unknown,
   params: { model?: unknown; effort?: unknown },
 ): SessionBinding | null {
-  return setRuntimeParamsForWorkspaceInState(state, bindingKey, workspaceRoot, params);
+  return setRuntimeParamsForWorkspaceInState(state, bindingKey, workspaceRoot, params, "codex");
 }
 
 export function clearThreadIdForWorkspaceInState(
   state: SessionState,
   bindingKey: unknown,
   workspaceRoot: unknown,
+  runtimeId: unknown = "codex",
 ): SessionBinding | null {
   const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
   if (!normalizedWorkspaceRoot) {
@@ -194,19 +214,36 @@ export function clearThreadIdForWorkspaceInState(
   if (!normalizedBindingKey) {
     return null;
   }
+  const normalizedRuntimeId = normalizeRuntimeId(runtimeId);
   const current = state.bindings[normalizedBindingKey] || createEmptySessionBinding();
   const threadIdByWorkspaceRoot = {
-    ...getThreadMap(current),
+    ...getThreadMap(current, normalizedRuntimeId),
+    [normalizedWorkspaceRoot]: "",
+  };
+  const pendingThreadIdByWorkspaceRoot = {
+    ...getPendingThreadMap(current, normalizedRuntimeId),
     [normalizedWorkspaceRoot]: "",
   };
   const workspaceBootstrapThreadIdByWorkspaceRoot = {
-    ...getWorkspaceBootstrapThreadMap(current),
+    ...getWorkspaceBootstrapThreadMap(current, normalizedRuntimeId),
     [normalizedWorkspaceRoot]: "",
   };
   const normalizedBinding = normalizeSessionBinding({
     ...current,
-    threadIdByWorkspaceRoot,
-    workspaceBootstrapThreadIdByWorkspaceRoot,
+    ...(normalizedRuntimeId === "codex" ? { threadIdByWorkspaceRoot } : {}),
+    threadIdByWorkspaceRootByRuntime: {
+      ...(current.threadIdByWorkspaceRootByRuntime || {}),
+      [normalizedRuntimeId]: threadIdByWorkspaceRoot,
+    },
+    pendingThreadIdByWorkspaceRootByRuntime: {
+      ...(current.pendingThreadIdByWorkspaceRootByRuntime || {}),
+      [normalizedRuntimeId]: pendingThreadIdByWorkspaceRoot,
+    },
+    ...(normalizedRuntimeId === "codex" ? { workspaceBootstrapThreadIdByWorkspaceRoot } : {}),
+    workspaceBootstrapThreadIdByWorkspaceRootByRuntime: {
+      ...(current.workspaceBootstrapThreadIdByWorkspaceRootByRuntime || {}),
+      [normalizedRuntimeId]: workspaceBootstrapThreadIdByWorkspaceRoot,
+    },
     updatedAt: new Date().toISOString(),
   });
   state.bindings = {
@@ -242,18 +279,26 @@ export function setActiveWorkspaceRootInState(
   return normalizeSessionBinding(state.bindings[normalizedBindingKey]);
 }
 
-export function listWorkspaceRootsFromState(state: SessionState, bindingKey: unknown): string[] {
+export function listWorkspaceRootsFromState(
+  state: SessionState,
+  bindingKey: unknown,
+  runtimeId: unknown = "codex",
+): string[] {
   const current = getBindingFromState(state, bindingKey) || createEmptySessionBinding();
-  return Object.keys(getThreadMap(current));
+  return Object.keys(getThreadMap(current, runtimeId));
 }
 
-export function findBindingForThreadIdInState(state: SessionState, threadId: unknown): BindingRef | null {
+export function findBindingForThreadIdInState(
+  state: SessionState,
+  threadId: unknown,
+  runtimeId: unknown = "codex",
+): BindingRef | null {
   const normalizedThreadId = normalizeValue(threadId);
   if (!normalizedThreadId) {
     return null;
   }
   for (const [bindingKey, binding] of Object.entries(state.bindings || {})) {
-    for (const [workspaceRoot, candidateThreadId] of Object.entries(getThreadMap(binding))) {
+    for (const [workspaceRoot, candidateThreadId] of Object.entries(getThreadMap(binding, runtimeId))) {
       if (candidateThreadId === normalizedThreadId) {
         return {
           bindingKey,
@@ -270,6 +315,7 @@ export function hasWorkspaceBootstrapForThreadInState(
   bindingKey: unknown,
   workspaceRoot: unknown,
   threadId: unknown,
+  runtimeId: unknown = "codex",
 ): boolean {
   const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
   const normalizedThreadId = normalizeValue(threadId);
@@ -277,7 +323,7 @@ export function hasWorkspaceBootstrapForThreadInState(
     return false;
   }
   const current = getBindingFromState(state, bindingKey) || createEmptySessionBinding();
-  return getWorkspaceBootstrapThreadMap(current)[normalizedWorkspaceRoot] === normalizedThreadId;
+  return getWorkspaceBootstrapThreadMap(current, runtimeId)[normalizedWorkspaceRoot] === normalizedThreadId;
 }
 
 export function rememberWorkspaceBootstrapForThreadInState(
@@ -285,6 +331,7 @@ export function rememberWorkspaceBootstrapForThreadInState(
   bindingKey: unknown,
   workspaceRoot: unknown,
   threadId: unknown,
+  runtimeId: unknown = "codex",
 ): SessionBinding | null {
   const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
   const normalizedThreadId = normalizeValue(threadId);
@@ -295,14 +342,19 @@ export function rememberWorkspaceBootstrapForThreadInState(
   if (!normalizedBindingKey) {
     return null;
   }
+  const normalizedRuntimeId = normalizeRuntimeId(runtimeId);
   const current = state.bindings[normalizedBindingKey] || createEmptySessionBinding();
   const workspaceBootstrapThreadIdByWorkspaceRoot = {
-    ...getWorkspaceBootstrapThreadMap(current),
+    ...getWorkspaceBootstrapThreadMap(current, normalizedRuntimeId),
     [normalizedWorkspaceRoot]: normalizedThreadId,
   };
   const normalizedBinding = normalizeSessionBinding({
     ...current,
-    workspaceBootstrapThreadIdByWorkspaceRoot,
+    ...(normalizedRuntimeId === "codex" ? { workspaceBootstrapThreadIdByWorkspaceRoot } : {}),
+    workspaceBootstrapThreadIdByWorkspaceRootByRuntime: {
+      ...(current.workspaceBootstrapThreadIdByWorkspaceRootByRuntime || {}),
+      [normalizedRuntimeId]: workspaceBootstrapThreadIdByWorkspaceRoot,
+    },
     updatedAt: new Date().toISOString(),
   });
   state.bindings = {
@@ -310,6 +362,65 @@ export function rememberWorkspaceBootstrapForThreadInState(
     [normalizedBindingKey]: normalizedBinding,
   };
   return normalizeSessionBinding(state.bindings[normalizedBindingKey]);
+}
+
+export function getPendingThreadIdForWorkspaceFromState(
+  state: SessionState,
+  bindingKey: unknown,
+  workspaceRoot: unknown,
+  runtimeId: unknown = "codex",
+): string {
+  const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
+  if (!normalizedWorkspaceRoot) {
+    return "";
+  }
+  const pendingThreadId = getPendingThreadMap(getBindingFromState(state, bindingKey), runtimeId)[normalizedWorkspaceRoot];
+  return typeof pendingThreadId === "string" ? pendingThreadId : "";
+}
+
+export function setPendingThreadIdForWorkspaceInState(
+  state: SessionState,
+  bindingKey: unknown,
+  workspaceRoot: unknown,
+  threadId: unknown,
+  runtimeId: unknown = "codex",
+): SessionBinding | null {
+  const normalizedWorkspaceRoot = normalizeValue(workspaceRoot);
+  if (!normalizedWorkspaceRoot) {
+    return getBindingFromState(state, bindingKey);
+  }
+  const normalizedBindingKey = normalizeValue(bindingKey);
+  if (!normalizedBindingKey) {
+    return null;
+  }
+  const normalizedRuntimeId = normalizeRuntimeId(runtimeId);
+  const current = state.bindings[normalizedBindingKey] || createEmptySessionBinding();
+  const pendingThreadIdByWorkspaceRoot = {
+    ...getPendingThreadMap(current, normalizedRuntimeId),
+    [normalizedWorkspaceRoot]: normalizeValue(threadId),
+  };
+  const normalizedBinding = normalizeSessionBinding({
+    ...current,
+    pendingThreadIdByWorkspaceRootByRuntime: {
+      ...(current.pendingThreadIdByWorkspaceRootByRuntime || {}),
+      [normalizedRuntimeId]: pendingThreadIdByWorkspaceRoot,
+    },
+    updatedAt: new Date().toISOString(),
+  });
+  state.bindings = {
+    ...(state.bindings || {}),
+    [normalizedBindingKey]: normalizedBinding,
+  };
+  return normalizeSessionBinding(state.bindings[normalizedBindingKey]);
+}
+
+export function clearPendingThreadIdForWorkspaceInState(
+  state: SessionState,
+  bindingKey: unknown,
+  workspaceRoot: unknown,
+  runtimeId: unknown = "codex",
+): SessionBinding | null {
+  return setPendingThreadIdForWorkspaceInState(state, bindingKey, workspaceRoot, "", runtimeId);
 }
 
 export function buildBindingKey({

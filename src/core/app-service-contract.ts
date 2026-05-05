@@ -80,6 +80,7 @@ export interface RuntimeAdapterDescriptor {
   provider: string;
   operations: RuntimeAdapterOperations;
   endpoint?: string | undefined;
+  model?: string | undefined;
   sessionsFile?: string | undefined;
   profile?: string | undefined;
   mode?: string | undefined;
@@ -98,8 +99,12 @@ export interface SessionBindingSnapshot extends Record<string, unknown> {
   activeWorkspaceRoot?: string;
   bindingKey?: string;
   runtimeParamsByWorkspaceRoot?: Record<string, unknown>;
+  runtimeParamsByWorkspaceRootByRuntime?: Record<string, Record<string, unknown>>;
   senderId?: string;
   threadIdByWorkspaceRoot?: Record<string, string>;
+  threadIdByWorkspaceRootByRuntime?: Record<string, Record<string, string>>;
+  pendingThreadIdByWorkspaceRootByRuntime?: Record<string, Record<string, string>>;
+  workspaceBootstrapThreadIdByWorkspaceRootByRuntime?: Record<string, Record<string, string>>;
   workspaceId?: string;
 }
 
@@ -114,6 +119,7 @@ export interface SessionStoreLike {
   getAvailableModelCatalog(): AvailableModelCatalogView | null;
   getBinding(bindingKey: string): { senderId?: string } | null;
   getRuntimeParamsForWorkspace(bindingKey: string, workspaceRoot?: string): { model?: string; effort?: string };
+  getPendingThreadIdForWorkspace?(bindingKey: string, workspaceRoot: string): string;
   getPendingApprovalForThread(threadId: string): PendingApprovalState | null;
   getThreadIdForWorkspace(bindingKey: string, workspaceRoot: string): string;
   listBindings(): SessionBindingSnapshot[];
@@ -144,6 +150,9 @@ export interface SessionStoreWriterLike {
     extra?: Record<string, unknown>,
   ): Promise<unknown>;
   clearThreadIdForWorkspace(bindingKey: string, workspaceRoot: string): Promise<unknown>;
+  getPendingThreadIdForWorkspace?(bindingKey: string, workspaceRoot: string): Promise<string>;
+  setPendingThreadIdForWorkspace?(bindingKey: string, workspaceRoot: string, threadId: string): Promise<unknown>;
+  clearPendingThreadIdForWorkspace?(bindingKey: string, workspaceRoot: string): Promise<unknown>;
 }
 
 export interface ChannelAdapterLike {
@@ -180,6 +189,7 @@ export interface ChannelAdapterLike {
 
 export interface RuntimeAdapterLike {
   cancelTurn(args: { threadId: string; turnId: string }): Promise<unknown>;
+  compactThread?(args: { threadId: string; workspaceRoot: string }): Promise<unknown>;
   close(): Promise<void>;
   describe(): RuntimeAdapterDescriptor;
   getSessionStore(): SessionStoreLike;
@@ -197,6 +207,7 @@ export interface RuntimeAdapterLike {
   }): Promise<unknown>;
   respondApproval(args: { requestId: string; decision: "accept" | "decline" }): Promise<unknown>;
   resumeThread(args: { threadId: string; workspaceRoot?: string }): Promise<unknown>;
+  startFreshThreadDraft?(args: { workspaceRoot: string }): Promise<unknown>;
   sendTextTurn(args: {
     bindingKey: string;
     workspaceRoot: string;
@@ -268,6 +279,12 @@ export interface SystemMessageQueueLike {
   } | null;
   hasPendingForAccount(accountId: string): boolean;
   takeReadyForAccount(accountId: string, options?: { nowMs?: number }): SystemMessage[];
+}
+
+export interface PageArtifactStoreLike {
+  activatePointer(bindingKey: unknown, artifactId: unknown, page: unknown): void;
+  clearActivePointer(bindingKey: unknown): void;
+  getActivePointer(bindingKey: unknown): { artifactId: string; page: number } | null;
 }
 
 export interface SystemMessageDispatcherLike {
@@ -346,6 +363,7 @@ export interface AppServices {
   backstageTaskLifecycle: BackstageTaskLifecycleLike;
   channelAdapter: ChannelAdapterLike;
   channelCommandRouter: ChannelCommandRouterLike;
+  pageArtifactStore: PageArtifactStoreLike;
   reminderQueue: ReminderQueueLike;
   runtimeAdapter: RuntimeAdapterLike;
   runtimeTurnLifecycle: RuntimeTurnLifecycleLike;

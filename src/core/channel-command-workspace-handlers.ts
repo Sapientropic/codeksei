@@ -1,6 +1,11 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { formatCheckinRange, resolveCheckinConfig } from "../state/checkin-config";
+import {
+  buildPageArtifactUri,
+  formatWeixinPageMessage,
+  type PageArtifactStore,
+} from "../state/page-artifacts";
 import type {
   AppRuntimeConfig,
   ChannelAdapterLike,
@@ -28,7 +33,7 @@ type WorkspaceCommandMessage = Pick<
   "accountId" | "contextToken" | "provider" | "senderId" | "text" | "workspaceId"
 >;
 
-type WorkspaceCommandChannelAdapter = Pick<ChannelAdapterLike, "sendText">;
+type WorkspaceCommandChannelAdapter = Pick<ChannelAdapterLike, "sendText" | "sendFile">;
 type WorkspaceCommandConfig = Pick<AppRuntimeConfig, "checkinConfigFile" | "runtimeAccessMode" | "workspaceRoot">;
 
 interface WorkspaceCommandSessionStore extends ChannelCommandSessionStore {
@@ -38,7 +43,7 @@ interface WorkspaceCommandSessionStore extends ChannelCommandSessionStore {
 
 interface WorkspaceCommandRuntimeAdapter extends Pick<
   RuntimeAdapterLike,
-  "cancelTurn" | "refreshThreadInstructions" | "resumeThread"
+  "cancelTurn" | "compactThread" | "describe" | "refreshThreadInstructions" | "resumeThread" | "startFreshThreadDraft"
 >, ChannelCommandRuntimeAdapter {
   getSessionStore(): WorkspaceCommandSessionStore;
 }
@@ -50,12 +55,15 @@ interface WorkspaceCommandThreadStateStore extends ChannelCommandThreadStateStor
 type WorkspaceCommandStreamDelivery = Pick<StreamDeliveryLike, "queueReplyTargetForThread">;
 type WorkspaceCommandSessionWriter = Pick<
   SessionStoreWriterLike,
-  "clearThreadIdForWorkspace" | "setActiveWorkspaceRoot" | "setThreadIdForWorkspace"
+  "clearThreadIdForWorkspace" | "setActiveWorkspaceRoot" | "setPendingThreadIdForWorkspace" | "setThreadIdForWorkspace"
 >;
 
 interface WorkspaceCommandHandlers {
   bind(normalized: WorkspaceCommandMessage, command: ParsedChannelCommand): Promise<void>;
+  compact(normalized: WorkspaceCommandMessage): Promise<void>;
+  hasActivePagePointer(normalized: WorkspaceCommandMessage): Promise<boolean>;
   new: (normalized: WorkspaceCommandMessage) => Promise<void>;
+  page(normalized: WorkspaceCommandMessage, command: ParsedChannelCommand): Promise<void>;
   reread(normalized: WorkspaceCommandMessage): Promise<void>;
   status(normalized: WorkspaceCommandMessage): Promise<void>;
   stop(normalized: WorkspaceCommandMessage): Promise<void>;
@@ -72,6 +80,7 @@ interface ScheduleRuntimeEventWatchdogPayload {
 function createWorkspaceCommandHandlers({
   channelAdapter,
   config,
+  pageArtifactStore = null,
   resolveWorkspaceRoot,
   runtimeAdapter,
   scheduleRuntimeEventWatchdog,
@@ -81,6 +90,7 @@ function createWorkspaceCommandHandlers({
 }: {
   channelAdapter: WorkspaceCommandChannelAdapter;
   config: WorkspaceCommandConfig;
+  pageArtifactStore?: PageArtifactStore | null;
   resolveWorkspaceRoot(bindingKey: string): string;
   runtimeAdapter: WorkspaceCommandRuntimeAdapter;
   scheduleRuntimeEventWatchdog(payload: ScheduleRuntimeEventWatchdogPayload): void;
@@ -131,6 +141,7 @@ function createWorkspaceCommandHandlers({
         threadStateStore,
       });
       void sessionStore;
+      pageArtifactStore?.clearActivePointer(bindingKey);
       await sessionWriter.setActiveWorkspaceRoot(bindingKey, canonicalWorkspaceRoot);
       await channelAdapter.sendText({
         userId: normalized.senderId,
@@ -158,9 +169,15 @@ function createWorkspaceCommandHandlers({
         `thread: ${threadId || "(none)"}`,
         `status: ${threadState?.status || "idle"}`,
       ];
+      const runtimeDescriptor = runtimeAdapter.describe();
+      if (runtimeDescriptor.provider) {
+        lines.push(`runtime: ${runtimeDescriptor.provider}`);
+      }
       const runtimeParams = sessionStore.getRuntimeParamsForWorkspace(bindingKey, workspaceRoot);
-      lines.push(`model: ${runtimeParams.model || "(default)"}`);
-      lines.push(`effort: ${runtimeParams.effort || "(default)"}`);
+      lines.push(`model: ${runtimeParams.model || runtimeDescriptor.model || "(default)"}`);
+      if (runtimeDescriptor.provider !== "claudecode" || runtimeParams.effort) {
+        lines.push(`effort: ${runtimeParams.effort || "(default)"}`);
+      }
       const checkinConfigFile = normalizeCommandArgument(config.checkinConfigFile);
       if (checkinConfigFile) {
         const checkinConfig = resolveCheckinConfig({ filePath: checkinConfigFile });
@@ -190,6 +207,13 @@ function createWorkspaceCommandHandlers({
           lines.push(`usage: ${usageParts.join(" | ")}`);
         }
       }
+      const activePagePointer = pageArtifactStore?.getActivePointer(bindingKey) || null;
+      if (activePagePointer) {
+        const activeArtifact = pageArtifactStore?.getArtifact(activePagePointer.artifactId);
+        if (activeArtifact) {
+          lines.push(`page: active ${activePagePointer.page}/${activeArtifact.totalPages}`);
+        }
+      }
       await channelAdapter.sendText({
         userId: normalized.senderId,
         text: lines.join("\n"),
@@ -205,12 +229,121 @@ function createWorkspaceCommandHandlers({
         threadStateStore,
       });
       void sessionStore;
+      if (typeof runtimeAdapter.startFreshThreadDraft === "function") {
+        await runtimeAdapter.startFreshThreadDraft({ workspaceRoot });
+      }
+      pageArtifactStore?.clearActivePointer(bindingKey);
       await sessionWriter.clearThreadIdForWorkspace(bindingKey, workspaceRoot);
       await channelAdapter.sendText({
         userId: normalized.senderId,
         text: `已切到新线程草稿。\n\nworkspace: ${workspaceRoot}\n下一条普通消息会先按当前 workspace 重建上下文入口。`,
         contextToken: normalized.contextToken,
       });
+    },
+
+    async compact(normalized: WorkspaceCommandMessage): Promise<void> {
+      const {
+        threadId,
+        workspaceRoot,
+      } = buildChannelCommandContext({
+        normalized,
+        resolveWorkspaceRoot,
+        runtimeAdapter,
+        threadStateStore,
+      });
+      if (!threadId) {
+        await channelAdapter.sendText({
+          userId: normalized.senderId,
+          text: "当前还没有可用线程，先发一条普通消息开始。",
+          contextToken: normalized.contextToken,
+        });
+        return;
+      }
+      const operations = runtimeAdapter.describe().operations;
+      if (!operations.compactThread || typeof runtimeAdapter.compactThread !== "function") {
+        await channelAdapter.sendText({
+          userId: normalized.senderId,
+          text: "当前 runtime 不支持 /compact。",
+          contextToken: normalized.contextToken,
+        });
+        return;
+      }
+      await runtimeAdapter.compactThread({ threadId, workspaceRoot });
+      await channelAdapter.sendText({
+        userId: normalized.senderId,
+        text: `已发送 compact 请求。\n\nthread: ${threadId}`,
+        contextToken: normalized.contextToken,
+      });
+    },
+
+    async hasActivePagePointer(normalized: WorkspaceCommandMessage): Promise<boolean> {
+      if (!pageArtifactStore) {
+        return false;
+      }
+      const { bindingKey } = buildChannelCommandContext({
+        normalized,
+        resolveWorkspaceRoot,
+        runtimeAdapter,
+        threadStateStore,
+      });
+      return Boolean(pageArtifactStore.getActivePointer(bindingKey));
+    },
+
+    async page(normalized: WorkspaceCommandMessage, command: ParsedChannelCommand): Promise<void> {
+      const { bindingKey } = buildChannelCommandContext({
+        normalized,
+        resolveWorkspaceRoot,
+        runtimeAdapter,
+        threadStateStore,
+      });
+      if (!pageArtifactStore) {
+        await sendWorkspaceText(channelAdapter, normalized, "当前没有可继续翻页的内容。");
+        return;
+      }
+      const pointer = pageArtifactStore.getActivePointer(bindingKey);
+      if (!pointer) {
+        await sendWorkspaceText(channelAdapter, normalized, "当前没有可继续翻页的内容。");
+        return;
+      }
+      const artifact = pageArtifactStore.getArtifact(pointer.artifactId);
+      if (!artifact) {
+        pageArtifactStore.clearActivePointer(bindingKey);
+        await sendWorkspaceText(channelAdapter, normalized, "这段分页内容已经过期，请重新触发。");
+        return;
+      }
+
+      const commandName = normalizeCommandArgument(command.name).toLowerCase();
+      if (commandName === "done") {
+        pageArtifactStore.clearActivePointer(bindingKey);
+        await sendWorkspaceText(channelAdapter, normalized, "已收起分页内容。");
+        return;
+      }
+      if (commandName === "full") {
+        const filePath = pageArtifactStore.writeFullTextFile(artifact.id);
+        if (filePath && typeof channelAdapter.sendFile === "function") {
+          await channelAdapter.sendFile({
+            userId: normalized.senderId,
+            filePath,
+            contextToken: normalized.contextToken,
+          });
+          return;
+        }
+        await sendWorkspaceText(channelAdapter, normalized, "当前通道不支持文件发送，可以继续用 /more 翻页。");
+        return;
+      }
+
+      const targetPage = resolveTargetPage(commandName, command.args, pointer.page, artifact.totalPages);
+      if (!targetPage) {
+        await sendWorkspaceText(channelAdapter, normalized, `用法：/more、/prev、/page <1-${artifact.totalPages}>、/full、/done`);
+        return;
+      }
+      const result = pageArtifactStore.readTextResourcePage(buildPageArtifactUri(artifact.id, targetPage));
+      if (!result) {
+        await sendWorkspaceText(channelAdapter, normalized, `没有第 ${targetPage} 页，当前共有 ${artifact.totalPages} 页。`);
+        return;
+      }
+      pageArtifactStore.activatePointer(bindingKey, artifact.id, targetPage);
+      await sendWorkspaceText(channelAdapter, normalized, formatWeixinPageMessage(result));
     },
 
     async reread(normalized: WorkspaceCommandMessage): Promise<void> {
@@ -313,7 +446,12 @@ function createWorkspaceCommandHandlers({
       const knownTarget = sessionStore.findBindingForThreadId(targetThreadId);
       const workspaceRoot = knownTarget?.workspaceRoot || currentWorkspaceRoot;
       await runtimeAdapter.resumeThread({ threadId: targetThreadId, workspaceRoot });
-      await sessionWriter.setThreadIdForWorkspace(bindingKey, workspaceRoot, targetThreadId);
+      pageArtifactStore?.clearActivePointer(bindingKey);
+      if (runtimeAdapter.describe().provider === "claudecode" && typeof sessionWriter.setPendingThreadIdForWorkspace === "function") {
+        await sessionWriter.setPendingThreadIdForWorkspace(bindingKey, workspaceRoot, targetThreadId);
+      } else {
+        await sessionWriter.setThreadIdForWorkspace(bindingKey, workspaceRoot, targetThreadId);
+      }
       const switchedWorkspaceNotice = workspaceRoot !== currentWorkspaceRoot
         ? "\n已跟随这条 thread 的已知 workspace。"
         : "";
@@ -334,7 +472,8 @@ function createWorkspaceCommandHandlers({
         runtimeAdapter,
         threadStateStore,
       });
-      if (!threadId || !threadState?.turnId || threadState.status !== "running") {
+      const cancellableStatus = threadState?.status === "running" || threadState?.status === "waiting_approval";
+      if (!threadId || !threadState?.turnId || !cancellableStatus) {
         await channelAdapter.sendText({
           userId: normalized.senderId,
           text: "当前没有正在运行的线程。",
@@ -368,6 +507,32 @@ function formatCompactNumber(value: unknown): string {
     return `${Math.round(normalized / 100) / 10}k`;
   }
   return String(Math.round(normalized));
+}
+
+function resolveTargetPage(commandName: string, args: unknown, currentPage: number, totalPages: number): number {
+  if (commandName === "more" || commandName === "next") {
+    return Math.min(totalPages, currentPage + 1);
+  }
+  if (commandName === "prev") {
+    return Math.max(1, currentPage - 1);
+  }
+  if (commandName === "page") {
+    const requested = Number.parseInt(normalizeCommandArgument(args), 10);
+    return Number.isInteger(requested) && requested >= 1 && requested <= totalPages ? requested : 0;
+  }
+  return 0;
+}
+
+async function sendWorkspaceText(
+  channelAdapter: WorkspaceCommandChannelAdapter,
+  normalized: WorkspaceCommandMessage,
+  text: string,
+): Promise<void> {
+  await channelAdapter.sendText({
+    userId: normalized.senderId,
+    text,
+    contextToken: normalized.contextToken,
+  });
 }
 
 function normalizeCommandArgument(value: unknown): string {

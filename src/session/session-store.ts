@@ -17,13 +17,16 @@ import {
   findBindingForThreadIdInState,
   getActiveWorkspaceRootFromState,
   getBindingFromState,
+  getPendingThreadIdForWorkspaceFromState,
   getRuntimeParamsForWorkspaceFromState,
   getThreadIdForWorkspaceFromState,
   hasWorkspaceBootstrapForThreadInState,
   listBindingsFromState,
   listWorkspaceRootsFromState,
   rememberWorkspaceBootstrapForThreadInState,
+  clearPendingThreadIdForWorkspaceInState,
   setActiveWorkspaceRootInState,
+  setPendingThreadIdForWorkspaceInState,
   setRuntimeParamsForWorkspaceInState,
   setThreadIdForWorkspaceInState,
   updateBindingInState,
@@ -51,16 +54,19 @@ import { withSessionStoreLock } from "../adapters/runtime/codex/session-store-lo
 
 interface SessionStoreConfig {
   filePath: string;
+  runtimeId?: string;
 }
 
 export class SessionStore {
   readonly filePath: string;
   readonly lockFilePath: string;
+  readonly runtimeId: string;
   state: SessionState;
 
-  constructor({ filePath }: SessionStoreConfig) {
+  constructor({ filePath, runtimeId = "codex" }: SessionStoreConfig) {
     this.filePath = filePath;
     this.lockFilePath = `${filePath}.lock`;
+    this.runtimeId = normalizeValue(runtimeId).toLowerCase() || "codex";
     this.state = createEmptySessionState();
     this.ensureParentDirectory();
     this.load();
@@ -128,7 +134,7 @@ export class SessionStore {
   }
 
   getThreadIdForWorkspace(bindingKey: unknown, workspaceRoot: unknown): string {
-    return getThreadIdForWorkspaceFromState(this.refresh(), bindingKey, workspaceRoot);
+    return getThreadIdForWorkspaceFromState(this.refresh(), bindingKey, workspaceRoot, this.runtimeId);
   }
 
   async setThreadIdForWorkspace(
@@ -137,11 +143,18 @@ export class SessionStore {
     threadId: unknown,
     extra: Record<string, unknown> = {},
   ): Promise<SessionBinding | null> {
-    return this.mutateState((state) => setThreadIdForWorkspaceInState(state, bindingKey, workspaceRoot, threadId, extra));
+    return this.mutateState((state) => setThreadIdForWorkspaceInState(
+      state,
+      bindingKey,
+      workspaceRoot,
+      threadId,
+      extra,
+      this.runtimeId,
+    ));
   }
 
   getRuntimeParamsForWorkspace(bindingKey: unknown, workspaceRoot: unknown): RuntimeWorkspaceParams {
-    return getRuntimeParamsForWorkspaceFromState(this.refresh(), bindingKey, workspaceRoot);
+    return getRuntimeParamsForWorkspaceFromState(this.refresh(), bindingKey, workspaceRoot, this.runtimeId);
   }
 
   async setRuntimeParamsForWorkspace(
@@ -149,10 +162,13 @@ export class SessionStore {
     workspaceRoot: unknown,
     { model = "", effort = "" }: { model?: unknown; effort?: unknown },
   ): Promise<SessionBinding | null> {
-    return this.mutateState((state) => setRuntimeParamsForWorkspaceInState(state, bindingKey, workspaceRoot, {
-      model,
-      effort,
-    }));
+    return this.mutateState((state) => setRuntimeParamsForWorkspaceInState(
+      state,
+      bindingKey,
+      workspaceRoot,
+      { model, effort },
+      this.runtimeId,
+    ));
   }
 
   getCodexParamsForWorkspace(bindingKey: unknown, workspaceRoot: unknown): RuntimeWorkspaceParams {
@@ -168,7 +184,7 @@ export class SessionStore {
   }
 
   async clearThreadIdForWorkspace(bindingKey: unknown, workspaceRoot: unknown): Promise<SessionBinding | null> {
-    return this.mutateState((state) => clearThreadIdForWorkspaceInState(state, bindingKey, workspaceRoot));
+    return this.mutateState((state) => clearThreadIdForWorkspaceInState(state, bindingKey, workspaceRoot, this.runtimeId));
   }
 
   async setActiveWorkspaceRoot(bindingKey: unknown, workspaceRoot: unknown): Promise<SessionBinding | null> {
@@ -176,15 +192,15 @@ export class SessionStore {
   }
 
   listWorkspaceRoots(bindingKey: unknown): string[] {
-    return listWorkspaceRootsFromState(this.refresh(), bindingKey);
+    return listWorkspaceRootsFromState(this.refresh(), bindingKey, this.runtimeId);
   }
 
   findBindingForThreadId(threadId: unknown): BindingRef | null {
-    return findBindingForThreadIdInState(this.refresh(), threadId);
+    return findBindingForThreadIdInState(this.refresh(), threadId, this.runtimeId);
   }
 
   hasWorkspaceBootstrapForThread(bindingKey: unknown, workspaceRoot: unknown, threadId: unknown): boolean {
-    return hasWorkspaceBootstrapForThreadInState(this.refresh(), bindingKey, workspaceRoot, threadId);
+    return hasWorkspaceBootstrapForThreadInState(this.refresh(), bindingKey, workspaceRoot, threadId, this.runtimeId);
   }
 
   async rememberWorkspaceBootstrapForThread(
@@ -192,7 +208,40 @@ export class SessionStore {
     workspaceRoot: unknown,
     threadId: unknown,
   ): Promise<SessionBinding | null> {
-    return this.mutateState((state) => rememberWorkspaceBootstrapForThreadInState(state, bindingKey, workspaceRoot, threadId));
+    return this.mutateState((state) => rememberWorkspaceBootstrapForThreadInState(
+      state,
+      bindingKey,
+      workspaceRoot,
+      threadId,
+      this.runtimeId,
+    ));
+  }
+
+  getPendingThreadIdForWorkspace(bindingKey: unknown, workspaceRoot: unknown): string {
+    return getPendingThreadIdForWorkspaceFromState(this.refresh(), bindingKey, workspaceRoot, this.runtimeId);
+  }
+
+  async setPendingThreadIdForWorkspace(
+    bindingKey: unknown,
+    workspaceRoot: unknown,
+    threadId: unknown,
+  ): Promise<SessionBinding | null> {
+    return this.mutateState((state) => setPendingThreadIdForWorkspaceInState(
+      state,
+      bindingKey,
+      workspaceRoot,
+      threadId,
+      this.runtimeId,
+    ));
+  }
+
+  async clearPendingThreadIdForWorkspace(bindingKey: unknown, workspaceRoot: unknown): Promise<SessionBinding | null> {
+    return this.mutateState((state) => clearPendingThreadIdForWorkspaceInState(
+      state,
+      bindingKey,
+      workspaceRoot,
+      this.runtimeId,
+    ));
   }
 
   getApprovalCommandAllowlistForWorkspace(workspaceRoot: unknown): string[][] {

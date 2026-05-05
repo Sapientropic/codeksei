@@ -151,6 +151,18 @@ const TOPIC_HELP = {
       "  对 Hermes 这类宿主，优先用 host seed/claim/settle；hosted proactive 不再通过 reminder flag 或 operator glue 侧门收口。",
     ],
   }),
+  tool: () => ({
+    usage: [
+      buildTerminalActionExample("tool.mcp_bootstrap", { audience: "public", includeArgs: true }),
+    ],
+    bodyLabel: "补充：",
+    body: [
+      "  Codeksei Tools MCP 是 Claude Code Mode 的显式 opt-in 工具入口，不是运行 Claude Code Mode 的必需前置条件。",
+      "  默认路径是 --scope local，只打印 claude mcp add 命令和 JSON 配置；只有传 --install 才会修改 Claude 配置。",
+      "  --scope project --install 会写 workspace .mcp.json，必须额外传 --allow-project-config。",
+      "  claude mcp serve 是把 Claude Code 暴露给其他 MCP client，不是 Codeksei Tools MCP server。",
+    ],
+  }),
   timeline: () => ({
     usage: [
       `${buildExample("timeline.event", true)} / ${buildTerminalEntryUsage("timeline.write", "public")} <args> / ${buildTerminalEntryUsage("timeline.read", "public")} <args> / ${buildTerminalEntryUsage("timeline.categories", "public")} / ${buildTerminalEntryUsage("timeline.proposals", "public")} <args> / ${buildTerminalEntryUsage("timeline.build", "public")} / ${buildTerminalEntryUsage("timeline.serve", "public")} / ${buildTerminalEntryUsage("timeline.dev", "public")} / ${buildTerminalActionExample("timeline.screenshot", { audience: "public", includeArgs: true })}`,
@@ -303,6 +315,32 @@ const LEAF_HELP = {
     body: [
       "  从 command truth 渲染 provider-facing host asset。",
       "  当前第一条 renderer 固定是 Hermes companion skill；--validate 会在渲染内容与仓内模板不一致时返回 partial。",
+    ],
+    includeFlagBlock: true,
+  }),
+  "tool.mcp_bootstrap": () => ({
+    usage: [buildTerminalActionExample("tool.mcp_bootstrap", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  生成 Claude Code 可使用的 codeksei_tools MCP 配置。",
+      "  默认只预览，不执行 claude mcp add，也不会写 workspace .mcp.json。",
+      "  默认 --scope local；Claude Code 会把 local scope 写到 ~/.claude.json。",
+      "  如果显式使用 --scope project --install，必须同时传 --allow-project-config，避免无意修改项目级 .mcp.json。",
+    ],
+    examples: [
+      "  codeksei tool mcp-bootstrap --scope local",
+      "  codeksei tool mcp-bootstrap --scope local --toolset companion --install",
+      "  codeksei tool mcp-bootstrap --scope project --install --allow-project-config",
+    ],
+    includeFlagBlock: true,
+  }),
+  "tool.mcp_server": () => ({
+    usage: [buildTerminalActionExample("tool.mcp_server", { audience: "public", includeArgs: true })],
+    bodyLabel: "说明：",
+    body: [
+      "  这是 MCP stdio server 入口，只应由 Claude Code 或其他 MCP client 启动。",
+      "  stdout 只写 MCP JSON-RPC 协议；诊断信息只能写 stderr。",
+      "  普通安装和查看配置请使用 tool mcp-bootstrap。",
     ],
     includeFlagBlock: true,
   }),

@@ -196,16 +196,26 @@ test("reply handler inspects updates and resets delivery config", async () => {
     name: "reply",
     args: "merge 140",
   });
+  await harness.handlers.reply(buildNormalizedCommandMessage("/reply page 900"), {
+    name: "reply",
+    args: "page 900",
+  });
+  await harness.handlers.reply(buildNormalizedCommandMessage("/reply page off"), {
+    name: "reply",
+    args: "page off",
+  });
   await harness.handlers.reply(buildNormalizedCommandMessage("/reply reset"), {
     name: "reply",
     args: "reset",
   });
 
-  assert.equal(harness.textCalls.length, 4);
+  assert.equal(harness.textCalls.length, 6);
   assert.match(harness.textCalls[0]?.text || "", /replyMode: stream \[default\]/u);
   assert.match(harness.textCalls[1]?.text || "", /replyMode: settled \[stored\]/u);
   assert.match(harness.textCalls[2]?.text || "", /merge: 140 chars \[stored\]/u);
-  assert.match(harness.textCalls[3]?.text || "", /replyMode: stream \[default\]/u);
+  assert.match(harness.textCalls[3]?.text || "", /page: auto 900 chars \[stored\]/u);
+  assert.match(harness.textCalls[4]?.text || "", /page: off 900 chars \[stored\]/u);
+  assert.match(harness.textCalls[5]?.text || "", /replyMode: stream \[default\]/u);
   assert.deepEqual(harness.setReplyModeCalls, ["settled", "stream"]);
 });
 
@@ -223,6 +233,13 @@ test("reply handler rejects invalid mode and merge values", async () => {
     args: "merge 9999",
   });
   assert.match(mergeHarness.textCalls[0]?.text || "", /\/reply merge <1-3800>/u);
+
+  const pageHarness = createControlCommandHarness();
+  await pageHarness.handlers.reply(buildNormalizedCommandMessage("/reply page 300"), {
+    name: "reply",
+    args: "page 300",
+  });
+  assert.match(pageHarness.textCalls[0]?.text || "", /\/reply page auto\|off\|<600-2000>\|reset/u);
 });
 
 test("help handler uses the shared weixin help text", async () => {

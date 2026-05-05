@@ -164,7 +164,7 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
   capabilitiesStatus: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,
-      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "", description: "显式 provider 视角：codex|hermes|generic-shell" },
+      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "", description: "显式 provider 视角：codex|claudecode|hermes|generic-shell" },
       { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "显式 sender id，用于判断 target-scoped 能力" },
       { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "显式 workspace 路径，用于判断 target-scoped 能力" },
     ],
@@ -324,7 +324,7 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
   hostManifest: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,
-      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "", description: "显式 provider 视角：codex|hermes|generic-shell" },
+      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "", description: "显式 provider 视角：codex|claudecode|hermes|generic-shell" },
       { name: "config", keys: ["--config"], type: "string", defaultValue: "", description: "显式 canonical config 文件路径" },
     ],
   }),
@@ -333,9 +333,9 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       COMMON_HELP_FLAG,
       COMMON_DRY_RUN_FLAG,
       COMMON_IDEMPOTENCY_FLAG,
-      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "hermes", description: "目标 recipe provider，如 codex|hermes；generic-shell 需显式指定" },
+      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "hermes", description: "目标 recipe provider，如 codex|claudecode|hermes；generic-shell 需显式指定" },
       { name: "config", keys: ["--config"], type: "string", defaultValue: "", description: "显式 canonical config 文件路径" },
-      { name: "modeClass", keys: ["--mode-class"], type: "string", defaultValue: "", description: "codex-managed|hosted-proactive|hosted-skill-only|cli-only（兼容 legacy: bridge-full）" },
+      { name: "modeClass", keys: ["--mode-class"], type: "string", defaultValue: "", description: "codex-managed|claudecode-managed|hosted-proactive|hosted-skill-only|cli-only（兼容 legacy: bridge-full）" },
       { name: "workspace", keys: ["--workspace"], type: "string", defaultValue: "", description: "canonical config 里的 workspaceRoot" },
       { name: "stateDir", keys: ["--state-dir"], type: "string", defaultValue: "", description: "canonical config 里的 stateDir" },
       { name: "user", keys: ["--user"], type: "string", defaultValue: "", description: "canonical config 里的 user.id" },
@@ -347,14 +347,14 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
   hostDoctor: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,
-      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "hermes", description: "显式 provider，如 hermes；generic-shell 需显式指定" },
+      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "hermes", description: "显式 provider，如 claudecode|hermes；generic-shell 需显式指定" },
       { name: "config", keys: ["--config"], type: "string", defaultValue: "", description: "显式 canonical config 文件路径" },
     ],
   }),
   hostSmoke: createCommandArgSchema({
     flags: [
       COMMON_HELP_FLAG,
-      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "hermes", description: "显式 provider，如 hermes" },
+      { name: "provider", keys: ["--provider"], type: "string", defaultValue: "hermes", description: "显式 provider，如 claudecode|hermes" },
       { name: "config", keys: ["--config"], type: "string", defaultValue: "", description: "显式 canonical config 文件路径" },
     ],
   }),
@@ -421,6 +421,29 @@ export const COMMAND_ARG_SCHEMAS: Readonly<Record<string, CommandArgSchema>> = O
       { name: "provider", keys: ["--provider"], type: "string", defaultValue: "hermes", description: "显式 provider，如 hermes" },
       { name: "target", keys: ["--target"], type: "string", defaultValue: "skill", description: "当前只支持 skill" },
       { name: "validate", keys: ["--validate"], type: "boolean", defaultValue: false, description: "若与仓内模板不一致，返回 partial" },
+    ],
+  }),
+  toolMcpBootstrap: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "install", keys: ["--install"], type: "boolean", defaultValue: false, description: "实际执行 claude mcp add；默认只打印命令和 JSON 配置" },
+      { name: "allowProjectConfig", keys: ["--allow-project-config"], type: "boolean", defaultValue: false, description: "允许 --scope project --install 写 workspace .mcp.json" },
+      { name: "scope", keys: ["--scope"], type: "string", defaultValue: "local", description: "Claude MCP scope：local|user|project；默认 local" },
+      { name: "toolset", keys: ["--toolset"], type: "string", defaultValue: "read", description: "暴露给 Claude Code 的工具集：read|companion|delivery" },
+      { name: "workspaceRoot", keys: ["--workspace-root"], type: "string", defaultValue: "", description: "MCP server 绑定的 workspace root；默认当前目录" },
+      { name: "claudeCommand", keys: ["--claude-command"], type: "string", defaultValue: "", description: "Claude Code CLI 命令；默认 claude" },
+      { name: "nodeCommand", keys: ["--node-command"], type: "string", defaultValue: "", description: "Node.js 命令；默认当前 process.execPath" },
+    ],
+  }),
+  toolMcpServer: createCommandArgSchema({
+    flags: [
+      COMMON_HELP_FLAG,
+      { name: "runtimeId", keys: ["--runtime-id"], type: "string", defaultValue: "claudecode", description: "MCP server 绑定的 runtime id；当前用于 claudecode" },
+      { name: "workspaceRoot", keys: ["--workspace-root"], type: "string", defaultValue: "", description: "MCP tool 调用默认传给 Codeksei CLI 的 workspace root" },
+      { name: "toolset", keys: ["--toolset"], type: "string", defaultValue: "read", description: "暴露工具集：read|companion|delivery" },
+      { name: "maxResultChars", keys: ["--max-result-chars"], type: "string", defaultValue: "", description: "单页 MCP tool 返回文本最大字符数；默认 12000" },
+      { name: "cliEntrypoint", keys: ["--cli-entrypoint"], type: "string", defaultValue: "", description: "内部调试入口；默认当前包发布后的 CLI entrypoint" },
+      { name: "nodeCommand", keys: ["--node-command"], type: "string", defaultValue: "", description: "内部调试入口；默认当前 process.execPath" },
     ],
   }),
   projectRadar: createCommandArgSchema({

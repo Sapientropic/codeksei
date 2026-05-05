@@ -16,7 +16,10 @@ type ChildSignal = NodeJS.Signals | null;
 
 
 async function main() {
-  assertBridgeMode(process.env, "npm run shared:open");
+  const hostMode = assertBridgeMode(process.env, "npm run shared:open");
+  if (hostMode.runtimeProvider === "claudecode") {
+    throw new Error("shared:open is Codex desktop attach only; Claude Code Mode is available through the Codeksei bridge but has no Codex remote attach target.");
+  }
   const sharedContext = resolveSharedProcessContext();
   const workspaceRoot = readPrefixedEnv(process.env, "WORKSPACE_ROOT") || process.cwd();
   await ensureSharedAppServer();

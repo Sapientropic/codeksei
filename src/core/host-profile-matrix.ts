@@ -35,6 +35,7 @@ export interface RuntimeAdapterOperations {
   respondApproval: boolean;
   resumeThread: boolean;
   cancelTurn: boolean;
+  compactThread: boolean;
 }
 
 export type BridgeOnlyMessageKind = "bridge_ready" | "hosted_bridge_replaced" | "unsupported_profile";
@@ -51,12 +52,14 @@ export interface HostProfileMatrixEntry {
 
 const HOST_PROFILE_MATRIX = Object.freeze<Record<HostProfileId, HostProfileMatrixEntry>>({
   "codex-mode": Object.freeze(buildCompatibilityEntry("codex-mode")),
+  "claudecode-mode": Object.freeze(buildCompatibilityEntry("claudecode-mode")),
   "hosted-mode": Object.freeze(buildCompatibilityEntry("hosted-mode")),
   unsupported: Object.freeze(buildCompatibilityEntry("unsupported")),
 });
 
 const SUPPORTED_HOST_PROFILE_IDS = Object.freeze<readonly SupportedHostProfileId[]>([
   "codex-mode",
+  "claudecode-mode",
   "hosted-mode",
 ]);
 
@@ -76,7 +79,7 @@ export function getHostProfileMatrixEntry(profile: HostProfileId): HostProfileMa
 }
 
 export function isSupportedHostProfileId(value: unknown): value is SupportedHostProfileId {
-  return value === "codex-mode" || value === "hosted-mode";
+  return value === "codex-mode" || value === "claudecode-mode" || value === "hosted-mode";
 }
 
 export function listSupportedHostProfileIds(): SupportedHostProfileId[] {
@@ -86,12 +89,14 @@ export function listSupportedHostProfileIds(): SupportedHostProfileId[] {
 function buildCompatibilityEntry(profile: HostProfileId): HostProfileMatrixEntry {
   const attachment = profile === "codex-mode"
     ? resolveHostAttachment({ runtime: "codex", channelProvider: "codeksei", channel: "weixin" })
+    : profile === "claudecode-mode"
+      ? resolveHostAttachment({ runtime: "claudecode", channelProvider: "codeksei", channel: "weixin" })
     : profile === "hosted-mode"
       ? resolveHostAttachment({ runtime: "hermes", channelProvider: "hermes" })
       : resolveHostAttachment({ runtime: "openclaw-reserved" });
 
   return {
-    bridgeOnlyMessageKind: profile === "codex-mode"
+    bridgeOnlyMessageKind: profile === "codex-mode" || profile === "claudecode-mode"
       ? "bridge_ready"
       : profile === "hosted-mode"
         ? "hosted_bridge_replaced"
@@ -106,7 +111,7 @@ function buildCompatibilityEntry(profile: HostProfileId): HostProfileMatrixEntry
 }
 
 function resolveChannelOperations(profile: HostProfileId): ChannelAdapterOperations {
-  if (profile === "codex-mode") {
+  if (profile === "codex-mode" || profile === "claudecode-mode") {
     return {
       pollUpdates: true,
       login: true,
@@ -127,7 +132,7 @@ function resolveChannelOperations(profile: HostProfileId): ChannelAdapterOperati
 }
 
 function resolveRuntimeOperations(profile: HostProfileId): RuntimeAdapterOperations {
-  if (profile === "codex-mode") {
+  if (profile === "codex-mode" || profile === "claudecode-mode") {
     return {
       initialize: true,
       interactiveTurn: true,
@@ -135,6 +140,7 @@ function resolveRuntimeOperations(profile: HostProfileId): RuntimeAdapterOperati
       respondApproval: true,
       resumeThread: true,
       cancelTurn: true,
+      compactThread: profile === "claudecode-mode",
     };
   }
   return {
@@ -144,5 +150,6 @@ function resolveRuntimeOperations(profile: HostProfileId): RuntimeAdapterOperati
     respondApproval: false,
     resumeThread: false,
     cancelTurn: false,
+    compactThread: false,
   };
 }

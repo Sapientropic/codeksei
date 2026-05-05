@@ -16,6 +16,7 @@ test("config slices compose into the legacy-compatible app runtime surface", () 
       diaryDir: "E:/state/diary",
       timelineStateDir: "E:/state/timeline",
       logDir: "E:/state/logs",
+      pageArtifactsDir: "E:/state/page-artifacts",
       reminderQueueFile: "E:/state/reminder-queue.json",
       cliIdempotencyLedgerFile: "E:/state/cli-idempotency-ledger.json",
       syncBufferDir: "E:/state/sync-buffers",
@@ -53,6 +54,15 @@ test("config slices compose into the legacy-compatible app runtime surface", () 
       runtimeCommand: "codex",
       runtimeAccessMode: "workspace-write",
       codexAccessMode: "current",
+      claudeCommand: "claude",
+      claudeContextWindow: 0,
+      claudeDisableVerbose: false,
+      claudeExtraArgs: [],
+      claudeMcpConfigPaths: [],
+      claudeStrictMcpConfig: false,
+      claudeMaxOutputTokens: 0,
+      claudeModel: "",
+      claudePermissionMode: "default",
       hermesCommand: "hermes",
       hermesHome: "E:/hermes",
       hermesRepoRoot: "E:/hermes-agent",
@@ -141,6 +151,38 @@ test("parseEnvConfig keeps workspace schema refs and state-backed checkin files 
   assert.equal(config.proactiveObservationModel, "gemma-4-E2B-it");
   assert.equal(config.proactiveObservationMinConfidence, 0.55);
   assert.equal(config.checkinConfigFile.replace(/\\/g, "/"), "E:/state/checkin-config.json");
+  assert.equal(config.pageArtifactsDir.replace(/\\/g, "/"), "E:/state/page-artifacts");
   assert.equal(config.weixinDeliveryConfigFile.replace(/\\/g, "/"), "E:/state/weixin-delivery-config.json");
   assert.equal(config.systemMessageQueueFile.replace(/\\/g, "/"), "E:/state/system-message-queue.json");
+});
+
+test("parseEnvConfig resolves Claude Code runtime config without falling back to Codex defaults", () => {
+  const config = parseEnvConfig({
+    CODEKSEI_STATE_DIR: "E:/state",
+    CODEKSEI_WORKSPACE_ROOT: "E:/workspace/current",
+    CODEKSEI_RUNTIME: "claudecode",
+    CODEKSEI_RUNTIME_COMMAND: "runtime-default",
+    CODEKSEI_CLAUDE_COMMAND: "claude-beta",
+    CODEKSEI_CLAUDE_MODEL: "claude-sonnet-4-5",
+    CODEKSEI_CLAUDE_PERMISSION_MODE: "acceptEdits",
+    CODEKSEI_CLAUDE_DISABLE_VERBOSE: "1",
+    CODEKSEI_CLAUDE_EXTRA_ARGS: "--dangerously-skip-permissions --debug",
+    CODEKSEI_CLAUDE_MCP_CONFIG: "E:/mcp-one.json;E:/mcp-two.json",
+    CODEKSEI_CLAUDE_STRICT_MCP_CONFIG: "1",
+    CODEKSEI_CLAUDE_CONTEXT_WINDOW: "200000",
+    CLAUDE_CODE_MAX_OUTPUT_TOKENS: "8192",
+  });
+
+  assert.equal(config.runtime, "claudecode");
+  assert.equal(config.channelProvider, "codeksei");
+  assert.equal(config.runtimeCommand, "runtime-default");
+  assert.equal(config.claudeCommand, "claude-beta");
+  assert.equal(config.claudeModel, "claude-sonnet-4-5");
+  assert.equal(config.claudePermissionMode, "acceptEdits");
+  assert.equal(config.claudeDisableVerbose, true);
+  assert.deepEqual(config.claudeExtraArgs, ["--dangerously-skip-permissions", "--debug"]);
+  assert.deepEqual(config.claudeMcpConfigPaths, ["E:/mcp-one.json", "E:/mcp-two.json"]);
+  assert.equal(config.claudeStrictMcpConfig, true);
+  assert.equal(config.claudeContextWindow, 200000);
+  assert.equal(config.claudeMaxOutputTokens, 8192);
 });

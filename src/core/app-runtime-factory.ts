@@ -1,4 +1,5 @@
 import { createWeixinChannelAdapter } from "../adapters/channel/weixin";
+import { createClaudeCodeRuntimeAdapter } from "../adapters/runtime/claudecode";
 import { createCodexRuntimeAdapter } from "../adapters/runtime/codex";
 import { createTimelineIntegration } from "../integrations/timeline";
 import { BackstageTaskLifecycle } from "../runtime/backstage-task-lifecycle";
@@ -6,6 +7,7 @@ import { StreamDelivery } from "../runtime/stream-delivery";
 import { ThreadStateStore } from "../runtime/thread-state-store";
 import { RuntimeTurnLifecycle } from "../runtime/runtime-turn-lifecycle";
 import { RuntimeWatchdogLifecycle } from "../runtime/runtime-watchdog-lifecycle";
+import { PageArtifactStore } from "../state/page-artifacts";
 import { ReminderQueueStore } from "../state/reminder-queue-store";
 import { SystemMessageQueueStore } from "../state/system-message-queue-store";
 import { resolveWeixinDeliveryConfig } from "../state/weixin-delivery-config";
@@ -67,6 +69,7 @@ interface ReplyFailureHandlerRef {
 
 interface AppInfrastructure {
   channelAdapter: AppServices["channelAdapter"];
+  pageArtifactStore: PageArtifactStore;
   reminderQueue: AppServices["reminderQueue"];
   replyFailureHandlerRef: ReplyFailureHandlerRef;
   runtimeAdapter: AppServices["runtimeAdapter"];
@@ -83,12 +86,14 @@ function createAppInfrastructure({
   config: AppFactoryConfig;
 }): AppInfrastructure {
   const hostMode = resolveHostMode(config);
-  const channelAdapter = hostMode.mode === "codex"
+  const channelAdapter = hostMode.mode === "codex" || hostMode.mode === "claudecode"
     ? createWeixinChannelAdapter(config)
     : createHostedChannelAdapter(config);
   const runtimeAdapter = hostMode.mode === "codex"
     ? createCodexRuntimeAdapter(config)
-    : createHostedRuntimeAdapter(config);
+    : hostMode.mode === "claudecode"
+      ? createClaudeCodeRuntimeAdapter(config)
+      : createHostedRuntimeAdapter(config);
   const sessionWriter = runtimeAdapter.getSessionWriter();
   const timelineIntegration = createTimelineIntegration(config);
   const threadStateStore = new ThreadStateStore();
@@ -97,6 +102,7 @@ function createAppInfrastructure({
     deadLetterFilePath: config.systemMessageDeadLetterFile,
   });
   const reminderQueue = new ReminderQueueStore({ filePath: config.reminderQueueFile });
+  const pageArtifactStore = new PageArtifactStore({ rootDir: config.pageArtifactsDir });
   const replyFailureHandlerRef: ReplyFailureHandlerRef = {
     current: async () => undefined,
   };
@@ -106,7 +112,10 @@ function createAppInfrastructure({
   });
   const streamDelivery = new StreamDelivery({
     channelAdapter,
+    pageArtifactStore,
+    runtimeId: config.runtime,
     sessionStore: runtimeAdapter.getSessionStore(),
+    weixinDeliveryConfigFile: config.weixinDeliveryConfigFile,
     weixinReplyMode: weixinDeliveryConfig.replyMode,
     deliveryTraceEnabled: Boolean(config.weixinDeliveryTrace),
     onDeliveryFailure: (payload: DeliveryFailurePayload) => replyFailureHandlerRef.current(payload),
@@ -114,6 +123,7 @@ function createAppInfrastructure({
 
   return {
     channelAdapter,
+    pageArtifactStore,
     reminderQueue,
     replyFailureHandlerRef,
     runtimeAdapter,
@@ -137,6 +147,7 @@ function createRuntimeWorkflowServices({
 > {
   const {
     channelAdapter,
+    pageArtifactStore,
     reminderQueue,
     replyFailureHandlerRef,
     runtimeAdapter,
@@ -184,6 +195,7 @@ function createRuntimeWorkflowServices({
     workspaceHandlers: createWorkspaceCommandHandlers({
       channelAdapter,
       config,
+      pageArtifactStore,
       resolveWorkspaceRoot,
       runtimeAdapter,
       sessionWriter,

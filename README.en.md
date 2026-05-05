@@ -28,7 +28,7 @@
 
 - **What it is**: a local-first, `daemon-first / host-attachable` companion engine; for humans it is a companion assistant, and for hosts it is an attachable domain layer
 - **CLI contract**: `codeksei help`, `codeksei schema`, and `codeksei host manifest` are the public discovery surface; non-TTY runs default to JSON, `stdout` carries results, and `stderr` carries diagnostics
-- **Recommended start**: complete shared `SETUP` first, then choose `Codex Mode` or `Hosted Mode`
+- **Recommended start**: complete shared `SETUP` first, then choose `Codex Mode`, `Claude Code Mode`, or `Hosted Mode`
 
 <a id="agent-quickstart"></a>
 
@@ -38,7 +38,7 @@ If you are an external agent, do not infer internal seams from long README prose
 
 1. Read `CODEKSEI_HOSTKIT.json` in the repo root first
 2. Treat the README as human-facing guidance, and treat `HOSTKIT + codeksei host manifest/bootstrap/doctor/smoke` as the machine entrypoint
-3. Prefer `Hosted Mode` by default
+3. Pick the host path explicitly: `--provider codex` for Codex Mode, `--provider claudecode` for Claude Code Mode, or `--provider hermes` for Hosted Mode
 4. Treat `host bootstrap` as “Codeksei attachment/bootstrap completed”, not as proof that Hermes gateway or live Weixin bring-up is already complete
 
 - `CODEKSEI_HOSTKIT.json` now also carries minimal entrypoint/workflow hints, enough for a new host to discover the default onboarding / companion-memory / context-briefing route; `codeksei host manifest` remains the richer dynamic source of truth
@@ -47,6 +47,12 @@ Recommended order:
 
 ```bash
 npx -y codeksei@latest host manifest
+npx -y codeksei@latest host bootstrap --provider codex
+npx -y codeksei@latest host doctor --provider codex
+npx -y codeksei@latest host smoke --provider codex
+npx -y codeksei@latest host bootstrap --provider claudecode
+npx -y codeksei@latest host doctor --provider claudecode
+npx -y codeksei@latest host smoke --provider claudecode
 npx -y codeksei@latest host bootstrap --provider hermes
 npx -y codeksei@latest host doctor --provider hermes
 npx -y codeksei@latest host smoke --provider hermes
@@ -61,6 +67,8 @@ Codeksei is now positioned as a **daemon-first / host-attachable / companion eng
 
 - `Codex Mode`
   Current default path: `Codeksei first-party Weixin adapter + Codex runtime`
+- `Claude Code Mode`
+  `Codeksei first-party Weixin adapter + Claude Code CLI runtime`; Codeksei owns bridge lifecycle and manages Claude Code child processes per workspace
 - `Hosted Mode`
   Hermes owns the agent loop and host-side messaging surface; Codeksei exposes timeline, diary, reminder, review, note, and project radar through its CLI / skill surface
 - `Proactive context layer`
@@ -117,7 +125,7 @@ If you are using the `npx` path and do not have a global `codeksei` binary on `P
 ### SETUP boundaries
 
 - A successful setup only means the CLI, public schema, and host attachment contract / hostkit are discoverable
-- It does not mean `Codex Mode` has already logged in
+- It does not mean `Codex Mode` or `Claude Code Mode` has already logged in
 - It also does not mean `Hosted Mode` is already live-attached to Hermes gateway / host bridge
 - It definitely does not mean reminders, check-ins, repo-local shims, or hosted send-back are all ready yet
 
@@ -150,6 +158,33 @@ Common follow-up commands:
 npm run shared:open
 npm run shared:status
 ```
+
+### Claude Code Mode
+
+Use this when you want Codeksei's WeChat bridge, thread binding, approvals, `/new`, `/switch`, `/stop`, and `/compact`, but want turns to run through Claude Code CLI.
+
+```bash
+codeksei host manifest --provider claudecode
+codeksei host bootstrap --provider claudecode --workspace /absolute/path/to/workspace
+codeksei host doctor --provider claudecode
+CODEKSEI_RUNTIME=claudecode npm run shared:start
+```
+
+Notes:
+
+- `CODEKSEI_CLAUDE_COMMAND` falls back to `CODEKSEI_RUNTIME_COMMAND`, then to `claude`
+- `shared:start` starts only the Codeksei bridge; it does not start `codex app-server`
+- `shared:open` is only for Codex desktop attach and is explicitly unavailable in Claude Code Mode
+- Codeksei Tools MCP is explicit opt-in; start with `codeksei tool mcp-bootstrap --scope local`
+
+When Claude Code should call Codeksei context, timeline, diary, note, or reminder tools, install MCP explicitly:
+
+```bash
+codeksei tool mcp-bootstrap --scope local --workspace-root /absolute/path/to/workspace
+codeksei tool mcp-bootstrap --scope local --toolset companion --install --workspace-root /absolute/path/to/workspace
+```
+
+`--scope project --install` writes project `.mcp.json` and requires `--allow-project-config`. `claude mcp serve` exposes Claude Code to other MCP clients; it is not the Codeksei Tools MCP server.
 
 ### Hosted Mode
 
@@ -261,8 +296,18 @@ Earlier values win. Later `.env` files only fill missing keys and never overwrit
 
 ```dotenv
 CODEKSEI_ACCOUNT_ID=
+CODEKSEI_RUNTIME=codex
 CODEKSEI_RUNTIME_ENDPOINT=ws://127.0.0.1:8765
 CODEKSEI_RUNTIME_COMMAND=codex
+CODEKSEI_CLAUDE_COMMAND=claude
+CODEKSEI_CLAUDE_MODEL=
+CODEKSEI_CLAUDE_PERMISSION_MODE=
+CODEKSEI_CLAUDE_DISABLE_VERBOSE=
+CODEKSEI_CLAUDE_EXTRA_ARGS=
+CODEKSEI_CLAUDE_CONTEXT_WINDOW=
+CODEKSEI_CLAUDE_MAX_OUTPUT_TOKENS=
+CODEKSEI_CLAUDE_MCP_CONFIG=
+CODEKSEI_CLAUDE_STRICT_MCP_CONFIG=0
 CODEKSEI_HERMES_COMMAND=hermes
 CODEKSEI_REVIEW_SEMANTIC_HOST=auto
 CODEKSEI_COMPANION_SEMANTIC_HOST=
@@ -307,12 +352,14 @@ Notes:
 
 - `CODEKSEI_WEIXIN_REPLY_MODE=stream` now behaves more like a hybrid stream: it prefers natural sentence boundaries or completed blocks so unfinished final sentences are not split into multiple WeChat bubbles
 - `CODEKSEI_WEIXIN_REPLY_MODE=settled` still means “wait until the whole turn settles”: only the latest visible final reply is sent
-- `CODEKSEI_WEIXIN_MIN_CHUNK_CHARS` controls how aggressively short WeChat reply fragments are merged. During a running bridge session, `/reply mode ...` and `/reply merge ...` persist overrides, and `/reply reset` returns to env / default
+- `CODEKSEI_WEIXIN_MIN_CHUNK_CHARS` controls how aggressively short WeChat reply fragments are merged. `CODEKSEI_WEIXIN_PAGE_MODE=auto|off` and `CODEKSEI_WEIXIN_PAGE_CHARS=600-2000` control long-reply pagination. During a running bridge session, `/reply mode ...`, `/reply merge ...`, and `/reply page ...` persist overrides, and `/reply reset` returns to env / default
 - The Weixin bridge now exposes only one official `v2` adapter; the issue #4 media gap is handled as an internal legacy media fallback instead of a second public adapter
 - `CODEKSEI_WEIXIN_PROTOCOL_CLIENT_VERSION` now defaults to Tencent's official `@tencent-weixin/openclaw-weixin@2.1.8`; only override it when you have source-backed upstream evidence to do so
 - International / overseas WeChat login can still be gated by Tencent's regional rollout; Tencent's public docs say Hong Kong is supported while other regions are still rolling out
-- `CODEKSEI_RUNTIME` / `CODEKSEI_CHANNEL_PROVIDER` decide whether the current runtime is `Codex Mode` or `Hosted Mode`
+- `CODEKSEI_RUNTIME` / `CODEKSEI_CHANNEL_PROVIDER` decide whether the current runtime is `Codex Mode`, `Claude Code Mode`, or `Hosted Mode`
 - `CODEKSEI_RUNTIME_ENDPOINT` / `CODEKSEI_RUNTIME_COMMAND` are the new host-neutral runtime ingress; legacy `CODEKSEI_CODEX_*` variables still remain for compatibility
+- `CODEKSEI_CLAUDE_*` only applies when `CODEKSEI_RUNTIME=claudecode`; `CODEKSEI_CLAUDE_MAX_OUTPUT_TOKENS` also honors the official `CLAUDE_CODE_MAX_OUTPUT_TOKENS`
+- `CODEKSEI_CLAUDE_MCP_CONFIG` accepts one or more Claude MCP config paths separated by comma or semicolon; `--strict-mcp-config` is only passed when `CODEKSEI_CLAUDE_STRICT_MCP_CONFIG=1`
 - `CODEKSEI_REVIEW_SEMANTIC_HOST=auto|codex|hermes|deterministic` lets you pin the semantic review host explicitly; default is `auto`
 - `CODEKSEI_COMPANION_SEMANTIC_HOST=auto|codex|hermes|deterministic` lets ongoing companion-memory extraction pick a dedicated semantic host; when left blank it follows the default host decision
 - `CODEKSEI_COMPANION_SEMANTIC_MODEL` can pin a cheaper model just for ongoing companion-memory extraction
@@ -407,9 +454,17 @@ WeChat:
 /reply
 /reply mode stream|settled
 /reply merge <chars>
+/reply page auto|off|<chars>
 /reply reset
+/more
+/prev
+/page <n>
+/full
+/done
 /help
 ```
+
+Long replies do not flood WeChat by default: Codeksei sends page 1 first, then `/more`, `/prev`, and `/page <n>` continue paging. `/full` prefers a temporary `.txt` attachment.
 
 Terminal:
 

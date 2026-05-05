@@ -12,7 +12,7 @@ export const HOST_CORE_INVARIANT = "codeksei-core-owned" as const;
 export const HOST_SCHEDULE_TRUTH_OWNER = "codeksei" as const;
 
 export interface HostIdentity {
-  profile: "codex-mode" | "hosted-mode" | "unsupported";
+  profile: "codex-mode" | "claudecode-mode" | "hosted-mode" | "unsupported";
   legacyProfileIds: string[];
   mode: CodekseiExecutionMode;
   runtimeProvider: CodekseiRuntimeProvider;
@@ -53,6 +53,7 @@ export interface HostEntrypointManifest {
   pulseFeedback: string[];
   pulseGenerate: string[];
   pulseToday: string[];
+  toolMcpBootstrap: string[];
 }
 
 export interface HostWorkflowStep {
@@ -86,7 +87,8 @@ export interface HostWorkflowStep {
     | "reminderWrite"
     | "pulseFeedback"
     | "pulseGenerate"
-    | "pulseToday";
+    | "pulseToday"
+    | "toolMcpBootstrap";
   reason: string;
 }
 
@@ -104,6 +106,7 @@ export interface HostWorkflowHint {
     | "project_continuity_write"
     | "context_handoff_refresh"
     | "daily_pulse_review"
+    | "claudecode_mcp_tools_bootstrap"
     | "whereabouts_ingest_and_context"
     | "user_correction_persistence";
   trigger: string;

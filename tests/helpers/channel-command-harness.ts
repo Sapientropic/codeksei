@@ -53,16 +53,21 @@ interface ControlHarness {
 
 interface WorkspaceHarnessOptions {
   currentModel?: string;
+  currentEffort?: string;
   currentThreadId?: string;
   currentThreadState?: ChannelCommandThreadState | null;
   currentWorkspaceRoot?: string;
+  runtimeProvider?: string;
   knownThreadBindings?: Record<string, ThreadBindingRef>;
+  pageArtifactStore?: import("../../src/state/page-artifacts").PageArtifactStore;
   usage?: ChannelCommandUsageSnapshot | null;
 }
 
 interface WorkspaceHarness {
   cancelCalls: Array<{ threadId: string; turnId: string }>;
   clearThreadCalls: Array<{ key: string; workspaceRoot: string }>;
+  compactCalls: Array<{ threadId: string; workspaceRoot: string }>;
+  fileCalls: Array<{ contextToken?: string; filePath: string; userId: string }>;
   handlers: ReturnType<typeof createWorkspaceCommandHandlers>;
   queueReplyCalls: Array<{
     target: { contextToken: string; provider: string; userId: string };
@@ -76,6 +81,8 @@ interface WorkspaceHarness {
     workspaceRoot: string;
   }>;
   resumeCalls: Array<{ threadId: string; workspaceRoot?: string }>;
+  startFreshThreadDraftCalls: Array<{ workspaceRoot: string }>;
+  setPendingThreadCalls: Array<{ key: string; threadId: string; workspaceRoot: string }>;
   setThreadCalls: Array<{ key: string; threadId: string; workspaceRoot: string }>;
   setWorkspaceCalls: Array<{ key: string; workspaceRoot: string }>;
   textCalls: TextCall[];
@@ -248,8 +255,11 @@ function createWorkspaceCommandHarness({
   currentWorkspaceRoot = DEFAULT_WORKSPACE_ROOT,
   currentThreadId = "thread-current",
   currentThreadState = null,
+  currentEffort = "medium",
   currentModel = "gpt-5",
+  runtimeProvider = "test",
   knownThreadBindings = {},
+  pageArtifactStore = undefined,
   usage = null,
 }: WorkspaceHarnessOptions = {}): WorkspaceHarness {
   const textCalls: TextCall[] = [];
@@ -258,7 +268,11 @@ function createWorkspaceCommandHarness({
   const refreshCalls: WorkspaceHarness["refreshCalls"] = [];
   const resumeCalls: WorkspaceHarness["resumeCalls"] = [];
   const cancelCalls: WorkspaceHarness["cancelCalls"] = [];
+  const compactCalls: WorkspaceHarness["compactCalls"] = [];
+  const fileCalls: WorkspaceHarness["fileCalls"] = [];
   const clearThreadCalls: WorkspaceHarness["clearThreadCalls"] = [];
+  const startFreshThreadDraftCalls: WorkspaceHarness["startFreshThreadDraftCalls"] = [];
+  const setPendingThreadCalls: WorkspaceHarness["setPendingThreadCalls"] = [];
   const setThreadCalls: WorkspaceHarness["setThreadCalls"] = [];
   const setWorkspaceCalls: WorkspaceHarness["setWorkspaceCalls"] = [];
 
@@ -280,7 +294,7 @@ function createWorkspaceCommandHarness({
       return currentWorkspaceRoot;
     },
     getRuntimeParamsForWorkspace() {
-      return { model: currentModel, effort: "medium" };
+      return { model: currentModel, effort: currentEffort };
     },
     getPendingApprovalForThread() {
       return null;
@@ -300,6 +314,9 @@ function createWorkspaceCommandHarness({
     async setActiveWorkspaceRoot(key: string, workspaceRoot: string) {
       setWorkspaceCalls.push({ key, workspaceRoot });
     },
+    async setPendingThreadIdForWorkspace(key: string, workspaceRoot: string, threadId: string) {
+      setPendingThreadCalls.push({ key, workspaceRoot, threadId });
+    },
     async setThreadIdForWorkspace(key: string, workspaceRoot: string, threadId: string) {
       setThreadCalls.push({ key, workspaceRoot, threadId });
     },
@@ -312,11 +329,33 @@ function createWorkspaceCommandHarness({
     async cancelTurn(payload: { threadId: string; turnId: string }) {
       cancelCalls.push(payload);
     },
+    describe() {
+      return {
+        id: "test-runtime",
+        kind: "runtime" as const,
+        provider: runtimeProvider,
+        operations: {
+          cancelTurn: true,
+          compactThread: true,
+          initialize: true,
+          interactiveTurn: true,
+          refreshThreadInstructions: true,
+          respondApproval: true,
+          resumeThread: true,
+        },
+      };
+    },
+    async compactThread(payload: { threadId: string; workspaceRoot: string }) {
+      compactCalls.push(payload);
+    },
     async refreshThreadInstructions(payload: WorkspaceHarness["refreshCalls"][number]) {
       refreshCalls.push(payload);
     },
     async resumeThread(payload: { threadId: string; workspaceRoot?: string }) {
       resumeCalls.push(payload);
+    },
+    async startFreshThreadDraft(payload: { workspaceRoot: string }) {
+      startFreshThreadDraftCalls.push(payload);
     },
   };
 
@@ -333,6 +372,10 @@ function createWorkspaceCommandHarness({
     async sendText(payload: TextCall) {
       textCalls.push(payload);
     },
+    async sendFile(payload: { contextToken?: string; filePath: string; userId: string }) {
+      fileCalls.push(payload);
+      return { status: "ok" };
+    },
   };
 
   const streamDelivery = {
@@ -340,27 +383,36 @@ function createWorkspaceCommandHarness({
       queueReplyCalls.push({ threadId, target });
     },
   };
+  type WorkspaceCommandHandlerOptions = Parameters<typeof createWorkspaceCommandHandlers>[0];
+  const workspaceCommandHandlerOptions: WorkspaceCommandHandlerOptions = {
+    channelAdapter,
+    config,
+    resolveWorkspaceRoot() {
+      return currentWorkspaceRoot;
+    },
+    runtimeAdapter,
+    scheduleRuntimeEventWatchdog(payload) {
+      watchdogCalls.push(payload);
+    },
+    sessionWriter,
+    streamDelivery,
+    threadStateStore,
+  };
+  if (pageArtifactStore) {
+    workspaceCommandHandlerOptions.pageArtifactStore = pageArtifactStore;
+  }
 
   return {
     cancelCalls,
+    compactCalls,
     clearThreadCalls,
-    handlers: createWorkspaceCommandHandlers({
-      channelAdapter,
-      config,
-      resolveWorkspaceRoot() {
-        return currentWorkspaceRoot;
-      },
-      runtimeAdapter,
-      scheduleRuntimeEventWatchdog(payload) {
-        watchdogCalls.push(payload);
-      },
-      sessionWriter,
-      streamDelivery,
-      threadStateStore,
-    }),
+    fileCalls,
+    handlers: createWorkspaceCommandHandlers(workspaceCommandHandlerOptions),
     queueReplyCalls,
     refreshCalls,
     resumeCalls,
+    startFreshThreadDraftCalls,
+    setPendingThreadCalls,
     setThreadCalls,
     setWorkspaceCalls,
     textCalls,

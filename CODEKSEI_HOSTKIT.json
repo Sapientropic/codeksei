@@ -277,6 +277,13 @@
       "today",
       "--format",
       "json"
+    ],
+    "toolMcpBootstrap": [
+      "codeksei",
+      "tool",
+      "mcp-bootstrap",
+      "--format",
+      "json"
     ]
   },
   "config": {
@@ -314,6 +321,22 @@
       "supportsToolSurface": true
     },
     {
+      "id": "claudecode",
+      "kind": "generic",
+      "runtimeProviders": [
+        "claudecode"
+      ],
+      "channelProviders": [
+        "codeksei"
+      ],
+      "channelKinds": [
+        "weixin"
+      ],
+      "defaultDeliveryRecipe": "codeksei-weixin-bridge",
+      "supportsDelegatedCheckin": true,
+      "supportsToolSurface": false
+    },
+    {
       "id": "hermes",
       "kind": "first_party",
       "runtimeProviders": [
@@ -339,6 +362,7 @@
       "kind": "generic",
       "runtimeProviders": [
         "codex",
+        "claudecode",
         "hermes"
       ],
       "channelProviders": [
@@ -380,6 +404,16 @@
         {
           "commandRef": "render",
           "reason": "Read the generated host skill if the runtime needs a human-readable decision tree instead of raw CLI discovery."
+        }
+      ]
+    },
+    {
+      "id": "claudecode_mcp_tools_bootstrap",
+      "trigger": "Claude Code Mode is enabled and the operator explicitly wants Claude Code to call Codeksei timeline, context, diary, note, reminder, or delivery tools through MCP.",
+      "steps": [
+        {
+          "commandRef": "toolMcpBootstrap",
+          "reason": "Preview the opt-in Codeksei Tools MCP configuration first; only pass --install when the operator has chosen a Claude MCP scope and toolset."
         }
       ]
     },

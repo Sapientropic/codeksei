@@ -10,9 +10,13 @@ export interface RawSessionBinding extends PlainObject {
   activeWorkspaceRoot?: unknown;
   updatedAt?: unknown;
   threadIdByWorkspaceRoot?: unknown;
+  threadIdByWorkspaceRootByRuntime?: unknown;
+  pendingThreadIdByWorkspaceRootByRuntime?: unknown;
   runtimeParamsByWorkspaceRoot?: unknown;
+  runtimeParamsByWorkspaceRootByRuntime?: unknown;
   codexParamsByWorkspaceRoot?: unknown;
   workspaceBootstrapThreadIdByWorkspaceRoot?: unknown;
+  workspaceBootstrapThreadIdByWorkspaceRootByRuntime?: unknown;
 }
 
 export interface RawPendingApprovalRecord extends PlainObject {
@@ -52,8 +56,12 @@ export interface SessionBinding {
   activeWorkspaceRoot: string;
   updatedAt: string;
   threadIdByWorkspaceRoot: Record<string, string>;
+  threadIdByWorkspaceRootByRuntime: Record<string, Record<string, string>>;
+  pendingThreadIdByWorkspaceRootByRuntime: Record<string, Record<string, string>>;
   runtimeParamsByWorkspaceRoot: Record<string, { model: string; effort: string }>;
+  runtimeParamsByWorkspaceRootByRuntime: Record<string, Record<string, { model: string; effort: string }>>;
   workspaceBootstrapThreadIdByWorkspaceRoot: Record<string, string>;
+  workspaceBootstrapThreadIdByWorkspaceRootByRuntime: Record<string, Record<string, string>>;
   [key: string]: unknown;
 }
 
@@ -162,6 +170,13 @@ export const sessionStoreStateSchema = z.unknown().transform((
 
 export function normalizeSessionBinding(binding: unknown): SessionBinding {
   const source = asRawSessionBinding(binding);
+  const threadIdByWorkspaceRoot = normalizeStringMap(source.threadIdByWorkspaceRoot);
+  const runtimeParamsByWorkspaceRoot = normalizeRuntimeParamsMap(
+    source.runtimeParamsByWorkspaceRoot ?? source.codexParamsByWorkspaceRoot,
+  );
+  const workspaceBootstrapThreadIdByWorkspaceRoot = normalizeStringMap(
+    source.workspaceBootstrapThreadIdByWorkspaceRoot,
+  );
   return {
     ...source,
     workspaceId: normalizeText(source.workspaceId),
@@ -169,12 +184,23 @@ export function normalizeSessionBinding(binding: unknown): SessionBinding {
     senderId: normalizeText(source.senderId),
     activeWorkspaceRoot: normalizeText(source.activeWorkspaceRoot),
     updatedAt: normalizeIsoTimestamp(source.updatedAt),
-    threadIdByWorkspaceRoot: normalizeStringMap(source.threadIdByWorkspaceRoot),
-    runtimeParamsByWorkspaceRoot: normalizeRuntimeParamsMap(
-      source.runtimeParamsByWorkspaceRoot ?? source.codexParamsByWorkspaceRoot,
+    threadIdByWorkspaceRoot,
+    threadIdByWorkspaceRootByRuntime: normalizeStringMapByRuntime(
+      source.threadIdByWorkspaceRootByRuntime,
+      threadIdByWorkspaceRoot,
     ),
-    workspaceBootstrapThreadIdByWorkspaceRoot: normalizeStringMap(
-      source.workspaceBootstrapThreadIdByWorkspaceRoot,
+    pendingThreadIdByWorkspaceRootByRuntime: normalizeStringMapByRuntime(
+      source.pendingThreadIdByWorkspaceRootByRuntime,
+    ),
+    runtimeParamsByWorkspaceRoot,
+    runtimeParamsByWorkspaceRootByRuntime: normalizeRuntimeParamsMapByRuntime(
+      source.runtimeParamsByWorkspaceRootByRuntime,
+      runtimeParamsByWorkspaceRoot,
+    ),
+    workspaceBootstrapThreadIdByWorkspaceRoot,
+    workspaceBootstrapThreadIdByWorkspaceRootByRuntime: normalizeStringMapByRuntime(
+      source.workspaceBootstrapThreadIdByWorkspaceRootByRuntime,
+      workspaceBootstrapThreadIdByWorkspaceRoot,
     ),
   };
 }
@@ -207,6 +233,24 @@ function normalizeRuntimeParamsMap(value: unknown): Record<string, { model: stri
   return result;
 }
 
+function normalizeRuntimeParamsMapByRuntime(
+  value: unknown,
+  codexFallback: Record<string, { model: string; effort: string }> = {},
+): Record<string, Record<string, { model: string; effort: string }>> {
+  const result: Record<string, Record<string, { model: string; effort: string }>> = {};
+  for (const [runtimeId, paramsByWorkspaceRoot] of objectEntries(value)) {
+    const normalizedRuntimeId = normalizeText(runtimeId).toLowerCase();
+    if (!normalizedRuntimeId) {
+      continue;
+    }
+    result[normalizedRuntimeId] = normalizeRuntimeParamsMap(paramsByWorkspaceRoot);
+  }
+  if (Object.keys(codexFallback).length && !Object.keys(result.codex || {}).length) {
+    result.codex = { ...codexFallback };
+  }
+  return result;
+}
+
 function normalizeStringMap(value: unknown): Record<string, string> {
   const result: Record<string, string> = {};
   for (const [key, entryValue] of objectEntries(value)) {
@@ -215,6 +259,24 @@ function normalizeStringMap(value: unknown): Record<string, string> {
       continue;
     }
     result[normalizedKey] = normalizeText(entryValue);
+  }
+  return result;
+}
+
+function normalizeStringMapByRuntime(
+  value: unknown,
+  codexFallback: Record<string, string> = {},
+): Record<string, Record<string, string>> {
+  const result: Record<string, Record<string, string>> = {};
+  for (const [runtimeId, mapValue] of objectEntries(value)) {
+    const normalizedRuntimeId = normalizeText(runtimeId).toLowerCase();
+    if (!normalizedRuntimeId) {
+      continue;
+    }
+    result[normalizedRuntimeId] = normalizeStringMap(mapValue);
+  }
+  if (Object.keys(codexFallback).length && !Object.keys(result.codex || {}).length) {
+    result.codex = { ...codexFallback };
   }
   return result;
 }
@@ -307,6 +369,16 @@ function validateBinding(binding: unknown, bindingKey: string): string {
       }
     }
   }
+  for (const key of [
+    "threadIdByWorkspaceRootByRuntime",
+    "pendingThreadIdByWorkspaceRootByRuntime",
+    "workspaceBootstrapThreadIdByWorkspaceRootByRuntime",
+  ] as const) {
+    const error = validateStringMapByRuntime(source[key], `session store binding ${bindingKey}.${key}`);
+    if (error) {
+      return error;
+    }
+  }
   const runtimeParamsSource = "runtimeParamsByWorkspaceRoot" in source
     ? source.runtimeParamsByWorkspaceRoot
     : source.codexParamsByWorkspaceRoot;
@@ -326,6 +398,47 @@ function validateBinding(binding: unknown, bindingKey: string): string {
       }
       if ("effort" in params && typeof params.effort !== "string") {
         return `session store binding ${bindingKey}.${runtimeParamsLabel}.${workspaceRoot}.effort must be a string`;
+      }
+    }
+  }
+  if ("runtimeParamsByWorkspaceRootByRuntime" in source) {
+    if (!isPlainObject(source.runtimeParamsByWorkspaceRootByRuntime)) {
+      return `session store binding ${bindingKey}.runtimeParamsByWorkspaceRootByRuntime must be an object`;
+    }
+    for (const [runtimeId, paramsByWorkspaceRoot] of objectEntries(source.runtimeParamsByWorkspaceRootByRuntime)) {
+      if (typeof runtimeId !== "string" || !isPlainObject(paramsByWorkspaceRoot)) {
+        return `session store binding ${bindingKey}.runtimeParamsByWorkspaceRootByRuntime entries must be object values`;
+      }
+      for (const [workspaceRoot, params] of objectEntries(paramsByWorkspaceRoot)) {
+        if (typeof workspaceRoot !== "string" || !isPlainObject(params)) {
+          return `session store binding ${bindingKey}.runtimeParamsByWorkspaceRootByRuntime.${runtimeId} entries must be object values`;
+        }
+        if ("model" in params && typeof params.model !== "string") {
+          return `session store binding ${bindingKey}.runtimeParamsByWorkspaceRootByRuntime.${runtimeId}.${workspaceRoot}.model must be a string`;
+        }
+        if ("effort" in params && typeof params.effort !== "string") {
+          return `session store binding ${bindingKey}.runtimeParamsByWorkspaceRootByRuntime.${runtimeId}.${workspaceRoot}.effort must be a string`;
+        }
+      }
+    }
+  }
+  return "";
+}
+
+function validateStringMapByRuntime(value: unknown, label: string): string {
+  if (typeof value === "undefined") {
+    return "";
+  }
+  if (!isPlainObject(value)) {
+    return `${label} must be an object`;
+  }
+  for (const [runtimeId, mapValue] of objectEntries(value)) {
+    if (typeof runtimeId !== "string" || !isPlainObject(mapValue)) {
+      return `${label} entries must be object values`;
+    }
+    for (const [mapKey, mapEntryValue] of objectEntries(mapValue)) {
+      if (typeof mapKey !== "string" || typeof mapEntryValue !== "string") {
+        return `${label}.${runtimeId} entries must be string:string`;
       }
     }
   }

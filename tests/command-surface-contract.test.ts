@@ -227,7 +227,7 @@ test("command classification helpers cover representative explicit and default b
   assert.equal(resolveCommandSafetyTierDefinition("app.schema"), "open");
   assert.equal(resolveCommandHostSupportTierDefinition("timeline.write"), "host_neutral");
   assert.equal(resolveCommandHostSupportTierDefinition("timeline.screenshot"), "host_neutral");
-  assert.deepEqual(resolveCommandHostProfileIdsDefinition("timeline.screenshot"), ["codex-mode", "hosted-mode"]);
+  assert.deepEqual(resolveCommandHostProfileIdsDefinition("timeline.screenshot"), ["codex-mode", "claudecode-mode", "hosted-mode"]);
 });
 
 test("mutating weixin control commands are write-scoped and bridge-only", () => {
@@ -261,7 +261,10 @@ test("mutating weixin control commands are write-scoped and bridge-only", () => 
     assert.equal(action.mutability, "write", `${action.action} should not look read-only`);
     assert.equal(action.safetyTier, "warned", `${action.action} should not look open`);
     assert.equal(action.hostSupportTier, "bridge_only", `${action.action} should not look host-neutral`);
-    assert.deepEqual(action.hostProfileIds, ["codex-mode"], `${action.action} should stay scoped to Codex bridge mode`);
+    const expectedProfiles = action.action === "effort.select"
+      ? ["codex-mode"]
+      : ["codex-mode", "claudecode-mode"];
+    assert.deepEqual(action.hostProfileIds, expectedProfiles, `${action.action} should stay scoped to first-party bridge mode`);
   }
 });
 
@@ -292,7 +295,7 @@ test("every command action resolves through either an explicit classification ov
 
     const resolvedHostProfiles = resolveCommandHostProfileIdsDefinition(action.action);
     if (!hostProfileOverrideIds.has(action.action)) {
-      assert.deepEqual(resolvedHostProfiles, ["codex-mode", "hosted-mode"], `${action.action} should use the default host profile set when not overridden`);
+      assert.deepEqual(resolvedHostProfiles, ["codex-mode", "claudecode-mode", "hosted-mode"], `${action.action} should use the default host profile set when not overridden`);
     }
 
     const resolvedMutability = resolveCommandMutabilityDefinition(action.action);

@@ -44,6 +44,7 @@ function buildTestRuntimeDescriptor(id: string) {
       respondApproval: true,
       resumeThread: true,
       cancelTurn: true,
+      compactThread: false,
     },
   };
 }

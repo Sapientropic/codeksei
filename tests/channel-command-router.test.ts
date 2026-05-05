@@ -26,9 +26,13 @@ interface RoutedCall {
 
 function createRouterHarness() {
   const calls: RoutedCall[] = [];
+  let activePagePointer = false;
   const workspaceHandlers: WorkspaceCommandHandlerSet = {
     async bind(normalized: ChannelCommandMessage, command: ParsedChannelCommand) {
       calls.push({ type: "bind", normalized, command });
+    },
+    async compact(normalized: ChannelCommandMessage, command: ParsedChannelCommand) {
+      calls.push({ type: "compact", normalized, command });
     },
     async status(normalized: ChannelCommandMessage, command: ParsedChannelCommand) {
       calls.push({ type: "status", normalized, command });
@@ -44,6 +48,12 @@ function createRouterHarness() {
     },
     async stop(normalized: ChannelCommandMessage, command: ParsedChannelCommand) {
       calls.push({ type: "stop", normalized, command });
+    },
+    async page(normalized: ChannelCommandMessage, command: ParsedChannelCommand) {
+      calls.push({ type: "page", normalized, command });
+    },
+    async hasActivePagePointer() {
+      return activePagePointer;
     },
   };
   const controlHandlers: ControlCommandHandlerSet = {
@@ -70,7 +80,13 @@ function createRouterHarness() {
     workspaceHandlers,
     controlHandlers,
   });
-  return { calls, router };
+  return {
+    calls,
+    router,
+    setActivePagePointer(value: boolean) {
+      activePagePointer = value;
+    },
+  };
 }
 
 test("parseChannelCommand ignores ordinary text and normalizes slash commands", () => {
@@ -127,6 +143,32 @@ test("ChannelCommandRouter routes reply commands through the reply handler", asy
   assert.ok(firstCall);
   assert.equal(firstCall.type, "reply");
   assert.equal(firstCall.command.args, "merge 120");
+});
+
+test("ChannelCommandRouter routes compact commands through the workspace compact handler", async () => {
+  const { calls, router } = createRouterHarness();
+
+  const handled = await router.maybeDispatchCommand(buildNormalizedCommandMessage("/compact"));
+
+  assert.equal(handled, true);
+  assert.equal(calls.length, 1);
+  const firstCall = calls[0];
+  assert.ok(firstCall);
+  assert.equal(firstCall.type, "compact");
+});
+
+test("ChannelCommandRouter routes slash and active Chinese pagination aliases through workspace page handler", async () => {
+  const { calls, router, setActivePagePointer } = createRouterHarness();
+
+  assert.equal(await router.maybeDispatchCommand(buildNormalizedCommandMessage("/more")), true);
+  assert.equal(calls.at(-1)?.type, "page");
+  assert.equal(calls.at(-1)?.command.name, "more");
+
+  assert.equal(await router.maybeDispatchCommand(buildNormalizedCommandMessage("更多")), false);
+  setActivePagePointer(true);
+  assert.equal(await router.maybeDispatchCommand(buildNormalizedCommandMessage("更多")), true);
+  assert.equal(calls.at(-1)?.type, "page");
+  assert.equal(calls.at(-1)?.command.name, "more");
 });
 
 test("ChannelCommandRouter falls back unknown commands to help", async () => {

@@ -43,6 +43,7 @@ function buildTestRuntimeDescriptor(overrides: Partial<{
       respondApproval: true,
       resumeThread: overrides.resumeThread ?? true,
       cancelTurn: true,
+      compactThread: false,
     },
   };
 }

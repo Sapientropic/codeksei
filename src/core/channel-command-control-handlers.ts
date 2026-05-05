@@ -14,11 +14,15 @@ import {
 import { WeixinDeliveryConfigStore } from "../state/weixin-delivery-config-store";
 import {
   formatWeixinDeliveryConfig,
+  MAX_WEIXIN_PAGE_CHARS,
   MAX_WEIXIN_MIN_CHUNK_CHARS,
+  MIN_WEIXIN_PAGE_CHARS,
+  parseWeixinPageChars,
   parseWeixinMinChunkChars,
   resolveWeixinDeliveryConfig,
 } from "../state/weixin-delivery-config";
 import {
+  normalizeOptionalWeixinDeliveryPageMode,
   normalizeOptionalWeixinDeliveryReplyMode,
   type WeixinDeliveryReplyMode,
 } from "../contracts/weixin-delivery-config";
@@ -338,6 +342,29 @@ function createControlCommandHandlers({
         return;
       }
 
+      if (normalizedAction === "page" && value && !rest.length) {
+        const normalizedValue = normalizeCommandArgument(value).toLowerCase();
+        if (normalizedValue === "reset") {
+          store.setConfig({ pageMode: undefined, pageChars: undefined });
+          await sendText(channelAdapter, normalized, `已重置翻页设置。\n\n${buildReplyInspectText(configFile, config.weixinReplyMode)}`);
+          return;
+        }
+        const pageMode = normalizeOptionalWeixinDeliveryPageMode(normalizedValue);
+        if (pageMode) {
+          store.setConfig({ pageMode });
+          await sendText(channelAdapter, normalized, `已更新翻页模式。\n\n${buildReplyInspectText(configFile, config.weixinReplyMode)}`);
+          return;
+        }
+        const pageChars = parseWeixinPageChars(normalizedValue);
+        if (!pageChars) {
+          await sendText(channelAdapter, normalized, buildReplyPageUsageText());
+          return;
+        }
+        store.setConfig({ pageMode: "auto", pageChars });
+        await sendText(channelAdapter, normalized, `已更新翻页长度。\n\n${buildReplyInspectText(configFile, config.weixinReplyMode)}`);
+        return;
+      }
+
       await sendText(channelAdapter, normalized, buildReplyUsageText());
     },
 
@@ -376,8 +403,13 @@ function buildReplyUsageText(): string {
     "用法：/reply",
     "/reply mode stream|settled",
     `/reply merge <1-${MAX_WEIXIN_MIN_CHUNK_CHARS}>`,
+    buildReplyPageUsageText(),
     "/reply reset",
   ].join("\n");
+}
+
+function buildReplyPageUsageText(): string {
+  return `/reply page auto|off|<${MIN_WEIXIN_PAGE_CHARS}-${MAX_WEIXIN_PAGE_CHARS}>|reset`;
 }
 
 function buildEffortInspectText({
