@@ -79,9 +79,10 @@ export async function executeStreamFlush(
       preferLatestMessage: prefersSettledDelivery(state) || finalOnlyDelivery,
       force,
     });
-  const sanitized = streamPrepared
-    ? { suppress: false, text: plainText }
-    : sanitizeReplyText(state.replyTarget, plainText);
+  const sanitized = sanitizeReplyText(state.replyTarget, plainText);
+  const streamDeliveredVisibleAfter = streamPrepared
+    ? sanitizeReplyText(state.replyTarget, streamPrepared.deliveredVisibleAfter).text
+    : "";
   if (sanitized.suppress) {
     state.sentText = sanitized.text;
     state.lastDeliveredVisibleText = sanitized.text;
@@ -94,15 +95,23 @@ export async function executeStreamFlush(
   }
   const safeText = sanitized.text;
   if (!safeText) {
+    if (streamPrepared) {
+      // SILENT/protocol sentinels are model-visible control tokens, not
+      // user-visible text. Consume them in the stream cursor after sanitizing
+      // so the same completed item is not retried or leaked on a later flush.
+      state.sentText = streamDeliveredVisibleAfter || state.lastDeliveredVisibleText || "";
+      state.lastDeliveredVisibleText = streamDeliveredVisibleAfter || state.lastDeliveredVisibleText || "";
+      commitPreparedStreamingDelivery(streamPrepared, { delivered: true });
+    }
     return;
   }
 
   let deltaResult = streamPrepared
     ? {
-      delta: streamPrepared.safeText,
+      delta: safeText,
       relation: streamPrepared.relation,
       deliveredVisibleBefore: state.lastDeliveredVisibleText,
-      deliveredVisibleAfter: streamPrepared.deliveredVisibleAfter,
+      deliveredVisibleAfter: streamDeliveredVisibleAfter,
     }
     : computeVisibleDeliveryDelta(state.sentText, safeText);
   let delta = normalizeDeliveryDelta(

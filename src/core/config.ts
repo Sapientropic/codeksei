@@ -71,9 +71,10 @@ function parseEnvConfig(env: EnvSource, options: ReadConfigOptions = {}): AppRun
     readPrefixedEnv(env, "CHANNEL_PROVIDER") || (runtime === "hermes" ? "hermes" : "codeksei"),
   ) || (runtime === "hermes" ? "hermes" : "codeksei");
   const channel = normalizeCodekseiChannel(readPrefixedEnv(env, "CHANNEL")) || "weixin";
+  const explicitUserLanguage = readPrefixedEnv(env, "USER_LANGUAGE");
   const locale = resolveCodekseiLocale(
     readPrefixedEnv(env, "LOCALE"),
-    readPrefixedEnv(env, "USER_LANGUAGE"),
+    explicitUserLanguage,
   );
 
   return composeAppRuntimeConfig({
@@ -101,7 +102,7 @@ function parseEnvConfig(env: EnvSource, options: ReadConfigOptions = {}): AppRun
       userName: readPrefixedEnv(env, "USER_NAME") || "",
       userGender: readPrefixedEnv(env, "USER_GENDER") || "neutral",
       locale,
-      userLanguage: readPrefixedEnv(env, "USER_LANGUAGE") || "zh-CN",
+      userLanguage: explicitUserLanguage || locale,
       allowedUserIds: readPrefixedListEnv(env, "ALLOWED_USER_IDS"),
     },
     weixinBridge: {

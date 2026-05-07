@@ -387,6 +387,30 @@ test("final-only system turns suppress final SILENT without leaking earlier reas
   assert.deepEqual(sent, []);
 });
 
+test("stream mode suppresses final SILENT sentinel before WeChat delivery", async () => {
+  const { delivery, sent, attach } = createDelivery({
+    streamForceFlushChars: 1,
+    streamBoundaryFlushChars: 1,
+  });
+  attach("thread-weixin-silent");
+  await startTurn(delivery, "thread-weixin-silent", "turn-weixin-silent");
+
+  await sendCompleted(delivery, {
+    threadId: "thread-weixin-silent",
+    turnId: "turn-weixin-silent",
+    itemId: "final-1",
+    text: "[SILENT]",
+    phase: "final",
+  });
+  const state = delivery.stateByRunKey.get("thread-weixin-silent:turn-weixin-silent");
+  assert.equal(state?.sentText, "");
+  assert.equal(state?.lastDeliveredVisibleText, "");
+
+  await completeTurn(delivery, "thread-weixin-silent", "turn-weixin-silent");
+
+  assert.deepEqual(sent, []);
+});
+
 test("stream mode streams final items incrementally and turn completion only sends the tail", async (t) => {
   enableMockTimers(t);
   const { delivery, sent, attach } = createDelivery({

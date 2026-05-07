@@ -5,6 +5,7 @@ const os: typeof import("node:os") = require("node:os");
 const path: typeof import("node:path") = require("node:path");
 
 const { loadWechatInstructions }: typeof import("../src/adapters/runtime/codex") = require("../src/adapters/runtime/codex");
+const { parseEnvConfig }: typeof import("../src/core/config") = require("../src/core/config");
 const {
   createCompanionMemoryRuntimeStateStore,
   createDefaultCompanionMemoryRuntimeState,
@@ -90,6 +91,24 @@ test("weixin persona switches to english when the companion profile prefers engl
   assert.match(content, /You are with the person you're with on WeChat right now\./u);
   assert.match(content, /Use diary, timeline, review, reminder, and durable notes as active tools/u);
   assert.match(content, /open loop or real follow-up commitment -> today's diary `Todo`/u);
+  assert.doesNotMatch(content, /你现在是在微信里陪/u);
+});
+
+test("weixin persona treats CODEKSEI_LOCALE=en as the default user language", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codeksei-instructions-locale-english-"));
+  const stateDir = path.join(tempRoot, ".codeksei-state");
+  fs.mkdirSync(stateDir, { recursive: true });
+
+  const config = parseEnvConfig({
+    CODEKSEI_LOCALE: "en",
+    CODEKSEI_STATE_DIR: stateDir,
+    CODEKSEI_WORKSPACE_ROOT: tempRoot,
+  });
+  const content = loadWechatInstructions(config);
+
+  assert.equal(config.locale, "en");
+  assert.equal(config.userLanguage, "en");
+  assert.match(content, /You are with the person you're with on WeChat right now\./u);
   assert.doesNotMatch(content, /你现在是在微信里陪/u);
 });
 
