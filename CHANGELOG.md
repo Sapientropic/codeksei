@@ -9,6 +9,8 @@
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-05-08
+
 ### Added
 
 - 新增 Codeksei-native 的微信回复投递控制：`/reply` 查看当前策略，`/reply mode stream|settled` 切换后续 turn 的投递模式，`/reply merge <chars>` 调整短片段合并阈值，`/reply reset` 回到 env / default。
@@ -18,6 +20,12 @@
 
 - 吸收原仓近期微信分片与 runtime thread 切换经验，但不引入旧品牌、旧分片 alias、其他旧命令、旧 JS runtime adapter 或旧 bin/docs。
 - runtime `resumeThread` seam 现在允许携带 `workspaceRoot`，`/switch` 与 watchdog subscription restore 会把 workspace 一并传给 runtime adapter，方便未来 host/runtime owner 正确恢复线程上下文。
+
+### Fixed
+
+- Codex Mode 的微信 persona 会把 `CODEKSEI_LOCALE=en` 作为默认用户语言，除非显式设置了 `CODEKSEI_USER_LANGUAGE`；只切全局 locale 时不再继续落回中文模板。
+- WeChat stream delivery 现在会在发送和内部可见文本状态两层统一清理 `[SILENT]` / protocol sentinel，避免控制标记作为用户可见消息泄露或污染后续 delta 判断。
+- 刷新生产 lockfile 到 patched `express-rate-limit@8.5.1`、`ip-address@10.2.0`、`uuid@13.0.2`，恢复 `npm run audit:prod` 为零生产漏洞状态。
 
 ## [0.5.0] - 2026-04-18
 
@@ -197,7 +205,8 @@
 - `643529e` add host-neutral core and Hermes hosted mode
 - `29080b7` Bump release version to 0.3.0
 
-[Unreleased]: https://github.com/Sapientropic/codeksei/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Sapientropic/codeksei/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/Sapientropic/codeksei/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Sapientropic/codeksei/compare/2b712b5...v0.5.0
 [0.4.1]: https://github.com/Sapientropic/codeksei/compare/9fe7d9d...2b712b5
 [0.4.0]: https://github.com/Sapientropic/codeksei/compare/v0.3.0...9fe7d9d
