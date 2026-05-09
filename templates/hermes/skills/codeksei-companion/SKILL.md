@@ -44,7 +44,7 @@ codeksei reminder write --delay 30m --text "提醒内容"
 codeksei companion remember --user <wechat_user_id> --workspace /绝对路径 --source host_user_turn [--text "内容" | --stdin]
 codeksei note auto (--project <slug> | --scope <name>) --kind <kind> [--text "内容" | --stdin]
 codeksei onboarding start --user <wechat_user_id>
-codeksei onboarding step --user <wechat_user_id> --session <sessionId> [--text "内容" | --stdin]
+codeksei onboarding step --user <wechat_user_id> [--session <sessionId>] [--text "内容" | --stdin]
 codeksei onboarding status --user <wechat_user_id>
 codeksei review nightly
 codeksei review weekly

@@ -14,6 +14,7 @@
   <p><strong>It keeps timeline, diary, reminders, reviews, and project continuity inside one local-first companion core, then attaches that core to whichever host bridge you want.</strong></p>
   <p>Codeksei is not just a chat box waiting for prompts, and it is not a second agent runtime. It helps capture what happened, reconnect loose threads, leave reminders, and make project re-entry gentler while keeping state, logs, and life traces local by default. WeChat is now only a first-party adapter, not the whole product identity.</p>
   <p>
+    <a href="#first-day-loop">First Day Agent Loop</a> ·
     <a href="#agent-quickstart">Agent Quickstart</a> ·
     <a href="#setup">SETUP</a> ·
     <a href="#mode-specific-bring-up">Mode-Specific Bring-Up</a> ·
@@ -28,7 +29,33 @@
 
 - **What it is**: a local-first, `daemon-first / host-attachable` companion engine; for humans it is a companion assistant, and for hosts it is an attachable domain layer
 - **CLI contract**: `codeksei help`, `codeksei schema`, and `codeksei host manifest` are the public discovery surface; non-TTY runs default to JSON, `stdout` carries results, and `stderr` carries diagnostics
-- **Recommended start**: complete shared `SETUP` first, then choose `Codex Mode`, `Claude Code Mode`, or `Hosted Mode`
+- **Recommended start**: let an agent install Codeksei and run the first-day service loop for the user; the user should not have to learn commands first
+
+<a id="first-day-loop"></a>
+
+## First Day Agent Loop
+
+The user does not need to learn these commands. The ideal experience is that an agent or host installs, configures, and runs Codeksei in the right local environment, then turns the results into better companionship, reminders, reviews, and context continuity.
+
+This is the agent/operator service path for day one, not an end-user CLI tutorial.
+
+```bash
+codeksei onboarding status --user <id>
+codeksei onboarding start --user <id>
+codeksei onboarding step --user <id> --stdin
+codeksei context inspect --user <id> --workspace <path>
+codeksei pulse today --user <id> --workspace <path>
+codeksei frame serve
+codeksei review nightly
+```
+
+Recommended agent order:
+
+1. `onboarding status/start/step`: prepare the companion profile enough for the daily loop; `step` can omit `--session` when there is exactly one active session for the user
+2. `context inspect`: let the agent check whether today's sources are thick enough, especially onboarding, companion memory, today's diary, and handoff state
+3. `pulse today`: give the agent up to three cards worth continuing today; thin context produces repair cards first
+4. `frame serve`: provide the local frontstage view with timeline, diary, reminders, projects, and freshness state
+5. `review nightly`: close the day intentionally instead of leaving open loops buried in chat
 
 <a id="agent-quickstart"></a>
 

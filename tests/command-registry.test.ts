@@ -30,6 +30,14 @@ test("timeline write help labels the command as a low-level batch/json entry", (
   assert.match(action.summary, /低层入口/u);
 });
 
+test("public help labels the continuity group for companion context", () => {
+  const projectsGroup = listCommandGroups()
+    .find((group: { id: string; label: string }) => group.id === "projects");
+
+  assert.ok(projectsGroup);
+  assert.equal(projectsGroup.label, "陪伴与上下文");
+});
+
 test("timeline topic help still prefers timeline:event for single events", () => {
   const help = buildTerminalTopicHelp("timeline");
 

@@ -7,6 +7,18 @@
 `Codeksei` 先定义稳定动作，再分别映射到终端和微信，让不同入口共享同一套行为语义。
 这页只负责对外说明；真实 active command surface 以当前共享 help / manifest 为准，不再单独发明第二套命令语义。
 
+## Agent 服务路径导航
+
+这不是给终端用户背命令的清单。Codeksei 的目标是让 Agent / 宿主替用户安装和运行这些能力，再把结果转成更好的陪伴体验。
+
+首次接入时，Agent 先按要替用户完成的服务找入口；host/provider 是进阶接入层，不是第一屏必须让用户理解的东西。
+
+- 激活：`codeksei onboarding status --user <id>` -> `codeksei onboarding start --user <id>` -> `codeksei onboarding step --user <id> --stdin`
+- 记录：`codeksei diary write --text "..."`、`codeksei companion remember --user <id> --workspace <path> --source host_user_turn --stdin`、`codeksei timeline event ...`
+- 继续：`codeksei context inspect --user <id> --workspace <path>` -> `codeksei pulse today --user <id> --workspace <path>` -> `codeksei frame serve`
+- 收口：`codeksei review nightly`、`codeksei note auto ...`、`codeksei pulse feedback --card <id> --kind task`
+- 接入：`codeksei host manifest` -> `codeksei host bootstrap --provider <provider>` -> `codeksei host doctor --provider <provider>` -> `codeksei host smoke --provider <provider>`
+
 ## Host Modes
 
 当前有三条官方路径：
@@ -275,7 +287,7 @@ Context packs 是可解释、可限预算的定向规则包，不是角色扮演
 这一组入口负责“激活即访谈”的轻量本地流程：先自然聊出最小画像，再把长期事实写进 companion note，由 context board 投影给宿主消费。
 
 - `codeksei onboarding start --user <senderId>`
-- `codeksei onboarding step --user <senderId> --session <sessionId> --stdin`
+- `codeksei onboarding step --user <senderId> [--session <sessionId>] --stdin`
 - `codeksei onboarding status --user <senderId>`
 - `codeksei onboarding reset --user <senderId>`
 

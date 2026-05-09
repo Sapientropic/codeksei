@@ -26,13 +26,25 @@ export interface ContextInspectLayer {
 }
 
 export interface ContextInspectReport {
+  companionMemory: ContextBoardBriefing["companionMemory"];
   excluded: ContextInspectLayer[];
   layers: ContextInspectLayer[];
   mode: ContextBriefingMode;
+  onboarding: ContextBoardBriefing["onboarding"] & {
+    nextAction: "start" | "step" | "ready";
+    nextPrompt: string;
+    readyForDailyLoop: boolean;
+  };
   pendingHandoff: ContextBoardBriefing["checkin"]["pendingHandoff"];
   redaction: {
     applied: boolean;
     strategy: string;
+  };
+  sourceHealth: {
+    missing: string[];
+    readyForDailyLoop: boolean;
+    staleReasons: string[];
+    thin: boolean;
   };
   staleReasons: string[];
   stateCard: ContextBoardBriefing["stateCard"];
@@ -93,15 +105,24 @@ export function buildContextInspectReport(
       tokenOrCharEstimate: pack.content.length,
     })),
   ];
+  const sourceHealth = buildSourceHealth(briefing);
   const report: ContextInspectReport = {
+    companionMemory: briefing.companionMemory,
     excluded: layers.filter((layer) => !layer.included),
     layers,
     mode,
+    onboarding: {
+      ...briefing.onboarding,
+      nextAction: briefing.onboarding.status === "ready" ? "ready" : (briefing.onboarding.status === "not_started" ? "start" : "step"),
+      nextPrompt: buildOnboardingInspectPrompt(briefing.onboarding),
+      readyForDailyLoop: briefing.onboarding.status === "ready",
+    },
     pendingHandoff: briefing.checkin.pendingHandoff,
     redaction: {
       applied: true,
       strategy: "text output redacts sensitive tokens and local workspace/state paths",
     },
+    sourceHealth,
     staleReasons: [...briefing.staleReasons],
     stateCard: briefing.stateCard,
     target: briefing.target,
@@ -146,11 +167,34 @@ export function renderContextInspectText(
     workspaceRoot?: unknown;
   } = {},
 ): string {
+  const onboarding = report.onboarding || {
+    missingSlots: [],
+    nextAction: "start",
+    nextPrompt: "",
+    readyForDailyLoop: false,
+    status: "not_started",
+    updatedAt: "",
+  };
+  const companionMemory = report.companionMemory || {
+    lastSource: "",
+    lastUpdatedAt: "",
+    recentWriteCount: 0,
+    slotFreshness: {},
+  };
+  const sourceHealth = report.sourceHealth || {
+    missing: [],
+    readyForDailyLoop: false,
+    staleReasons: report.staleReasons || [],
+    thin: Boolean(report.staleReasons?.length),
+  };
   const lines = [
     `Codeksei context inspect (${report.mode})`,
     `target: ${report.target.senderId} @ ${report.target.workspaceRoot}`,
     `pending handoff: ${report.pendingHandoff.exists ? "yes" : "no"}`,
     report.staleReasons.length ? `stale: ${report.staleReasons.join(", ")}` : "stale: none",
+    `onboarding: ${onboarding.status}${onboarding.missingSlots.length ? ` | missing ${onboarding.missingSlots.join(", ")}` : ""}${onboarding.nextAction ? ` | next ${onboarding.nextAction}` : ""}${onboarding.readyForDailyLoop ? " | daily loop ready" : ""}`,
+    `companion memory: ${companionMemory.lastUpdatedAt || "missing"}${companionMemory.lastSource ? ` | source ${companionMemory.lastSource}` : ""} | recent writes ${companionMemory.recentWriteCount}`,
+    `source health: ${sourceHealth.thin ? "thin" : "ready"}${sourceHealth.missing.length ? ` | missing ${sourceHealth.missing.join(", ")}` : ""}`,
     "",
     "Layers:",
     ...report.layers.map((layer) => `- ${layer.id} | ${layer.included ? "included" : "excluded"} | ${layer.sourceKind} | ${layer.reason} | chars ${layer.tokenOrCharEstimate}`),
@@ -201,6 +245,52 @@ function countWorkspaceFiles(briefing: ContextBoardBriefing): number {
   return briefing.workspaceBootstrap.primaryFiles.length
     + briefing.workspaceBootstrap.recentFiles.length
     + briefing.workspaceBootstrap.conditionalFiles.length;
+}
+
+function buildSourceHealth(briefing: ContextBoardBriefing): ContextInspectReport["sourceHealth"] {
+  const missing: string[] = [];
+  if (!briefing.todayDiary.exists) {
+    missing.push("todayDiary");
+  }
+  if (!briefing.companionNote.exists) {
+    missing.push("companionNote");
+  }
+  if (!briefing.companionMemory.lastUpdatedAt && !briefing.companionMemory.recentWriteCount) {
+    missing.push("companionMemory");
+  }
+  if (briefing.onboarding.status !== "ready") {
+    missing.push("onboarding");
+  }
+  if (!briefing.checkin.stateFound) {
+    missing.push("checkin");
+  }
+  const thin = briefing.stale || briefing.stateCard.sourceThickness === "thin" || missing.includes("onboarding");
+  return {
+    missing,
+    readyForDailyLoop: !thin && briefing.onboarding.status === "ready",
+    staleReasons: [...briefing.staleReasons],
+    thin,
+  };
+}
+
+function buildOnboardingInspectPrompt(onboarding: ContextBoardBriefing["onboarding"]): string {
+  if (onboarding.status === "ready") {
+    return "";
+  }
+  const nextSlot = onboarding.missingSlots[0] || "current_status";
+  switch (nextSlot) {
+    case "rhythm":
+      return "补一句你通常什么时候有精力、什么时候最好别打扰。";
+    case "preference":
+      return "补一句你更喜欢我怎样说话、怎样支持你。";
+    case "boundary":
+      return "补一句哪些做法会冒犯、越界或需要先问你。";
+    case "next":
+      return "补一句接下来几天最可能先发生、最希望被接住的事。";
+    case "current_status":
+    default:
+      return "补一句最近的日子大概是什么样、眼下最想被帮到什么。";
+  }
 }
 
 function buildContextPackScanText(briefing: ContextBoardBriefing, text: unknown): string {

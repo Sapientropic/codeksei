@@ -421,6 +421,14 @@ body { background: var(--bg); color: var(--tx); font-family: var(--font-body); f
 /* ─── Empty States ─── */
 .empty-state { text-align: center; padding: var(--space-8) var(--space-4); color: var(--tx-4); font-family: var(--font-display); font-style: italic; font-size: var(--text-sm); line-height: 1.7; opacity: 0.60; }
 .empty-state::before { content: '—'; display: block; font-family: var(--font-mono); font-size: var(--text-xl); color: var(--tx-4); margin-bottom: var(--space-3); opacity: 0.3; letter-spacing: 0.2em; }
+.freshness-line {
+  margin: 0 auto var(--space-5); max-width: var(--content-max-w);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface); color: var(--tx-3); padding: var(--space-3) var(--space-4);
+  font-size: var(--text-xs); line-height: 1.6;
+}
+.freshness-line.healthy { display: none; }
+.source-note { margin-top: var(--space-3); font-size: var(--text-xs); color: var(--tx-4); line-height: 1.6; }
 
 /* ================================================================
    INPUTS
@@ -543,10 +551,11 @@ body { background: var(--bg); color: var(--tx); font-family: var(--font-body); f
   [data-layout="wide"] .panel-avatar { width: 56px; height: 70px; }
   [data-layout="wide"] .panel-greeting { font-size: var(--text-xs); max-width: none; }
   [data-layout="wide"] .panel-clock .time-display { font-size: var(--text-md); }
+  [data-layout="wide"] .panel-content { padding-bottom: calc(160px + env(safe-area-inset-bottom, 0px)); }
   [data-layout="wide"] .card { padding: var(--space-5); }
   [data-layout="wide"] .card-title { font-size: var(--text-sm); margin-bottom: var(--space-3); }
   [data-layout="wide"] .timeline-track { height: 40px; }
-  [data-layout="wide"] .timeline-slot .slot-label { display: none; }
+  [data-layout="wide"] .timeline-slot .slot-label { display: block; padding: 0 var(--space-2); font-size: var(--text-2xs); max-width: 100%; }
   [data-layout="wide"] .input-capsule { border-radius: var(--radius-lg); }
 }
 
@@ -667,6 +676,7 @@ body { background: var(--bg); color: var(--tx); font-family: var(--font-body); f
         <div class="timeline-hours" id="timelineHours"></div>
       </div>
     </section>
+    <div class="freshness-line" id="freshnessLine" hidden></div>
 
     <!-- Content Grid -->
     <div class="content-grid">
@@ -741,6 +751,8 @@ const LANG = {
     checkin_settle: '先收起来', checkin_quiet: '今天剩下的时间留给你',
     checkin_due: 'check-in 时间到了', checkin_progress: 'check-in 处理中',
     checkin_next: '下次 check-in ${time}', checkin_pending: 'check-in 待调度',
+    freshness_missing: '有些来源还没接上：${sources}',
+    action_unavailable: '这项动作还没接到后端',
     toast_write_fail: '没连上，内容还在', toast_written: '已同步到 Codeksei',
     toast_diary_saved: '记下了', toast_reminder_fail: '没连上，状态未更新',
     toast_ok: '好的', toast_checkin_fail: '没连上，状态未更新', toast_connection_fail: '还没连上相框',
@@ -773,6 +785,8 @@ const LANG = {
     checkin_settle: 'Tuck away', checkin_quiet: 'Peace for the rest of the day',
     checkin_due: 'Check-in time', checkin_progress: 'Check-in in progress',
     checkin_next: 'Next check-in ${time}', checkin_pending: 'Check-in pending',
+    freshness_missing: 'Some sources are not connected yet: ${sources}',
+    action_unavailable: 'This action is not wired yet',
     toast_write_fail: 'Not synced, content kept', toast_written: 'Synced to Codeksei',
     toast_diary_saved: 'Noted', toast_reminder_fail: 'Not synced, state unchanged',
     toast_ok: 'OK', toast_checkin_fail: 'Not synced, state unchanged', toast_connection_fail: 'Not connected to Frame',
@@ -876,6 +890,10 @@ const EMPTY_STATE = {
   timeline: { slots: [] }, diary: { fragments: [], todaySummary: "" },
   reminders: [], projects: [],
   checkIn: { status: "scheduled" }, character: { greeting: "" },
+  actionAvailability: {
+    reminderActions: { available: false, endpoint: "/frame/reminder/action", reason: "not wired" },
+    checkinActions: { available: false, endpoint: "/frame/checkin/action", reason: "not wired" }
+  },
   freshness: { updatedAt: "", stale: true, warnings: ["frame_state_unavailable"] }
 };
 
@@ -1139,12 +1157,15 @@ const MINOR_SHOW=3; let reminderExpanded=false;
 function renderReminders(reminders){
   const c=document.getElementById('reminders');c.replaceChildren();const sr=Array.isArray(reminders)?reminders:[];
   const primary=sr.filter(r=>r.priority==='primary'), minor=sr.filter(r=>r.priority==='minor');
+  const canAct=getActionAvailability('reminderActions').available;
   if(primary.length>0){const p=primary[0],d=document.createElement('div');d.className='reminder-primary';
     const tx=document.createElement('div');tx.className='reminder-text';tx.textContent=String(p.text||'');tx.title=String(p.text||'');
     const du=document.createElement('div');du.className='reminder-due';du.textContent=String(p.due||'');
-    const ac=document.createElement('div');ac.className='reminder-actions';
-    ac.append(buildActionBtn(t('reminder_here'),'present',p.id),buildActionBtn(t('reminder_later'),'snooze',p.id),buildActionBtn(t('reminder_settle'),'settle',p.id));
-    d.append(tx,du,ac);c.appendChild(d);}
+    d.append(tx,du);
+    if(canAct){const ac=document.createElement('div');ac.className='reminder-actions';
+      ac.append(buildActionBtn(t('reminder_here'),'present',p.id),buildActionBtn(t('reminder_later'),'snooze',p.id),buildActionBtn(t('reminder_settle'),'settle',p.id));d.appendChild(ac);}
+    else{d.appendChild(buildSourceNote(t('action_unavailable')));}
+    c.appendChild(d);}
   if(minor.length>0){const ls=document.createElement('div');ls.className='reminder-minor-list';
     const vis=reminderExpanded?minor:minor.slice(0,MINOR_SHOW);
     vis.forEach(m=>{const r=document.createElement('div');r.className='reminder-minor';const tx=document.createElement('span');tx.className='reminder-text';tx.textContent=String(m.text||'');tx.title=String(m.text||'');const du=document.createElement('span');du.className='reminder-due';du.textContent=String(m.due||'');r.append(tx,du);ls.appendChild(r);});
@@ -1153,6 +1174,7 @@ function renderReminders(reminders){
   if(!sr.length){const e=document.createElement('div');e.className='empty-state';e.textContent=t('reminders_empty');e.style.padding='var(--space-4) 0';c.appendChild(e);}
 }
 function buildActionBtn(label,action,id){const b=document.createElement('button');b.textContent=label;b.dataset.action=action;b.dataset.id=String(id||'');return b;}
+function buildSourceNote(text){const n=document.createElement('div');n.className='source-note';n.textContent=text;return n;}
 
 /* ─── Project Renderer (shared) ─── */
 function renderProjects(projects){
@@ -1218,6 +1240,7 @@ function setupInteractions(){
   // Reminder actions
   document.getElementById('reminders')?.addEventListener('click',async e=>{
     const btn=e.target.closest('button[data-action]');if(!btn)return;
+    if(!getActionAvailability('reminderActions').available){showToast(t('action_unavailable'));return;}
     const r=await postFrameJson('/frame/reminder/action',{id:btn.dataset.id,action:btn.dataset.action});
     if(!r.ok){showToast(t('toast_reminder_fail'));return;}showToast(t('toast_ok'));
     const pr=btn.closest('.reminder-primary');if(pr){pr.style.opacity='0.35';pr.style.pointerEvents='none';}
@@ -1226,12 +1249,16 @@ function setupInteractions(){
   // Check-in overlay
   const ov=document.getElementById('checkinOverlay');
   ov.querySelectorAll('button').forEach(b=>b.addEventListener('click',async()=>{
+    if(!getActionAvailability('checkinActions').available){showToast(t('action_unavailable'));ov.classList.remove('visible');return;}
     const r=await postFrameJson('/frame/checkin/action',{action:b.dataset.action,triggerId:currentFrameState.checkIn?.triggerId||''});
     if(!r.ok){showToast(t('toast_checkin_fail'));return;}ov.classList.remove('visible');
     showToast({here:t('msg_here'),later:t('msg_later'),settle:t('msg_settle'),quiet_today:t('msg_quiet')}[b.dataset.action]||t('toast_ok'));
   }));
   ov.addEventListener('click',e=>{if(e.target===ov)ov.classList.remove('visible');});
-  document.getElementById('checkinStatus')?.addEventListener('click',()=>ov.classList.add('visible'));
+  document.getElementById('checkinStatus')?.addEventListener('click',()=>{
+    if(!getActionAvailability('checkinActions').available){showToast(t('action_unavailable'));return;}
+    ov.classList.add('visible');
+  });
 
   // Theme toggle
   document.getElementById('themeToggle')?.addEventListener('click',()=>{
@@ -1247,7 +1274,7 @@ function setupInteractions(){
     const p=new URLSearchParams(window.location.search);
     if(p.get('mode')==='mock') currentFrameState=currentLang==='en'?MOCK_EN:MOCK;
     renderTimeline(currentFrameState.timeline?.slots||[]);renderDiary(currentFrameState.diary?.fragments||[],currentFrameState.diary?.todaySummary||'');
-    renderReminders(currentFrameState.reminders||[]);renderProjects(currentFrameState.projects||[]);renderCheckin(currentFrameState.checkIn||{});updateClock();
+    renderFreshness(currentFrameState.freshness||{});renderReminders(currentFrameState.reminders||[]);renderProjects(currentFrameState.projects||[]);renderCheckin(currentFrameState.checkIn||{});updateClock();
   });
 
   // Layout toggle
@@ -1263,6 +1290,22 @@ function setupInteractions(){
 
 async function postFrameJson(url,body){try{const r=await fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});const p=await r.json().catch(()=>({}));return{ok:r.ok&&p.ok!==false,payload:p};}catch(e){console.warn('[frame] POST failed:',e);return{ok:false,payload:null};}}
 
+function getActionAvailability(key){
+  const state=currentFrameState.actionAvailability||EMPTY_STATE.actionAvailability||{};
+  const value=state[key]||{};
+  return {available:value.available===true, endpoint:String(value.endpoint||''), reason:String(value.reason||'not wired')};
+}
+
+function renderFreshness(freshness){
+  const el=document.getElementById('freshnessLine');if(!el)return;
+  const warnings=Array.isArray(freshness?.warnings)?freshness.warnings.filter(Boolean):[];
+  const stale=freshness?.stale===true||warnings.length>0;
+  el.hidden=!stale;el.classList.toggle('healthy',!stale);
+  if(!stale){el.textContent='';return;}
+  const sources=warnings.length?warnings.join(', '):'unknown';
+  el.textContent=t('freshness_missing',{sources});
+}
+
 /* ─── Data Loader ─── */
 async function loadData(){
   const p=new URLSearchParams(window.location.search),mode=p.get('mode');
@@ -1275,8 +1318,10 @@ async function loadData(){
 
 function renderCheckin(ci){
   const s=document.getElementById('checkinStatus'),ov=document.getElementById('checkinOverlay');if(!s)return;
-  if(ci?.status==='due'){s.textContent=t('checkin_due');ov?.classList.add('visible');return;}
+  const canAct=getActionAvailability('checkinActions').available;
+  if(ci?.status==='due'){s.textContent=t('checkin_due');if(canAct)ov?.classList.add('visible');else ov?.classList.remove('visible');return;}
   if(ci?.status==='in_progress'){s.textContent=t('checkin_progress');return;}
+  ov?.classList.remove('visible');
   s.textContent=ci?.scheduledAt?t('checkin_next',{time:ci.scheduledAt}):t('checkin_pending');
 }
 
@@ -1295,6 +1340,7 @@ async function init(){
   const data=await loadData();currentFrameState=data||EMPTY_STATE;
   renderTimeline(currentFrameState.timeline?.slots||[]);
   renderDiary(currentFrameState.diary?.fragments||[],currentFrameState.diary?.todaySummary||'');
+  renderFreshness(currentFrameState.freshness||{});
   renderReminders(currentFrameState.reminders||[]);renderProjects(currentFrameState.projects||[]);
   renderCheckin(currentFrameState.checkIn||{});updateClock();setupInteractions();
   setInterval(updateClock,30000);

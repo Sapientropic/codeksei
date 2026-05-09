@@ -39,9 +39,18 @@ export async function maybeExtractCompanionMemorySemantic(
   }
 
   try {
+    const timeoutMs = resolveCompanionMemorySemanticTimeoutMs(config, lane);
     const raw = hasInjectedGenerator
-      ? await injectedGenerator(buildCompanionMemorySemanticGeneratorInput(config, input, lane))
-      : await hostAdapter!.run(config, input, resolveCompanionMemorySemanticTimeoutMs(config, lane), lane);
+      ? await withCompanionSemanticTimeout(
+        injectedGenerator(buildCompanionMemorySemanticGeneratorInput(config, input, lane)),
+        timeoutMs,
+        lane,
+      )
+      : await withCompanionSemanticTimeout(
+        hostAdapter!.run(config, input, timeoutMs, lane),
+        timeoutMs,
+        lane,
+      );
     const data = normalizeCompanionMemorySemanticResult(raw);
     if (!data || !hasCompanionMemorySemanticPayload(data)) {
       return {
@@ -100,6 +109,28 @@ function resolveCompanionMemorySemanticTimeoutMs(
     return fallback;
   }
   return DEFAULT_TIMEOUT_MS;
+}
+
+function withCompanionSemanticTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  lane: "companion" | "onboarding",
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${lane} semantic extraction timed out after ${timeoutMs}ms`));
+    }, Math.max(1, timeoutMs));
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }
 
 function formatErrorMessage(error: unknown): string {

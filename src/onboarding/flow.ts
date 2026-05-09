@@ -40,6 +40,13 @@ export interface OnboardingConversationResult {
   writes: ExtractedOnboardingWrite[];
 }
 
+export interface OnboardingStatusView {
+  missingSlots: OnboardingSlotId[];
+  nextAction: "start" | "step" | "ready";
+  nextPrompt: string;
+  readyForDailyLoop: boolean;
+}
+
 const MAX_ONBOARDING_TURNS = 8;
 
 type OnboardingConversationLanguage = "zh-CN" | "en";
@@ -231,6 +238,29 @@ export function getOnboardingStatus(
   userId: string,
 ): OnboardingState {
   return createOnboardingStateStore(config, userId).getState();
+}
+
+export function describeOnboardingStatus(
+  config: OnboardingRuntimeConfig,
+  userId: string,
+  state: OnboardingState = getOnboardingStatus(config, userId),
+): OnboardingStatusView {
+  const language = resolveOnboardingLanguage(config, userId);
+  if (state.status === "ready") {
+    return {
+      missingSlots: [],
+      nextAction: "ready",
+      nextPrompt: "",
+      readyForDailyLoop: true,
+    };
+  }
+  const nextTurnCount = state.status === "not_started" ? 1 : state.turnCount;
+  return {
+    missingSlots: [...state.missingSlots],
+    nextAction: state.status === "not_started" ? "start" : "step",
+    nextPrompt: buildPromptForMissingSlot(state.missingSlots, nextTurnCount, [], language),
+    readyForDailyLoop: false,
+  };
 }
 
 export function resetOnboardingState(

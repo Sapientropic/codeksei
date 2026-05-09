@@ -48,14 +48,28 @@ test("frame server serves page state and write endpoints without fake success", 
     assert.doesNotMatch(html, /chinese-font\.netlify/u);
     assert.doesNotMatch(html, /user-scalable=no/u);
     assert.doesNotMatch(html, /innerHTML/u);
+    assert.match(html, /freshnessLine/u);
+    assert.match(html, /actionAvailability/u);
+    assert.doesNotMatch(html, /\.timeline-slot\s+\.slot-label\s*\{[^}]*display:\s*none/su);
     for (const match of html.matchAll(/<script>([\s\S]*?)<\/script>/gu)) {
       assert.doesNotThrow(() => new Function(match[1] || ""));
     }
 
     const state = await fetch(`${info.url}/state`);
     assert.equal(state.status, 200);
-    const stateJson = await state.json() as { diary?: { fragments?: unknown[] } };
+    const stateJson = await state.json() as {
+      actionAvailability?: {
+        checkinActions?: { available?: boolean; reason?: string };
+        reminderActions?: { available?: boolean; reason?: string };
+      };
+      diary?: { fragments?: unknown[] };
+      freshness?: { stale?: boolean; warnings?: string[] };
+    };
     assert.deepEqual(stateJson.diary?.fragments, []);
+    assert.equal(stateJson.actionAvailability?.reminderActions?.available, false);
+    assert.equal(stateJson.actionAvailability?.checkinActions?.available, false);
+    assert.match(stateJson.actionAvailability?.reminderActions?.reason || "", /not wired/u);
+    assert.equal(stateJson.freshness?.stale, true);
 
     const write = await fetch(`${info.url}/input`, {
       method: "POST",

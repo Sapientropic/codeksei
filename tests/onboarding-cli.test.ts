@@ -284,6 +284,77 @@ test("semantic failure falls back to deterministic extraction", async () => {
   assert.match(profileContent, /下午效率高/u);
 });
 
+test("semantic timeout falls back within the onboarding timeout budget", async () => {
+  const fixture = createOnboardingFixture({
+    onboardingSemanticTimeoutMs: 25,
+    onboardingSemanticGenerator: async () => new Promise(() => {}),
+  });
+
+  const started = await runOnboardingStartCommand(fixture.config, ["--user", fixture.userId]);
+  const startedAt = Date.now();
+  const firstStep = await runOnboardingStepCommand(fixture.config, [
+    "--user", fixture.userId,
+    "--session", started.data.state.sessionId,
+    "--text", "我是独立开发者，最近在做 Codeksei。下午效率高。你可以短一点，别太密。接下来我会先补 onboarding CLI。",
+  ]);
+
+  assert.equal(Date.now() - startedAt < 1000, true);
+  assert.match(String(firstStep.text || ""), /已经大概摸到你的节奏了|接下来/u);
+  assert.equal(firstStep.data.state.status, "ready");
+});
+
+test("onboarding step auto-resumes the only active session but still rejects mismatches", async () => {
+  const fixture = createOnboardingFixture();
+  const started = await runOnboardingStartCommand(fixture.config, ["--user", fixture.userId]);
+
+  const step = await runOnboardingStepCommand(fixture.config, [
+    "--user", fixture.userId,
+    "--text", "我是独立开发者，最近在做 Codeksei。下午效率高。你可以短一点，别太密。接下来我会先补 onboarding CLI。",
+  ]);
+
+  assert.equal(step.data.state.sessionId, started.data.state.sessionId);
+  assert.equal(step.data.state.status, "ready");
+
+  await assert.rejects(
+    () => runOnboardingStepCommand(fixture.config, [
+      "--user", fixture.userId,
+      "--session", "wrong-session",
+      "--text", "这条不应该写入。",
+    ]),
+    /onboarding session 已变化/u,
+  );
+});
+
+test("onboarding status exposes host-ready next action fields", async () => {
+  const fixture = createOnboardingFixture();
+  const beforeStart = await runOnboardingStatusCommand(fixture.config, ["--user", fixture.userId]);
+
+  assert.equal(beforeStart.data.nextAction, "start");
+  assert.equal(beforeStart.data.readyForDailyLoop, false);
+  assert.deepEqual(beforeStart.data.missingSlots, ["current_status", "rhythm", "preference", "boundary", "next"]);
+  assert.match(beforeStart.data.nextPrompt, /最近|这阵子|日子/u);
+  assert.match(String(beforeStart.text || ""), /nextAction: start/u);
+  assert.match(String(beforeStart.text || ""), /nextPrompt:/u);
+
+  await runOnboardingStartCommand(fixture.config, ["--user", fixture.userId]);
+  const inProgress = await runOnboardingStatusCommand(fixture.config, ["--user", fixture.userId]);
+  assert.equal(inProgress.data.nextAction, "step");
+  assert.match(inProgress.data.nextPrompt, /最近|这阵子|日子/u);
+});
+
+test("onboarding start dry-run previews the first prompt without writing state", async () => {
+  const fixture = createOnboardingFixture();
+
+  const dryRun = await runOnboardingStartCommand(fixture.config, ["--user", fixture.userId, "--dry-run"]);
+
+  assert.equal(dryRun.data.state.status, "not_started");
+  assert.equal(dryRun.data.userId, fixture.userId);
+  assert.match(dryRun.data.nextPrompt, /最近|这阵子|日子/u);
+  assert.match(String(dryRun.text || ""), /nextPrompt:/u);
+  assert.deepEqual(dryRun.meta.sideEffects.map((entry: { kind: string }) => entry.kind), ["write_onboarding_state"]);
+  assert.equal(fs.existsSync(path.join(fixture.stateDir, "onboarding", `${fixture.userId}.json`)), false);
+});
+
 test("onboarding status and reset keep long-term companion note intact", async () => {
   const fixture = createOnboardingFixture();
   const started = await runOnboardingStartCommand(fixture.config, ["--user", fixture.userId]);

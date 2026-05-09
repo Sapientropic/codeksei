@@ -25,6 +25,7 @@ export function selectPulseCards(
     inspection: {
       staleReasons: string[];
       pendingHandoff: { exists: boolean };
+      sourceHealth?: { thin: boolean };
     };
     previousRuns: PulseRun[];
     tasks: PulseTask[];
@@ -59,6 +60,7 @@ function scorePulseCandidate(
     inspection: {
       staleReasons: string[];
       pendingHandoff: { exists: boolean };
+      sourceHealth?: { thin: boolean };
     };
     previousRuns: PulseRun[];
     tasks: PulseTask[];
@@ -66,8 +68,10 @@ function scorePulseCandidate(
 ): PulseCard {
   const text = `${candidate.title}\n${candidate.why}\n${candidate.summary}\n${candidate.detailsMarkdown}`;
   const focusSurface = `${candidate.title}\n${candidate.topic}`;
+  const contextThin = Boolean(context.inspection.sourceHealth?.thin || context.inspection.staleReasons.length);
   const breakdown: PulseScoreBreakdown = {
-    contextThin: context.inspection.staleReasons.length ? -2 : 0,
+    activationRepair: candidate.type === "onboarding" ? 6 : 0,
+    contextThin: candidate.type === "context" && contextThin ? 5 : 0,
     focus: matchesTopic(focusSurface, context.focus) ? 4 : 0,
     negativeFeedback: resolveNegativeFeedbackScore(text, context.feedback),
     pendingHandoff: candidate.type === "handoff" || context.inspection.pendingHandoff.exists && matchesTopic(text, "handoff") ? 3 : 0,

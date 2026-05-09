@@ -59,6 +59,20 @@ test("README docs keep bilingual public discovery aligned while shared mode stay
   for (const { name, content } of readmeDocs) {
     assertSharedReadmeCliContract(content, name);
   }
+  assert.ok(readme.includes("## Agent 安装后的第一天闭环"));
+  assert.ok(readme.includes("用户不需要学习这些命令"));
+  assert.ok(readme.includes("codeksei onboarding status --user <id>"));
+  assert.ok(readme.includes("codeksei context inspect --user <id> --workspace <path>"));
+  assert.ok(readme.includes("codeksei pulse today --user <id> --workspace <path>"));
+  assert.ok(readme.includes("codeksei frame serve"));
+  assert.ok(readme.includes("codeksei review nightly"));
+  assert.ok(readmeEn.includes("## First Day Agent Loop"));
+  assert.ok(readmeEn.includes("The user does not need to learn these commands"));
+  assert.ok(readmeEn.includes("codeksei onboarding status --user <id>"));
+  assert.ok(readmeEn.includes("codeksei context inspect --user <id> --workspace <path>"));
+  assert.ok(readmeEn.includes("codeksei pulse today --user <id> --workspace <path>"));
+  assert.ok(readmeEn.includes("codeksei frame serve"));
+  assert.ok(readmeEn.includes("codeksei review nightly"));
 });
 
 test("README docs keep bilingual agent-native setup anchors aligned", () => {
@@ -68,6 +82,13 @@ test("README docs keep bilingual agent-native setup anchors aligned", () => {
 });
 
 test("docs/commands keeps public CLI examples aligned with the terminal usage source", () => {
+  assert.ok(commandsDoc.includes("## Agent 服务路径导航"));
+  assert.ok(commandsDoc.includes("这不是给终端用户背命令的清单"));
+  assert.ok(commandsDoc.includes("激活："));
+  assert.ok(commandsDoc.includes("记录："));
+  assert.ok(commandsDoc.includes("继续："));
+  assert.ok(commandsDoc.includes("收口："));
+  assert.ok(commandsDoc.includes("接入："));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("app.login", "public")));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("host.manifest", "public")));
   assert.ok(commandsDoc.includes(buildTerminalEntryUsage("host.bootstrap", "public")));

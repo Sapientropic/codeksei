@@ -92,7 +92,7 @@ export function generatePulseRun(
     createdAt: new Date().toISOString(),
     date,
     focus,
-    headline: "今天值得继续的 3 张卡片",
+    headline: buildPulseHeadline(cards.length),
     kind: "pulse_run",
     version: 1,
   };
@@ -146,6 +146,10 @@ function collectRecentPulseRuns(config: PulseConfig, date: string): PulseRun[] {
     .map((candidateDate) => readPulseRun(config, candidateDate))
     .filter((run): run is PulseRun => Boolean(run));
   return candidates;
+}
+
+function buildPulseHeadline(cardCount: number): string {
+  return `今天值得继续的 ${Math.max(0, cardCount)} 张卡片`;
 }
 
 function offsetDate(date: string, offsetDays: number): string {

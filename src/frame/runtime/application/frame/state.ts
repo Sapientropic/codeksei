@@ -66,10 +66,26 @@ function buildFrameState(config: FrameStateConfig = {}, now = new Date()): Frame
     character: {
       greeting: buildGreeting(now, timezone),
     },
+    actionAvailability: buildActionAvailability(),
     freshness: {
       updatedAt: nowIso,
       stale: warnings.length > 0,
       warnings,
+    },
+  };
+}
+
+function buildActionAvailability(): FrameState["actionAvailability"] {
+  return {
+    checkinActions: {
+      available: false,
+      endpoint: "/frame/checkin/action",
+      reason: "not wired: endpoint is present but currently returns 501",
+    },
+    reminderActions: {
+      available: false,
+      endpoint: "/frame/reminder/action",
+      reason: "not wired: endpoint is present but currently returns 501",
     },
   };
 }

@@ -13,6 +13,7 @@ const { runPulseCommand } = require("../src/app/pulse-cli");
 const { runHostManifestCommand } = require("../src/app/host-manifest-cli");
 const { getCurrentDateStringInTimezone } = require("../src/core/timezone");
 const { evaluateContextPacks } = require("../src/context/context-packs");
+const { createOnboardingStateStore } = require("../src/onboarding/state");
 
 function createGovernanceFixture(prefix: string) {
   const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -153,6 +154,33 @@ function writePendingHandoff(fixture: ReturnType<typeof createGovernanceFixture>
   });
 }
 
+function markOnboardingReady(fixture: ReturnType<typeof createGovernanceFixture>) {
+  createOnboardingStateStore(fixture.config, fixture.target.senderId).setState({
+    coverage: {
+      domains: {
+        biography: 1,
+        experiences: 1,
+        preferences: 1,
+        psychometrics: 0,
+        social_circle: 0,
+        work: 1,
+      },
+      slots: {
+        boundary: 1,
+        current_status: 1,
+        next: 1,
+        preference: 1,
+        rhythm: 1,
+      },
+    },
+    missingSlots: [],
+    sessionId: "ready-fixture",
+    status: "ready",
+    turnCount: 2,
+    updatedAt: new Date("2026-04-25T00:00:00.000Z").toISOString(),
+  });
+}
+
 test("capabilities status explains configured, available, and blocked commands", async () => {
   const fixture = createGovernanceFixture("codeksei-capabilities-");
   const result = await runCapabilitiesStatusCommand(fixture.config, [
@@ -225,6 +253,13 @@ test("context inspect reports layers, exclusions, pending handoff, redaction, an
   assert.ok(packLayer);
   assert.equal(packLayer.included, false);
   assert.match(packLayer.reason, /exclude trigger/u);
+  assert.equal(result.data.onboarding.status, "not_started");
+  assert.equal(result.data.onboarding.readyForDailyLoop, false);
+  assert.equal(result.data.sourceHealth.thin, true);
+  assert.ok(result.data.sourceHealth.missing.includes("todayDiary"));
+  assert.equal(typeof result.data.companionMemory.recentWriteCount, "number");
+  assert.match(result.text, /onboarding: not_started/u);
+  assert.match(result.text, /source health: thin/u);
   assert.doesNotMatch(result.text, new RegExp(fixture.workspaceRoot.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
 });
 
@@ -314,6 +349,7 @@ test("pulse generate keeps at most three cards, applies feedback penalties, and 
   const fixture = createGovernanceFixture("codeksei-pulse-");
   const today = writeTodayDiary(fixture);
   writePendingHandoff(fixture);
+  markOnboardingReady(fixture);
 
   await runPulseCommand(fixture.config, [
     "feedback",
@@ -356,6 +392,22 @@ test("pulse generate keeps at most three cards, applies feedback penalties, and 
 
   const todayResult = await runPulseCommand(fixture.config, ["today", "--date", today]);
   assert.equal(todayResult.data.cards.length, result.data.cards.length);
+});
+
+test("pulse prioritizes activation repair cards when onboarding and context are thin", async () => {
+  const fixture = createGovernanceFixture("codeksei-pulse-thin-");
+  const result = await runPulseCommand(fixture.config, [
+    "generate",
+    "--user", fixture.target.senderId,
+    "--workspace", fixture.target.workspaceRoot,
+    "--date", "2026-04-25",
+  ]);
+
+  assert.equal(result.data.cards.length <= 3, true);
+  assert.match(result.data.headline, new RegExp(`${result.data.cards.length} 张卡片`, "u"));
+  assert.equal(result.data.cards[0]?.type, "onboarding");
+  assert.match(`${result.data.cards[0]?.title} ${result.data.cards[0]?.why}`, /画像|onboarding|上下文/u);
+  assert.equal(result.data.cards.some((card: { type: string }) => card.type === "project"), false);
 });
 
 test("pulse generate does not leak missing-whereabouts diagnostics or local paths into visible cards", async () => {

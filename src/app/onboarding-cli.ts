@@ -5,10 +5,12 @@ import { runCliMutation } from "../core/cli-mutation";
 import { buildTerminalLeafHelp } from "../core/command-registry";
 import { normalizeText } from "../core/text-normalization";
 import {
+  describeOnboardingStatus,
   getOnboardingStatus,
   resetOnboardingState,
   startOnboardingConversation,
   stepOnboardingConversation,
+  type OnboardingStatusView,
   type OnboardingRuntimeConfig,
 } from "../onboarding/flow";
 
@@ -55,6 +57,8 @@ export async function runOnboardingStartCommand(
     };
   }
   const userId = requireUserId(options.user);
+  const state = getOnboardingStatus(config, userId);
+  const statusView = describeOnboardingStatus(config, userId, state);
   return runCliMutation<Record<string, unknown>>({
     commandKey: "onboarding.start",
     config,
@@ -65,12 +69,15 @@ export async function runOnboardingStartCommand(
     dryRun: options.dryRun,
     dryRunResult: {
       data: {
-        state: getOnboardingStatus(config, userId),
+        ...statusView,
+        state,
         userId,
       },
       text: [
         "onboarding start dry-run",
         `user: ${userId}`,
+        `nextAction: ${statusView.nextAction}`,
+        `nextPrompt: ${statusView.nextPrompt || "(none)"}`,
       ].join("\n"),
     },
     execute: async () => {
@@ -119,6 +126,7 @@ export async function runOnboardingStepCommand(
   if (!text) {
     throw new Error("onboarding step 需要输入用户最新回复，传 --text 或 --stdin。");
   }
+  const sessionId = resolveOnboardingStepSession(config, userId, options.session);
   return runCliMutation<Record<string, unknown>>({
     commandKey: "onboarding.step",
     config,
@@ -129,19 +137,19 @@ export async function runOnboardingStepCommand(
     dryRun: options.dryRun,
     dryRunResult: {
       data: {
-        sessionId: normalizeText(options.session),
+        sessionId,
         text,
         userId,
       },
       text: [
         "onboarding step dry-run",
         `user: ${userId}`,
-        `session: ${normalizeText(options.session)}`,
+        `session: ${sessionId}`,
       ].join("\n"),
     },
     execute: async () => {
       const result = await stepOnboardingConversation(config, {
-        sessionId: options.session,
+        sessionId,
         text,
         userId,
       });
@@ -158,7 +166,7 @@ export async function runOnboardingStepCommand(
     },
     idempotencyKey: normalizeText(options.idempotencyKey),
     request: {
-      sessionId: normalizeText(options.session),
+      sessionId,
       text,
       userId,
     },
@@ -192,12 +200,14 @@ export async function runOnboardingStatusCommand(
   }
   const userId = requireUserId(options.user);
   const state = getOnboardingStatus(config, userId);
+  const statusView = describeOnboardingStatus(config, userId, state);
   return {
     data: {
+      ...statusView,
       state,
       userId,
     },
-    text: renderOnboardingState(state, userId),
+    text: renderOnboardingState(state, userId, statusView),
   };
 }
 
@@ -287,18 +297,37 @@ function requireUserId(userId: string): string {
   return normalized;
 }
 
+function resolveOnboardingStepSession(
+  config: OnboardingCliConfig,
+  userId: string,
+  explicitSessionId: string,
+): string {
+  const explicit = normalizeText(explicitSessionId);
+  if (explicit) {
+    return explicit;
+  }
+  const state = getOnboardingStatus(config, userId);
+  if ((state.status === "in_progress" || state.status === "followup_needed") && state.sessionId) {
+    return state.sessionId;
+  }
+  throw new Error("当前还没有唯一 active onboarding session，请先执行 onboarding start，或显式传 --session。");
+}
+
 function renderOnboardingState(state: {
   missingSlots: string[];
   sessionId: string;
   status: string;
   turnCount: number;
   updatedAt: string;
-}, userId: string): string {
+}, userId: string, view: OnboardingStatusView): string {
   return [
     `user: ${userId}`,
     `status: ${state.status}`,
     `session: ${state.sessionId || "(none)"}`,
     `missing: ${state.missingSlots.join(", ") || "(none)"}`,
+    `nextAction: ${view.nextAction}`,
+    `nextPrompt: ${view.nextPrompt || "(none)"}`,
+    `readyForDailyLoop: ${view.readyForDailyLoop ? "yes" : "no"}`,
     `turnCount: ${state.turnCount}`,
     `updatedAt: ${state.updatedAt || "(none)"}`,
   ].join("\n");

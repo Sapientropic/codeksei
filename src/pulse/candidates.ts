@@ -26,6 +26,43 @@ export function buildPulseCandidates({
 }): PulseCandidate[] {
   const candidates: PulseCandidate[] = [];
   const whereaboutsReason = extractWhereaboutsReason(inspection);
+  if (!inspection.onboarding.readyForDailyLoop) {
+    candidates.push(createCandidate({
+      date,
+      detailsMarkdown: [
+        `onboarding status: ${inspection.onboarding.status}`,
+        inspection.onboarding.missingSlots.length ? `missing: ${inspection.onboarding.missingSlots.join(", ")}` : "",
+        inspection.onboarding.nextPrompt ? `next prompt: ${inspection.onboarding.nextPrompt}` : "",
+      ].filter(Boolean).join("\n"),
+      sourceRefs: [{ id: "onboarding.status", kind: "onboarding", title: "Onboarding Status" }],
+      suggestedPrompt: inspection.onboarding.nextPrompt
+        ? `继续 onboarding，先回答：${inspection.onboarding.nextPrompt}`
+        : "继续 onboarding，先补一条最近真实状态。",
+      summary: "陪伴画像还没补到能稳定进入日常循环。",
+      title: "先把陪伴画像补到能日常接住",
+      topic: "onboarding repair",
+      type: "onboarding",
+      why: "onboarding 还没完成，先补画像比假装已有充分上下文更稳。",
+    }, { localPaths }));
+  }
+  if (inspection.sourceHealth.thin) {
+    candidates.push(createCandidate({
+      date,
+      detailsMarkdown: [
+        inspection.sourceHealth.missing.length ? `missing sources: ${inspection.sourceHealth.missing.join(", ")}` : "",
+        inspection.sourceHealth.staleReasons.length ? inspection.sourceHealth.staleReasons.map((reason) => `- ${formatPulseStaleReason(reason)}`).join("\n") : "",
+      ].filter(Boolean).join("\n"),
+      sourceRefs: [{ id: "context.inspect", kind: "context_inspector", title: "Context Inspector" }],
+      suggestedPrompt: inspection.sourceHealth.missing.includes("todayDiary")
+        ? "帮我写一条今天事实，先把 context board 接回现实。"
+        : "帮我补齐当前 context board 里最薄的一块来源。",
+      summary: "[⚠️ 需确认] 当前上下文偏薄，先补来源比继续推进更稳。",
+      title: inspection.sourceHealth.missing.includes("todayDiary") ? "先写一条今日事实" : "补齐偏薄的上下文来源",
+      topic: "context thin",
+      type: "context",
+      why: "context inspect 标记了缺失来源，继续前应先确认事实。",
+    }, { localPaths }));
+  }
   if (focus) {
     candidates.push(createCandidate({
       date,
@@ -73,7 +110,7 @@ export function buildPulseCandidates({
       why: "当前有子会话留下的 proactive handoff，主会话应先处理它。",
     }, { localPaths }));
   }
-  if (inspection.stateCard.easiestReentryStep || inspection.stateCard.activeThread) {
+  if (!inspection.sourceHealth.thin && inspection.onboarding.readyForDailyLoop && (inspection.stateCard.easiestReentryStep || inspection.stateCard.activeThread)) {
     candidates.push(createCandidate({
       date,
       detailsMarkdown: [
@@ -121,7 +158,7 @@ export function buildPulseCandidates({
     type: "capability",
     why: "这能防止把“配置启用”误判成“当前会话可用”。",
   }, { localPaths }));
-  if (inspection.staleReasons.length) {
+  if (inspection.staleReasons.length && !inspection.sourceHealth.thin) {
     candidates.push(createCandidate({
       date,
       detailsMarkdown: inspection.staleReasons.map((reason) => `- ${formatPulseStaleReason(reason)}`).join("\n"),

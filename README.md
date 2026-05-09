@@ -14,6 +14,7 @@
   <p><strong>把 timeline、diary、reminders、reviews 和 project continuity 收口进同一个本地优先 companion core，再按需要挂到不同宿主桥上。</strong></p>
   <p>它不是一个只会等你开口的聊天框，也不是另一套 agent runtime。Codeksei 会在合适的时候帮你补记录、接回线索、留提醒、带你重新进入项目，也让你的状态、日志和生活痕迹尽量继续留在本地。WeChat 现在只是一个 first-party adapter，不再是唯一正门。</p>
   <p>
+    <a href="#first-day-loop">Agent 安装后的第一天闭环</a> ·
     <a href="#agent-quickstart">给 Agent</a> ·
     <a href="#setup">SETUP</a> ·
     <a href="#mode-specific-bring-up">模式化拉起</a> ·
@@ -28,7 +29,33 @@
 
 - **它是什么**：一个本地优先、`daemon-first / host-attachable` 的 companion engine；对用户是陪伴型助理，对宿主是可附着的领域层
 - **CLI contract**：`codeksei help`、`codeksei schema`、`codeksei host manifest` 是默认 discovery 面；非 TTY 默认 JSON，`stdout` 留给结果，`stderr` 留给诊断
-- **推荐开始方式**：先做通用 `SETUP`，再按 `Codex Mode`、`Claude Code Mode` 或 `Hosted Mode` 分流
+- **推荐开始方式**：让 Agent 先替用户安装并跑通第一天服务闭环；用户不需要先学习命令
+
+<a id="first-day-loop"></a>
+
+## Agent 安装后的第一天闭环
+
+用户不需要学习这些命令。理想体验是 Agent / 宿主在合适的本地环境里替用户安装、配置和执行这些入口，然后把结果转化成更好的陪伴、提醒、复盘和上下文承接。
+
+下面是 Agent/operator 的第一天服务链路，不是终端用户的上手教程。
+
+```bash
+codeksei onboarding status --user <id>
+codeksei onboarding start --user <id>
+codeksei onboarding step --user <id> --stdin
+codeksei context inspect --user <id> --workspace <path>
+codeksei pulse today --user <id> --workspace <path>
+codeksei frame serve
+codeksei review nightly
+```
+
+Agent 建议顺序：
+
+1. `onboarding status/start/step`：替用户把陪伴画像补到能进入日常循环；`step` 省略 `--session` 时会自动续接该用户唯一 active session
+2. `context inspect`：替 Agent 判断今天来源是否足够厚，尤其是 onboarding、companion memory、今日 diary 和 handoff 是否缺失
+3. `pulse today`：给 Agent 最多三张今天值得继续的卡；如果上下文薄，会先给补齐上下文的修复卡
+4. `frame serve`：给本地前台相框提供 timeline、diary、reminder、project 和 freshness 状态
+5. `review nightly`：一天结束时替用户收口，而不是把未完成事项留在聊天里
 
 <a id="agent-quickstart"></a>
 

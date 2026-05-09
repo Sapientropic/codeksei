@@ -38,6 +38,12 @@ export interface FrameCheckin {
   scheduledAt?: string;
 }
 
+export interface FrameActionState {
+  available: boolean;
+  endpoint: string;
+  reason: string;
+}
+
 export interface FrameState {
   now: string;
   timezone: string;
@@ -53,6 +59,10 @@ export interface FrameState {
   checkIn: FrameCheckin;
   character: {
     greeting: string;
+  };
+  actionAvailability: {
+    checkinActions: FrameActionState;
+    reminderActions: FrameActionState;
   };
   freshness: {
     updatedAt: string;

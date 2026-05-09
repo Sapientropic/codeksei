@@ -7,6 +7,7 @@ export const PULSE_CARD_STATUSES = [
 export const PULSE_CARD_TYPES = [
   "focus",
   "task",
+  "onboarding",
   "handoff",
   "project",
   "today",
@@ -27,6 +28,7 @@ export type PulseCardType = typeof PULSE_CARD_TYPES[number];
 export type PulseFeedbackKind = typeof PULSE_FEEDBACK_KINDS[number];
 
 export interface PulseScoreBreakdown {
+  activationRepair: number;
   contextThin: number;
   focus: number;
   negativeFeedback: number;

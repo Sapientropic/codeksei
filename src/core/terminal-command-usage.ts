@@ -41,7 +41,7 @@ const ACTION_USAGE_ARGS: Readonly<Partial<Record<CommandActionId, string>>> = Ob
   "host.finalize_checkin": `--provider hermes --user <wechat_user_id> --workspace /绝对路径 --lease <leaseId> [--result sent_message|silent|backstage_only] [--decision-id <id> --response-outcome continued --feedback-text "..."] (--next-wake-at <ISO8601> | --sleep-for ${CHECKIN_COMPLETION_SLEEP_FOR_PLACEHOLDER})`,
   "host.render": "--provider hermes --target skill [--validate]",
   "onboarding.start": "--user <wechat_user_id>",
-  "onboarding.step": "--user <wechat_user_id> --session <sessionId> [--text \"内容\" | --stdin]",
+  "onboarding.step": "--user <wechat_user_id> [--session <sessionId>] [--text \"内容\" | --stdin]",
   "onboarding.status": "--user <wechat_user_id>",
   "onboarding.reset": "--user <wechat_user_id>",
   "note.auto": "(--project <slug> | --scope <name>) --kind <kind> [--text \"内容\" | --stdin]",
