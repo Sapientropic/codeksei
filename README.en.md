@@ -494,7 +494,7 @@ More detailed references:
 
 If you maintain this repository, the current quality-gate split is:
 
-- `npm run check`: source-only guardrails and typechecks; it does not rebuild `dist/`
+- `npm run check`: source-only guardrails, typechecks, tests TS typecheck, and source-only runtime tests; it does not rebuild `dist/`. The source-only runner skips tests that must validate built `dist`, including the shared-mode long chain, timeline first-party runtime, CLI native contract, root helper smoke, dependency contract, and published runtime artifacts
 - `npm run coverage:critical`: the owner-focused coverage gate for `config`, `weixin delivery text`, `runtime turn`, and `stream delivery`; this stays in `verify`, not in `check`
 - `npm run verify`: runs `check`, then explicitly rebuilds published runtime artifacts, runs built-runtime tests, and finishes with `npm run pack:dry-run`
 - `npm run build`: use this only when you intentionally want to refresh the published runtime artifacts

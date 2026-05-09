@@ -15,10 +15,12 @@ function createTempStateDir(prefix: string): string {
 
 function createResponse(body: Buffer, {
   contentType = "application/octet-stream",
+  contentLength,
   ok = true,
   status = 200,
 }: {
   contentType?: string;
+  contentLength?: string;
   ok?: boolean;
   status?: number;
 } = {}): Response {
@@ -27,7 +29,14 @@ function createResponse(body: Buffer, {
     status,
     headers: {
       get(name: string) {
-        return String(name || "").toLowerCase() === "content-type" ? contentType : null;
+        const normalizedName = String(name || "").toLowerCase();
+        if (normalizedName === "content-type") {
+          return contentType;
+        }
+        if (normalizedName === "content-length") {
+          return contentLength ?? null;
+        }
+        return null;
       },
     },
     async arrayBuffer() {
@@ -82,6 +91,163 @@ test("persistIncomingWeixinAttachments falls back from direct urls to CDN downlo
     assert.match(result.saved[0].fileName, /^notes\.txt$/u);
     assert.match(result.saved[0].relativePath, /^inbox\/2026-04-14\//u);
     assert.equal(fs.readFileSync(result.saved[0].absolutePath, "utf8"), "downloaded from cdn");
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("persistIncomingWeixinAttachments rejects non HTTP direct urls without calling fetch", async () => {
+  const stateDir = createTempStateDir("codeksei-media-receive-url-");
+  const calls: string[] = [];
+  const originalFetch = global.fetch;
+  global.fetch = (async (input: RequestInfo | URL) => {
+    calls.push(String(input));
+    return createResponse(Buffer.from("should not download"));
+  }) as typeof fetch;
+
+  try {
+    const result = await persistIncomingWeixinAttachments({
+      attachments: [{
+        kind: "file",
+        fileName: "local-secret.txt",
+        directUrls: ["file:///C:/Users/example/secret.txt"],
+      }],
+      stateDir,
+      cdnBaseUrl: "",
+      messageId: "msg-url",
+      receivedAt: "2026-04-14T10:30:00+08:00",
+      workspaceRoot: "E:/repo/current",
+    });
+
+    assert.equal(result.saved.length, 0);
+    assert.equal(result.failed.length, 1);
+    assert.deepEqual(calls, []);
+    assert.match(result.failed[0].reason, /unsupported download URL protocol: file:/u);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("persistIncomingWeixinAttachments rejects oversized responses before reading the body", async () => {
+  const stateDir = createTempStateDir("codeksei-media-receive-size-");
+  let bodyWasRead = false;
+  const originalFetch = global.fetch;
+  global.fetch = (async () => ({
+    ok: true,
+    status: 200,
+    headers: {
+      get(name: string) {
+        if (String(name || "").toLowerCase() === "content-length") {
+          return String(26 * 1024 * 1024);
+        }
+        return null;
+      },
+    },
+    async arrayBuffer() {
+      bodyWasRead = true;
+      return Buffer.from("too large").buffer;
+    },
+  } as Response)) as typeof fetch;
+
+  try {
+    const result = await persistIncomingWeixinAttachments({
+      attachments: [{
+        kind: "file",
+        fileName: "huge.bin",
+        directUrls: ["https://cdn.example.com/huge.bin"],
+      }],
+      stateDir,
+      cdnBaseUrl: "https://cdn.example.com",
+      messageId: "msg-size",
+      receivedAt: "2026-04-14T10:45:00+08:00",
+      workspaceRoot: "E:/repo/current",
+    });
+
+    assert.equal(result.saved.length, 0);
+    assert.equal(result.failed.length, 1);
+    assert.equal(bodyWasRead, false);
+    assert.match(result.failed[0].reason, /attachment download exceeds 25 MB limit/u);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("persistIncomingWeixinAttachments cancels chunked responses that exceed the download limit", async () => {
+  const stateDir = createTempStateDir("codeksei-media-receive-stream-size-");
+  let streamWasCanceled = false;
+  const originalFetch = global.fetch;
+  global.fetch = (async () => ({
+    ok: true,
+    status: 200,
+    headers: {
+      get() {
+        return null;
+      },
+    },
+    body: new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(26 * 1024 * 1024));
+      },
+      cancel() {
+        streamWasCanceled = true;
+      },
+    }),
+  } as unknown as Response)) as typeof fetch;
+
+  try {
+    const result = await persistIncomingWeixinAttachments({
+      attachments: [{
+        kind: "file",
+        fileName: "chunked.bin",
+        directUrls: ["https://cdn.example.com/chunked.bin"],
+      }],
+      stateDir,
+      cdnBaseUrl: "https://cdn.example.com",
+      messageId: "msg-stream-size",
+      receivedAt: "2026-04-14T10:47:00+08:00",
+      workspaceRoot: "E:/repo/current",
+    });
+
+    assert.equal(result.saved.length, 0);
+    assert.equal(result.failed.length, 1);
+    assert.equal(streamWasCanceled, true);
+    assert.match(result.failed[0].reason, /attachment download exceeds 25 MB limit/u);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("persistIncomingWeixinAttachments downloads from a valid CDN reference without direct urls", async () => {
+  const stateDir = createTempStateDir("codeksei-media-receive-cdn-");
+  const calls: string[] = [];
+  const originalFetch = global.fetch;
+  global.fetch = (async (input: RequestInfo | URL) => {
+    calls.push(String(input));
+    return createResponse(Buffer.from("cdn only"), { contentType: "text/plain" });
+  }) as typeof fetch;
+
+  try {
+    const result = await persistIncomingWeixinAttachments({
+      attachments: [{
+        kind: "file",
+        fileName: "cdn-note",
+        mediaRef: {
+          encryptQueryParam: "cdn-token",
+        },
+      }],
+      stateDir,
+      cdnBaseUrl: "https://cdn.example.com/c2c/",
+      messageId: "msg-cdn",
+      receivedAt: "2026-04-14T10:50:00+08:00",
+      workspaceRoot: "E:/repo/current",
+    });
+
+    assert.equal(result.failed.length, 0);
+    assert.equal(result.saved.length, 1);
+    assert.deepEqual(calls, [
+      "https://cdn.example.com/c2c/download?encrypted_query_param=cdn-token",
+    ]);
+    assert.equal(fs.readFileSync(result.saved[0].absolutePath, "utf8"), "cdn only");
   } finally {
     global.fetch = originalFetch;
   }

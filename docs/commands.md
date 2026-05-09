@@ -569,7 +569,8 @@ maintainer 仍需额外补一次真实账号 smoke：
 这组入口现在明确分工，不再靠 `prepare` 或 pack lifecycle 偷偷刷新发布产物。
 
 - `npm run check`
-  source-only：跑 authored-source JS guard、published runtime artifact guard、其它 lint guard、源码 typecheck、tests TS typecheck；不会重建 `dist/`
+  source-only：跑 authored-source JS guard、published runtime artifact guard、其它 lint guard、源码 typecheck、tests TS typecheck，以及 `test:source-runtime`；不会重建 `dist/`
+  source-only runtime tests 会跳过必须验证 built `dist` 的入口，例如 `shared-mode-long-chain`、`timeline-first-party-runtime`、`cli-agent-native-contract`、`root-helper-smoke`、`dependency-contract`、`published-runtime-artifacts`
   这里已经直接覆盖 duplicate helper、bare empty catch、redundant `typedXxx`、`!:`、explicit `any` 等结构债 guard
 - `npm run coverage:critical`
   owner-focused + per-file coverage gate：只覆盖 `config`、`weixin delivery text`、`runtime turn`、`stream delivery` 这组关键 owner，并逐文件执行阈值；不进入 `check`

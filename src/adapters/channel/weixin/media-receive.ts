@@ -13,10 +13,17 @@ import type {
 
 const DEFAULT_INBOX_DIR = "inbox";
 const MAX_FILE_NAME_LENGTH = 120;
+const MAX_ATTACHMENT_DOWNLOAD_MIB = 25;
+const MAX_ATTACHMENT_DOWNLOAD_BYTES = MAX_ATTACHMENT_DOWNLOAD_MIB * 1024 * 1024;
 
 interface DownloadedAttachmentPayload {
   bytes: Buffer;
   contentType: string;
+}
+
+interface DownloadCandidates {
+  urls: string[];
+  rejectedReasons: string[];
 }
 
 async function persistIncomingWeixinAttachments({
@@ -107,12 +114,15 @@ async function downloadAttachmentPayload(
   cdnBaseUrl: unknown,
 ): Promise<DownloadedAttachmentPayload> {
   const candidates = buildDownloadCandidates(attachment, cdnBaseUrl);
-  if (!candidates.length) {
+  if (!candidates.urls.length) {
+    if (candidates.rejectedReasons.length) {
+      throw new Error(candidates.rejectedReasons.join("; "));
+    }
     throw new Error("attachment did not include a supported download reference");
   }
 
   let lastError: unknown = null;
-  for (const candidate of candidates) {
+  for (const candidate of candidates.urls) {
     try {
       const response = await fetch(candidate, {
         method: "GET",
@@ -125,9 +135,8 @@ async function downloadAttachmentPayload(
         continue;
       }
 
-      const arrayBuffer = await response.arrayBuffer();
       return {
-        bytes: Buffer.from(arrayBuffer),
+        bytes: await readResponseBodyWithinLimit(response),
         contentType: normalizeContentType(response.headers.get("content-type")),
       };
     } catch (error) {
@@ -138,19 +147,26 @@ async function downloadAttachmentPayload(
   throw lastError || new Error("attachment download failed");
 }
 
-function buildDownloadCandidates(attachment: IncomingWeixinAttachment, cdnBaseUrl: unknown): string[] {
+function buildDownloadCandidates(attachment: IncomingWeixinAttachment, cdnBaseUrl: unknown): DownloadCandidates {
   const candidates: string[] = [];
+  const rejectedReasons: string[] = [];
   const seen = new Set<string>();
   const directUrls = Array.isArray(attachment.directUrls) ? attachment.directUrls : [];
   for (const directUrl of directUrls) {
-    addCandidate(candidates, seen, directUrl);
+    addCandidate(candidates, rejectedReasons, seen, directUrl);
   }
 
   const encryptedQueryParam = normalizeText(attachment.mediaRef?.encryptQueryParam);
   if (encryptedQueryParam) {
-    const normalizedCdnBaseUrl = String(cdnBaseUrl || "").replace(/\/+$/g, "");
+    const normalizedCdnBaseUrl = normalizeText(cdnBaseUrl).replace(/\/+$/g, "");
+    if (!normalizedCdnBaseUrl) {
+      rejectedReasons.push("CDN base URL is required for encrypted media download");
+      return { urls: candidates, rejectedReasons };
+    }
+
     addCandidate(
       candidates,
+      rejectedReasons,
       seen,
       `${normalizedCdnBaseUrl}/download?encrypted_query_param=${encodeURIComponent(encryptedQueryParam)}`,
     );
@@ -159,22 +175,109 @@ function buildDownloadCandidates(attachment: IncomingWeixinAttachment, cdnBaseUr
     if (fileKey) {
       addCandidate(
         candidates,
+        rejectedReasons,
         seen,
         `${normalizedCdnBaseUrl}/download?encrypted_query_param=${encodeURIComponent(encryptedQueryParam)}&filekey=${encodeURIComponent(fileKey)}`,
       );
     }
   }
 
-  return candidates;
+  return { urls: candidates, rejectedReasons };
 }
 
-function addCandidate(candidates: string[], seen: Set<string>, rawUrl: unknown): void {
+function addCandidate(candidates: string[], rejectedReasons: string[], seen: Set<string>, rawUrl: unknown): void {
   const normalizedUrl = normalizeText(rawUrl);
   if (!normalizedUrl || seen.has(normalizedUrl)) {
     return;
   }
+
+  const validationError = validateDownloadUrl(normalizedUrl);
+  if (validationError) {
+    rejectedReasons.push(validationError);
+    seen.add(normalizedUrl);
+    return;
+  }
+
   seen.add(normalizedUrl);
   candidates.push(normalizedUrl);
+}
+
+function validateDownloadUrl(value: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return "unsupported download URL";
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return `unsupported download URL protocol: ${parsed.protocol}`;
+  }
+  return "";
+}
+
+async function readResponseBodyWithinLimit(response: Response): Promise<Buffer> {
+  const declaredLength = parseContentLength(response.headers.get("content-length"));
+  if (declaredLength > MAX_ATTACHMENT_DOWNLOAD_BYTES) {
+    throw new Error(formatAttachmentSizeLimitError());
+  }
+
+  if (response.body && typeof response.body.getReader === "function") {
+    return readStreamWithinLimit(response.body);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  if (arrayBuffer.byteLength > MAX_ATTACHMENT_DOWNLOAD_BYTES) {
+    throw new Error(formatAttachmentSizeLimitError());
+  }
+  return Buffer.from(arrayBuffer);
+}
+
+async function readStreamWithinLimit(body: ReadableStream<Uint8Array>): Promise<Buffer> {
+  const reader = body.getReader();
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      if (!value) {
+        continue;
+      }
+
+      totalBytes += value.byteLength;
+      // The limit is enforced while streaming so an untrusted server cannot
+      // force us into an unbounded in-memory arrayBuffer read.
+      if (totalBytes > MAX_ATTACHMENT_DOWNLOAD_BYTES) {
+        const error = new Error(formatAttachmentSizeLimitError());
+        try {
+          await reader.cancel(error);
+        } catch {
+          // The size limit has already been reached; cancellation is best effort.
+        }
+        throw error;
+      }
+      chunks.push(Buffer.from(value));
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  return Buffer.concat(chunks, totalBytes);
+}
+
+function parseContentLength(value: unknown): number {
+  if (typeof value !== "string" || !/^\d+$/u.test(value.trim())) {
+    return 0;
+  }
+  return Number(value.trim());
+}
+
+function formatAttachmentSizeLimitError(): string {
+  return `attachment download exceeds ${MAX_ATTACHMENT_DOWNLOAD_MIB} MB limit`;
 }
 
 function decodeAttachmentPayload(bytes: Buffer, attachment: IncomingWeixinAttachment, contentType: string): Buffer {

@@ -20,7 +20,7 @@
 
 当前质量基线也已经同步到结构层：
 
-- `npm run check` / `npm run verify` 默认全绿
+- `npm run check` / `npm run verify` 默认全绿；`check` 现在包含 source-only runtime tests，`verify` 会在 build 后再跑 built-runtime tests
 - `npm run coverage:critical` 现在是 verify 层的 owner-focused coverage gate，不进入 `check`
 - TS 源码侧的 CommonJS 过渡 allowlist 已清零
 - `@ts-nocheck` allowlist 已清零
@@ -28,7 +28,7 @@
 - 构建产物仍输出 CommonJS，但源码内部已经不再靠 `require / module.exports / export {}` 过渡态维持结构
 - timeline build 现在只复制非代码资产（如 CSS / examples），不再把 source runtime 整树原样复制进 `dist`
 - 跨模块共享的基础 helper 现在统一收口到 `src/contracts/text-normalization.ts`、`src/core/error-handling.ts`、`src/core/message-catalog.ts`
-- `npm run check` 现在会直接守 bare `.catch(() => {})`、重复 `normalizeText`、冗余 `typedXxx`、`!:` 和 explicit `any` 这类结构债，不再只靠 review 口头约束
+- `npm run check` 现在会直接守 bare `.catch(() => {})`、重复 `normalizeText`、冗余 `typedXxx`、`!:` 和 explicit `any` 这类结构债，并跑 source-only runtime tests；依赖 built `dist` 的 shared-mode long chain、timeline first-party runtime、CLI native contract、root helper smoke、dependency contract、published runtime artifacts 继续留给 build 后的 built-runtime gate
 - `RuntimeTurnLifecycle` 现在退回 façade，动作 / 输入准备 / runtime send 已拆到 sibling owner；后续不要把这三类逻辑再顺手耦回一个文件
 - `playwright-core` 与 `dotenv` 继续留在 runtime dependency：前者支撑公开 `timeline screenshot` 能力，后者负责 repo `.env` -> state `.env` 的两阶段加载以及 Hermes repo-local `.env` 镜像
 
