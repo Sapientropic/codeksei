@@ -25,7 +25,7 @@ test("frame state returns stable empty shape when optional sources are missing",
   assert.ok(state.freshness.warnings.includes("diary_dir_missing"));
   assert.equal(state.actionAvailability.reminderActions.available, false);
   assert.equal(state.actionAvailability.checkinActions.available, false);
-  assert.match(state.actionAvailability.reminderActions.reason, /not wired/u);
+  assert.match(state.actionAvailability.reminderActions.reason, /missing reminder queue/u);
 });
 
 test("frame state projects reminders diary and checkin into the dashboard shape", () => {
@@ -92,6 +92,6 @@ test("frame state projects reminders diary and checkin into the dashboard shape"
   assert.equal(state.reminders[0]?.text, "提醒 <script>");
   assert.equal(state.checkIn.status, "due");
   assert.equal(state.checkIn.triggerId, "trig-1");
-  assert.equal(state.actionAvailability.reminderActions.available, false);
-  assert.equal(state.actionAvailability.checkinActions.available, false);
+  assert.equal(state.actionAvailability.reminderActions.available, true);
+  assert.equal(state.actionAvailability.checkinActions.available, true);
 });

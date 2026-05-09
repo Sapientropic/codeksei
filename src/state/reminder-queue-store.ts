@@ -9,6 +9,7 @@ import {
   reminderQueueStateSchema,
   type ReminderQueueEntry,
 } from "../contracts/queue-items";
+import { normalizeText } from "../contracts/text-normalization";
 
 interface ReminderQueueState {
   reminders: ReminderQueueEntry[];
@@ -59,6 +60,46 @@ class ReminderQueueStore {
     this.state.reminders.sort(compareReminderQueueEntries);
     this.save();
     return normalized;
+  }
+
+  removeById(id: unknown): ReminderQueueEntry | null {
+    this.load();
+    const normalizedId = normalizeText(id);
+    if (!normalizedId) {
+      return null;
+    }
+    const index = this.state.reminders.findIndex((reminder) => reminder.id === normalizedId);
+    if (index < 0) {
+      return null;
+    }
+    const [removed] = this.state.reminders.splice(index, 1);
+    this.save();
+    return removed || null;
+  }
+
+  rescheduleById(id: unknown, dueAtMs: unknown): ReminderQueueEntry | null {
+    this.load();
+    const normalizedId = normalizeText(id);
+    const normalizedDueAtMs = Number(dueAtMs);
+    if (!normalizedId || !Number.isFinite(normalizedDueAtMs) || normalizedDueAtMs <= 0) {
+      return null;
+    }
+    const index = this.state.reminders.findIndex((reminder) => reminder.id === normalizedId);
+    if (index < 0) {
+      return null;
+    }
+    const existing = this.state.reminders[index];
+    if (!existing) {
+      return null;
+    }
+    const next = {
+      ...existing,
+      dueAtMs: Math.floor(normalizedDueAtMs),
+    };
+    this.state.reminders.splice(index, 1, next);
+    this.state.reminders.sort(compareReminderQueueEntries);
+    this.save();
+    return next;
   }
 
   listDue(nowMs = Date.now()): ReminderQueueEntry[] {

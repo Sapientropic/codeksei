@@ -66,7 +66,7 @@ function buildFrameState(config: FrameStateConfig = {}, now = new Date()): Frame
     character: {
       greeting: buildGreeting(now, timezone),
     },
-    actionAvailability: buildActionAvailability(),
+    actionAvailability: buildActionAvailability(config),
     freshness: {
       updatedAt: nowIso,
       stale: warnings.length > 0,
@@ -75,17 +75,19 @@ function buildFrameState(config: FrameStateConfig = {}, now = new Date()): Frame
   };
 }
 
-function buildActionAvailability(): FrameState["actionAvailability"] {
+function buildActionAvailability(config: FrameStateConfig): FrameState["actionAvailability"] {
+  const reminderQueueFile = normalizeText(config.reminderQueueFile);
+  const checkinScheduleStateFile = normalizeText(config.checkinScheduleStateFile);
   return {
     checkinActions: {
-      available: false,
+      available: Boolean(checkinScheduleStateFile),
       endpoint: "/frame/checkin/action",
-      reason: "not wired: endpoint is present but currently returns 501",
+      reason: checkinScheduleStateFile ? "" : "missing checkin schedule state config",
     },
     reminderActions: {
-      available: false,
+      available: Boolean(reminderQueueFile),
       endpoint: "/frame/reminder/action",
-      reason: "not wired: endpoint is present but currently returns 501",
+      reason: reminderQueueFile ? "" : "missing reminder queue config",
     },
   };
 }

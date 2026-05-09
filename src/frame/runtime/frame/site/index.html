@@ -752,7 +752,8 @@ const LANG = {
     checkin_due: 'check-in 时间到了', checkin_progress: 'check-in 处理中',
     checkin_next: '下次 check-in ${time}', checkin_pending: 'check-in 待调度',
     freshness_missing: '有些来源还没接上：${sources}',
-    action_unavailable: '这项动作还没接到后端',
+    action_unavailable: '当前没有可操作的本地状态',
+    checkin_no_current: '暂时没有需要处理的打卡',
     toast_write_fail: '没连上，内容还在', toast_written: '已同步到 Codeksei',
     toast_diary_saved: '记下了', toast_reminder_fail: '没连上，状态未更新',
     toast_ok: '好的', toast_checkin_fail: '没连上，状态未更新', toast_connection_fail: '还没连上相框',
@@ -786,7 +787,8 @@ const LANG = {
     checkin_due: 'Check-in time', checkin_progress: 'Check-in in progress',
     checkin_next: 'Next check-in ${time}', checkin_pending: 'Check-in pending',
     freshness_missing: 'Some sources are not connected yet: ${sources}',
-    action_unavailable: 'This action is not wired yet',
+    action_unavailable: 'No local action state is available',
+    checkin_no_current: 'No check-in needs action right now',
     toast_write_fail: 'Not synced, content kept', toast_written: 'Synced to Codeksei',
     toast_diary_saved: 'Noted', toast_reminder_fail: 'Not synced, state unchanged',
     toast_ok: 'OK', toast_checkin_fail: 'Not synced, state unchanged', toast_connection_fail: 'Not connected to Frame',
@@ -891,8 +893,8 @@ const EMPTY_STATE = {
   reminders: [], projects: [],
   checkIn: { status: "scheduled" }, character: { greeting: "" },
   actionAvailability: {
-    reminderActions: { available: false, endpoint: "/frame/reminder/action", reason: "not wired" },
-    checkinActions: { available: false, endpoint: "/frame/checkin/action", reason: "not wired" }
+    reminderActions: { available: false, endpoint: "/frame/reminder/action", reason: "missing local reminder queue" },
+    checkinActions: { available: false, endpoint: "/frame/checkin/action", reason: "missing local check-in state" }
   },
   freshness: { updatedAt: "", stale: true, warnings: ["frame_state_unavailable"] }
 };
@@ -1243,7 +1245,7 @@ function setupInteractions(){
     if(!getActionAvailability('reminderActions').available){showToast(t('action_unavailable'));return;}
     const r=await postFrameJson('/frame/reminder/action',{id:btn.dataset.id,action:btn.dataset.action});
     if(!r.ok){showToast(t('toast_reminder_fail'));return;}showToast(t('toast_ok'));
-    const pr=btn.closest('.reminder-primary');if(pr){pr.style.opacity='0.35';pr.style.pointerEvents='none';}
+    renderFrameState(r.payload?.data?.state||await loadData());
   });
 
   // Check-in overlay
@@ -1253,10 +1255,13 @@ function setupInteractions(){
     const r=await postFrameJson('/frame/checkin/action',{action:b.dataset.action,triggerId:currentFrameState.checkIn?.triggerId||''});
     if(!r.ok){showToast(t('toast_checkin_fail'));return;}ov.classList.remove('visible');
     showToast({here:t('msg_here'),later:t('msg_later'),settle:t('msg_settle'),quiet_today:t('msg_quiet')}[b.dataset.action]||t('toast_ok'));
+    renderFrameState(r.payload?.data?.state||await loadData());
   }));
   ov.addEventListener('click',e=>{if(e.target===ov)ov.classList.remove('visible');});
   document.getElementById('checkinStatus')?.addEventListener('click',()=>{
     if(!getActionAvailability('checkinActions').available){showToast(t('action_unavailable'));return;}
+    const status=currentFrameState.checkIn?.status||'scheduled';
+    if(status!=='due'&&status!=='in_progress'){showToast(t('checkin_no_current'));return;}
     ov.classList.add('visible');
   });
 
@@ -1273,8 +1278,7 @@ function setupInteractions(){
     currentLang=currentLang==='zh'?'en':'zh';localStorage.setItem('frame-lang',currentLang);applyLang();
     const p=new URLSearchParams(window.location.search);
     if(p.get('mode')==='mock') currentFrameState=currentLang==='en'?MOCK_EN:MOCK;
-    renderTimeline(currentFrameState.timeline?.slots||[]);renderDiary(currentFrameState.diary?.fragments||[],currentFrameState.diary?.todaySummary||'');
-    renderFreshness(currentFrameState.freshness||{});renderReminders(currentFrameState.reminders||[]);renderProjects(currentFrameState.projects||[]);renderCheckin(currentFrameState.checkIn||{});updateClock();
+    renderFrameState(currentFrameState);
   });
 
   // Layout toggle
@@ -1293,7 +1297,7 @@ async function postFrameJson(url,body){try{const r=await fetch(url,{method:'POST
 function getActionAvailability(key){
   const state=currentFrameState.actionAvailability||EMPTY_STATE.actionAvailability||{};
   const value=state[key]||{};
-  return {available:value.available===true, endpoint:String(value.endpoint||''), reason:String(value.reason||'not wired')};
+  return {available:value.available===true, endpoint:String(value.endpoint||''), reason:String(value.reason||'missing local action state')};
 }
 
 function renderFreshness(freshness){
@@ -1304,6 +1308,17 @@ function renderFreshness(freshness){
   if(!stale){el.textContent='';return;}
   const sources=warnings.length?warnings.join(', '):'unknown';
   el.textContent=t('freshness_missing',{sources});
+}
+
+function renderFrameState(state){
+  currentFrameState=state||EMPTY_STATE;
+  renderTimeline(currentFrameState.timeline?.slots||[]);
+  renderDiary(currentFrameState.diary?.fragments||[],currentFrameState.diary?.todaySummary||'');
+  renderFreshness(currentFrameState.freshness||{});
+  renderReminders(currentFrameState.reminders||[]);
+  renderProjects(currentFrameState.projects||[]);
+  renderCheckin(currentFrameState.checkIn||{});
+  updateClock();
 }
 
 /* ─── Data Loader ─── */
@@ -1337,12 +1352,7 @@ async function init(){
   const tb=document.getElementById('themeToggle');if(tb)tb.textContent=theme==='dark'?'☀':'☾';
   const ci=document.getElementById('characterImg');if(ci)ci.src=theme==='dark'?'../assets/character.png':'../assets/character_day.png';
   const lb=document.getElementById('layoutToggle');if(lb)lb.textContent=layout==='wide'?t('layout_wide'):t('layout_sidebar');
-  const data=await loadData();currentFrameState=data||EMPTY_STATE;
-  renderTimeline(currentFrameState.timeline?.slots||[]);
-  renderDiary(currentFrameState.diary?.fragments||[],currentFrameState.diary?.todaySummary||'');
-  renderFreshness(currentFrameState.freshness||{});
-  renderReminders(currentFrameState.reminders||[]);renderProjects(currentFrameState.projects||[]);
-  renderCheckin(currentFrameState.checkIn||{});updateClock();setupInteractions();
+  renderFrameState(await loadData());setupInteractions();
   setInterval(updateClock,30000);
   setInterval(()=>{if(getCurrentLayout()==='sidebar'){const n=new Date();document.getElementById('timelineNow').style.left=((n.getHours()+n.getMinutes()/60)/24*100)+'%';}},60000);
   window.__CODEKSEI_FRAME_READY__=true;
